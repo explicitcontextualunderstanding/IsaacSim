@@ -44,6 +44,8 @@ allowed_paths=[
 ]
 
 
+[repo_build.docker]
+enabled = false
 [repo_build]
 # List of packman projects to pull (in order)
 
@@ -64,6 +66,7 @@ fetch.pip.files_to_pull = [
   "${root}/deps/pip_cloud.toml",
 ]
 fetch.pip.licensing_enabled = false
+fetch.pip.publish_pip_cache = false
 
 # # Extensions precache
 # # This is one way to get the headers and bin files from extensions to show up... like needed in omni.sensors.nv.common
