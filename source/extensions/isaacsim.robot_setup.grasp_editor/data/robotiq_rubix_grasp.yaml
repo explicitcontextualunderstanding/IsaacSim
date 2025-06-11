@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+format: isaac_grasp
+format_version: 1.0
+
+object_frame: /cube/RubikCube
+gripper_frame: /gripper/Robotiq_2F_85
+
+grasps:
+   "grasp_0":
+      confidence: 1.0
+      position: [-0.1222831276074638, -0.0604307348412766, 0.0895302876240841]
+      orientation: {w: 0.9004798531532286, xyz: [-0.09601596004498891, 0.27552127857327746, 0.3224980535369557]}
+      cspace_position:
+         finger_joint: 0.18325994908809662
+      pregrasp_cspace_position:
+         finger_joint: 0.18325994908809662
+
+   "grasp_1":
+      confidence: 1.0
+      position: [-0.13256364870261714, -0.06671887519456805, -0.14897155140648582]
+      orientation: {w: 0.8342422246932983, xyz: [0.1769535725646071, -0.42840731993728665, 0.2986545025937998]}
+      cspace_position:
+         finger_joint: 0.1758938431739807
+      pregrasp_cspace_position:
+         finger_joint: 0.1758938431739807
+

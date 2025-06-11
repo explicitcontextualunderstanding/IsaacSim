@@ -1,0 +1,99 @@
+{
+    "IsaacComputeRTXLidarFlatScan": {
+        "version": 3,        "icon": "icons/isaac-sim.svg",
+        "description": "Accumulates full scan from the lowest elevation emitter on an RTX Lidar",
+        "language": "C++",
+        "metadata": {
+            "categories": ["Sensor"],
+            "keywords": ["rtx", "lidar", "sensor"],
+            "tooltip": "Accumulates full scan from the lowest elevation emitter on an RTX Lidar",
+            "display_name": "Compute RTX Lidar Flat Scan"
+        },
+        "categoryDefinitions": "config/CategoryDefinition.json",
+        "categories": "isaacRtxSensor",
+        "state": {"$comment": ["Internal state"]},
+        "inputs": {
+            "exec": {
+                "type": "execution",
+                "description": "The input execution port"
+            },
+            "dataPtr": {
+                "type": "uint64",
+                "description": "Pointer to LiDAR render result.",
+                "uiName": "Data Pointer",
+                "default": 0
+            },
+            "cudaDeviceIndex": {
+                "type": "int",
+                "description": "DEPRECATED - Index of the device where the data lives (-1 for host data)",
+                "default": -1
+            },
+            "bufferSize": {
+                "type": "uint64",
+                "description": "DEPRECATED - Size (in bytes) of the buffer (0 if the input is a texture)"
+            },
+            "renderProductPath": {
+                "type": "token",
+                "description": "Used to retrieve lidar configuration."
+            },
+            "cudaStream": {
+                "description" : "Cuda Stream Input",
+                "type" : "uint64",
+                "default" : 0
+            }
+        },
+        "outputs": {
+            "exec": {
+                "type": "execution",
+                "description": "Output execution triggers when lidar sensor has accumulated a full scan."
+            },
+            "horizontalFov": {
+                "type": "float",
+                "description": "Horizontal Field of View (deg)",
+                "default": 0
+            },
+            "horizontalResolution": {
+                "type": "float",
+                "description": "Increment between horizontal rays (deg)",
+                "default": 0
+            },
+            "depthRange": {
+                "type": "float[2]",
+                "description": "Range for sensor to detect a hit [min, max] (m)",
+                "default": [0, 0]
+            },
+            "rotationRate": {
+                "type": "float",
+                "description": "Rotation rate of sensor in Hz",
+                "default": 0
+            },
+            "linearDepthData":{
+                "type": "float[]",
+                "description": "Linear depth measurements from full scan, ordered by increasing azimuth (m)",
+                "memoryType": "cpu",
+                "default": []
+            },
+            "intensitiesData":{
+                "type": "uchar[]",
+                "description": "Intensity measurements from full scan, ordered by increasing azimuth",
+                "memoryType": "cpu",
+                "default": []
+            },
+            "numRows": {
+                "type": "int",
+                "description": "Number of rows in buffers",
+                "default": 1
+            },
+            "numCols": {
+                "type": "int",
+                "description": "Number of columns in buffers",
+                "default": 0
+            },
+            "azimuthRange": {
+                "type": "float[2]",
+                "description": "The azimuth range [min, max] (deg).",
+                "default": [0.0, 0.0]
+            }
+        }
+    }
+}

@@ -1,0 +1,87 @@
+{
+    "DifferentialController": {
+        "version": 1,
+        "icon": "icons/isaac-sim.svg",
+        "description": "Differential Controller",
+        "categories": ["isaacWheeledRobots"],
+        "categoryDefinitions": "config/CategoryDefinition.json",
+        "metadata": {
+            "uiName": "Differential Controller"
+        },
+        "$comment": "Use the wheel radius and the distance between the wheels to calculate the desired wheels speed when given a desired vehicle speed.",
+        "inputs": {
+            "execIn": {
+                "type": "execution",
+                "description": "The input execution"
+            },
+            "wheelRadius": {
+                "type": "double",
+                "description": "radius of the wheels",
+                "default": 0.0
+            },
+            "wheelDistance": {
+                "type": "double",
+                "description": "distance between the two wheels",
+                "default": 0.0
+            },
+            "dt": {
+                "type": "double",
+                "description": "delta time",
+                "default": 0.0
+            },
+            "maxAcceleration": {
+                "type": "double",
+                "description": "maximum linear acceleration of the robot for forward and reverse, 0.0 means not set",
+                "default": 0.0
+            },
+            "maxDeceleration": {
+                "type": "double",
+                "description": "maximum linear braking of the robot, 0.0 means not set.",
+                "default": 0.0
+            },
+            "maxAngularAcceleration": {
+                "type": "double",
+                "description": "maximum angular acceleration of the robot, 0.0 means not set",
+                "default": 0.0
+            },           
+            "maxLinearSpeed":{
+                "type": "double",
+                "description": "max linear speed allowed for vehicle, 0.0 means not set",
+                "default": 0.0
+            },
+            "maxAngularSpeed":{
+                "type": "double",
+                "description": "max angular speed allowed for vehicle, 0.0 means not set",
+                "default": 0.0
+            },
+            "maxWheelSpeed":{
+                "type": "double",
+                "description": "max wheel speed allowed, 0.0 means not set",
+                "default": 0.0
+            },
+            "linearVelocity":{
+                "type": "double",
+                "description": "desired linear velocity",
+                "metadata": {
+                    "uiName": "Desired Linear Velocity"
+                },
+                "default": 0.0
+            },
+            "angularVelocity":{
+                "type": "double",
+                "description": "desired rotation velocity",
+                "metadata": {
+                    "uiName": "Desired Angular Velocity"
+                },
+                "default": 0.0
+            }
+        },
+        "outputs":{
+            "velocityCommand":{
+                "type": "double[]",
+                "description": "velocity commands",
+                "default": [0.0, 0.0]    
+            }
+        }
+    }
+}
