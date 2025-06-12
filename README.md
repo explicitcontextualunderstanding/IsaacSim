@@ -25,11 +25,12 @@ NVIDIA Isaac Sim™ is a simulation platform built on NVIDIA Omniverse, designed
 
 - [Isaac Lab](https://docs.isaacsim.omniverse.nvidia.com/latest/isaac_lab_tutorials/index.html): GPU-accelerated framework built for reinforcement learning, imitation learning, and motion planning.
 - [ROS Bridge](https://docs.isaacsim.omniverse.nvidia.com/latest/ros2_tutorials/ros2_landing_page.html): Integration with Robot Operating System (ROS).
-- [Synthetic Data Generation](https://docs.isaacsim.omniverse.nvidia.com/latest/sdg_index.html): Collection of SDG tools
+- [Synthetic Data Generation](https://docs.isaacsim.omniverse.nvidia.com/latest/synthetic_data_generation/index.html): Collection of SDG tools
 
 ## Documentation
 
-For the latest Isaac Sim documentation, release notes, quick start, tutorials, and more, see [Isaac Sim Documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html). Follow these links to get started:
+For the latest Isaac Sim documentation, see [Isaac Sim Documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html). 
+Follow these links to get started:
 
 - [Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html)
 - [Assets](https://docs.isaacsim.omniverse.nvidia.com/latest/assets/usd_assets_overview.html)
@@ -110,6 +111,11 @@ build.bat
 
 ### 3. Run
 
+> **⚠️ Startup Time**  
+> The first time loading Isaac Sim may take up to several minutes as Extensions and Shader are loaded and cached. The subsequent startup time should be in the ranges of 10-30 seconds depending on hardware configuration.
+
+
+
 Navigate to the corresponding binary directory for your platform and run the executable.
 
 **Linux:**
@@ -124,7 +130,7 @@ cd _build/windows-x86_64/release
 isaac-sim.bat
 ```
 
-> **NOTE:** If this is your first time building Isaac Sim, you will be prompted to accept the Omniverse Licensing Terms.
+> NOTE: If this is your first time building Isaac Sim, you will be prompted to accept the Omniverse Licensing Terms.
 
 
 
