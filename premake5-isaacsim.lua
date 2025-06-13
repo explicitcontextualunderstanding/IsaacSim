@@ -163,9 +163,9 @@ function add_cuda_dependencies()
     filter { "files:**.cu", "system:windows", "configurations:release" }
     make_nvcc_command(nvccPath, nvccHostCompilerVS, "", "-allow-unsupported-compiler")
     filter { "files:**.cu", "system:linux", "configurations:debug" }
-    make_nvcc_command(nvccPath, nvccHostCompilerVS, "-fPIC -g", "-g -G")
+    make_nvcc_command(nvccPath, nvccHostCompilerVS, "-fPIC -g", "-g -G -allow-unsupported-compiler")
     filter { "files:**.cu", "system:linux", "configurations:release" }
-    make_nvcc_command(nvccPath, nvccHostCompilerVS, "-fPIC", "")
+    make_nvcc_command(nvccPath, nvccHostCompilerVS, "-fPIC", "-allow-unsupported-compiler")
     filter {}
 
     -- link against CUDA runtime static library.
