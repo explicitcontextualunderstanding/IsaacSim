@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, public-main ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, public-main ]
 
 # Concurrency control to prevent parallel runs on the same PR
 concurrency:
@@ -27,6 +27,7 @@ jobs:
         LD_LIBRARY_PATH: /usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64
         DOCKER_HOST: unix:///var/run/docker.sock
         DOCKER_TLS_CERTDIR: ""
+        OMNI_KIT_ALLOW_ROOT: 1
     container:
       image: ubuntu:22.04
       options: --gpus all --security-opt=no-new-privileges:true --privileged
