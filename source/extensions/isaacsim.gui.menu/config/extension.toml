@@ -1,5 +1,5 @@
 [package]
-version = "2.3.10"
+version = "2.3.12"
 category = "Simulation"
 title = "Isaac Sim Menus"
 description = "Menus specific to Isaac Sim"

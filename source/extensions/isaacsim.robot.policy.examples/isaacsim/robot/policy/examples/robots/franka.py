@@ -16,21 +16,16 @@
 from typing import Optional
 
 import numpy as np
-import omni
-import omni.kit.commands
-import torch
 from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.rotations import quat_to_rot_matrix
-from isaacsim.core.utils.stage import get_current_stage
-from isaacsim.core.utils.torch.transformations import tf_combine, tf_inverse, tf_vector
+from isaacsim.core.utils.prims import get_prim_at_path
+from isaacsim.core.utils.transformations import get_world_pose_from_relative
 from isaacsim.core.utils.types import ArticulationAction
 from isaacsim.robot.policy.examples.controllers import PolicyController
 from isaacsim.storage.native import get_assets_root_path
-from pxr import UsdGeom
 
 
 class FrankaOpenDrawerPolicy(PolicyController):
-    """The Franka Policy"""
+    """The Franka Open Drawer Policy. In this policy, the robot will open the top drawer of the cabinet and hold it open"""
 
     def __init__(
         self,
@@ -67,15 +62,14 @@ class FrankaOpenDrawerPolicy(PolicyController):
             policy_path + "env.yaml",
         )
 
-        self._action_scale = 0.5
+        self._action_scale = 1.0
         self._previous_action = np.zeros(9)
         self._policy_counter = 0
 
         self.cabinet = cabinet
-        self.robot_grasp_rot = np.zeros(4)
-        self.robot_grasp_pos = np.zeros(3)
-        self.drawer_grasp_rot = np.zeros(4)
-        self.drawer_grasp_pos = np.zeros(3)
+
+        self.franka_hand_prim = get_prim_at_path(self.robot.prim_path + "/panda_hand")
+        self.drawer_handle_top_prim = get_prim_at_path(self.cabinet.prim_path + "/drawer_handle_top")
 
     def _compute_observation(self):
         """
@@ -85,75 +79,35 @@ class FrankaOpenDrawerPolicy(PolicyController):
         np.ndarray -- The observation vector.
 
         """
-
-        def get_env_local_pose(xformable):
-            """Compute pose in env-local coordinates"""
-            env_pos = torch.Tensor([0, 0, 0])
-            world_transform = xformable.ComputeLocalToWorldTransform(0)
-            world_pos = world_transform.ExtractTranslation()
-            world_quat = world_transform.ExtractRotationQuat()
-
-            px = world_pos[0] - env_pos[0]
-            py = world_pos[1] - env_pos[1]
-            pz = world_pos[2] - env_pos[2]
-            qx = world_quat.imaginary[0]
-            qy = world_quat.imaginary[1]
-            qz = world_quat.imaginary[2]
-            qw = world_quat.real
-
-            return torch.tensor([px, py, pz, qw, qx, qy, qz])
-
-        stage = get_current_stage()
-        # retrieve the hand's world coordinates
-        hand_pose_w = get_env_local_pose(UsdGeom.Xformable(stage.GetPrimAtPath("/World/franka/panda_link7")))
-        self.hand_pose = hand_pose_w[0:3]
-        self.hand_rot = hand_pose_w[3:7]
-
-        # retrieve the panda fingers' world coordinates
-        lfinger_pose = get_env_local_pose(UsdGeom.Xformable(stage.GetPrimAtPath("/World/franka/panda_leftfinger")))
-        rfinger_pose = get_env_local_pose(UsdGeom.Xformable(stage.GetPrimAtPath("/World/franka/panda_rightfinger")))
-        finger_pose = torch.zeros(7)
-        finger_pose[0:3] = (lfinger_pose[0:3] + rfinger_pose[0:3]) / 2.0
-        self.finger_mid = finger_pose[0:3]
-
-        hand_pose_inv_rot, hand_pose_inv_pos = tf_inverse(self.hand_rot, self.hand_pose)
-        robot_local_grasp_pose_rot, robot_local_pose_pos = tf_combine(
-            hand_pose_inv_rot, hand_pose_inv_pos, finger_pose[3:7], self.finger_mid
+        # relative transform from the drawer handle to the drawer handle link
+        """
+        From env.yaml
+        - prim_path: /World/envs/env_.*/Cabinet/drawer_handle_top
+            name: drawer_handle_top
+            offset:
+                pos: !!python/tuple
+                - 0.305
+                - 0.0
+                - 0.01
+        """
+        drawer_world_pos, _ = get_world_pose_from_relative(
+            self.drawer_handle_top_prim, np.array([0.305, 0, 0.01]), np.array([1, 0, 0, 0])
         )
 
-        self.robot_local_grasp_pos = robot_local_pose_pos
-        self.robot_local_grasp_rot = robot_local_grasp_pose_rot
-
-        # retrieve the drawer world coordinate
-        drawer_handle_pos_w = get_env_local_pose(
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/cabinet/drawer_handle_top"))
+        # relative transform from the tool cneter to the hands
+        """
+        From env.yaml
+        - prim_path: /World/envs/env_.*/Robot/panda_hand
+            name: ee_tcp
+            offset:
+                pos: !!python/tuple
+                - 0.0
+                - 0.0
+                - 0.1034
+        """
+        robot_world_pos, _ = get_world_pose_from_relative(
+            self.franka_hand_prim, np.array([0, 0, 0.1034]), np.array([1, 0, 0, 0])
         )
-        self.drawer_pos = drawer_handle_pos_w[0:3]
-        self.drawer_rot = drawer_handle_pos_w[3:7]
-
-        finger_pose[3:7] = lfinger_pose[3:7]
-
-        # from RL training result env.yaml, we can see that drawer_handle_top frame is caulcuated in the common reference frame
-        # cabinet frame with offset below, so we need directly set offset in code.
-        # ---------------
-        # target_frames:
-        # - prim_path: /World/envs/env_.*/Cabinet/drawer_handle_top
-        # name: drawer_handle_top
-        # offset:
-        #    pos: !!python/tuple
-        #    - 0.305
-        #    - 0.0
-        #    - 0.01
-        #    rot: !!python/tuple
-        #    - 0.5
-        #    - 0.5
-        #    - -0.5
-        #    - -0.5
-        drawer_local_grasp_pose = torch.tensor([0.305, 0.0, 0.01, 0.5, 0.5, -0.5, -0.5])
-        self.drawer_local_grasp_pos = drawer_local_grasp_pose[0:3]
-        self.drawer_local_grasp_rot = drawer_local_grasp_pose[3:7]
-
-        self._compute_intermediate_values()
 
         obs = np.zeros(31)
         # Base lin pos
@@ -166,53 +120,13 @@ class FrankaOpenDrawerPolicy(PolicyController):
         obs[18:19] = self.cabinet.get_joint_positions()[self.drawer_link_idx]
         obs[19:20] = self.cabinet.get_joint_velocities()[self.drawer_link_idx]
 
-        obs[20:23] = self.drawer_grasp_pos - self.robot_grasp_pos
+        # relative distance between drawer and robot
+        obs[20:23] = drawer_world_pos - robot_world_pos
 
         # Previous Action
         obs[23:31] = self._previous_action[0:8]
 
         return obs
-
-    def _compute_grasp_transforms(
-        self,
-        hand_rot,
-        hand_pos,
-        franka_local_grasp_rot,
-        franka_local_grasp_pos,
-        drawer_rot,
-        drawer_pos,
-        drawer_local_grasp_rot,
-        drawer_local_grasp_pos,
-    ):
-        global_franka_rot, global_franka_pos = tf_combine(
-            hand_rot, hand_pos, franka_local_grasp_rot, franka_local_grasp_pos
-        )
-        global_drawer_rot, global_drawer_pos = tf_combine(
-            drawer_rot, drawer_pos, drawer_local_grasp_rot, drawer_local_grasp_pos
-        )
-
-        return global_franka_rot, global_franka_pos, global_drawer_rot, global_drawer_pos
-
-    def _compute_intermediate_values(self, env_ids=None):
-
-        if env_ids is None:
-            env_ids = 0
-
-        (
-            self.robot_grasp_rot,
-            self.robot_grasp_pos,
-            self.drawer_grasp_rot,
-            self.drawer_grasp_pos,
-        ) = self._compute_grasp_transforms(
-            self.hand_rot,
-            self.hand_pose,
-            self.robot_local_grasp_rot,
-            self.robot_local_grasp_pos,
-            self.drawer_rot,
-            self.drawer_pos,
-            self.drawer_local_grasp_rot,
-            self.drawer_local_grasp_pos,
-        )
 
     def forward(self, dt):
         """
@@ -229,9 +143,10 @@ class FrankaOpenDrawerPolicy(PolicyController):
 
         # articulation space
         # copy last item for two fingers in order to increase action size from 8 to 9
+        # finger positions are absolute positions, not relative to the default position
+        self.action[0:8] = self.action[0:8] + self.default_pos[0:8]
         action_input = np.append(self.action, self.action[-1])
-        action = ArticulationAction(joint_positions=self.default_pos + (action_input * self._action_scale))
-
+        action = ArticulationAction(joint_positions=(action_input * self._action_scale))
         # here action is size 9
         self.robot.apply_action(action)
 
@@ -241,11 +156,13 @@ class FrankaOpenDrawerPolicy(PolicyController):
         """
         Initialize the articulation interface, set up drive mode
         """
-        super().initialize(physics_sim_view=physics_sim_view, control_mode="effort")
+        super().initialize(physics_sim_view=physics_sim_view, control_mode="force", set_articulation_props=True)
 
         self.cabinet.initialize(physics_sim_view=physics_sim_view)
 
-        self.hand_link_idx = self.robot.get_dof_index("panda_joint7")
-        self.left_finger_link_idx = self.robot.get_dof_index("panda_finger_joint1")
-        self.right_finger_link_idx = self.robot.get_dof_index("panda_finger_joint2")
         self.drawer_link_idx = self.cabinet.get_dof_index("drawer_top_joint")
+
+        self.robot.set_solver_position_iteration_count(32)
+        self.robot.set_solver_velocity_iteration_count(4)
+        self.robot.set_stabilization_threshold(0)
+        self.robot.set_sleep_threshold(0)

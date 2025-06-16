@@ -26,8 +26,8 @@ class FrankaExample(BaseSample):
     def __init__(self) -> None:
         super().__init__()
         self._world_settings["stage_units_in_meters"] = 1.0
-        self._world_settings["physics_dt"] = 1.0 / 200.0
-        self._world_settings["rendering_dt"] = 1.0 / 200.0
+        self._world_settings["physics_dt"] = 1.0 / 400.0
+        self._world_settings["rendering_dt"] = 1.0 / 60.0
 
     def setup_scene(self) -> None:
 
@@ -54,7 +54,7 @@ class FrankaExample(BaseSample):
         )
 
         self.franka = FrankaOpenDrawerPolicy(
-            prim_path="/World/franka", name="franka", position=np.array([0, -0.1, 0]), cabinet=self.cabinet
+            prim_path="/World/franka", name="franka", position=np.array([0, -0, 0]), cabinet=self.cabinet
         )
 
         timeline = omni.timeline.get_timeline_interface()
@@ -70,6 +70,7 @@ class FrankaExample(BaseSample):
 
     async def setup_post_reset(self) -> None:
         self._physics_ready = False
+        self.franka.previous_action = np.zeros(9)
         await self.get_world().play_async()
 
     def on_physics_step(self, step_size) -> None:

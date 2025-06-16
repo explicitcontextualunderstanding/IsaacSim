@@ -18,7 +18,6 @@ Backend of "Add Joints and Drives"
 """
 
 import omni.usd
-import usd.schema.isaac.robot_schema as rs
 from pxr import PhysxSchema, UsdPhysics
 
 JOINT_TYPES = ["Prismatic", "Revolute", "Fixed"]  ## TODO: future suppor:  "Spherical", "D6", "Mimic"
@@ -211,7 +210,7 @@ def apply_drive_settings(joint_path, **kwargs):
     elif joint_prim.GetTypeName() == "PhysicsRevoluteJoint":
         actuator_type = "angular"
     else:
-        print("joint type not supported with drive")
+        # joint type not supported with drive
         return
 
     # first check if the drive already exists
@@ -278,7 +277,7 @@ def get_all_settings(joint_path):
     elif joint_prim.GetTypeName() == "PhysicsRevoluteJoint":
         actuator_type = "angular"
     else:
-        print("joint type not supported with drive")
+        # joint type not supported with drive
         return
     settings_dict["drive_type"] = joint_prim.GetAttribute(f"drive:{actuator_type}:physics:type")
     settings_dict["max_force"] = joint_prim.GetAttribute(f"drive:{actuator_type}:physics:maxForce")
@@ -299,13 +298,8 @@ def apply_joint_apis(robot_path):
     robot_name = robot_prim.GetName()
     # joint state api on every joint and
     joint_scope_prim = stage.GetPrimAtPath(f"/{robot_name}/Joints")
-    robot_joints = robot_prim.GetRelationship(rs.Relations.ROBOT_JOINTS.name)
 
     for joint_prim in joint_scope_prim.GetChildren():
-        # apply robot schema joint api and relationship
-        rs.ApplyJointAPI(joint_prim)
-        robot_joints.AddTarget(joint_prim.GetPath())
-
         # apply joint state api
         joint_type = joint_prim.GetTypeName()
         actuator_type = None
@@ -314,7 +308,8 @@ def apply_joint_apis(robot_path):
         elif joint_type == "PhysicsRevoluteJoint":
             actuator_type = "angular"
         else:
-            print("joint type not supported with joint state api")
+            # joint type not supported with joint state
             continue
 
-        PhysxSchema.JointStateAPI.Apply(joint_prim, actuator_type)
+        if actuator_type is not None:
+            PhysxSchema.JointStateAPI.Apply(joint_prim, actuator_type)

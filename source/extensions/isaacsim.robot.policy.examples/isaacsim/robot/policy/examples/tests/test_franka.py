@@ -38,13 +38,13 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         World.clear_instance()
         await create_new_stage_async()
         # This needs to be set so that kit updates match physics updates
-        self._physics_rate = 200
+        self._physics_rate = 400
         carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", True)
         carb.settings.get_settings().set_int("/app/runLoops/main/rateLimitFrequency", int(self._physics_rate))
         carb.settings.get_settings().set_int("/persistent/simulation/minFrameRate", int(self._physics_rate))
 
         self._physics_dt = 1 / self._physics_rate
-        self._world = World(stage_units_in_meters=1.0, physics_dt=self._physics_dt, rendering_dt=2 * self._physics_dt)
+        self._world = World(stage_units_in_meters=1.0, physics_dt=self._physics_dt, rendering_dt=10 * self._physics_dt)
         await self._world.initialize_simulation_context_async()
 
         ground_prim = get_prim_at_path("/World/defaultGroundPlane")
@@ -65,7 +65,6 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
             prim_path=cabinet_prim_path, name=cabinet_name, position=cabinet_position, orientation=cabinet_orientation
         )
 
-        self._stage = omni.usd.get_context().get_stage()
         self._timeline = omni.timeline.get_timeline_interface()
         await omni.kit.app.get_app().next_update_async()
 
@@ -92,7 +91,7 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         max_drawer_opening = 0
         drawer_link_idx = self.cabinet.get_dof_index("drawer_top_joint")
-        for i in range(150):
+        for i in range(100):
             # Step the simulation
             await omni.kit.app.get_app().next_update_async()
             drawer_joint_position = self._franka.cabinet.get_joint_positions()[drawer_link_idx]
@@ -100,15 +99,15 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
                 max_drawer_opening = drawer_joint_position
 
         # drawer is closed at 0.0 and open at 0.4, the robot should be able to open the drawer
-        # to at least 0.2
-        self.assertGreater(max_drawer_opening, 0.2)
+        # to at least 0.3
+        self.assertGreater(max_drawer_opening, 0.3)
         print("robot drawer opening passed, drawer position:", max_drawer_opening)
 
     async def spawn_franka(self, name="franka"):
         self._prim_path = "/World/" + name
 
         self._franka = FrankaOpenDrawerPolicy(
-            prim_path=self._prim_path, name=name, position=np.array([0, -0.1, 0]), cabinet=self.cabinet
+            prim_path=self._prim_path, name=name, position=np.array([0, 0, 0]), cabinet=self.cabinet
         )
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()

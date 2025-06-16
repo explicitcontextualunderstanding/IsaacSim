@@ -84,6 +84,8 @@ def create_apriltag(usd_path, shader_name, stage_path, tag_path):
 class CreateMenuExtension:
     def __init__(self, ext_id):
         self._ext_id = ext_id
+        self._menu_categories = []
+
         self.__menu_layout = [
             MenuLayout.Menu(
                 "Create",
@@ -143,12 +145,14 @@ class CreateMenuExtension:
         def create_submenu(menu_dict):
             # Handle non-nested menu items
             if "name" in menu_dict and isinstance(menu_dict["name"], str):
-                return MenuItemDescription(
-                    name=menu_dict["name"],
-                    onclick_fn=menu_dict.get("onclick_fn"),
-                    onclick_action=menu_dict.get("onclick_action"),
-                    glyph=menu_dict.get("glyph"),
-                )
+                return [
+                    MenuItemDescription(
+                        name=menu_dict["name"],
+                        onclick_fn=menu_dict.get("onclick_fn"),
+                        onclick_action=menu_dict.get("onclick_action"),
+                        glyph=menu_dict.get("glyph"),
+                    )
+                ]
 
             # Handle nested submenus recursively
             submenu_name = next(iter(menu_dict["name"]))
@@ -168,7 +172,7 @@ class CreateMenuExtension:
                         )
                     )
 
-            return MenuItemDescription(name=submenu_name, sub_menu=sub_menu_items, glyph=menu_dict.get("glyph"))
+            return [MenuItemDescription(name=submenu_name, sub_menu=sub_menu_items, glyph=menu_dict.get("glyph"))]
 
         icon_dir = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__)
         robot_icon_path = str(Path(icon_dir).joinpath("data/robot.svg"))
@@ -219,8 +223,7 @@ class CreateMenuExtension:
             "glyph": robot_icon_path,
         }
 
-        robot_menu = create_submenu(robot_menu_dict)
-        add_menu_items([robot_menu], "Create")
+        self._menu_categories.append(add_menu_items(create_submenu(robot_menu_dict), "Create"))
 
         ## Environments
         environment_menu_dict = {
@@ -256,8 +259,7 @@ class CreateMenuExtension:
             "glyph": str(Path(icon_dir).joinpath("data/environment.svg")),
         }
 
-        environment_menu = create_submenu(environment_menu_dict)
-        add_menu_items([environment_menu], "Create")
+        self._menu_categories.append(add_menu_items(create_submenu(environment_menu_dict), "Create"))
 
         ## Sensor
         sensor_sub_menu = [
@@ -267,7 +269,7 @@ class CreateMenuExtension:
         ]
         sensor_icon_path = str(Path(icon_dir).joinpath("data/sensor.svg"))
         sensor_menu = [MenuItemDescription(name="Sensors", glyph=sensor_icon_path, sub_menu=sensor_sub_menu)]
-        add_menu_items(sensor_menu, "Create")
+        self._menu_categories.append(add_menu_items(sensor_menu, "Create"))
 
         ## April Tags
         apriltag_menu_dict = {
@@ -275,8 +277,7 @@ class CreateMenuExtension:
             "onclick_action": (ext_id, "isaac_create_apriltag"),
             "glyph": str(Path(icon_dir).joinpath("data/apriltag.svg")),
         }
-        apriltag_menu = create_submenu(apriltag_menu_dict)
-        add_menu_items([apriltag_menu], "Create")
+        self._menu_categories.append(add_menu_items(create_submenu(apriltag_menu_dict), "Create"))
 
         ## add apriltag selection
         action_registry = omni.kit.actions.core.get_action_registry()
@@ -326,12 +327,10 @@ class CreateMenuExtension:
             "CREATE",
         )
 
-        self._menu_categories = [robot_menu, environment_menu, sensor_menu, apriltag_menu]
-
-    def __del__(self):
+    def shutdown(self):
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
         for menu_item in self._menu_categories:
-            remove_menu_items([menu_item], "Create")
+            remove_menu_items(menu_item, "Create")
 
         action_registry = omni.kit.actions.core.get_action_registry()
         action_registry.deregister_action(

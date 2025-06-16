@@ -18,7 +18,6 @@ from typing import Optional
 
 import numpy as np
 import omni
-import omni.kit.commands
 from isaacsim.core.utils.rotations import quat_to_rot_matrix
 from isaacsim.robot.policy.examples.controllers import PolicyController
 from isaacsim.robot.policy.examples.utils import LstmSeaNetwork

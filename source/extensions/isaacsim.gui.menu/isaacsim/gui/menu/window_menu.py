@@ -84,5 +84,5 @@ class WindowMenuExtension:
 
         add_menu_items([simulation_setting_window], "Window")
 
-    def __del__(self):
+    def shutdown(self):
         omni.kit.menu.utils.remove_layout(self.__menu_layout)

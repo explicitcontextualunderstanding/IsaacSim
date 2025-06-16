@@ -1,4 +1,8 @@
 # Changelog
+## [1.0.5] - 2025-06-13
+### Fixed
+- UI does not rebuild the whole window when modifying values
+
 ## [1.0.4] - 2025-05-31
 ### Changed
 - Use default nucleus server for all tests

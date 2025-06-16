@@ -515,9 +515,6 @@ public:
      * @param[in] azimuthRange Start (`angle_min`) and end (`angle_max`) angles of the scan in degrees.
      * @param[in] rotationRate Scan frequency in Hz (`1 / scan_time`).
      * @param[in] depthRange Minimum (`range_min`) and maximum (`range_max`) range values.
-     * @param[in] buffSize Range and intensities array sizes.
-     * @param[in] rangeData Range array.
-     * @param[in] intensitiesData Intensities array.
      * @param[in] horizontalResolution Angular distance (`angle_increment`) between measurements in degrees.
      * @param[in] horizontalFov Horizontal field of view (`360 * time_increment * ranges.size / scan_time`) in degrees.
      */

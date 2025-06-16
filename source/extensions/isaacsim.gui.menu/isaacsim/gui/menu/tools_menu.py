@@ -99,7 +99,7 @@ class ToolsMenuExtension:
                                     MenuLayout.Item(name="Differential Controller"),
                                     MenuLayout.Item(name="Joint Position"),
                                     MenuLayout.Item(name="Joint Velocity"),
-                                    MenuLayout.Item(name="Open Loop Gripper Controller"),
+                                    MenuLayout.Item(name="Open Loop Gripper"),
                                 ],
                             ),
                             MenuLayout.Item("ROS 2 OmniGraphs"),
@@ -143,5 +143,5 @@ class ToolsMenuExtension:
 
         add_menu_items([physics_inspector], "Tools")
 
-    def __del__(self):
+    def shutdown(self):
         omni.kit.menu.utils.remove_layout(self.__menu_layout)

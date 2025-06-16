@@ -12,8 +12,8 @@ Python API
     :nosignatures:
 
     CreateSurfaceGripper
-    ~_surface_gripper.Surface_Gripper_Properties
-    ~_surface_gripper.Surface_Gripper
+    GripperView
+    _surface_gripper.SurfaceGripperInterface
 
 |
 
@@ -26,13 +26,13 @@ Python API
     :show-inheritance:
     :exclude-members: do, undo
 
-.. autoclass:: isaacsim.robot.surface_gripper._surface_gripper.Surface_Gripper_Properties
+.. autoclass:: isaacsim.robot.surface_gripper._surface_gripper.SurfaceGripperInterface
     :members:
     :undoc-members:
     :inherited-members:
     :show-inheritance:
 
-.. autoclass:: isaacsim.robot.surface_gripper._surface_gripper.Surface_Gripper
+.. autoclass:: isaacsim.robot.surface_gripper.GripperView
     :members:
     :undoc-members:
     :inherited-members:

@@ -41,6 +41,7 @@ class TestSDGUsefulSnippetsSimready(omni.kit.test.AsyncTestCase):
         import omni.replicator.core as rep
         import omni.timeline
         import omni.usd
+        from isaacsim.core.utils.semantics import upgrade_prim_semantics_to_labels
         from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics
 
         # Make sure the simready explorer extension is enabled
@@ -56,7 +57,7 @@ class TestSDGUsefulSnippetsSimready(omni.kit.test.AsyncTestCase):
                 actions.execute_action("omni.simready.explorer", "toggle_window")
 
         async def search_assets_async():
-            print(f"\tSearching for simready assets...")
+            print(f"Searching for simready assets...")
             tables = await sre.find_assets(["table", "furniture"])
             plates = await sre.find_assets(["plate"])
             bowls = await sre.find_assets(["bowl"])
@@ -67,22 +68,21 @@ class TestSDGUsefulSnippetsSimready(omni.kit.test.AsyncTestCase):
             return tables, dishes, items
 
         async def run_simready_randomization_async(stage, camera_prim, render_product, tables, dishes, items):
-            print(f"Creating new temp layer")
+            print(f"Creating new temp layer for randomizing the scene...")
             simready_temp_layer = Sdf.Layer.CreateAnonymous("TempSimreadyLayer")
             session = stage.GetSessionLayer()
             session.subLayerPaths.append(simready_temp_layer.identifier)
+
             with Usd.EditContext(stage, simready_temp_layer):
                 # Load the simready assets with rigid body properties
                 variants = {"PhysicsVariant": "RigidBody"}
 
                 # Choose a random table from the list of tables and add it to the stage with physics
                 table_asset = random.choice(tables)
+                print(f"\tAdding table '{table_asset.name}' with colliders and disabled rigid body properties")
                 _, table_prim_path = sre.add_asset_to_stage(table_asset.main_url, variants=variants, payload=True)
-                print(f"\tAdded '{table_asset.name}'")
-
-                print(f"\tDisabling rigid body properties and keeping only colliders...")
-                # Disable the rigid body properties and keep only the colliders
                 table_prim = stage.GetPrimAtPath(table_prim_path)
+                upgrade_prim_semantics_to_labels(table_prim)
                 if not table_prim.HasAPI(UsdPhysics.RigidBodyAPI):
                     rigid_body_api = UsdPhysics.RigidBodyAPI.Apply(table_prim)
                 else:
@@ -97,31 +97,38 @@ class TestSDGUsefulSnippetsSimready(omni.kit.test.AsyncTestCase):
                 # Choose one random plate from the list of plates
                 dish_asset = random.choice(dishes)
                 _, dish_prim_path = sre.add_asset_to_stage(dish_asset.main_url, variants=variants, payload=True)
-                print(f"\tAdded '{dish_asset.name}'")
+
+                dish_prim = stage.GetPrimAtPath(dish_prim_path)
+                upgrade_prim_semantics_to_labels(dish_prim)
 
                 # Compute the height of the plate from its bounding box
-                dish_prim = stage.GetPrimAtPath(dish_prim_path)
                 dish_bbox = bbox_cache.ComputeWorldBound(dish_prim)
                 dish_size = dish_bbox.GetRange().GetSize()
 
-                # Get a random position for the plate on the table using the two sizes
-                dish_x = random.uniform(-table_size[0] / 2 + dish_size[0] / 2, table_size[0] / 2 - dish_size[0] / 2)
-                dish_y = random.uniform(-table_size[1] / 2 + dish_size[1] / 2, table_size[1] / 2 - dish_size[1] / 2)
+                # Get a random position for the plate near the center of the table
+                placement_reduction = 0.75
+                x_range = (table_size[0] - dish_size[0]) / 2 * placement_reduction
+                y_range = (table_size[1] - dish_size[1]) / 2 * placement_reduction
+                dish_x = random.uniform(-x_range, x_range)
+                dish_y = random.uniform(-y_range, y_range)
                 dish_z = table_size[2] + dish_size[2] / 2
 
                 # Move the plate to the random position on the table
-                dish_prim.GetAttribute("xformOp:translate").Set(Gf.Vec3f(dish_x, dish_y, dish_z))
+                dish_location = Gf.Vec3f(dish_x, dish_y, dish_z)
+                dish_prim.GetAttribute("xformOp:translate").Set(dish_location)
+                print(f"\tAdded '{dish_asset.name}' at: {dish_location}")
 
-                # Spawn a random number of items
+                # Spawn a random number of items above the plate
                 num_items = random.randint(2, 4)
+                print(f"\tAdding {num_items} items above the plate '{dish_asset.name}':")
                 item_prims = []
                 for _ in range(num_items):
                     item_asset = random.choice(items)
                     _, item_prim_path = sre.add_asset_to_stage(item_asset.main_url, variants=variants, payload=True)
-                    item_prims.append(stage.GetPrimAtPath(item_prim_path))
-                print(f"\tAdded {[item.GetName() for item in item_prims]}")
+                    item_prim = stage.GetPrimAtPath(item_prim_path)
+                    upgrade_prim_semantics_to_labels(item_prim)
+                    item_prims.append(item_prim)
 
-                # Move the items on top of each other above the plate
                 current_z = dish_z
                 xy_offset = dish_size[0] / 4
                 for item_prim in item_prims:
@@ -130,40 +137,40 @@ class TestSDGUsefulSnippetsSimready(omni.kit.test.AsyncTestCase):
                     item_x = dish_x + random.uniform(-xy_offset, xy_offset)
                     item_y = dish_y + random.uniform(-xy_offset, xy_offset)
                     item_z = current_z + item_size[2] / 2
-                    item_prim.GetAttribute("xformOp:translate").Set(Gf.Vec3f(item_x, item_y, item_z))
+                    item_location = Gf.Vec3f(item_x, item_y, item_z)
+                    item_prim.GetAttribute("xformOp:translate").Set(item_location)
+                    print(f"\t\t'{item_prim.GetName()}' at: {item_location}")
                     current_z += item_size[2]
 
-                # Run the simulation for several frames for the items to settle
-                print(f"\tRunning the simulation for the items to settle...")
+                num_sim_steps = 25
+                print(f"\tRunning the simulation for {num_sim_steps} steps for the items to settle...")
                 timeline = omni.timeline.get_timeline_interface()
                 timeline.play()
-                for _ in range(25):
+                for _ in range(num_sim_steps):
                     await omni.kit.app.get_app().next_update_async()
                 print(f"\tPausing the simulation")
                 timeline.pause()
 
-                # Move the camera above the dish
-                print(f"\tMoving the camera above the dish and capturing the scene...")
+                print(f"\tMoving the camera above the scene to capture the scene...")
                 camera_prim.GetAttribute("xformOp:translate").Set(Gf.Vec3f(dish_x, dish_y, dish_z + 2))
-
-                # Toggle the render product and capture the scene
                 render_product.hydra_texture.set_updates_enabled(True)
                 await rep.orchestrator.step_async(delta_time=0.0, rt_subframes=16)
                 render_product.hydra_texture.set_updates_enabled(False)
-                print("\tStoping the timeline")
-                timeline.stop()
+                await omni.kit.app.get_app().next_update_async()
 
+            print("\tStopping the timeline")
+            timeline.stop()
             await omni.kit.app.get_app().next_update_async()
+
+            print(f"\tRemoving the temp layer")
             session.subLayerPaths.remove(simready_temp_layer.identifier)
             simready_temp_layer = None
-            print(f"\tRemoved the temp layer")
 
         async def run_simready_randomizations_async(num_scenarios):
             await omni.usd.get_context().new_stage_async()
             stage = omni.usd.get_context().get_stage()
             rep.orchestrator.set_capture_on_play(False)
-            random.seed(8)
-            rep.set_global_seed(8)
+            random.seed(15)
 
             # Add lights to the scene
             dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
@@ -183,7 +190,7 @@ class TestSDGUsefulSnippetsSimready(omni.kit.test.AsyncTestCase):
 
             # Create the writer and the render product for capturing the scene
             output_dir = os.path.join(os.getcwd(), "_out_simready_assets")
-            print(f"\tWriting to {output_dir}...")
+            print(f"\tInitializing writer, output directory: {output_dir}...")
             writer = rep.writers.get("BasicWriter")
             writer.initialize(output_dir=output_dir, rgb=True)
 

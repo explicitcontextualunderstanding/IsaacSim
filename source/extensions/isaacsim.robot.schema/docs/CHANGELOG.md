@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.5.1] - 2025-06-12
+### Changed
+- Get extension path using `os` module since carb tokens can not be resolved by Sphinx
+
 ## [3.5.0] - 2025-05-30
 ### Changed
 - Added Isaac prefix to Robot Schema classes

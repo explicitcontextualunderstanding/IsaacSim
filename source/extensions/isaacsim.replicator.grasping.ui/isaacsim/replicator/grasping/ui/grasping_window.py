@@ -108,7 +108,16 @@ class GraspingWindow(ui.Window):
         # Overwrite results output files if they exist
         self._overwrite_results = False
 
+        # UI containers for partial rebuilds
+        self._simulation_frame_container = None
+        self._gripper_frame_container = None
+        self._object_frame_container = None
+        self._workflow_frame_container = None
+        self._config_frame_container = None
+        self._ui_initialized = False
+
         # Build the UI
+        self._build_window_ui()
         asyncio.ensure_future(self._build_window_ui_async())
 
     def destroy(self):
@@ -117,6 +126,12 @@ class GraspingWindow(ui.Window):
         self._stage_update = None
         self._stage_subscription = None
         self._grasping_manager = None
+        self._simulation_frame_container = None
+        self._gripper_frame_container = None
+        self._object_frame_container = None
+        self._workflow_frame_container = None
+        self._config_frame_container = None
+        self._ui_initialized = False
         super().destroy()
 
     def _clear(self):
@@ -152,17 +167,57 @@ class GraspingWindow(ui.Window):
     # Main UI Building Methods
     # ==============================================================================
     def _build_window_ui(self):
+        if self._ui_initialized:
+            return
+
         with self.frame:
             with ui.ScrollingFrame():
                 with ui.VStack(spacing=5):
-                    self._build_simulation_frame()
-                    self._build_gripper_frame()
-                    self._build_object_frame()
-                    self._build_workflow_frame()
-                    self._build_config_frame()
+                    self._simulation_frame_container = ui.VStack()
+                    self._gripper_frame_container = ui.VStack()
+                    self._object_frame_container = ui.VStack()
+                    self._workflow_frame_container = ui.VStack()
+                    self._config_frame_container = ui.VStack()
+        self._ui_initialized = True
 
     async def _build_window_ui_async(self):
-        self._build_window_ui()
+        await asyncio.gather(
+            self._rebuild_simulation_frame_async(),
+            self._rebuild_gripper_frame_async(),
+            self._rebuild_object_frame_async(),
+            self._rebuild_workflow_frame_async(),
+            self._rebuild_config_frame_async(),
+        )
+
+    async def _rebuild_simulation_frame_async(self):
+        if self._simulation_frame_container:
+            self._simulation_frame_container.clear()
+            with self._simulation_frame_container:
+                self._build_simulation_frame()
+
+    async def _rebuild_gripper_frame_async(self):
+        if self._gripper_frame_container:
+            self._gripper_frame_container.clear()
+            with self._gripper_frame_container:
+                self._build_gripper_frame()
+
+    async def _rebuild_object_frame_async(self):
+        if self._object_frame_container:
+            self._object_frame_container.clear()
+            with self._object_frame_container:
+                self._build_object_frame()
+
+    async def _rebuild_workflow_frame_async(self):
+        if self._workflow_frame_container:
+            self._workflow_frame_container.clear()
+            with self._workflow_frame_container:
+                self._build_workflow_frame()
+
+    async def _rebuild_config_frame_async(self):
+        if self._config_frame_container:
+            self._config_frame_container.clear()
+            with self._config_frame_container:
+                self._build_config_frame()
 
     def _rebuild_ui_if_joints_changed(self):
         had_joints = bool(self._joint_ui_data)
@@ -173,7 +228,9 @@ class GraspingWindow(ui.Window):
         self._sync_phase_joints_with_ui_selection()
 
         if had_joints or self._joint_ui_data:
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(
+                asyncio.gather(self._rebuild_gripper_frame_async(), self._rebuild_workflow_frame_async())
+            )
 
     # ==============================================================================
     # Gripper UI Building and Logic
@@ -1013,7 +1070,9 @@ class GraspingWindow(ui.Window):
         else:
             self._clear_gripper_joints()
             # Ensure UI (like start button) updates even if gripper set fails
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(
+                asyncio.gather(self._rebuild_gripper_frame_async(), self._rebuild_workflow_frame_async())
+            )
 
     def _on_include_joint_in_grasp_changed(self, model, joint_data):
         if joint_data["is_valid_grasp_joint"]:
@@ -1031,7 +1090,7 @@ class GraspingWindow(ui.Window):
                     if not phase.has_joint(absolute_path):
                         phase.add_joint(absolute_path)
 
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(self._rebuild_gripper_frame_async())
 
     def _on_set_joint_pregrasp_state(self, model, joint_path):
         position_value = model.get_value_as_float()
@@ -1041,16 +1100,16 @@ class GraspingWindow(ui.Window):
     def _on_move_grasp_phase_up(self, phase_name):
         """Move a grasp phase up in the sequence (earlier execution)."""
         if grasping_ui_utils.move_grasp_phase_up(self._grasping_manager, phase_name):
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(self._rebuild_gripper_frame_async())
 
     def _on_move_grasp_phase_down(self, phase_name):
         """Move a grasp phase down in the sequence (later execution)."""
         if grasping_ui_utils.move_grasp_phase_down(self._grasping_manager, phase_name):
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(self._rebuild_gripper_frame_async())
 
     def _on_delete_grasp_phase(self, phase_name):
         if self._grasping_manager.remove_grasp_phase_by_name(phase_name):
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(self._rebuild_gripper_frame_async())
         else:
             carb.log_warn(f"Grasp phase '{phase_name}' not found.")
 
@@ -1069,12 +1128,12 @@ class GraspingWindow(ui.Window):
         # Create and add the new phase to the manager
         self._grasping_manager.create_and_add_grasp_phase(name=self._new_grasp_phase_name)
         self._new_grasp_phase_name = ""
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(self._rebuild_gripper_frame_async())
 
     # --- Object Event Handlers ---
     def _on_object_path_changed(self, model):
         self._grasping_manager.set_object_prim_path(model.as_string)
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(asyncio.gather(self._rebuild_object_frame_async(), self._rebuild_workflow_frame_async()))
 
     def _on_num_candidates_changed(self, model):
         self._grasping_manager.sampler_config["num_candidates"] = model.as_int
@@ -1120,14 +1179,16 @@ class GraspingWindow(ui.Window):
             config["random_seed"] = None
 
         self._grasping_manager.generate_grasp_poses(config)
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(asyncio.gather(self._rebuild_object_frame_async(), self._rebuild_workflow_frame_async()))
 
     def _on_clear_grasp_poses(self):
         """Clear the generated grasp poses from the manager."""
         if self._grasping_manager:
             self._grasping_manager.clear_grasp_poses()
             grasping_ui_utils.clear_debug_draw()
-            asyncio.ensure_future(self._build_window_ui_async())
+            asyncio.ensure_future(
+                asyncio.gather(self._rebuild_object_frame_async(), self._rebuild_workflow_frame_async())
+            )
 
     # --- Visualization Event Handlers ---
     def _on_visualize_grasp_poses(self) -> bool:
@@ -1172,7 +1233,7 @@ class GraspingWindow(ui.Window):
 
         self._current_grasp_pose_idx = (self._current_grasp_pose_idx - 1 + total_poses) % total_poses
         self._grasping_manager.move_gripper_to_grasp_pose(self._current_grasp_pose_idx, in_world_frame=True)
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(self._rebuild_object_frame_async())
 
     def _on_next_grasp_pose(self):
         gripper_path = self._grasping_manager.gripper_path
@@ -1188,7 +1249,7 @@ class GraspingWindow(ui.Window):
 
         self._current_grasp_pose_idx = (self._current_grasp_pose_idx + 1) % total_poses
         self._grasping_manager.move_gripper_to_grasp_pose(self._current_grasp_pose_idx, in_world_frame=True)
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(self._rebuild_object_frame_async())
 
     def _on_reset_grasp_pose(self):
         self._current_grasp_pose_idx = 0
@@ -1199,7 +1260,7 @@ class GraspingWindow(ui.Window):
             origin_location = Gf.Vec3d(0, 0, 0)
             origin_orientation = Gf.Quatd(1, 0, 0, 0)
             self._grasping_manager.set_gripper_pose(origin_location, origin_orientation)
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(self._rebuild_object_frame_async())
 
     # --- Simulation Event Handlers ---
     def _on_simulation_steps_changed(self, model, phase_name):
@@ -1235,7 +1296,7 @@ class GraspingWindow(ui.Window):
         if not success:
             carb.log_warn(f"Simulation of phase '{phase_identifier}' failed.")
 
-        asyncio.ensure_future(self._build_window_ui_async())
+        asyncio.ensure_future(self._rebuild_gripper_frame_async())
 
     def _on_reset_simulation(self):
         self._grasping_manager.clear_simulation(simulate_using_timeline=self._simulate_using_timeline)
@@ -1250,7 +1311,7 @@ class GraspingWindow(ui.Window):
         )
         if not success:
             carb.log_warn("Simulation failed.")
-        self._build_window_ui()
+        asyncio.ensure_future(self._rebuild_gripper_frame_async())
 
     # --- Workflow Event Handlers ---
     def _on_num_grasps_to_evaluate_changed(self, model):
@@ -1262,7 +1323,7 @@ class GraspingWindow(ui.Window):
             return
 
         self._is_workflow_running = True
-        await self._build_window_ui_async()
+        await self._rebuild_workflow_frame_async()
 
         if self._grasping_manager.get_initial_gripper_pose() is None:
             self._grasping_manager.store_initial_gripper_pose()
@@ -1272,7 +1333,7 @@ class GraspingWindow(ui.Window):
             self._is_workflow_running = False
             self._current_evaluated_grasp_idx = 0
             self._on_reset_grasp_pose()
-            await self._build_window_ui_async()
+            await self._rebuild_workflow_frame_async()
             return
 
         total = len(self._grasping_manager.grasp_locations)
@@ -1296,14 +1357,14 @@ class GraspingWindow(ui.Window):
             self._is_workflow_running = False
             self._current_evaluated_grasp_idx = 0
             self._on_reset_grasp_pose()
-            await self._build_window_ui_async()
+            await self._rebuild_workflow_frame_async()
             return
 
         scene_path_to_use = None
         if self._physics_scene_path:
             if not Sdf.Path.IsValidPathString(self._physics_scene_path):
                 carb.log_warn(f"Custom physics scene path is not valid: {self._physics_scene_path}")
-                await self._build_window_ui_async()
+                await self._rebuild_workflow_frame_async()
                 return
             scene_path_to_use = self._physics_scene_path
 
@@ -1344,7 +1405,7 @@ class GraspingWindow(ui.Window):
             # Reset counters and gripper position if workflow stopped or completed
             self._current_evaluated_grasp_idx = 0
             self._on_reset_grasp_pose()  # Resets self._current_grasp_pose_idx and moves gripper
-            await self._build_window_ui_async()
+            await self._rebuild_workflow_frame_async()
 
     # --- Config Event Handlers ---
     def _on_config_path_changed(self, model):
@@ -1408,17 +1469,26 @@ class GraspingWindow(ui.Window):
 
         carb.log_info("\n".join(status_log_lines))
 
-        sampler_config_loaded_ui = "sampler" in successful_loads
-
         if "pregrasp" in successful_loads and self._grasping_manager.joint_pregrasp_states:
             carb.log_info("Applying loaded pregrasp joint states...")
             grasping_utils.apply_joint_pregrasp_states(self._grasping_manager.joint_pregrasp_states)
 
-        if any(comp in successful_loads for comp in ["gripper", "phases", "pregrasp"]):
-            self._rebuild_ui_if_joints_changed()
+        needs_gripper_rebuild = any(comp in successful_loads for comp in ["gripper", "phases", "pregrasp"])
+        needs_object_rebuild = any(comp in successful_loads for comp in ["object", "poses", "sampler"])
+
+        if needs_gripper_rebuild:
+            # Rebuilds the joints UI to reload joint info and rebuild gripper/workflow frames.
             self._update_ui_joint_selection_from_loaded_phases()
-        elif any(comp in successful_loads for comp in ["object", "poses"]) or sampler_config_loaded_ui:
-            asyncio.ensure_future(self._build_window_ui_async())
+
+        if needs_object_rebuild:
+            if needs_gripper_rebuild:
+                # Rebuild the object frame, workflow frame is already being rebuilt.
+                asyncio.ensure_future(self._rebuild_object_frame_async())
+            else:
+                # Rebuild object and workflow frames.
+                asyncio.ensure_future(
+                    asyncio.gather(self._rebuild_object_frame_async(), self._rebuild_workflow_frame_async())
+                )
 
     # --- General UI Event Handlers ---
     def _on_set_field_from_selection(self, model):

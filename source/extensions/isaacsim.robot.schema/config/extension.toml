@@ -4,7 +4,7 @@ reloadable = false
 order = -100
 
 [package]
-version = "3.5.0"
+version = "3.5.1"
 category = "Simulation"
 title = "Isaac USD schema"
 description="Extension used to host all USD schemas made for robots. Provides the generated schema USDA. and a few utility functions used for informal schemas."

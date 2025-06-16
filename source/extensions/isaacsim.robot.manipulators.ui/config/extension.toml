@@ -1,5 +1,5 @@
 [package]
-version = "2.1.16"
+version = "2.1.18"
 category = "Simulation"
 title = "Isaac Sim Manipulators UI"
 description = "Manipulators"
@@ -13,6 +13,7 @@ writeTarget.kit = true
 [dependencies]
 "isaacsim.core.api" = {}
 "isaacsim.robot.manipulators" = {}
+"isaacsim.gui.components" = {}
 "omni.kit.menu.utils" = {}
 
 [[python.module]]

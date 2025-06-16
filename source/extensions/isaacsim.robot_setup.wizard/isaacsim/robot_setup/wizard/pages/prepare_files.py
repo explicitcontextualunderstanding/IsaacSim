@@ -129,9 +129,7 @@ class PrepareFiles:
                             ui.Spacer(height=10)
                             with ui.VStack(height=0):
                                 with ui.HStack(height=0):
-                                    self._save_current_stage_widget_frame = ui.Frame(
-                                        visible=self._current_stage_is_unsaved
-                                    )
+                                    self._save_current_stage_widget_frame = ui.Frame(visible=False, width=600)
                                     with self._save_current_stage_widget_frame:
                                         with ui.HStack(height=0):
                                             ui.Label("Overwrite Current Stage File", width=0)
@@ -201,9 +199,10 @@ class PrepareFiles:
                     # step 4: inform users about the robot files that will be saved
                     self._robot_files_frame = ui.Frame(visible=True, height=0)
 
-                    robot_file_msg = f"Main Robot File - Contains all variants:"
-                    base_file_msg = f"Base File - Minimum Robot Definition:"
-                    physics_file_msg = f"Physics File - Includes Physics Rigging:"
+                    robot_file_msg = f"Main Robot File"
+                    base_file_msg = f"Base File"
+                    physics_file_msg = f"Physics File"
+                    robot_schema_file_msg = f"Robot Schema File"
                     # current_stage_msg = f"Current Stage Saved At:"
 
                     with self._robot_files_frame:
@@ -220,21 +219,27 @@ class PrepareFiles:
                             ui.Spacer(height=10)
                             with ui.HStack(height=0):
                                 ui.Spacer(width=15)
-                                ui.Label(robot_file_msg, width=300)
+                                ui.Label(robot_file_msg, width=160)
                                 ui.Spacer(width=5)
                                 self._robot_file_path_label = ui.Label("", width=0)
                             ui.Spacer(height=5)
                             with ui.HStack(height=0):
                                 ui.Spacer(width=15)
-                                ui.Label(base_file_msg, width=300)
+                                ui.Label(base_file_msg, width=160)
                                 ui.Spacer(width=5)
                                 self._base_file_path_label = ui.Label("", width=0)
                             ui.Spacer(height=5)
                             with ui.HStack(height=0):
                                 ui.Spacer(width=15)
-                                ui.Label(physics_file_msg, width=300)
+                                ui.Label(physics_file_msg, width=160)
                                 ui.Spacer(width=5)
                                 self._physics_file_path_label = ui.Label("", width=0)
+                            ui.Spacer(height=5)
+                            with ui.HStack(height=0):
+                                ui.Spacer(width=15)
+                                ui.Label(robot_schema_file_msg, width=160)
+                                ui.Spacer(width=5)
+                                self._robot_schema_file_path_label = ui.Label("", width=0)
                             # ui.Spacer(height=5)
                             # with ui.HStack(height=0):
                             #     ui.Spacer(width=15)
@@ -272,6 +277,7 @@ class PrepareFiles:
         current_stage_path = self._current_stage_path_widget.model.get_value_as_string()
         base_file_path = os.path.join(robot_root_folder, "configurations", robot_name + "_base.usd")
         physics_file_path = os.path.join(robot_root_folder, "configurations", robot_name + "_physics.usd")
+        robot_schema_file_path = os.path.join(robot_root_folder, "configurations", robot_name + "_robot.usd")
         robot_file_path = os.path.join(robot_root_folder, robot_name + ".usd")
         stage_copy_path = os.path.join(robot_root_folder, "stage_copy.usd")
 
@@ -279,6 +285,7 @@ class PrepareFiles:
 
         self._base_file_path_label.text = base_file_path
         self._physics_file_path_label.text = physics_file_path
+        self._robot_schema_file_path_label.text = robot_schema_file_path
         self._robot_file_path_label.text = robot_file_path
         # self._current_stage_path_label.text = current_stage_path
 
@@ -296,6 +303,13 @@ class PrepareFiles:
         else:
             self._physics_file_path_label.style = {"color": LABEL_COLOR}
 
+        if os.path.exists(robot_schema_file_path):
+            self._robot_schema_file_path_label.style = {"color": LABEL_WARNING_COLOR}
+        elif not can_create_dir(os.path.dirname(robot_schema_file_path)):
+            self._robot_schema_file_path_label.style = {"color": LABEL_ERROR_COLOR}
+        else:
+            self._robot_schema_file_path_label.style = {"color": LABEL_COLOR}
+
         if os.path.exists(robot_file_path):
             self._robot_file_path_label.style = {"color": LABEL_WARNING_COLOR}
         elif not can_create_dir(os.path.dirname(robot_file_path)):
@@ -310,7 +324,13 @@ class PrepareFiles:
         # else:
         #     self._current_stage_path_label.style = {"color": LABEL_COLOR}
 
-        if self._current_stage_is_unsaved:
+        can_write_to_stage = False
+        stage = omni.usd.get_context().get_stage()
+        if stage:
+            root_layer = stage.GetRootLayer()
+            can_write_to_stage = root_layer.permissionToEdit and root_layer.permissionToSave
+
+        if self._current_stage_is_unsaved and can_write_to_stage:
             self._save_current_stage_widget_frame.visible = True
         else:
             self._save_current_stage_widget_frame.visible = False
@@ -405,6 +425,10 @@ class PrepareFiles:
         self._robot.physics_file_path = os.path.join(
             robot_root_folder, "configurations", self._robot.name + "_physics.usd"
         )
+        self._robot.robot_schema_file_path = os.path.join(
+            robot_root_folder, "configurations", self._robot.name + "_robot.usd"
+        )
+        # save the main robot file
         self._robot.robot_file_path = os.path.join(robot_root_folder, self._robot.name + ".usd")
 
         # save the stage as it is

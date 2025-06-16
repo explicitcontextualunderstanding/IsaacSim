@@ -68,11 +68,11 @@ The docstring of such properties and methods will indicate which backends (in or
     *availability* and according to the listed order. The *availability* refers to the state of the simulation
     in which a backend can be used after instantiating a class.
 
-    A specific backend can be explicitly requested using the :func:`~isaacsim.core.experimental.prims.use_backend` context manager.
+    A specific backend can be explicitly requested using the :func:`~isaacsim.core.experimental.utils.impl.backend.use_backend` context manager.
 
 .. warning::
 
-    If a backend is explicitly requested (using the :func:`~isaacsim.core.experimental.prims.use_backend` context manager)
+    If a backend is explicitly requested (using the :func:`~isaacsim.core.experimental.utils.impl.backend.use_backend` context manager)
     but is unavailable at the time of the request, resulting in a fallback to another backend, a warning is logged.
 
 .. warning::
@@ -122,16 +122,3 @@ Wrappers
     :undoc-members:
     :inherited-members:
     :show-inheritance:
-
-Backend-related functions
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. autofunction:: isaacsim.core.experimental.prims.get_current_backend
-
-.. autofunction:: isaacsim.core.experimental.prims.is_backend_set
-
-.. autofunction:: isaacsim.core.experimental.prims.should_raise_on_fallback
-
-.. autofunction:: isaacsim.core.experimental.prims.should_raise_on_unsupported
-
-.. autofunction:: isaacsim.core.experimental.prims.use_backend

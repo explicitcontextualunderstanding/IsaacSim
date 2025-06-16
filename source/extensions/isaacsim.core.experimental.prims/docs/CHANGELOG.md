@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.2] - 2025-06-12
+### Fixed
+- Fix broken autodocs references in api.rst
+
 ## [0.5.1] - 2025-06-07
 ### Changed
 - Set test timeout to 900 seconds

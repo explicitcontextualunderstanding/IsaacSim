@@ -19,7 +19,7 @@ class HookMenuHandler:
     def __init__(self):
         omni.kit.menu.utils.add_hook(self.__hook_func)
 
-    def __del__(self):
+    def shutdown(self):
         omni.kit.menu.utils.remove_hook(self.__hook_func)
 
     def __hook_func(self, merged_menu):

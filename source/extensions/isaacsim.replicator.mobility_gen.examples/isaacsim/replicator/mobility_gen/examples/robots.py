@@ -203,7 +203,8 @@ class JetbotRobot(WheeledMobilityGenRobot):
     path_following_target_point_offset_meters: float = 1.0
 
     wheel_dof_names: List[str] = ["left_wheel_joint", "right_wheel_joint"]
-    usd_url: str = get_assets_root_path() + "/Isaac/Robots/Jetbot/jetbot.usd"
+    usd_url: str = get_assets_root_path() + "/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd"
+
     chassis_subpath: str = "chassis"
     wheel_base: float = 0.1125
     wheel_radius: float = 0.03
@@ -251,7 +252,7 @@ class CarterRobot(WheeledMobilityGenRobot):
     path_following_target_point_offset_meters: float = 1.0
 
     wheel_dof_names: List[str] = ["joint_wheel_left", "joint_wheel_right"]
-    usd_url: str = get_assets_root_path() + "/Isaac/Robots/Carter/nova_carter_sensors.usd"
+    usd_url: str = get_assets_root_path() + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
     chassis_subpath: str = "chassis_link"
     wheel_base = 0.413
     wheel_radius = 0.14

@@ -277,12 +277,12 @@ class JointsandDrives:
                     self._break_torque_field = ResetableField(current_item.break_torque, ui.FloatField)
                 ui.Spacer(height=4)
                 with ui.HStack(height=30):
-                    self._rotation_limit_check = ui.CheckBox(width=25, height=22)
-                    self._rotation_limit_check.model.set_value(True)
-                    self._rotation_limit_check.model.add_value_changed_fn(
-                        lambda m: self._set_rotation_limit(m.get_value_as_bool())
+                    self._joint_limit_check = ui.CheckBox(width=25, height=22)
+                    self._joint_limit_check.model.set_value(True)
+                    self._joint_limit_check.model.add_value_changed_fn(
+                        lambda m: self._set_joint_limit(m.get_value_as_bool())
                     )
-                    ui.Label("Rotation is Limited", width=0, height=0, name="property")
+                    ui.Label("Joint Range is Limited", width=0, height=0, name="property")
                 with ui.HStack(height=0):
                     ui.Label("Lower Limit", name="property")
                     ui.Label("  Upper Limit", name="property")
@@ -306,7 +306,7 @@ class JointsandDrives:
         self._break_force_field.enable = enable
         self._break_torque_field.enable = enable
 
-    def _set_rotation_limit(self, enable):
+    def _set_joint_limit(self, enable):
         if not enable:
             self._lower_limit_field._value_model.set_value(float("-inf"))
             self._upper_limit_field._value_model.set_value(float("inf"))

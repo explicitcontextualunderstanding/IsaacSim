@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.6.6] - 2025-06-11
+### Changed
+- Update Franka Open Drawer Policy example
+
 ## [4.6.5] - 2025-06-06
 ### Fixed
 - Removed the lingering physics callback after stop is pressed

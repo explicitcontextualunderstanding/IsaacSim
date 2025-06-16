@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.7] - 2025-06-10
+### Changed
+- pulled robot schema into its own variant
+- articulation root uses core api
+
 ## [0.0.6] - 2025-05-22
 ### Changed
 - Update copyright and license to apache v2.0

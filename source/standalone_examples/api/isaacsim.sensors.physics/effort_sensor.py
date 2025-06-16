@@ -27,7 +27,7 @@ from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
 from isaacsim.core.utils.prims import get_prim_at_path
 from isaacsim.core.utils.stage import add_reference_to_stage
-from isaacsim.sensors.physics.scripts.effort_sensor import EffortSensor
+from isaacsim.sensors.physics import EffortSensor
 from isaacsim.storage.native import get_assets_root_path
 from pxr import UsdPhysics
 

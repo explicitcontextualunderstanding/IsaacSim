@@ -132,11 +132,19 @@ class TestDifferentialRobotGraph(OmniUiTest):
         graph_path = "/World/test_graph"
         graph = og.Controller.create_graph({"graph_path": graph_path, "evaluator_name": "execution"})
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
-        for _ in range(25):
-            await update_stage_async()
         # Open UI and set to add to existing graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Differential Controller", human_delay_speed=10)
-        for _ in range(25):
+        delays = [5, 50, 100]
+        for delay in delays:
+            try:
+                await menu_click(
+                    "Tools/Robotics/OmniGraph Controllers/Differential Controller", human_delay_speed=delay
+                )
+                break
+            except AttributeError as e:
+                if "NoneType' object has no attribute 'center'" in str(e) and delay != delays[-1]:
+                    continue
+                raise
+        for _ in range(10):
             await update_stage_async()
 
         # Find and interact with parameter window
