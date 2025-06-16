@@ -19,7 +19,7 @@ contact_links:
   - name: Question / Feature request
     url: https://github.com/isaac-sim/IsaacSim/discussions
     about: Please ask questions or request features on the Discussions tab
-  - name: Isaac Sim Forum
+  - name: Isaac Sim forum
     url: https://forums.developer.nvidia.com/c/omniverse/simulation/69
     about: Isaac Sim page on the NVIDIA Developer Forums
   - name: Isaac Lab repository
