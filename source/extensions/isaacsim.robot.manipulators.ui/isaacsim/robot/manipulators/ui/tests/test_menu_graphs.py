@@ -413,7 +413,15 @@ class TestArticulationGraphs(OmniUiTest):
             await update_stage_async()
 
         # Create gripper controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Open Loop Gripper")
+        delays = [5, 50, 100]
+        for delay in delays:
+            try:
+                await menu_click("Tools/Robotics/OmniGraph Controllers/Open Loop Gripper", human_delay_speed=delay)
+                break
+            except AttributeError as e:
+                if "NoneType' object has no attribute 'center'" in str(e) and delay != delays[-1]:
+                    continue
+                raise
         for _ in range(10):
             await update_stage_async()
 

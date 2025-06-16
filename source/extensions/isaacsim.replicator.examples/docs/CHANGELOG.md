@@ -1,4 +1,8 @@
 # Changelog
+## [1.1.25] - 2025-06-13
+### Changed
+- Fixed various simready assets example snippet warnings
+
 ## [1.1.24] - 2025-06-03
 ### Changed
 - Fix incorrect licenses and add missing licenses

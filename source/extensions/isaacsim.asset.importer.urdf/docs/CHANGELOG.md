@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.4.13] - 2025-06-12
+### Fixed
+- Fix section header syntax in api.rst
+
 ## [2.4.12] - 2025-06-10
 ### Fixed
 - Cleanup preview.png

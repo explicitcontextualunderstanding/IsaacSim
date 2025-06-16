@@ -81,6 +81,9 @@ if __name__ == "__main__":
     reader = MobilityGenReader(args.input_path)
     num_steps = len(reader)
 
+    if os.path.exists(args.output_path):
+        shutil.rmtree(args.output_path)
+
     writer = MobilityGenWriter(args.output_path)
     writer.copy_init(args.input_path)
 

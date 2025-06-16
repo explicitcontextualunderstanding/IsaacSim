@@ -236,6 +236,7 @@ public:
      * @param[in] src Source pointer to copy from
      * @param[in] size Number of elements to copy
      * @param[in] kind Type of memory copy operation
+     * @param[in] cudaStream CUDA stream to use for the copy operation
      */
     virtual void copyAsync(const void* src,
                            size_t size,

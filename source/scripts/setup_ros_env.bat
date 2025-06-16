@@ -17,19 +17,6 @@
 
 REM setup_ros_env.bat - Configure ROS2 environment for Isaac Sim on Windows
 
-REM Exit early if called by isaac-sim.selector.bat
-REM Check if the command line contains isaac-sim.selector.bat (works in PowerShell)
-echo %cmdcmdline% | findstr /i "isaac-sim.selector" >nul 2>&1
-if not errorlevel 1 (
-    exit /b 0
-)
-
-REM Additional check for cmd prompt - search all cmd processes for selector pattern
-wmic process where "name='cmd.exe' and commandline like '%%isaac-sim.selector%%'" get processid >nul 2>&1
-if not errorlevel 1 (
-    exit /b 0
-)
-
 REM Get script directory and set Isaac Sim root path
 set SCRIPT_DIR=%~dp0
 REM Remove trailing backslash from SCRIPT_DIR

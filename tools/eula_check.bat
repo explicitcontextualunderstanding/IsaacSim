@@ -35,12 +35,15 @@ echo https://docs.nvidia.com/NVIDIA-IsaacSim-Additional-Software-and-Materials-L
 echo.
 echo ================================
 echo.
-set /p response="Do you accept the governing terms? (YES/NO): "
+set /p response="Do you accept the governing terms? (yes/No): "
 
 REM Check response
-if /i "!response!"=="YES" (
-    type nul > "%REPO_ROOT%\.eula_accepted"
-    exit /b 0
-) else (
-    exit /b 1
-)
+if /i "!response!"=="YES" goto :accept
+if /i "!response!"=="Y" goto :accept
+goto :reject
+
+:accept
+type nul > "%REPO_ROOT%\.eula_accepted"
+exit /b 0
+:reject
+exit /b 1

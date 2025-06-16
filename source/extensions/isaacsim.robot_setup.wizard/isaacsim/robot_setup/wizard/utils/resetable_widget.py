@@ -165,7 +165,7 @@ class ResetableLabelField:
         self._reset_button.enable = enable
         self._rect.enabled = enable
         self._label.enabled = enable
-        self._label_degree.enabled = enable
+        # self._label_degree.enabled = enable
 
     def get_model_value(self, model):
         if isinstance(model, ui.SimpleStringModel):
@@ -189,8 +189,8 @@ class ResetableLabelField:
                     self._label = ui.Label(
                         format(self._init_value, ".1f"), name="resetable", alignment=self._alignment, width=0
                     )
-                    ui.Spacer(width=3)
-                    self._label_degree = ui.Label("o", name="degree", alignment=ui.Alignment.RIGHT_TOP, width=0)
+                    # ui.Spacer(width=3)
+                    # self._label_degree = ui.Label("o", name="degree", alignment=ui.Alignment.RIGHT_TOP, width=0)
                     ui.Spacer(width=4)
             self._field.model.set_value(self._init_value)
             self._field.model.add_value_changed_fn(lambda m: self._update_value(m))
@@ -217,7 +217,7 @@ class ResetableLabelField:
     def _end_edit(self, model):
         self._rect.visible = True
         self._label.visible = True
-        self._label_degree.visible = True
+        # self._label_degree.visible = True
         self._field.visible = False
 
     def _begin_edit(self):
@@ -225,5 +225,5 @@ class ResetableLabelField:
             return
         self._rect.visible = False
         self._label.visible = False
-        self._label_degree.visible = False
+        # self._label_degree.visible = False
         self._field.visible = True

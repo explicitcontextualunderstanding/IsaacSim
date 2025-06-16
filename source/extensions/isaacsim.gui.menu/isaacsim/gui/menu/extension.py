@@ -62,6 +62,17 @@ class Extension(omni.ext.IExt):
 
     def on_shutdown(self):
         # remove_menu_items(self._menu_items, "Create")
+        self.__hook_menu.shutdown()
+        self.__file_menu.shutdown()
+        self.__edit_menu.shutdown()
+        self.__create_menu.shutdown()
+        self.__window_menu.shutdown()
+        self.__tools_menu.shutdown()
+        self.__utilities_menu.shutdown()
+        self.__layout_menu.shutdown()
+        self.__help_menu.shutdown()
+        self.__fixme_menu.shutdown()
+
         del self.__hook_menu
         del self.__file_menu
         del self.__edit_menu

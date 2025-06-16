@@ -432,6 +432,9 @@ setlocal
 set SCRIPT_DIR=%%~dp0
 set NO_ROS_ENV=false
 
+REM if this is the selector script, don't set up ros env
+if /i "%%~n0"=="isaac-sim.selector" set NO_ROS_ENV=true
+
 REM Check args for a flag to disable ROS environment setup
 for %%%%a in (%%*) do (
     if "%%%%a"=="--no-ros-env" (

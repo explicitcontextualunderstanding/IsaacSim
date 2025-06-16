@@ -69,7 +69,7 @@ class EditMenuExtension:
         global _extension_path
         _extension_path = omni.kit.app.get_app_interface().get_extension_manager().get_extension_path(ext_id)
 
-        self._ext_name = omni.ext.get_extension_name(ext_id)
+        self._ext_name = "isaacsim.gui.menu.edit_menu"
         register_actions(self._ext_name, EditMenuExtension, lambda: _extension_instance)
 
         self._select_recent_menu_list = [MenuItemDescription(name="None", enabled=False)]
@@ -140,12 +140,11 @@ class EditMenuExtension:
 
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
-    def __del__(self):
+    def shutdown(self):
         global _extension_instance
 
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
         self._unregister_page()
-        deregister_actions(self._ext_name)
 
         self._unregister_context_menu()
         self._cm_hooks = None
@@ -162,6 +161,7 @@ class EditMenuExtension:
             del self._create_selection_window
 
         omni.kit.menu.utils.remove_menu_items(self._edit_menu_list, "Edit")
+        deregister_actions(self._ext_name)
 
     def _register_page(self):
         try:
@@ -227,7 +227,7 @@ class EditMenuExtension:
                 index = self._select_recent.index(recent)
                 self._select_recent_menu_list.append(
                     MenuItemDescription(
-                        name=recent.description, onclick_action=("isaacsim.gui.menu", "select_recent", index)
+                        name=recent.description, onclick_action=("isaacsim.gui.menu.edit_menu", "select_recent", index)
                     )
                 )
 
@@ -283,7 +283,8 @@ class EditMenuExtension:
             index = self._selection_set.index(recent)
             self._selection_set_menu_list.append(
                 MenuItemDescription(
-                    name=recent.description, onclick_action=("isaacsim.gui.menu", "select_selection_set", index)
+                    name=recent.description,
+                    onclick_action=("isaacsim.gui.menu.edit_menu", "select_selection_set", index),
                 )
             )
 
@@ -302,14 +303,14 @@ class EditMenuExtension:
         for kind in self._usd_kinds_display():
             self._selection_kind_menu_list.append(
                 MenuItemDescription(
-                    name=str(kind).capitalize(), onclick_action=("isaacsim.gui.menu", "select_by_kind", kind)
+                    name=str(kind).capitalize(), onclick_action=("isaacsim.gui.menu.edit_menu", "select_by_kind", kind)
                 )
             )
 
         for kind in self._plugin_kinds():
             self._selection_kind_menu_list.append(
                 MenuItemDescription(
-                    name=str(kind).capitalize(), onclick_action=("isaacsim.gui.menu", "select_by_kind", kind)
+                    name=str(kind).capitalize(), onclick_action=("isaacsim.gui.menu.edit_menu", "select_by_kind", kind)
                 )
             )
 
@@ -340,34 +341,34 @@ class EditMenuExtension:
             MenuItemDescription(
                 name="Select Invert",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "selection_invert"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "selection_invert"),
                 hotkey=(carb.input.KEYBOARD_MODIFIER_FLAG_CONTROL, carb.input.KeyboardInput.I),
             ),
             MenuItemDescription(
                 name="Select Parent",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "selection_parent"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "selection_parent"),
                 hotkey=(0, carb.input.KeyboardInput.UP),
             ),
             MenuItemDescription(
                 name="Select Leaf",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "selection_leaf"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "selection_leaf"),
             ),
             MenuItemDescription(
                 name="Select Hierarchy",
-                onclick_action=("isaacsim.gui.menu", "selection_hierarchy"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "selection_hierarchy"),
                 enable_fn=EditMenuExtension.prim_selected,
             ),
             MenuItemDescription(
                 name="Select Similar",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "selection_similar"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "selection_similar"),
             ),
             MenuItemDescription(
                 name="Create Selection Set",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "create_selection_set"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "create_selection_set"),
             ),
             MenuItemDescription(name="Select Set", sub_menu=self._selection_set_menu_list),
             MenuItemDescription(name="Select by Kind", sub_menu=self._selection_kind_menu_list),
@@ -392,7 +393,7 @@ class EditMenuExtension:
             MenuItemDescription(
                 name="Instance",
                 enable_fn=[EditMenuExtension.prim_selected, EditMenuExtension.can_be_instanced],
-                onclick_action=("isaacsim.gui.menu", "instance_prim"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "instance_prim"),
                 hotkey=(
                     carb.input.KEYBOARD_MODIFIER_FLAG_CONTROL | carb.input.KEYBOARD_MODIFIER_FLAG_SHIFT,
                     carb.input.KeyboardInput.I,
@@ -401,63 +402,63 @@ class EditMenuExtension:
             MenuItemDescription(
                 name="Duplicate",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "duplicate_prim"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "duplicate_prim"),
                 hotkey=(carb.input.KEYBOARD_MODIFIER_FLAG_CONTROL, carb.input.KeyboardInput.D),
             ),
             MenuItemDescription(
                 name="Duplicate - All Layers",
                 enable_fn=[EditMenuExtension.prim_selected, EditMenuExtension.is_not_in_live_session],
-                onclick_action=("isaacsim.gui.menu", "duplicate_prim_and_layers"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "duplicate_prim_and_layers"),
             ),
             MenuItemDescription(
                 name="Duplicate - Collapsed",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "duplicate_prim_and_combine_layers"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "duplicate_prim_and_combine_layers"),
             ),
             MenuItemDescription(
                 name="Parent",
                 enable_fn=[EditMenuExtension.can_prims_parent, EditMenuExtension.is_not_in_live_session],
-                onclick_action=("isaacsim.gui.menu", "parent_prims"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "parent_prims"),
                 hotkey=(0, carb.input.KeyboardInput.P),
             ),
             MenuItemDescription(
                 name="Unparent",
                 enable_fn=[EditMenuExtension.can_prims_unparent, EditMenuExtension.is_not_in_live_session],
-                onclick_action=("isaacsim.gui.menu", "unparent_prims"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "unparent_prims"),
                 hotkey=(carb.input.KEYBOARD_MODIFIER_FLAG_SHIFT, carb.input.KeyboardInput.P),
             ),
             MenuItemDescription(
                 name="Group",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "create_xform_to_group"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "create_xform_to_group"),
                 hotkey=(carb.input.KEYBOARD_MODIFIER_FLAG_CONTROL, carb.input.KeyboardInput.G),
             ),
             MenuItemDescription(
                 name="Ungroup",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "ungroup_prims"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "ungroup_prims"),
             ),
             MenuItemDescription(
                 name="Toggle Visibility",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "toggle_visibillity"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "toggle_visibillity"),
                 hotkey=(0, carb.input.KeyboardInput.H),
             ),
             MenuItemDescription(
                 name="Deactivate",
-                onclick_action=("isaacsim.gui.menu", "deactivate_prims"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "deactivate_prims"),
                 hotkey=(carb.input.KEYBOARD_MODIFIER_FLAG_SHIFT, carb.input.KeyboardInput.DEL),
             ),
             MenuItemDescription(
                 name="Delete",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "delete_prim"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "delete_prim"),
                 hotkey=(0, carb.input.KeyboardInput.DEL),
             ),
             MenuItemDescription(
                 name="Delete - All Layers",
                 enable_fn=[EditMenuExtension.prim_selected, EditMenuExtension.is_not_in_live_session],
-                onclick_action=("isaacsim.gui.menu", "delete_prim_all_layers"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "delete_prim_all_layers"),
             ),
             MenuItemDescription(
                 name="Rename",
@@ -466,7 +467,7 @@ class EditMenuExtension:
                     EditMenuExtension.is_one_prim_selected,
                     EditMenuExtension.can_delete,
                 ],
-                onclick_action=("isaacsim.gui.menu", "menu_rename_prim_dialog"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "menu_rename_prim_dialog"),
                 hotkey=(0, carb.input.KeyboardInput.F2),
                 appear_after="Delete - All Layers",
             ),
@@ -481,7 +482,7 @@ class EditMenuExtension:
             MenuItemDescription(
                 name="Focus",
                 enable_fn=EditMenuExtension.prim_selected,
-                onclick_action=("isaacsim.gui.menu", "focus_prim"),
+                onclick_action=("isaacsim.gui.menu.edit_menu", "focus_prim"),
                 hotkey=(0, carb.input.KeyboardInput.F),
             ),
             MenuItemDescription(
@@ -493,7 +494,7 @@ class EditMenuExtension:
             self._edit_menu_list.append(
                 MenuItemDescription(
                     name="Capture Screenshot",
-                    onclick_action=("isaacsim.gui.menu", "capture_screenshot"),
+                    onclick_action=("isaacsim.gui.menu.edit_menu", "capture_screenshot"),
                     hotkey=(0, carb.input.KeyboardInput.F10),
                 )
             )
@@ -522,11 +523,14 @@ class EditMenuExtension:
                     {"name": {"Select Recent": self._select_recent_menu_list}},
                     {"name": "Select All", "onclick_action": ("omni.kit.selection", "all")},
                     {"name": "Select None", "onclick_action": ("omni.kit.selection", "none")},
-                    {"name": "Select Invert", "onclick_action": ("isaacsim.gui.menu", "selection_invert")},
-                    {"name": "Select Parent", "onclick_action": ("isaacsim.gui.menu", "selection_parent")},
-                    {"name": "Select Leaf", "onclick_action": ("isaacsim.gui.menu", "selection_leaf")},
-                    {"name": "Select Hierarchy", "onclick_action": ("isaacsim.gui.menu", "selection_hierarchy")},
-                    {"name": "Select Similar", "onclick_action": ("isaacsim.gui.menu", "selection_similar")},
+                    {"name": "Select Invert", "onclick_action": ("isaacsim.gui.menu.edit_menu", "selection_invert")},
+                    {"name": "Select Parent", "onclick_action": ("isaacsim.gui.menu.edit_menu", "selection_parent")},
+                    {"name": "Select Leaf", "onclick_action": ("isaacsim.gui.menu.edit_menu", "selection_leaf")},
+                    {
+                        "name": "Select Hierarchy",
+                        "onclick_action": ("isaacsim.gui.menu.edit_menu", "selection_hierarchy"),
+                    },
+                    {"name": "Select Similar", "onclick_action": ("isaacsim.gui.menu.edit_menu", "selection_similar")},
                     {"name": ""},
                     {"name": {"Select by Kind": self._selection_kind_menu_list}},
                 ]

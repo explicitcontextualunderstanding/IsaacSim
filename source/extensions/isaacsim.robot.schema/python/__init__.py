@@ -15,7 +15,6 @@
 
 import os
 
-import carb.tokens
 from pxr import Plug
 
 
@@ -35,7 +34,9 @@ def _register_plugins(ext_path: str):
     _register_plugin_path(os.path.join(plugin_path, "rangeSensorSchema", "resources"))
 
 
-_register_plugins(carb.tokens.get_tokens_interface().resolve("${isaacsim.robot.schema}"))
+# carb.tokens.get_tokens_interface().resolve("${isaacsim.robot.schema}") can not be resolved by sphinx
+ext_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_register_plugins(ext_path)
 
 
 from . import robot_schema

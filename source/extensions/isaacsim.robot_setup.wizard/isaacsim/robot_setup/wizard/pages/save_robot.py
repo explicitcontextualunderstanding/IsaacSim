@@ -19,7 +19,7 @@ import omni.usd
 from pxr import Gf, Sdf, Usd
 
 from ..builders.robot_templates import RobotRegistry
-from ..builders.save_robot_helper import apply_articulation_apis, create_variant_usd
+from ..builders.save_robot_helper import apply_articulation_apis, apply_robot_schema, create_variant_usd
 from ..progress import ProgressColorState, ProgressRegistry
 from ..utils.robot_asset_picker import RobotAssetPicker
 from ..utils.ui_utils import ButtonWithIcon, custom_header, separator
@@ -126,6 +126,7 @@ class SaveRobot:
         # save current layers
         robot = RobotRegistry().get()
         physics_filepath = f"{robot.name}_physics.usd"
+        robot_schema_filepath = f"{robot.name}_robot.usd"
         config_dir = os.path.join(robot.robot_root_folder, "configurations")
 
         stage = omni.usd.get_context().get_stage()
@@ -134,7 +135,6 @@ class SaveRobot:
         stage.SetDefaultPrim(stage.GetPrimAtPath(f"/{robot.name}"))
 
         # the current stage is the physics usd
-        omni.usd.get_context().save_as_stage(os.path.join(config_dir, physics_filepath))
         # base layer should already been saved during the hierarchy helper
 
         add_ground = self._save_ground_check.model.get_value_as_bool()
@@ -145,8 +145,23 @@ class SaveRobot:
         robot_path = f"/{robot.name}"
         articulation_root_path = self._articulation_root_widget.model.get_value_as_string()
         apply_articulation_apis(robot_path=robot_path, articulation_root_path=articulation_root_path)
+        omni.usd.get_context().save_as_stage(os.path.join(config_dir, physics_filepath))
 
+        # create the robot schema
+
+        # start a new layer for the robot schema
+        stage = omni.usd.get_context().get_stage()
+        stage.GetRootLayer().subLayerPaths.append(robot_schema_filepath)
+        root_layer = stage.GetRootLayer()
+        edit_target = stage.GetEditTargetForLocalLayer(root_layer)
+        stage.SetEditTarget(edit_target)
+
+        apply_robot_schema(robot_path)
+        edit_target.GetLayer().Export(os.path.join(config_dir, robot_schema_filepath))
+
+        # create the variant usd with the robot and physics
         create_variant_usd(add_ground, add_lights, add_physics_scene)
+        omni.usd.get_context().save_as_stage(os.path.join(robot.robot_root_folder, f"{robot.name}.usd"))
 
     def set_visible(self, visible):
         if self.frame:

@@ -85,7 +85,7 @@ class FileMenuExtension:
         global _extension_path
         _extension_path = omni.kit.app.get_app_interface().get_extension_manager().get_extension_path(ext_id)
 
-        self._ext_name = omni.ext.get_extension_name(ext_id)
+        self._ext_name = "isaacsim.gui.menu.file_menu"
         register_actions(self._ext_name)
 
         settings = carb.settings.get_settings()
@@ -142,16 +142,15 @@ class FileMenuExtension:
 
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
-    def __del__(self):
+    def shutdown(self):
         global _extension_instance
-
-        deregister_actions(self._ext_name)
 
         _extension_instance = None
         self._stage_sub = None
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
         omni.kit.menu.utils.remove_menu_items(self._recent_menu_list, "File")
         omni.kit.menu.utils.remove_menu_items(self._file_menu_list, "File")
+        deregister_actions(self._ext_name)
         self._recent_menu_list = None
         self._file_menu_list = None
         self._event_sub = None
@@ -175,7 +174,7 @@ class FileMenuExtension:
             MenuItemDescription(
                 name="Re-open with New Edit Layer",
                 # enable_fn=lambda: not FileMenuExtension.is_new_stage(),
-                onclick_action=("isaacsim.gui.menu", "open_stage_with_new_edit_layer"),
+                onclick_action=("isaacsim.gui.menu.file_menu", "open_stage_with_new_edit_layer"),
             ),
             MenuItemDescription(
                 name="Save",
@@ -211,13 +210,13 @@ class FileMenuExtension:
                 onclick_action=("omni.kit.window.file", "add_reference"),
             ),
             MenuItemDescription(name="Add Payload", onclick_action=("omni.kit.window.file", "add_payload")),
-            MenuItemDescription(name="Exit", onclick_action=("isaacsim.gui.menu", "quit")),
+            MenuItemDescription(name="Exit", onclick_action=("isaacsim.gui.menu.file_menu", "quit")),
         ]
         if not carb.settings.get_settings().get("/app/fastShutdown"):
             self._file_menu_list.append(
                 MenuItemDescription(
                     name="Exit Fast (Experimental)",
-                    onclick_action=("isaacsim.gui.menu", "quit_fast"),
+                    onclick_action=("isaacsim.gui.menu.file_menu", "quit_fast"),
                 )
             )
 

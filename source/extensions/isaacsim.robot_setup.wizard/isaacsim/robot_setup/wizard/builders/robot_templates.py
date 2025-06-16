@@ -92,6 +92,7 @@ class RobotTemplate(ABC):
         self.add_property(self.__class__, "robot_root_folder", None)
         self.add_property(self.__class__, "base_file_path", None)
         self.add_property(self.__class__, "physics_file_path", None)
+        self.add_property(self.__class__, "robot_schema_file_path", None)
         self.add_property(self.__class__, "robot_file_path", None)  # the main robot file usd with all the variants
         self.add_property(
             self.__class__, "original_stage_path", None

@@ -1,4 +1,10 @@
 # Changelog
+
+
+## [0.1.5] - 2025-06-12
+### Changed
+- Fix broken jetbot and nova carter asset links
+
 ## [0.1.4] - 2025-06-10
 ### Changed
 - Use default asset root for all assets

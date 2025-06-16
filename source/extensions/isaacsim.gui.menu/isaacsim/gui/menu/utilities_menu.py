@@ -38,6 +38,6 @@ class UtilitiesMenuExtension:
         ]
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
-    def __del__(self):
+    def shutdown(self):
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
         omni.kit.menu.utils.remove_menu_items(self._menu_placeholder, "Utilities")

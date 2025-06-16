@@ -1,4 +1,11 @@
 # Changelog
+## [4.8.3] - 2025-06-13
+### Changed
+- Switched CUDA files to Apache license.
+
+## [4.8.2] - 2025-06-12
+### Fixed
+- Remove additional unused parameter description in doxygen comments
 
 ## [4.8.1] - 2025-06-08
 ### Fixed
@@ -7,6 +14,7 @@
 ## [4.8.0] - 2025-06-05
 ### Fixed
 - Added error handling for IPCBufferManager on vGPU setups
+
 ### Changed
 - Converted NITROS functions to void
 - NITROS initialization failure disables NITROS for node lifetime

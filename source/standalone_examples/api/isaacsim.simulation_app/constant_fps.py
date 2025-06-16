@@ -35,6 +35,7 @@ app_update_time_s = 0.0
 
 
 def update_event_callback(event: carb.events.IEvent):
+    global last_frametime_timestamp_ns, app_update_time_s
     timestamp_ns = time.perf_counter_ns()
     app_update_time_s = round((timestamp_ns - last_frametime_timestamp_ns) / 1e9, 9)
     last_frametime_timestamp_ns = timestamp_ns

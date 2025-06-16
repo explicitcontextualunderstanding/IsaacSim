@@ -1,5 +1,5 @@
 [package]
-version = "1.0.4"
+version = "1.0.5"
 category = "Simulation"
 title = "Replicator Grasping Pipeline UI"
 description = "UI for the synthetic data generation workflow for grasping scenarios"

@@ -1,5 +1,5 @@
 [package]
-version = "0.0.6"
+version = "0.0.7"
 category = "other"
 title = "Isaac Sim Robot Wizard [Beta]"
 description = "Wizard to guide through robot import and configuration"
@@ -13,6 +13,7 @@ writeTarget.kit = true
 [dependencies]
 "isaacsim.gui.components" = {}
 "isaacsim.robot.schema" = {}
+"isaacsim.core.utils" = {}
 
 [[python.module]]
 name = "isaacsim.robot_setup.wizard"

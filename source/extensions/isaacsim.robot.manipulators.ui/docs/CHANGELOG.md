@@ -1,4 +1,13 @@
 # Changelog
+
+## [2.1.18] - 2025-06-13
+### Changed
+- Fix menu test timeout
+
+## [2.1.17] - 2025-06-11
+### Changed
+- Update dependecies
+
 ## [2.1.16] - 2025-05-31
 ### Changed
 - Use default nucleus server for all tests

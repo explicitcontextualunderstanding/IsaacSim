@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.2.2] - 2025-06-12
+### Fixed
+- Fix broken autodocs references in api.rst
+
 ## [3.2.1] - 2025-06-10
 ### Changed
 - Remove unnecessary dependencies and imports

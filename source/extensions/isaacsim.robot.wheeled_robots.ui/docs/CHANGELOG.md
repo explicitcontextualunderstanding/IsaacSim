@@ -1,4 +1,9 @@
 # Changelog
+
+## [2.1.18] - 2025-06-13
+### Changed
+- Fix menu test timeout
+
 ## [2.1.17] - 2025-06-06
 ### Changed
 - increase timeout for UI tests

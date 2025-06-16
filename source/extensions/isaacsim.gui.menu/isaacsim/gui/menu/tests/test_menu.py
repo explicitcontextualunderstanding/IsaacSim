@@ -119,7 +119,7 @@ class TestMenuAssets(OmniUiTest):
             await omni.kit.app.get_app().next_update_async()
             await omni.kit.app.get_app().next_update_async()
             has_robot = False
-            await menu_click(test_path, human_delay_speed=10)
+            await menu_click(test_path, human_delay_speed=50)
             for i in range(20):
                 await omni.kit.app.get_app().next_update_async()
 
@@ -147,7 +147,7 @@ class TestMenuAssets(OmniUiTest):
         apriltag_path = "Create/April Tags"
 
         await omni.kit.app.get_app().next_update_async()
-        await menu_click(apriltag_path, human_delay_speed=10)
+        await menu_click(apriltag_path, human_delay_speed=50)
         await omni.kit.app.get_app().next_update_async()
 
         omni.kit.commands.execute("CreateMeshPrimWithDefaultXform", prim_type="Cube", above_ground=True)
@@ -202,7 +202,7 @@ class TestMenuAssets(OmniUiTest):
             for _ in range(20):
                 await omni.kit.app.get_app().next_update_async()
             print(test_path)
-            await menu_click(test_path, human_delay_speed=10)
+            await menu_click(test_path, human_delay_speed=50)
             for i in range(5):
                 await omni.kit.app.get_app().next_update_async()
 

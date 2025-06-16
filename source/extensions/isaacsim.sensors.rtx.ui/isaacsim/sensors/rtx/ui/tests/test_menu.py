@@ -37,6 +37,7 @@ class TestMenuAssets(OmniUiTest):
         # Make sure the stage loaded
         self.assertTrue(result)
         await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
         pass
 
     # After running each test
@@ -83,13 +84,15 @@ def _create_test_for_menu_option(test_path):
     """Create a test function for a specific menu option"""
 
     async def test_function(self):
-        while omni.usd.get_context().get_stage_loading_status()[2] > 0:
-            print("Loading...")
-            await asyncio.sleep(1.0)
-            await omni.kit.app.get_app().next_update_async()
-        for _ in range(15):
-            await omni.kit.app.get_app().next_update_async()
-        await menu_click(test_path, human_delay_speed=10)
+        delays = [5, 50, 100]
+        for delay in delays:
+            try:
+                await menu_click(test_path, human_delay_speed=delay)
+                break
+            except AttributeError as e:
+                if "NoneType' object has no attribute 'center'" in str(e) and delay != delays[-1]:
+                    continue
+                raise
         self._timeline.play()
         for _ in range(5):
             await omni.kit.app.get_app().next_update_async()

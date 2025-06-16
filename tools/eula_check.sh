@@ -33,13 +33,14 @@ echo "https://docs.nvidia.com/NVIDIA-IsaacSim-Additional-Software-and-Materials-
 echo ""
 echo "================================"
 echo ""
-echo "Do you accept the governing terms? (YES/NO):"
+echo "Do you accept the governing terms? (yes/No):"
 
 # Read user input
 read response
+response=${response,,}
 
 # Check response
-if [ "$response" = "YES" ]; then
+if [[ "$response" == "yes" || "$response" == "y" ]]; then
     # Create the acceptance file in the repository root to persist it
     touch "${REPO_ROOT}/.eula_accepted"
     exit 0

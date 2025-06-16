@@ -1,4 +1,8 @@
 # Changelog
+## [3.2.6] - 2025-06-13
+### Changed
+- Switched CUDA files to Apache license.
+
 ## [3.2.5] - 2025-06-04
 ### Changed
 - Changed CUDA_CHECK in ScopedCudaDevice.h to indicate file and line for more verbose error logging

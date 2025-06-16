@@ -28,7 +28,6 @@ import os
 import shutil
 
 import omni.usd
-import usd.schema.isaac.robot_schema as rs
 from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
 
 from ..utils.utils import can_create_dir
@@ -55,7 +54,9 @@ def apply_hierarchy(lookup_table, reference_mesh, delete_prim_paths):
 
     robot = RobotRegistry().get()
     robot_name = robot.name
+    config_dir = os.path.join(robot.robot_root_folder, "configurations")
     base_layer_path = robot.base_file_path
+    physics_layer_path = robot.physics_file_path
     original_stage_path = robot.original_stage_path
 
     # a stage has to be opened already, save it to the original stage path if the user indicated so on the previous page, and have write access to
@@ -113,11 +114,13 @@ def apply_hierarchy(lookup_table, reference_mesh, delete_prim_paths):
     robot_prim = robot_stage.GetPrimAtPath(f"/{robot_name}")
     process_mesh(robot_stage, robot_prim, reference_mesh)
 
-    # # apply the apis
-    apply_apis()
-
     # # # clean up the transforms, so that scales and relative transforms (to the link) are in the meshes folder, and any link-level translation and rotation happens on the robot link level.
     cleanup_xforms(delete_prim_paths)
+
+    # save the current stage as the base usd
+    stage = omni.usd.get_context().get_stage()
+    stage.SetDefaultPrim(stage.GetPrimAtPath(f"/{robot_name}"))
+    omni.usd.get_context().save_as_stage(os.path.join(config_dir, base_layer_path))
 
     # # # apply the physics layer
     create_physics_variant()
@@ -456,41 +459,13 @@ def recursive_transform_removal(prim, exclude_list=[]):
         recursive_transform_removal(child_prim, exclude_list)
 
 
-def apply_apis():
-    # robot api to the robot prim
-    robot = RobotRegistry().get()
-    stage = omni.usd.get_context().get_stage()
-    if not robot or not stage:
-        return
-
-    robot_name = robot.name
-    robot_path = f"/{robot_name}"
-    robot_prim = stage.GetPrimAtPath(robot_path)
-    link_prims = [stage.GetPrimAtPath(f"{robot_path}/{link}") for link in robot.links]
-
-    # apply the robot api to the robot prim
-    applied = robot_prim.GetAppliedSchemas()
-    if "RobotAPI" not in applied:
-        # apply the robot api to the robot prim
-        rs.ApplyRobotAPI(robot_prim)
-
-        robot_links = robot_prim.GetRelationship(rs.Relations.ROBOT_LINKS.name)
-        for link_prim in link_prims:
-            rs.ApplyLinkAPI(link_prim)
-            robot_links.AddTarget(link_prim.GetPath())
-
-
 def create_physics_variant():
     """
     create a physics variant for the robot
     """
     robot = RobotRegistry().get()
-    stage = omni.usd.get_context().get_stage()
-    if not stage or not robot:
+    if not robot:
         return
-
-    # save the current stage as the base usd
-    stage.Save()
 
     # get the file paths from the robot registry
     robot_name = robot.name
@@ -504,6 +479,10 @@ def create_physics_variant():
     # insert the base usd as a layer
     # base_layer_relative_path = os.path.relpath(base_layer_path, os.path.dirname(physics_layer_path))
     physics_stage.GetRootLayer().subLayerPaths.append(base_layer_path)
+    # lock the base layer
+    base_layer = Sdf.Layer.Find(base_layer_path)
+    base_layer.SetPermissionToEdit(False)
+
     # set edit target to root layer
     root_layer = physics_stage.GetRootLayer()
     edit_target = physics_stage.GetEditTargetForLocalLayer(root_layer)
