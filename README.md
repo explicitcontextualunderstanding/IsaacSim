@@ -29,7 +29,7 @@ NVIDIA Isaac Sim™ is a simulation platform built on NVIDIA Omniverse, designed
 
 ## Documentation
 
-For the latest Isaac Sim documentation, see [Isaac Sim Documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html). 
+For the latest Isaac Sim documentation, see [Isaac Sim Documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
 Follow these links to get started:
 
 - [Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html)
@@ -45,7 +45,7 @@ Ensure your system is set up with the following before building Isaac Sim:
   > **(Linux) Ubuntu 24.04**
   > Ubuntu 24.04 is not fully supported at this time. Building with Ubuntu 24.04 requires GCC/GXX 12 to be installed, GCC/GXX 13 is not supported.
 
-- **GPU**: For additional information on GPU features and requirements, see [NVIDIA GPU Requirements](https://docs.omniverse.nvidia.com/materials-and-rendering/latest/common/technical-requirements.html)
+- **GPU**: For additional information on GPU features and requirements, see [NVIDIA GPU Requirements](https://docs.omniverse.nvidia.com/dev-guide/latest/common/technical-requirements.html)
 
   #### Local Workstation
 
@@ -61,7 +61,7 @@ Ensure your system is set up with the following before building Isaac Sim:
   | A40 | L40S | RTX PRO 6000 Blackwell Server |
   |  | L20 | |
 
-- **Driver**: See [NVIDIA Driver Requirements](https://docs.omniverse.nvidia.com/materials-and-rendering/latest/common/technical-requirements.html)
+- **Driver**: See [NVIDIA Driver Requirements](https://docs.omniverse.nvidia.com/dev-guide/latest/common/technical-requirements.html)
 
 - **Internet Access**: Required for downloading the Omniverse Kit SDK, extensions, and tools.
 
@@ -88,7 +88,7 @@ Ensure your system is set up with the following before building Isaac Sim:
   > ```bash
   > sudo apt-get install gcc-12 g++-12
   > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
-  > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 
+  > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
   > ```
 
 ### Recommended Software
@@ -128,7 +128,7 @@ build.bat
 
 ### 3. Run
 
-> **⚠️ Startup Time**  
+> **⚠️ Startup Time**
 > The first time loading Isaac Sim may take up to several minutes as Extensions and Shader are loaded and cached. The subsequent startup time should be in the ranges of 10-30 seconds depending on hardware configuration.
 
 
