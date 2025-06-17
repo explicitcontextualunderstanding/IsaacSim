@@ -148,13 +148,13 @@ def run_simready_randomization(stage, camera_prim, render_product, tables, dishe
         rep.orchestrator.step(delta_time=0.0, rt_subframes=16)
         render_product.hydra_texture.set_updates_enabled(False)
 
+        print("\tStopping the timeline")
+        timeline.stop()
+        simulation_app.update()
+
         print(f"\tRemoving the temp layer")
         session.subLayerPaths.remove(simready_temp_layer.identifier)
         simready_temp_layer = None
-        simulation_app.update()
-
-        print("\tStopping the timeline")
-        timeline.stop()
         simulation_app.update()
 
 

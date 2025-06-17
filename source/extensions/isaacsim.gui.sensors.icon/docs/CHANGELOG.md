@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0] - 2025-06-10
+### Changed
+- Refactored icon updates to enable batch processing per frame
+### Added
+- More layers of visiblity checks to prevent issues with extension startup sync conditions
+- Cached set of prims that were previously checked for sensor prims to improve performance on frame updates
+
 ## [1.2.4] - 2025-06-06
 ### Changed
 - ISIM-3831: Fix test failed.

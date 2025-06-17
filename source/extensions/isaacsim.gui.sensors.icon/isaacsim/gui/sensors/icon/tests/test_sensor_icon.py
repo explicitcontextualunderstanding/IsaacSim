@@ -54,6 +54,9 @@ class TestSensorIcon(OmniUiTest):
         if is_viewport_legacy():
             self._golden_img_dir = self._golden_img_dir.joinpath("legacy")
 
+        # Set icon visibility to true, default is false
+        self._settings.set(VISIBLE_SETTING, True)
+
     # After running each test
     async def tearDown(self):
         usd_context = omni.usd.get_context()

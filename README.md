@@ -40,7 +40,10 @@ Follow these links to get started:
 
 Ensure your system is set up with the following before building Isaac Sim:
 
-- **Operating System**: Windows 10/11 or Linux (Ubuntu 22.04 or Ubuntu 24.04)
+- **Operating System**: Windows 10/11 or Linux (Ubuntu 22.04)
+
+  > **(Linux) Ubuntu 24.04**
+  > Ubuntu 24.04 is not fully supported at this time. Building with Ubuntu 24.04 requires GCC/GXX 12 to be installed, GCC/GXX 13 is not supported.
 
 - **GPU**: For additional information on GPU features and requirements, see [NVIDIA GPU Requirements](https://docs.omniverse.nvidia.com/materials-and-rendering/latest/common/technical-requirements.html)
 
@@ -74,7 +77,19 @@ Ensure your system is set up with the following before building Isaac Sim:
 
 - **(Windows - C++ Only) Windows SDK**: Install this alongside MSVC. You can find it as part of the Visual Studio Installer. [Additional information on Windows development configuration](docs/readme/windows_developer_configuration.md)
 
-- **(Linux) build-essentials**: A package that includes `make` and other essential tools for building applications.  For Ubuntu, install with `sudo apt-get install build-essential`
+- **(Linux) build-essentials**: A package that includes `make` and other essential tools for building applications.  For Ubuntu, install with:
+
+  ```bash
+  sudo apt-get install build-essential
+  ```
+
+  > **(Linux) ⚠️**
+  > Please use GCC/GXX 12 or GCC/GXX 11, higher versions are not supported yet. To install GCC/GXX 12, run the following commands:
+  > ```bash
+  > sudo apt-get install gcc-12 g++-12
+  > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
+  > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 
+  > ```
 
 ### Recommended Software
 
@@ -93,6 +108,8 @@ This section guides you through building Isaac Sim from source code.
 ```bash
 git clone https://github.com/isaac-sim/IsaacSim.git isaacsim
 cd isaacsim
+git lfs install
+git lfs pull
 ```
 
 ### 2. Build

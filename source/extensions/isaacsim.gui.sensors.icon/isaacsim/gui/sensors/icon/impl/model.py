@@ -15,6 +15,7 @@
 __all__ = ["IconModel"]
 
 from pathlib import Path
+from typing import Dict
 
 import carb
 import omni.kit.app
@@ -22,10 +23,6 @@ import omni.usd
 import usdrt.Usd
 from omni.ui import scene as sc
 from pxr import Gf, Sdf, Tf, Trace, Usd, UsdGeom
-
-ICON_POSITION_ATTR = "xformOp:translate"
-ICON_ORIENTATION_ATTR = "xformOp:orient"
-ICON_TRANSFORM_ATTR = "xformOp:transform"
 
 
 class IconModel(sc.AbstractManipulatorModel):
@@ -51,7 +48,10 @@ class IconModel(sc.AbstractManipulatorModel):
         self._usdrt_stage = None
         self._world_unit = 0.1
         self._icons = {}
-        self._usd_listener = None
+        self._frame_sub = None
+        # Persistent XformCache used across position queries
+        self._xform_cache = None
+        self._hidden_paths = set()
 
         bus = carb.eventdispatcher.get_eventdispatcher()
 
@@ -85,12 +85,15 @@ class IconModel(sc.AbstractManipulatorModel):
                 self._world_unit = 0.1
 
             if self._usd_listening_active:
-                self._usd_listener = Tf.Notice.Register(Usd.Notice.ObjectsChanged, self._on_usd_changed, stage)
+                self._frame_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                    event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+                    on_event=self._on_frame_update,
+                    observer_name="IsaacSensorIconGUI.__update_event_callback",
+                )
                 self._populate_initial_icons()
             else:
-                if self._usd_listener:
-                    self._usd_listener.Revoke()
-                    self._usd_listener = None
+                if self._frame_sub:
+                    self._frame_sub = None
 
                 # populate icons with hidden state
                 self._populate_initial_icons()
@@ -99,13 +102,17 @@ class IconModel(sc.AbstractManipulatorModel):
                 self._item_changed(None)
         else:
             self._usdrt_stage = None
-            if self._usd_listener:
-                self._usd_listener.Revoke()
-            self._usd_listener = None
+            if self._frame_sub:
+                self._frame_sub = None
             self.clear()
 
+    @Trace.TraceFunction
     def _populate_initial_icons(self):
-        """Populate icons by querying the USDrt stage."""
+        """Populate icons by querying the USDrt stage. Skip if icon visibility is disabled."""
+        # Do not populate any icons when global visibility is turned off.
+        if not self._usd_listening_active:
+            return
+
         self.clear()
         if not self._usdrt_stage:
             return
@@ -128,38 +135,32 @@ class IconModel(sc.AbstractManipulatorModel):
             if not prim:
                 continue
 
-            # check visibility and activation status
+            # Create icon for all sensors and compute initial visibility
+            item = IconModel.IconItem(prim_path, self._sensor_icon_path)
+
+            # Check visibility and activation status
             is_active = prim.IsActive()
             should_be_visible = False
             try:
-                visibility = UsdGeom.Imageable(prim).ComputeVisibility()
-                should_be_visible = is_active and visibility != UsdGeom.Tokens.invisible
+                if prim.IsA(UsdGeom.Imageable):
+                    visibility = UsdGeom.Imageable(prim).ComputeVisibility()
+                    should_be_visible = is_active and visibility != UsdGeom.Tokens.invisible
+                else:
+                    should_be_visible = is_active
             except Exception as e:
                 carb.log_warn(f"[Warning] Failed to compute visibility/activation for {prim_path}: {e}")
 
-            # Ignore hidden sensors
-            if not should_be_visible:
-                continue
-
-            item = IconModel.IconItem(prim_path, self._sensor_icon_path)
             item.visible = should_be_visible if self._usd_listening_active else False
             self._icons[prim_path] = item
 
         self._item_changed(None)
 
     def _on_stage_opened(self, event):
-        # Revoke existing listener before reconnecting
-        if self._usd_listener:
-            self._usd_listener.Revoke()
-            self._usd_listener = None
         self._connect_to_stage()
 
     def _on_stage_closed(self, event):
         self.clear()
         self._usdrt_stage = None
-        if self._usd_listener:
-            self._usd_listener.Revoke()
-            self._usd_listener = None
 
     def get_world_unit(self):
         return max(self._world_unit, 0.1)
@@ -167,14 +168,14 @@ class IconModel(sc.AbstractManipulatorModel):
     def __del__(self):
         self._stage_open_sub = None
         self._stage_close_sub = None
-        self._usd_listener = None
+        self._frame_sub = None
         self.destroy()
 
     def destroy(self):
         self._icons = {}
-        if self._usd_listener:
-            self._usd_listener.Revoke()
-        self._usd_listener = None
+        if self._frame_sub:
+            self._frame_sub = None
+        self._hidden_paths.clear()
 
     def get_item(self, identifier):
         if isinstance(identifier, str):
@@ -184,6 +185,7 @@ class IconModel(sc.AbstractManipulatorModel):
     def get_prim_paths(self):
         return list(self._icons.keys())
 
+    @Trace.TraceFunction
     def get_position(self, prim_path):
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
@@ -195,8 +197,10 @@ class IconModel(sc.AbstractManipulatorModel):
             prim = stage.GetPrimAtPath(prim_path)
             if prim and prim.IsValid():
                 try:
-                    xformCache = UsdGeom.XformCache(Usd.TimeCode.Default())
-                    worldTransform = xformCache.GetLocalToWorldTransform(prim)
+                    # Use the persistent XformCache to avoid per-call allocation
+                    if self._xform_cache is None:
+                        self._xform_cache = UsdGeom.XformCache(Usd.TimeCode.Default())
+                    worldTransform = self._xform_cache.GetLocalToWorldTransform(prim)
                     translation = worldTransform.ExtractTranslation()
                     return Gf.Vec3d(translation[0], translation[1], translation[2])
                 except Exception as e:
@@ -217,174 +221,62 @@ class IconModel(sc.AbstractManipulatorModel):
         return item.icon_url if item else ""
 
     @Trace.TraceFunction
-    def _on_usd_changed(self, notice, stage):
-        if not self._usd_listening_active:
+    def _on_frame_update(self, e):
+
+        # Clear the transform cache so position queries are up-to-date.
+        self._xform_cache = None
+
+        if not self._usd_listening_active or not self._usdrt_stage:
             return
 
-        if not self._usdrt_stage and not stage:
-            return
-
-        try:
-            _ = UsdGeom.Tokens.invisible
-        except AttributeError:
-            # carb.log_warn("UsdGeom.Tokens not available. Icon visibility checks will be skipped.")
-            return
-
-        current_prim_paths = set(self._icons.keys())
-        added_paths = set()
-        removed_paths = set()
-        changed_paths_to_recheck = set()
-
-        # Current sensor states
         current_sensor_paths = set()
-        if self._usdrt_stage:
-            for sensor_type_str in self.SENSOR_TYPES:
-                try:
-                    paths = self._usdrt_stage.GetPrimsWithTypeName(sensor_type_str)
-                    current_sensor_paths.update(Sdf.Path(str(p)) for p in paths if p)
-                except Exception as e:
-                    # carb.log_warn(f"Failed querying usdrt during change notification for type {sensor_type_str}: {e}")
-                    pass
-        else:
-            # Fallback to USD stage query if usdrt fails or is unavailable
-            for prim in Usd.PrimRange.AllPrims(stage.GetPseudoRoot()):
-                prim_type = str(prim.GetTypeName())
-                if prim_type in self.SENSOR_TYPES:
-                    current_sensor_paths.add(prim.GetPath())
+        for sensor_type in self.SENSOR_TYPES:
+            try:
+                paths = self._usdrt_stage.GetPrimsWithTypeName(sensor_type)
+                current_sensor_paths.update(Sdf.Path(str(p)) for p in paths if p)
+            except Exception as err:
+                carb.log_warn(f"[SensorIcon] usdrt query failed for {sensor_type}: {err}")
 
-        # Verify additions and deletions
-        added_paths = current_sensor_paths - current_prim_paths
-        removed_paths = current_prim_paths - current_sensor_paths
+        cached_paths = set(self._icons.keys())
+        added_paths = current_sensor_paths - cached_paths
+        removed_paths = cached_paths - current_sensor_paths
 
-        # Recheck paths based on notice
-        potentially_changed_prims_from_notice = set()
-        resynced_paths = notice.GetResyncedPaths()
-        changed_info_paths = notice.GetChangedInfoOnlyPaths()
-
-        all_notice_paths = resynced_paths + changed_info_paths
-        for path in all_notice_paths:
-            prim_path = path.GetPrimPath()
-            if prim_path and prim_path != Sdf.Path.emptyPath:
-                potentially_changed_prims_from_notice.add(prim_path)
-
-        # Recheck tracked icons if ancestor or prim itself in notice
-        tracked_icons_to_consider = current_prim_paths - removed_paths
-        for tracked_path in tracked_icons_to_consider:
-            if tracked_path in potentially_changed_prims_from_notice:
-                changed_paths_to_recheck.add(tracked_path)
-                continue
-            for notice_prim_path in potentially_changed_prims_from_notice:
-                if tracked_path.HasPrefix(notice_prim_path) and tracked_path != notice_prim_path:
-                    changed_paths_to_recheck.add(tracked_path)
-                    break  # No need to check other notice paths for this tracked_path
-
-        # property change triggering updates
-        transform_props = {ICON_POSITION_ATTR, ICON_ORIENTATION_ATTR, ICON_TRANSFORM_ATTR, "xformOpOrder"}
-        visibility_props = {"visibility", UsdGeom.Tokens.visibility}
-        activation_props = {"active"}
-
-        for path in changed_info_paths:
-            if path.IsPropertyPath():
-                prim_path = path.GetPrimPath()
-                prop_name = path.name
-
-                if prim_path in tracked_icons_to_consider:
-                    if prop_name in transform_props or prop_name in visibility_props or prop_name in activation_props:
-                        changed_paths_to_recheck.add(prim_path)
-
-                for tracked_path in tracked_icons_to_consider:
-                    if tracked_path.HasPrefix(prim_path) and tracked_path != prim_path:
-                        if (
-                            prop_name in visibility_props
-                            or prop_name in activation_props
-                            or prop_name in transform_props
-                        ):
-                            changed_paths_to_recheck.add(tracked_path)
-
-        # handle deletions
-        items_changed_notification = []
-        for prim_path in removed_paths:
-            if prim_path in self._icons:
-                item = self._icons.pop(prim_path)
-                if not item.removed:
-                    item.removed = True
-                    items_changed_notification.append(item)
-
-        # handle additions
         for prim_path in added_paths:
-            if prim_path not in self._icons:
-                prim = stage.GetPrimAtPath(prim_path)
-                # verify valid prim and valid type
-                if prim and str(prim.GetTypeName()) in self.SENSOR_TYPES:
-                    try:
-                        is_active = prim.IsActive()
-                        visibility = UsdGeom.Imageable(prim).ComputeVisibility()
-                        should_be_visible = is_active and visibility != UsdGeom.Tokens.invisible
-                    except Exception as e:
-                        carb.log_warn(f"Failed checking state for new prim {prim_path}: {e}")
-                        should_be_visible = False
+            if prim_path not in self._hidden_paths:
+                self.add_sensor_icon(prim_path)
 
-                    item = IconModel.IconItem(prim_path, self._sensor_icon_path)
-                    item.visible = should_be_visible
-                    self._icons[prim_path] = item
-                    items_changed_notification.append(item)
+        for prim_path in removed_paths:
+            self.remove_sensor_icon(prim_path)
+            self._hidden_paths.discard(prim_path)
 
-        # handle potential updates
-        paths_to_evaluate = changed_paths_to_recheck - removed_paths - added_paths
+        stage = self._usd_context.get_stage()
+        if not stage:
+            return
 
-        for prim_path in paths_to_evaluate:
+        for prim_path in current_sensor_paths:
             item = self._icons.get(prim_path)
-            if not item or item.removed:
+            if not item:
                 continue
 
             prim = stage.GetPrimAtPath(prim_path)
             if not prim or not prim.IsValid():
-                if prim_path not in removed_paths:
-                    removed_paths.add(prim_path)
-                    item = self._icons.pop(prim_path)
-                    item.removed = True
-                    items_changed_notification.append(item)
                 continue
 
-            # Prim exists, re-compute its visibility state
-            needs_update = False
+            # Visibility check
+            should_be_visible = item.visible
             try:
-                is_active = prim.IsActive()
-                visibility = UsdGeom.Imageable(prim).ComputeVisibility()
-                should_be_visible = is_active and visibility != UsdGeom.Tokens.invisible
+                if prim.IsA(UsdGeom.Imageable):
+                    is_active = prim.IsActive()
+                    visibility = UsdGeom.Imageable(prim).ComputeVisibility()
+                    should_be_visible = is_active and visibility != UsdGeom.Tokens.invisible
+            except Exception:
+                pass
 
-                if item.visible != should_be_visible:
-                    item.visible = should_be_visible
-                    needs_update = True  # Visibility state changed
+            visibility_changed = should_be_visible != item.visible
+            if visibility_changed:
+                item.visible = should_be_visible
 
-            except Exception as e:
-                if item.visible:  # if it was visible, hide it on error
-                    item.visible = False
-                    needs_update = True
-
-            # path was added to changed_paths_to_recheck due to property change
-            if not needs_update:
-                for path in changed_info_paths:
-                    if path.IsPropertyPath() and path.GetPrimPath() == prim_path:
-                        if path.name in transform_props:
-                            needs_update = True
-                            break
-                    elif prim_path.HasPrefix(path.GetPrimPath()) and path.GetPrimPath() != prim_path:
-                        if path.IsPropertyPath() and path.name in transform_props:
-                            needs_update = True
-                            break
-
-            if needs_update:
-                items_changed_notification.append(item)
-
-        notified_items = set()
-        if items_changed_notification:
-            for item in items_changed_notification:
-                item_id = id(item)
-                if item_id not in notified_items:
-                    # update UI
-                    self._item_changed(item)
-                    notified_items.add(item_id)
+            self._item_changed(item)
 
     def clear(self):
         if self._icons:
@@ -392,6 +284,10 @@ class IconModel(sc.AbstractManipulatorModel):
             self._item_changed(None)
 
     def add_sensor_icon(self, prim_path, icon_url=None):
+        # Skip registering icons when visibility is disabled
+        if not self._usd_listening_active:
+            return
+
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
 
@@ -414,7 +310,6 @@ class IconModel(sc.AbstractManipulatorModel):
                 if prim and str(prim.GetTypeName()) in self.SENSOR_TYPES:
                     is_sensor = True
 
-        # If confirmed as a sensor by either method, add the icon
         if is_sensor:
             icon_url = icon_url or self._sensor_icon_path
             item = IconModel.IconItem(prim_path, icon_url)
@@ -449,6 +344,8 @@ class IconModel(sc.AbstractManipulatorModel):
             self._icons[prim_path].removed = True
             self._item_changed(self._icons[prim_path])
             self._icons.pop(prim_path)
+            # Mark as hidden
+            self._hidden_paths.add(prim_path)
 
     def set_icon_click_fn(self, prim_path, call_back):
         if not isinstance(prim_path, Sdf.Path):
@@ -457,20 +354,38 @@ class IconModel(sc.AbstractManipulatorModel):
         if item:
             item.on_click = call_back
 
+    @Trace.TraceFunction
     def show_sensor_icon(self, prim_path):
+        """Show a sensor icon by setting the USD prim visibility to visible and immediately updating internal state."""
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
+
+        stage = self._usd_context.get_stage()
+        if stage:
+            prim = stage.GetPrimAtPath(prim_path)
+            if prim and prim.IsA(UsdGeom.Imageable):
+                imageable = UsdGeom.Imageable(prim)
+                imageable.GetVisibilityAttr().Set(UsdGeom.Tokens.inherited)
+
         item = self._icons.get(prim_path)
-        if item:
-            if self._usd_listening_active:
-                item.visible = True
-                self._item_changed(item)
+        if item and not item.visible:
+            item.visible = True
+            self._item_changed(item)
 
     def hide_sensor_icon(self, prim_path):
+        """Hide a sensor icon by setting the USD prim visibility to invisible and immediately updating internal state."""
         if not isinstance(prim_path, Sdf.Path):
             prim_path = Sdf.Path(prim_path)
+
+        stage = self._usd_context.get_stage()
+        if stage:
+            prim = stage.GetPrimAtPath(prim_path)
+            if prim and prim.IsA(UsdGeom.Imageable):
+                imageable = UsdGeom.Imageable(prim)
+                imageable.GetVisibilityAttr().Set(UsdGeom.Tokens.invisible)
+
         item = self._icons.get(prim_path)
-        if item:
+        if item and item.visible:
             item.visible = False
             self._item_changed(item)
 
@@ -480,8 +395,12 @@ class IconModel(sc.AbstractManipulatorModel):
 
         # Re-register the USD listener if needed
         stage = self._usd_context.get_stage()
-        if stage and not self._usd_listener:
-            self._usd_listener = Tf.Notice.Register(Usd.Notice.ObjectsChanged, self._on_usd_changed, stage)
+        if stage and not self._frame_sub:
+            self._frame_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+                on_event=self._on_frame_update,
+                observer_name="IsaacSensorIconGUI.__update_event_callback",
+            )
 
         # Refresh all icons from the current USD state
         self._populate_initial_icons()
@@ -490,16 +409,12 @@ class IconModel(sc.AbstractManipulatorModel):
         # Deactivate USD listening
         self._usd_listening_active = False
 
-        # Revoke USD listener
-        if self._usd_listener:
-            self._usd_listener.Revoke()
-            self._usd_listener = None
-
-        # Forcefully clear all icons from the model.
+        # Forcefully clear all icons from the model
         if self._icons:
             self._icons = {}
             self._item_changed(None)
 
+    @Trace.TraceFunction
     def refresh_all_icon_visuals(self):
         """Force a refresh notification for all currently tracked icon items."""
         if not self._usd_listening_active:
