@@ -129,6 +129,11 @@ class IconManipulator(sc.Manipulator):
                         name = name[0:4] + "..." + name[-4:]
                     sc.Label(name)
 
+        # Ensure the UI element respects the model's visibility state
+        item = self.model.get_item(prim_path) if self.model else None
+        if item is not None:
+            icon_trans.visible = item.visible
+
     def update_icon_position(self, prim_path):
         """Update the transform of an existing icon UI element."""
         icon_pos = self.model.get_position(prim_path)

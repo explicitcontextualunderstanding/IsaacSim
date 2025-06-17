@@ -14,8 +14,6 @@
     <filter include="usd-${config}" />
     <filter include="cuda" />
     <filter include="omni_client_library" />
-    <filter include="omni_usd_resolver" />
-    <filter include="usdrt" />
     <filter include="usd-release" />
     <filter include="premake" linkPath="../_build/host-deps/premake" />
   </import>
@@ -41,13 +39,9 @@
   <dependency name="python" linkPath="../_build/target-deps/python" />
   <dependency name="nvtx" linkPath="../_build/target-deps/nvtx" />
 
-  <dependency name="pxshared" linkPath="../_build/target-deps/pxshared"/>
   <dependency name="physx" linkPath="../_build/target-deps/physx" />
-  <dependency name="vhacd" linkPath="../_build/target-deps/vhacd" />
   <dependency name="usd_ext_physics_${config}" linkPath="../_build/target-deps/usd_ext_physics/${config}" />
   <dependency name="gsl" linkPath="../_build/target-deps/gsl" />
-  <dependency name="omni_usd_resolver" linkPath="../_build/target-deps/omni_usd_resolver" />
-  <dependency name="usdrt" linkPath="../_build/target-deps/usdrt" />
 
   <import path="../_build/${platform_target}/${config}/kit/dev/deps/linbuild.packman.xml">
     <filter include="linbuild" linkPath="../_build/host-deps/linbuild" tags="non-redist" />

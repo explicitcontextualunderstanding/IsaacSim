@@ -1,5 +1,5 @@
 [package]
-version = "1.2.4"
+version = "2.0.0"
 category = "other"
 title = "Sensor Icon"
 description = "sensor icon in viewport"

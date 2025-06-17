@@ -186,6 +186,9 @@ def main():
         except Exception as e:
             print(f"Failed to process {xml_file}: {e}")
 
+    print("Finished downloading all kits")
+    print("Combinations: ", combinations)
+
 
 if __name__ == "__main__":
     main()

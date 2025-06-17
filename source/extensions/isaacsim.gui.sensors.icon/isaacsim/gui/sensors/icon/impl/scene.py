@@ -99,6 +99,9 @@ class SensorIcon:
         self.toggle_all_fn = []
         self._timeline = omni.timeline.get_timeline_interface()
 
+        if self._settings.get(VISIBLE_SETTING) is False:
+            self.model.hide_all()
+
         self.timeline_event_sub = self._timeline.get_timeline_event_stream().create_subscription_to_pop(
             self._on_timeline_event, name="SensorIconTimelineEventHandler"
         )

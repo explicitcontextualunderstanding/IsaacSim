@@ -102,34 +102,179 @@ def gather_package_data(files, config, platform_abi, platform_target, package=No
     deps_count_by_file = defaultdict(lambda: defaultdict(int))
     json_output = defaultdict(dict)
     full_package_listing = defaultdict(lambda: defaultdict(list))
+    imported_packages = {}  # Store package info from imported files
+    filtered_package_names = set()  # Track which package names were filtered
+
+    def substitute_variables(path):
+        """Substitute variables in a path string.
+
+        Args:
+            path: Path string that may contain variables
+
+        Returns:
+            str: Path with variables substituted
+        """
+        path = path.replace("${config}", config)
+        path = path.replace("${platform_target}", platform_target)
+        path = path.replace("${platform_target_abi}", platform_abi)
+        path = path.replace("${platform}", platform_target)
+        return path
+
+    def process_imported_file(import_path, filters):
+        """Process an imported file and store its package information.
+
+        Args:
+            import_path: Path to the imported file
+            filters: List of package names to include from the imported file
+        """
+        try:
+            import_tree = ET.parse(import_path)
+            import_root = import_tree.getroot()
+
+            # Store package info from imported file
+            for dependency in import_root.findall(".//dependency"):
+                name = dependency.get("name")
+                if not name:
+                    continue
+
+                # Get package name if it exists
+                package_elem = dependency.find("package")
+                package_name = package_elem.get("name") if package_elem is not None else None
+
+                # Only store packages that match the filters
+                if filters:
+                    # Substitute variables in name for comparison
+                    substituted_name = substitute_variables(name)
+                    substituted_package_name = substitute_variables(package_name) if package_name else None
+
+                    if not any(
+                        substitute_variables(filter_name) in substituted_name
+                        or (substituted_package_name and substitute_variables(filter_name) in substituted_package_name)
+                        for filter_name in filters
+                    ):
+                        continue
+
+                # Check if this package is for our platform
+                platforms = dependency.get("platforms", "")
+                package_elements = dependency.findall("package")
+
+                # If there's exactly one package and it has no platform info, accept it
+                if len(package_elements) == 1 and not platforms:
+                    filtered_package_names.add(substituted_name)
+
+                    # Get version from the package element
+                    version = package_elements[0].get("version", "")
+                    # Replace variables in version string
+                    version = substitute_variables(version)
+
+                    imported_packages[substituted_name] = {
+                        "name": package_name if package_name else substituted_name,
+                        "version": version,
+                        "license_file": find_license_file(dependency.get("linkPath", ""), substituted_name),
+                    }
+                    continue
+
+                # Otherwise, check platform compatibility
+                if platforms:
+                    platform_list = platforms.split()
+                    # Skip if none of the platforms match our target
+                    if not any(platform_target.lower() in platform.lower() for platform in platform_list):
+                        continue
+
+                filtered_package_names.add(substituted_name)
+
+                # Look for version in nested package element first
+                if package_elem is not None:
+                    version = package_elem.get("version", "")
+                else:
+                    version = dependency.get("version", "")
+
+                # Replace variables in version string
+                version = substitute_variables(version)
+
+                imported_packages[substituted_name] = {
+                    "name": package_name if package_name else substituted_name,
+                    "version": version,
+                    "license_file": find_license_file(dependency.get("linkPath", ""), substituted_name),
+                }
+        except Exception as e:
+            print(f"Warning: Failed to process imported file {import_path}: {e}")
 
     for file in files:
         tree = ET.parse(file)
         root = tree.getroot()
+        file_dir = os.path.dirname(os.path.abspath(file))
 
         print(
             f"\nChecking {file} with config: {config}, platform_abi: {platform_abi}, platform_target: {platform_target}"
         )
 
-        # Only count packages that match our platform and aren't filtered
-        total_deps = sum(
-            1
-            for dep in root.findall(".//dependency")
-            for pkg in dep.findall("package")
-            if not should_filter_package(platform_filter, pkg)
-        )
-        deps_count_by_file[file][config] = total_deps
+        # Process imports first
+        for import_elem in root.findall(".//import"):
+            import_path = import_elem.get("path")
+            if not import_path:
+                continue
+
+            # Substitute variables in import path
+            import_path = substitute_variables(import_path)
+
+            # Resolve import path relative to the file being scanned
+            import_path = os.path.normpath(os.path.join(file_dir, import_path))
+
+            # Get filters if any
+            filters = []
+            for filter_elem in import_elem.findall("filter"):
+                include = filter_elem.get("include")
+                if include:
+                    # Substitute variables in filter include value
+                    include = substitute_variables(include)
+                    filters.append(include)
+
+            # Process the imported file
+            process_imported_file(import_path, filters)
+
+        # Process dependencies
+        total_deps = 0
         full_package_listing[file][config] = []
 
-        # Create mapping of package name to link path
-        package_paths = {}
-        for dep in root.findall(".//dependency"):
-            link_path = dep.get("linkPath")
-            for pkg in dep.findall("package"):
-                # Skip if this package matches our filter
-                if should_filter_package(platform_filter, pkg):
-                    continue
-                package_paths[pkg.get("name")] = link_path
+        for dependency in root.findall(".//dependency"):
+            name = dependency.get("name")
+            if not name:
+                continue
+
+            # Substitute variables in name
+            name = substitute_variables(name)
+
+            # Skip if this package matches our filter
+            if should_filter_package(platform_filter, dependency):
+                continue
+
+            total_deps += 1
+
+            # Use imported package info if available, otherwise use local info
+            if name in imported_packages:
+                package_info = imported_packages[name]
+            else:
+                # Look for version in nested package element first
+                package_elem = dependency.find("package")
+                if package_elem is not None:
+                    version = package_elem.get("version", "")
+                else:
+                    version = dependency.get("version", "")
+
+                # Replace variables in version string
+                version = substitute_variables(version)
+
+                package_info = {
+                    "name": package_elem.get("name") if package_elem is not None else name,
+                    "version": version,
+                    "license_file": find_license_file(dependency.get("linkPath", ""), name),
+                }
+
+            if not package or name == package:
+                full_package_listing[file][config].append(package_info)
+
+        deps_count_by_file[file][config] = total_deps
 
         _, results = packmanapi.verify(
             file,
@@ -141,29 +286,6 @@ def gather_package_data(files, config, platform_abi, platform_target, package=No
         )
 
         results_by_file[file][config] = results
-
-        # Update the package listing
-        for dependency in root.findall(".//dependency"):
-            for package_elem in dependency.findall("package"):
-                # Skip if this package matches our filter
-                if should_filter_package(platform_filter, package_elem):
-                    continue
-
-                name = package_elem.get("name")
-                version = package_elem.get("version", "")
-                # Replace variables in version string
-                version = version.replace("${config}", config)
-                version = version.replace("${platform_target}", platform_target)
-                version = version.replace("${platform_target_abi}", platform_target)
-
-                if not package or name == package:
-                    package_info = {
-                        "name": name,
-                        "version": version,
-                        "license_file": find_license_file(package_paths.get(name, ""), name),
-                    }
-
-                    full_package_listing[file][config].append(package_info)
 
         # Prepare JSON output for this file and config
         json_output[file][config] = {
@@ -347,6 +469,26 @@ def verify_externals(xml_files=None, package=None, platform_abi=None, platform_t
     # Get combinations from kit-sdk.packman.xml
     _, _, combinations = get_package_combinations("./deps/kit-sdk.packman.xml", platform_filter)
 
+    # Filter combinations based on platform and config if specified
+    if platform_filter or platform_target:
+        filtered_combinations = []
+        for combo in combinations:
+            if (
+                platform_filter
+                and combo.get("platform_target")
+                and platform_filter.lower() in combo.get("platform_target").lower()
+            ):
+                continue
+            if platform_target and combo.get("platform_target") != platform_target:
+                continue
+            if platform_filter or platform_target:
+                filtered_combinations.append(combo)
+        combinations = filtered_combinations
+
+    if not combinations:
+        print("No matching combinations found for the specified platform/config")
+        return 1
+
     # Gather results for each combination
     all_results = []
     for combo in combinations:
@@ -383,11 +525,66 @@ def main():
     parser.add_argument(
         "--skip-platform", "-s", help="Skip platforms containing this string (e.g., 'linux' or 'aarch64')"
     )
+    parser.add_argument(
+        "--platform", "-t", help="Explicitly set platform target (e.g., 'linux-x86_64' or 'windows-x86_64')"
+    )
+    parser.add_argument("--config", "-c", help="Explicitly set config (e.g., 'release' or 'debug')")
     args = parser.parse_args()
 
-    files = [args.file] if args.file else None
-    exit_code = verify_externals(xml_files=files, package=args.package, platform_filter=args.skip_platform)
-    exit(exit_code)
+    # Get platform info
+    platform_abi = None
+    platform_target = args.platform
+    if platform_target is None:
+        platform_abi, platform_target = detect_platform()
+
+    # Get list of files to process
+    if args.file:
+        files = [args.file]
+        if not os.path.exists(args.file):
+            raise FileNotFoundError(f"Specified file not found: {args.file}")
+    else:
+        files = glob("./deps/*.packman.xml")
+        if not files:
+            raise FileNotFoundError("No packman XML files found in ./deps/")
+
+    # Get combinations from kit-sdk.packman.xml
+    _, _, combinations = get_package_combinations("./deps/kit-sdk.packman.xml", args.skip_platform)
+
+    # Filter combinations based on platform and config if specified
+    if args.platform or args.config:
+        filtered_combinations = []
+        for combo in combinations:
+            if args.platform and combo.get("platform_target") != args.platform:
+                continue
+            if args.config and combo.get("config") != args.config:
+                continue
+            filtered_combinations.append(combo)
+        combinations = filtered_combinations
+
+    if not combinations:
+        print("No matching combinations found for the specified platform/config")
+        return 1
+
+    # Gather results for each combination
+    all_results = []
+    for combo in combinations:
+        print(f"\nVerifying with combination: {combo}")
+        results = gather_package_data(
+            files,
+            combo["config"],
+            combo.get("platform_target_abi", platform_abi),
+            combo.get("platform_target", platform_target),
+            args.package,
+            args.skip_platform,
+        )
+        all_results.append(results)
+
+    # Merge results
+    merged_results = merge_verification_results(*all_results)
+
+    # Write output and get total issues
+    configs = list(set(combo["config"] for combo in combinations))
+    return write_output_files(*merged_results, configs)
 
 
 if __name__ == "__main__":
