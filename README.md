@@ -43,7 +43,7 @@ Ensure your system is set up with the following before building Isaac Sim:
 - **Operating System**: Windows 10/11 or Linux (Ubuntu 22.04)
 
   > **(Linux) Ubuntu 24.04**
-  > Ubuntu 24.04 is not fully supported at this time. Building with Ubuntu 24.04 requires GCC/GXX 12 to be installed, GCC/GXX 13 is not supported.
+  > Ubuntu 24.04 is not fully supported at this time. Building with Ubuntu 24.04 requires GCC/G++ 11 to be installed, GCC/G++ 12+ is not supported.
 
 - **GPU**: For additional information on GPU features and requirements, see [NVIDIA GPU Requirements](https://docs.omniverse.nvidia.com/dev-guide/latest/common/technical-requirements.html)
 
@@ -84,11 +84,11 @@ Ensure your system is set up with the following before building Isaac Sim:
   ```
 
   > **(Linux) ⚠️**
-  > Please use GCC/GXX 12 or GCC/GXX 11, higher versions are not supported yet. To install GCC/GXX 12, run the following commands:
+  > Please use GCC/G++ 11, higher versions are not supported yet. To install GCC/G++ 11, run the following commands:
   > ```bash
-  > sudo apt-get install gcc-12 g++-12
-  > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
-  > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
+  > sudo apt-get install gcc-11 g++-11
+  > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200
+  > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 200 
   > ```
 
 ### Recommended Software
@@ -105,6 +105,7 @@ This section guides you through building Isaac Sim from source code.
 
 ### 1. Clone the Repository
 
+
 ```bash
 git clone https://github.com/isaac-sim/IsaacSim.git isaacsim
 cd isaacsim
@@ -117,11 +118,23 @@ git lfs pull
 Run the following command to initiate the configuration wizard:
 
 **Linux:**
+
+Confirm that GCC/G++ 11 is being used before building using the following commands:
+
+```bash
+gcc --version
+g++ --version
+```
+
 ```bash
 ./build.sh
 ```
 
 **Windows:**
+
+> **⚠️ Windows Path Length Limitation**  
+> Windows has a path length limitation of 260 characters. If you encounter errors related missing files or other build errors, try moving the repository to a shorter path.
+
 ```powershell
 build.bat
 ```
