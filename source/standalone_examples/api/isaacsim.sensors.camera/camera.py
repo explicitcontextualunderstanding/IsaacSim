@@ -25,7 +25,6 @@ parser.add_argument("--test", action="store_true", help="Enable test mode (fixed
 args, _ = parser.parse_known_args()
 
 import isaacsim.core.utils.numpy.rotations as rot_utils
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from isaacsim.core.api import World

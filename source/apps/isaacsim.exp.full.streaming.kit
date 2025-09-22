@@ -2,7 +2,7 @@
 description = "Headless Isaac Sim with Livestream using WebRTC"
 execFile = "isaac-sim.streaming"
 title = "Isaac Sim Full Streaming"
-version = "5.0.0"
+version = "5.1.0"
 
 # That makes it browsable in UI with "experience" filter
 keywords = ["experience", "app", "usd"]
@@ -13,8 +13,8 @@ keywords = ["experience", "app", "usd"]
 
 [settings]
 app.name = "Isaac-Sim Streaming"
-app.version = "5.0.0"
-app.vulkan = true                        # Explicitly enable Vulkan (on by default on Linux, off by default on Windows)
+app.version = "5.1.0"
+app.vulkan = true                        # Explicitly enable Vulkan
 app.enableDeveloperWarnings = false      # disable developer warnings to reduce log noise
 
 [settings.app.exts.folders]
@@ -34,10 +34,3 @@ drawMouse = false
 [settings.app.livestream]
 allowResize = true
 outDirectory = "${data}"
-
-[settings.exts."omni.kit.registry.nucleus"]
-registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
-	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
-	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
-]

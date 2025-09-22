@@ -29,9 +29,9 @@ namespace ros2
 namespace bridge
 {
 
-Ros2DynamicMessageImpl::Ros2DynamicMessageImpl(std::string pkgName,
-                                               std::string msgSubfolder,
-                                               std::string msgName,
+Ros2DynamicMessageImpl::Ros2DynamicMessageImpl(const std::string& pkgName,
+                                               const std::string& msgSubfolder,
+                                               const std::string& msgName,
                                                BackendMessageType messageType)
     : Ros2MessageInterfaceImpl(pkgName, msgSubfolder, msgName, messageType)
 {
@@ -43,10 +43,10 @@ Ros2DynamicMessageImpl::Ros2DynamicMessageImpl(std::string pkgName,
     m_messageVectorOgnContainer.clear();
     m_messageJsonContainer = nlohmann::json::object();
     // get message fields
-    const void* members = getIntrospectionMembers();
+    const void* members = Ros2DynamicMessageImpl::getIntrospectionMembers();
     if (members)
     {
-        parseMessageFields("", members);
+        Ros2DynamicMessageImpl::parseMessageFields("", members);
     }
 }
 
@@ -76,10 +76,10 @@ const nlohmann::json& Ros2DynamicMessageImpl::readData()
 
 const std::vector<std::shared_ptr<void>>& Ros2DynamicMessageImpl::readData(bool asOgnType)
 {
-    size_t index = 0;
     const void* members = getIntrospectionMembers();
     if (members)
     {
+        size_t index = 0;
         getMessageValues(members, reinterpret_cast<uint8_t*>(m_msg),
                          asOgnType ? m_messageVectorOgnContainer : m_messageVectorRosContainer, index, asOgnType);
     }
@@ -97,10 +97,10 @@ void Ros2DynamicMessageImpl::writeData(const nlohmann::json& data)
 
 void Ros2DynamicMessageImpl::writeData(const std::vector<std::shared_ptr<void>>& data, bool fromOgnType)
 {
-    size_t index = 0;
     const void* members = getIntrospectionMembers();
     if (members)
     {
+        size_t index = 0;
         setMessageValues(members, reinterpret_cast<uint8_t*>(m_msg), data, index, fromOgnType);
     }
 }
@@ -476,8 +476,10 @@ void Ros2DynamicMessageImpl::getArrayEmbeddedMessage(const rosidl_typesupport_in
     if (member->is_upper_bound_ || !member->array_size_)
     {
         uint8_t* memberData;
-        memcpy(&memberData, data, sizeof(void*));
-        for (size_t i = 0; i < static_cast<size_t>(data[sizeof(void*)]); ++i)
+        size_t arrayLength = 0;
+        memcpy(&memberData, data, sizeof(memberData));
+        memcpy(&arrayLength, data + sizeof(memberData), sizeof(arrayLength)); // read length
+        for (size_t i = 0; i < arrayLength; ++i)
         {
             auto jsonObj = nlohmann::json::object();
             getMessageValues(embeddedMembers, memberData + i * embeddedMembers->size_of_, jsonObj);
@@ -1218,10 +1220,8 @@ void Ros2DynamicMessageImpl::getMessageValues(const void* members,
                 auto array = std::static_pointer_cast<std::vector<std::string>>(valuePtr);
                 array->clear();
                 array->reserve(rosArray.size());
-                for (auto const& item : rosArray)
-                {
-                    array->push_back(std::string(item.data));
-                }
+                std::transform(rosArray.begin(), rosArray.end(), std::back_inserter(*array),
+                               [](const auto& item) { return std::string(item.data); });
             }
             else
             {

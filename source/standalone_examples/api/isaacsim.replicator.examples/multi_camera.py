@@ -31,7 +31,7 @@ NUM_FRAMES = 5
 
 # Save rgb image to file
 def save_rgb(rgb_data, file_name):
-    rgb_img = Image.fromarray(rgb_data, "RGBA")
+    rgb_img = Image.fromarray(rgb_data).convert("RGBA")
     rgb_img.save(file_name + ".png")
 
 
@@ -47,6 +47,7 @@ def cube_color_randomizer():
 class MyWriter(Writer):
     def __init__(self, rgb: bool = True):
         self._frame_id = 0
+        self.annotators = []
         if rgb:
             self.annotators.append(AnnotatorRegistry.get_annotator("rgb"))
         # Create writer output directory

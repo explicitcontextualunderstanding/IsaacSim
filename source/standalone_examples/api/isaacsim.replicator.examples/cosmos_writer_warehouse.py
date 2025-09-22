@@ -112,7 +112,7 @@ def run_example(num_frames, capture_interval=1, start_delay=None, use_instance_i
     print(f"Opening stage: '{stage_path}'")
     omni.usd.get_context().open_stage(stage_path)
     stage = omni.usd.get_context().get_stage()
-
+    simulation_app.update()
     # Enable script nodes
     carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
@@ -123,6 +123,7 @@ def run_example(num_frames, capture_interval=1, start_delay=None, use_instance_i
     carter_url_path = assets_root_path + CARTER_NAV_ASSET_URL
     print(f"Loading carter nova asset: '{carter_url_path}' at prim path: '{CARTER_NAV_PATH}'")
     carter_nav_prim = add_reference_to_stage(usd_path=carter_url_path, prim_path=CARTER_NAV_PATH)
+    simulation_app.update()
     if not carter_nav_prim.GetAttribute("xformOp:translate"):
         UsdGeom.Xformable(carter_nav_prim).AddTranslateOp()
     carter_nav_prim.GetAttribute("xformOp:translate").Set(CARTER_NAV_POSITION)
@@ -141,7 +142,7 @@ def run_example(num_frames, capture_interval=1, start_delay=None, use_instance_i
     if not camera_prim.IsValid():
         print(f"Camera prim not found at path: {CARTER_CAMERA_PATH}, exiting")
         return
-
+    simulation_app.update()
     # Advance the timeline with the start delay if provided
     if start_delay is not None and start_delay > 0:
         advance_timeline_by_duration(start_delay)
@@ -154,3 +155,5 @@ NUM_FRAMES = 4
 CAPTURE_INTERVAL = 2
 START_DELAY = 0.1
 run_example(num_frames=NUM_FRAMES, capture_interval=4, start_delay=START_DELAY, use_instance_id=True)
+
+simulation_app.close()

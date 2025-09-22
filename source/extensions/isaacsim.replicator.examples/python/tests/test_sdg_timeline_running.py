@@ -19,8 +19,7 @@ import omni.kit
 import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
-
-from .common import validate_folder_contents
+from isaacsim.test.utils.file_validation import validate_folder_contents
 
 
 class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):

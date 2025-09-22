@@ -48,15 +48,15 @@ def _astype(src: wp.array, dtype: type) -> wp.array:
 
 
 def place(
-    x: list | np.ndarray | wp.array,
+    x: bool | int | float | list | np.ndarray | wp.array,
     *,
     dtype: type | None = None,
     device: str | wp.context.Device | None = None,
 ) -> wp.array:
-    """Create a Warp array from a list, a NumPy array, or a Warp array.
+    """Create a Warp array from a Python primitive or list, a NumPy array, or a Warp array.
 
     Args:
-        x: List, NumPy array, or Warp array.
+        x: Python primitive or list, NumPy array, or Warp array.
             If the input is a Warp array with the same device and dtype, it is returned as is.
         dtype: Data type of the output array. If not provided, the data type of the input is used.
         device: Device to place the output array on. If ``None``, the default device is used,
@@ -76,7 +76,21 @@ def place(
         >>> import numpy as np
         >>> import warp as wp
         >>>
-        >>> # list
+        >>> # Python primitive
+        >>> # - bool
+        >>> array = ops_utils.place(True, device="cpu")  # doctest: +NO_CHECK
+        >>> print(array, array.dtype, array.device, array.shape)
+        [ True] <class 'warp.types.bool'> cpu (1,)
+        >>> # - int
+        >>> array = ops_utils.place(1, device="cpu")  # doctest: +NO_CHECK
+        >>> print(array, array.dtype, array.device, array.shape)
+        [1] <class 'warp.types.int64'> cpu (1,)
+        >>> # - float
+        >>> array = ops_utils.place(1.0, device="cpu")  # doctest: +NO_CHECK
+        >>> print(array, array.dtype, array.device, array.shape)
+        [1.] <class 'warp.types.float64'> cpu (1,)
+        >>>
+        >>> # Python list
         >>> array = ops_utils.place([1.0, 2.0, 3.0], device="cpu")  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
         [1. 2. 3.] <class 'warp.types.float64'> cpu (3,)
@@ -103,23 +117,27 @@ def place(
     elif isinstance(x, (list, tuple)):
         x = np.array(x)
         return wp.array(x, dtype=np_dtype_to_warp_type.get(x.dtype) if dtype is None else dtype, device=device)
+    elif isinstance(x, (bool, int, float)):
+        py_dtype_to_np_type = {bool: np.bool_, int: np.int64, float: np.float64}
+        x = np.array([x], dtype=py_dtype_to_np_type.get(type(x), type(x)))
+        return wp.array(x, dtype=np_dtype_to_warp_type.get(x.dtype) if dtype is None else dtype, device=device)
     raise TypeError(f"Unsupported type: {type(x)}")
 
 
 def resolve_indices(
-    x: list | np.ndarray | wp.array | None,
+    x: bool | int | float | list | np.ndarray | wp.array | None,
     *,
     count: int | None = None,
     dtype: type | None = wp.int32,
     device: str | wp.context.Device | None = None,
 ) -> wp.array:
-    """Create a flattened (1D) Warp array to be used as indices from a list, a NumPy array, or a Warp array.
+    """Create a flattened (1D) Warp array to be used as indices from a Python primitive or list, a NumPy array, or a Warp array.
 
     Args:
-        x: List, NumPy array, or Warp array.
+        x: Python primitive or list, NumPy array, or Warp array.
         count: Number of indices to resolve.
             If input argument ``x`` is ``None``, the indices are generated from 0 to ``count - 1``.
-            If the input is not ``None``, this value is ignored.
+            If input argument ``x`` is not ``None``, this value is ignored.
         dtype: Data type of the output array. If ``None``, ``wp.int32`` is used.
         device: Device to place the output array on. If ``None``, the default device is used,
             unless the input is a Warp array (in which case the input device is used).
@@ -129,6 +147,7 @@ def resolve_indices(
 
     Raises:
         ValueError: If input argument ``x`` is ``None`` and ``count`` is not provided.
+        TypeError: If the input argument ``x`` is not a supported data container.
 
     Example:
 
@@ -138,7 +157,21 @@ def resolve_indices(
         >>> import numpy as np
         >>> import warp as wp
         >>>
-        >>> # list
+        >>> # Python primitive
+        >>> # - bool
+        >>> indices = ops_utils.resolve_indices(True, device="cpu")  # doctest: +NO_CHECK
+        >>> print(indices, indices.dtype, indices.device, indices.shape)
+        [1] <class 'warp.types.int32'> cpu (1,)
+        >>> # - int
+        >>> indices = ops_utils.resolve_indices(2, device="cpu")  # doctest: +NO_CHECK
+        >>> print(indices, indices.dtype, indices.device, indices.shape)
+        [2] <class 'warp.types.int32'> cpu (1,)
+        >>> # - float
+        >>> indices = ops_utils.resolve_indices(3.0, device="cpu")  # doctest: +NO_CHECK
+        >>> print(indices, indices.dtype, indices.device, indices.shape)
+        [3] <class 'warp.types.int32'> cpu (1,)
+        >>>
+        >>> # Python list
         >>> indices = ops_utils.resolve_indices([1, 2, 3], device="cpu")  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
         [1 2 3] <class 'warp.types.int32'> cpu (3,)
@@ -170,16 +203,20 @@ def resolve_indices(
         return wp.array(x.flatten(), dtype=dtype, device=device)
     elif isinstance(x, (list, tuple)):
         return wp.array(x, dtype=dtype, device=device).flatten()
+    elif isinstance(x, (bool, int, float)):
+        return wp.array([x], dtype=dtype, device=device).flatten()
+    else:
+        raise TypeError(f"Unsupported type: {type(x)}")
 
 
 def broadcast_to(
-    x: list | np.ndarray | wp.array,
+    x: bool | int | float | list | np.ndarray | wp.array,
     *,
     shape: list[int],
     dtype: type | None = None,
     device: str | wp.context.Device | None = None,
 ) -> wp.array:
-    """Broadcast a list, a NumPy array, or a Warp array to a Warp array with a new shape.
+    """Broadcast a Python primitive or list, a NumPy array, or a Warp array to a Warp array with a new shape.
 
     .. note::
 
@@ -190,7 +227,7 @@ def broadcast_to(
         * one of them is 1.
 
     Args:
-        x: List, NumPy array, or Warp array.
+        x: Python primitive or list, NumPy array, or Warp array.
         shape: Shape of the desired array.
         dtype: Data type of the output array. If ``None``, the data type of the input is used.
         device: Device to place the output array on. If ``None``, the default device is used,
@@ -201,6 +238,7 @@ def broadcast_to(
 
     Raises:
         ValueError: If the input list or array is not compatible with the new shape according to the broadcasting rules.
+        TypeError: If the input argument ``x`` is not a supported data container.
 
     Example:
 
@@ -210,7 +248,21 @@ def broadcast_to(
         >>> import numpy as np
         >>> import warp as wp
         >>>
-        >>> # list
+        >>> # Python primitive
+        >>> # - bool
+        >>> array = ops_utils.broadcast_to(True, shape=(1, 3))  # doctest: +NO_CHECK
+        >>> print(array)
+        [[ True  True  True]]
+        >>> # - int
+        >>> array = ops_utils.broadcast_to(2, shape=(1, 3))  # doctest: +NO_CHECK
+        >>> print(array)
+        [[2 2 2]]
+        >>> # - float
+        >>> array = ops_utils.broadcast_to(3.0, shape=(1, 3))  # doctest: +NO_CHECK
+        >>> print(array)
+        [[3. 3. 3.]]
+        >>>
+        >>> # Python list
         >>> array = ops_utils.broadcast_to([1, 2, 3], shape=(1, 3))  # doctest: +NO_CHECK
         >>> print(array)
         [[1 2 3]]
@@ -258,6 +310,12 @@ def broadcast_to(
     elif isinstance(x, (list, tuple)):
         x = np.broadcast_to(np.array(x), shape=shape)
         return wp.array(x, dtype=np_dtype_to_warp_type.get(x.dtype) if dtype is None else dtype, device=device)
+    elif isinstance(x, (bool, int, float)):
+        py_dtype_to_np_type = {bool: np.bool_, int: np.int64, float: np.float64}
+        x = np.broadcast_to(np.array([x], dtype=py_dtype_to_np_type.get(type(x), type(x))), shape=shape)
+        return wp.array(x, dtype=np_dtype_to_warp_type.get(x.dtype) if dtype is None else dtype, device=device)
+    else:
+        raise TypeError(f"Unsupported type: {type(x)}")
 
 
 """

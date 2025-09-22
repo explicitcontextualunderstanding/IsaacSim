@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0] - 2025-08-21
+### Changed
+- Remove app selector launcher
+- Moved help menu links to isaacsim.gui.menu
+- Added Exec field to Isaac Sim desktop file so icon can launch app
+- removed /persistent/exts/omni.anim.navigation.core/navMesh/config/autoRebakeOnChanges setting as its already specified in isaacsim.exp.base.kit
+
 ## [1.4.10] - 2025-07-22
 ### Fixed
 - Fix exception caused if extension is disabled while ros bridge is being enabled

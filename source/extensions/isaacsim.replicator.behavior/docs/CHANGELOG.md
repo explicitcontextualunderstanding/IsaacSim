@@ -1,4 +1,12 @@
 # Changelog
+## [1.1.16] - 2025-09-16
+### Fixed
+- Added kit update after timeline.stop to fix flaky test due to stage loading status
+
+## [1.1.15] - 2025-09-15
+### Changed
+- switched to isaacsim.test.utils for golden image comparison in tests
+
 ## [1.1.14] - 2025-07-17
 ### Changed
 - Updated windows golden images

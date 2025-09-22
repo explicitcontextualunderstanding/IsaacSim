@@ -19,6 +19,9 @@
 
 #include <usdrt/gf/matrix.h>
 
+#include <string>
+#include <vector>
+
 namespace isaacsim
 {
 namespace robot
@@ -41,19 +44,37 @@ struct SurfaceGripperInterface
     CARB_PLUGIN_INTERFACE("isaacsim::robot::surface_gripper::ISurfaceGripper", 0, 1);
 
     /** @brief Function pointer to get the current status of a surface gripper */
-    const char*(CARB_ABI* GetGripperStatus)(const char* primPath);
+    int(CARB_ABI* getGripperStatus)(const char* primPath);
 
     /** @brief Function pointer to open/release a surface gripper */
-    bool(CARB_ABI* OpenGripper)(const char* primPath);
+    bool(CARB_ABI* openGripper)(const char* primPath);
 
     /** @brief Function pointer to close/activate a surface gripper */
-    bool(CARB_ABI* CloseGripper)(const char* primPath);
+    bool(CARB_ABI* closeGripper)(const char* primPath);
 
     /** @brief Function pointer to set a specific gripper action value */
-    bool(CARB_ABI* SetGripperAction)(const char* primPath, const float action);
+    bool(CARB_ABI* setGripperAction)(const char* primPath, const float action);
 
     /** @brief Function pointer to get the list of objects currently gripped */
-    std::vector<std::string>(CARB_ABI* GetGrippedObjects)(const char* primPath);
+    std::vector<std::string>(CARB_ABI* getGrippedObjects)(const char* primPath);
+
+    /** @brief Function pointer to set whether to write to USD */
+    bool(CARB_ABI* setWriteToUsd)(const bool writeToUsd);
+
+    /** @brief Function pointer to get statuses for multiple surface grippers */
+    std::vector<int>(CARB_ABI* getGripperStatusBatch)(const char* const* primPaths, size_t count);
+
+    /** @brief Function pointer to open multiple surface grippers */
+    std::vector<bool>(CARB_ABI* openGripperBatch)(const char* const* primPaths, size_t count);
+
+    /** @brief Function pointer to close multiple surface grippers */
+    std::vector<bool>(CARB_ABI* closeGripperBatch)(const char* const* primPaths, size_t count);
+
+    /** @brief Function pointer to set actions for multiple surface grippers */
+    std::vector<bool>(CARB_ABI* setGripperActionBatch)(const char* const* primPaths, const float* actions, size_t count);
+
+    /** @brief Function pointer to get gripped objects for multiple surface grippers */
+    std::vector<std::vector<std::string>>(CARB_ABI* getGrippedObjectsBatch)(const char* const* primPaths, size_t count);
 };
 
 } // namespace surface_gripper

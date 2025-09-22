@@ -16,6 +16,7 @@ import os
 
 import omni.ui as ui
 import omni.usd
+from omni.usd import Sdf
 
 from ..builders.robot_templates import RobotRegistry
 from ..style import LABEL_COLOR, LABEL_ERROR_COLOR, LABEL_WARNING_COLOR
@@ -118,6 +119,9 @@ class PrepareFiles:
                                 mouse_pressed_fn=lambda x, y, b, a: self.select_robot_folder(self._robot_folder_widget),
                             )
                             ui.Spacer(width=5)
+                        self._invalid_robot_name_label = ui.Label(
+                            "Invalid Robot Name", visible=False, style={"color": "red"}
+                        )
                         ui.Spacer(height=10)
 
                     # step 2: actions for the current stage if the current stage is not saved
@@ -273,6 +277,10 @@ class PrepareFiles:
 
     def _build_robot_files_frame(self):
         robot_name = self._robot_name_widget.model.get_value_as_string()
+        if not Sdf.Path.IsValidIdentifier(robot_name):
+            self._invalid_robot_name_label.visible = True
+        else:
+            self._invalid_robot_name_label.visible = False
         robot_root_folder = self._robot_folder_widget.model.get_value_as_string()
         current_stage_path = self._current_stage_path_widget.model.get_value_as_string()
         base_file_path = os.path.join(robot_root_folder, "configurations", robot_name + "_base.usd")

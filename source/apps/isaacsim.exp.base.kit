@@ -1,7 +1,7 @@
 [package]
 description = "Base Isaac Sim App"
 title = "Isaac Sim Base"
-version = "5.0.0"
+version = "5.1.0"
 keywords = ["experience", "app", "usd"] # That makes it browsable in UI with "experience" filter
 
 
@@ -159,7 +159,7 @@ renderer.asyncInit = true # Don't block while renderer inits
 renderer.gpuEnumeration.glInterop.enabled = false # Improves startup speed.
 rtx-transient.dlssg.enabled = false # DLSSG frame generation is not compatible with synthetic data generation
 rtx.hydra.mdlMaterialWarmup = true # start loading the MDL shaders needed before any delegate is actually created.
-rtx.post.dlss.execMode = 3 # Set the DLSS model can be 0 (Performance), 1 (Balanced), 2 (Quality), or 3 (Auto)
+rtx.post.dlss.execMode = 0 # Set the DLSS model can be 0 (Performance), 1 (Balanced), 2 (Quality), or 3 (Auto)
 omni.replicator.asyncRendering = false # Async rendering must be disabled for SDG
 exts."omni.kit.test".includeTests = ["*isaac*"] # Add isaac tests to test runner
 foundation.verifyOsVersion.enabled = false
@@ -194,7 +194,7 @@ show_menu_titles = true
 
 [settings.app]
 name = "Isaac-Sim Base"
-version = "5.0.0"
+version = "5.1.0"
 versionFile = "${app}/../VERSION"
 content.emptyStageOnStart = true
 fastShutdown = true
@@ -276,10 +276,3 @@ renderer.startupMessageDisplayed = true # hides the IOMMU popup window
 resourcemonitor.timeBetweenQueries = 100 # improves performance
 simulation.defaultMetersPerUnit = 1.0 # Meters default
 omni.replicator.captureOnPlay = true
-
-[settings.exts."omni.kit.registry.nucleus"]
-registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
-	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
-	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
-]

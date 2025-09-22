@@ -23,7 +23,7 @@
 #include <carb/logging/Logger.h>
 
 #include <isaacsim/core/includes/BaseResetNode.h>
-#include <isaacsim/core/nodes/ICoreNodes.h>
+#include <isaacsim/core/simulation_manager/ISimulationManager.h>
 #include <omni/usd/UsdContext.h>
 #include <omni/usd/UsdContextIncludes.h>
 
@@ -42,7 +42,8 @@ public:
     static void initInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
     {
         auto& state = OgnIsaacRealTimeFactorDatabase::sPerInstanceState<OgnIsaacRealTimeFactor>(nodeObj, instanceId);
-        state.m_coreNodeFramework = carb::getCachedInterface<isaacsim::core::nodes::CoreNodes>();
+        state.m_simulationManagerFramework =
+            carb::getCachedInterface<isaacsim::core::simulation_manager::ISimulationManager>();
     }
 
     static bool compute(OgnIsaacRealTimeFactorDatabase& db)
@@ -53,7 +54,7 @@ public:
         if (state.m_resetTimes)
         {
             state.m_realStartTime = std::chrono::steady_clock::now();
-            state.m_simStartTime = state.m_coreNodeFramework->getSimTimeMonotonic();
+            state.m_simStartTime = state.m_simulationManagerFramework->getSimulationTimeMonotonic();
             state.m_resetTimes = false;
             return false;
         }
@@ -62,7 +63,7 @@ public:
                                      std::chrono::steady_clock::now() - state.m_realStartTime)
                                      .count();
 
-        double simTimeElapsed = state.m_coreNodeFramework->getSimTimeMonotonic() - state.m_simStartTime;
+        double simTimeElapsed = state.m_simulationManagerFramework->getSimulationTimeMonotonic() - state.m_simStartTime;
 
         if (simTimeElapsed == 0.0)
         {
@@ -73,7 +74,7 @@ public:
 
         db.outputs.rtf() = rtf;
         state.m_realStartTime = std::chrono::steady_clock::now();
-        state.m_simStartTime = state.m_coreNodeFramework->getSimTimeMonotonic();
+        state.m_simStartTime = state.m_simulationManagerFramework->getSimulationTimeMonotonic();
 
         return true;
     }
@@ -85,12 +86,12 @@ public:
 
 private:
     std::chrono::steady_clock::time_point m_realStartTime;
-    double m_simStartTime;
+    double m_simStartTime = 0.0;
     bool m_resetTimes = true;
     uint64_t m_frames = 0;
     uint64_t m_step = 1;
 
-    isaacsim::core::nodes::CoreNodes* m_coreNodeFramework;
+    isaacsim::core::simulation_manager::ISimulationManager* m_simulationManagerFramework = nullptr;
 };
 
 REGISTER_OGN_NODE()

@@ -34,7 +34,6 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True})
 
-import carb
 import omni.kit.test
 from isaacsim.core.api import PhysicsContext
 from isaacsim.core.utils.extensions import enable_extension

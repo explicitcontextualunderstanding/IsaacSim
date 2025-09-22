@@ -17,6 +17,8 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
 
+import sys
+
 import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
@@ -39,7 +41,8 @@ my_world.reset()
 for i in range(500):
     my_world.step(render=False)
 my_world.render()
-if not (xfrom_cube.get_world_poses()[0][:, -1].item() < 10e-02):
-    raise (ValueError(f"PhysX status is not updated in the rendering call"))
+if not (xfrom_cube.get_world_poses(usd=False)[0][:, -1].item() < 10e-02):
+    print(f"[FAIL] PhysX status is not updated in the rendering call")
+    sys.exit(1)
 
 simulation_app.close()

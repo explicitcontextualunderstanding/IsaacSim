@@ -1,5 +1,5 @@
 [package]
-version = "2.5.8"
+version = "2.5.11"
 category = "Simulation"
 title = "Omniverse MJCF Importer"
 description = "MJCF Importer"
@@ -12,6 +12,7 @@ writeTarget.kit = true
 
 [dependencies]
 "isaacsim.robot.schema" = {}
+"omni.kit.asset_converter" = {}
 "omni.kit.commands" = {}
 "omni.kit.helper.file_utils" = {}
 "omni.kit.pip_archive" = {} # pulls in pillow

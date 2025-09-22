@@ -58,7 +58,7 @@ bool KinematicChain::computeKinematicChain(const UrdfRobot& urdfRobot)
     {
         std::vector<std::string> childLinkNames;
 
-        for (auto& joint : urdfRobot.joints)
+        for (const auto& joint : urdfRobot.joints)
         {
             childLinkNames.push_back(joint.second.childLinkName);
         }

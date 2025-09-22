@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.8] - 2025-08-21
+### Changed
+- prim name checks
+- icons and preview pngs
+
 ## [0.0.7] - 2025-06-10
 ### Changed
 - pulled robot schema into its own variant

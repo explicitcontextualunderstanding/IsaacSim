@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ctypes
+import builtins
 import glob
 import os
 import sys
 
 
 def bootstrap_kernel():
-    using_inner_kernel = False
-
     # isaac-sim path
     isaacsim_path = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
 
@@ -33,21 +31,21 @@ def bootstrap_kernel():
     # kit path (internal kernel)
     if os.path.isdir(os.path.join(isaacsim_path, "kit", "extscore")):
         kit_path = os.path.join(isaacsim_path, "kit")
-        using_inner_kernel = True
+        if kit_path not in sys.path:
+            sys.path.append(kit_path)
+        try:
+            import kit_app  # importing 'kit_app' will bootstrap kernel
+
+        except Exception as e:
+            sys.exit(f"Unable to bootstrap inner kit kernel: {e}")
     # kit path (omniverse-kit kernel package)
     else:
         try:
-            import omni.kit_app  # importing 'omni.kit_app' will bootstrap kernel
+            import omni.kit_app  # importing 'kit_app' will bootstrap kernel
 
             kit_path = os.path.dirname(os.path.abspath(os.path.realpath(omni.kit_app.__file__)))
         except ModuleNotFoundError:
-            print("Unable to find 'omniverse-kit' package")
-            exit()
-
-    # preload libcarb.so
-    if using_inner_kernel:
-        carb_library = "carb.dll" if sys.platform == "win32" else "libcarb.so"
-        ctypes.PyDLL(os.path.join(kit_path, carb_library), mode=ctypes.RTLD_GLOBAL)
+            sys.exit("Unable to find 'omniverse-kit' package")
 
     # set environment variables
     if not os.environ.get("CARB_APP_PATH", None):
@@ -62,14 +60,8 @@ def bootstrap_kernel():
         os.environ["ISAAC_JUPYTER_PYTHON_PACKAGE"] = "1"
 
     # set PYTHONPATH
-    paths = []
-    # kit
-    if using_inner_kernel:
-        paths += [
-            os.path.join(kit_path, "kernel", "py"),
-        ]
     # isaac-sim
-    paths += [
+    paths = [
         os.path.join(isaacsim_path, "exts", "isaacsim.simulation_app"),
         os.path.join(isaacsim_path, "extsDeprecated", "omni.isaac.kit"),
     ]
@@ -77,7 +69,7 @@ def bootstrap_kernel():
     for path in paths:
         if not path in sys.path:
             if not os.path.exists(path):
-                print(f"PYTHONPATH: path doesn't exist ({path})")
+                print(f"[Warning] PYTHONPATH: path doesn't exist ({path})")
                 continue
             sys.path.insert(0, path)
 
@@ -86,7 +78,6 @@ def bootstrap_kernel():
 
     carb.log_info(f"Isaac Sim path: {isaacsim_path}")
     carb.log_info(f"Kit path: {kit_path}")
-    carb.log_info(f"Using inner kernel: {using_inner_kernel}")
 
 
 def expose_api():
@@ -103,10 +94,10 @@ def expose_api():
                 os.path.join(
                     os.environ.get("ISAAC_PATH", isaacsim_path), "exts*", "isaacsim.simulation_app*", "isaacsim"
                 )
-            )[0]
-            if os.path.exists(path):
+            )
+            if len(path) and os.path.exists(path[0]):
                 # register path
-                sys.path.insert(0, path)
+                sys.path.insert(0, path[0])
                 # import API
                 from simulation_app import AppFramework, SimulationApp
 
@@ -115,9 +106,9 @@ def expose_api():
                 sys.modules["isaacsim.simulation_app.SimulationApp"] = SimulationApp
                 sys.modules["isaacsim.simulation_app.AppFramework"] = AppFramework
             else:
-                print(f"PYTHONPATH: path doesn't exist ({path})")
+                print(f"[Warning] Unable to expose 'isaacsim.simulation_app' API: Extension not found")
         except ImportError as e:
-            print(f"Unable to expose 'isaacsim.simulation_app' API: {e}")
+            print(f"[Warning] Unable to expose 'isaacsim.simulation_app' API: {e}")
     return AppFramework, SimulationApp
 
 
@@ -139,8 +130,7 @@ def main():
 
             kit_path = os.path.dirname(os.path.abspath(os.path.realpath(omni.kit_app.__file__)))
         except ModuleNotFoundError:
-            print("Unable to find 'omniverse-kit' package")
-            exit()
+            sys.exit("Unable to find 'omniverse-kit' package")
 
     # experience file
     experience = args[0] if len(args) and not args[0].startswith("-") else "isaacsim.exp.full"
@@ -153,12 +143,12 @@ def main():
                     args = args[1:]
                 break
     if not os.path.isfile(experience):
-        print(f"Invalid experience (.kit) file: {args[0] if len(args) else ''}")
-        exit()
+        sys.exit(f"Unable to find experience (.kit) file: '{args[0] if len(args) else experience}'")
 
     # launch app
     if using_inner_kernel:
-        sys.path.append(kit_path)
+        if kit_path not in sys.path:
+            sys.path.append(kit_path)
         from kit_app import KitApp
     else:
         from omni.kit_app import KitApp
@@ -170,7 +160,47 @@ def main():
     sys.exit(app.shutdown())
 
 
+"""
+Setup Isaac Sim launch.
+"""
+
 bootstrap_kernel()
 
 # make isaacsim.simulation_app discoverable
 AppFramework, SimulationApp = expose_api()
+
+
+# register custom exception handler
+def exception_handler(exc_type, exc_value, exc_traceback):
+    ret = _excepthook(exc_type, exc_value, exc_traceback)
+    if issubclass(exc_type, (ImportError, ModuleNotFoundError)):
+        if not hasattr(builtins, "ISAACSIM_APP_LAUNCHED"):
+            print(
+                """
+========================================================================
+WARNING: Omniverse/Isaac Sim import statements must take place after the
+`SimulationApp` class has been instantiated. It is a requirement of the
+Carbonite framework's extension/runtime plugin system.
+========================================================================
+
+Ensure that the `SimulationApp` class is instantiated before importing
+any other Omniverse/Isaac Sim modules, as shown below:
+
+    ------------------------------------------------------------------
+    from isaacsim import SimulationApp
+
+    # instantiate the SimulationApp helper class
+    simulation_app = SimulationApp({"headless": False})
+
+    # execute other Omniverse/Isaac Sim imports after instantiating it
+    from isaacsim...
+    ------------------------------------------------------------------
+
+========================================================================
+"""
+            )
+    return ret
+
+
+_excepthook = sys.excepthook
+sys.excepthook = exception_handler

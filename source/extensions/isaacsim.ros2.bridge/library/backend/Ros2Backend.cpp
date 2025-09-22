@@ -28,9 +28,9 @@ namespace ros2
 namespace bridge
 {
 
-Ros2MessageInterfaceImpl::Ros2MessageInterfaceImpl(std::string pkgName,
-                                                   std::string msgSubfolder,
-                                                   std::string msgName,
+Ros2MessageInterfaceImpl::Ros2MessageInterfaceImpl(const std::string& pkgName,
+                                                   const std::string& msgSubfolder,
+                                                   const std::string& msgName,
                                                    BackendMessageType messageType,
                                                    bool showLoadingError)
     : Ros2MessageInterface(pkgName, msgSubfolder, msgName, messageType, showLoadingError)
@@ -62,7 +62,7 @@ void Ros2MessageInterfaceImpl::writeRosHeader(const std::string& frameId,
                                               const int64_t nanoseconds,
                                               std_msgs__msg__Header& header)
 {
-    writeRosString(frameId.c_str(), header.frame_id);
+    writeRosString(frameId, header.frame_id);
     if (nanoseconds > 0)
     {
         writeRosTime(nanoseconds, header.stamp);

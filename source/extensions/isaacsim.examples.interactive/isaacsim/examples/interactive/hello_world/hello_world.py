@@ -15,7 +15,7 @@
 
 from isaacsim.examples.interactive.base_sample import BaseSample
 
-# Note: checkout the required tutorials at https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+# Note: checkout the required tutorials at https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
 
 
 class HelloWorld(BaseSample):

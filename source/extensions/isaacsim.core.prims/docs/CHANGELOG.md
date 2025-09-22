@@ -1,4 +1,17 @@
 # Changelog
+
+## [0.6.1] - 2025-09-16
+### Fixed
+- Fix ill-formed SdfPath when querying XFormPrim's applied visual materials
+
+## [0.6.0] - 2025-08-27
+### Changed
+- Re-write XFormPrim's `get_world_poses`/`set_world_poses` fabric implemenattion using Fabric Scene Delegate and IFabricHierarchy
+
+## [0.5.2] - 2025-08-13
+### Fixed
+- Auto-compute joint indices when specifying joint names to get articulation's measured joint reaction forces/torques
+
 ## [0.5.1] - 2025-07-21
 ### Changed
 - Added explicit `destroy()` method to `Prim`

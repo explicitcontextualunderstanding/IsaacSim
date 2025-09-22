@@ -50,7 +50,7 @@ public:
      * @brief Constructs a new LiDAR sensor instance
      * @param[in] physxPtr Pointer to the PhysX interface for physics simulation
      */
-    LidarSensor(omni::physx::IPhysx* physxPtr);
+    explicit LidarSensor(omni::physx::IPhysx* physxPtr);
 
     /**
      * @brief Virtual destructor for proper cleanup

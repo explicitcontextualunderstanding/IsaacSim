@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import time
 
 import numpy as np
@@ -30,7 +31,6 @@ from isaacsim.core.prims import XFormPrim
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.prims import define_prim
 from isaacsim.core.utils.stage import add_reference_to_stage, update_stage_async
-from isaacsim.storage.native import get_assets_root_path_async
 from nav_msgs.msg import Odometry
 from omni.kit.ui_test.menu import *
 from omni.kit.ui_test.query import *
@@ -77,14 +77,7 @@ class ROS2MenuTestBase(ROS2TestCase):
         self.subscribers.append(sub)
         return sub
 
-    async def process_ros_messages(self, duration=0.1):
-        """Process ROS messages for a short duration"""
-        start_time = time.time()
-        while time.time() - start_time < duration:
-            rclpy.spin_once(self.node, timeout_sec=0.01)
-            await omni.kit.app.get_app().next_update_async()
-
-    async def setup_test_environment(self, robot_path="/World/test_robot", add_test_cubes=False, articulation=False):
+    async def setup_test_environment(self, robot_path="/World/test_robot", add_test_cubes=False):
         """Helper function to set up a standard test environment with a Nova Carter robot.
 
         Args:
@@ -93,8 +86,7 @@ class ROS2MenuTestBase(ROS2TestCase):
         Returns:
             The robot prim and base_link path.
         """
-        from isaacsim.core.utils.articulations import remove_articulation_root
-        from pxr import UsdLux, UsdPhysics
+        from pxr import UsdLux
 
         # Creating environment and Carter Robot
         dome_light_path = "/World/DomeLight"
@@ -113,32 +105,21 @@ class ROS2MenuTestBase(ROS2TestCase):
 
         await update_stage_async()
 
-        assets_root_path = await get_assets_root_path_async()
-        asset_path = assets_root_path + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
+        asset_path = self._assets_root_path + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
         robot = add_reference_to_stage(usd_path=asset_path, prim_path=robot_path)
         robot.GetVariantSet("Physics").SetVariantSelection("Physics_Base")
         robot.GetVariantSet("Sensors").SetVariantSelection("All_Sensors")
 
-        if articulation:
-            # Ensure physics properties are set on the robot
-            if not UsdPhysics.ArticulationRootAPI(robot):
-                UsdPhysics.ArticulationRootAPI.Apply(robot)
-
-            # Remove the nested articulation root API if it exists
-            chassis_link_path = f"{robot_path}/chassis_link"
-            chassis_link = self._stage.GetPrimAtPath(chassis_link_path)
-            if chassis_link and chassis_link.HasAPI(UsdPhysics.ArticulationRootAPI):
-                remove_articulation_root(chassis_link)
-
         # Create base_link in chassis_link using XFormPrim
-        xform_path = f"{robot_path}/chassis_link/base_link"
+        articulation_root_path = f"{robot_path}/chassis_link"
+        xform_path = f"{articulation_root_path}/base_link"
         define_prim(prim_path=xform_path, prim_type="Xform")
 
         XFormPrim(xform_path, positions=np.array([[0.0, 0.0, 0.0]]))
 
         await update_stage_async()
 
-        return robot, xform_path
+        return robot, xform_path, articulation_root_path
 
 
 class TestMenuROS2CameraGraph(ROS2MenuTestBase):
@@ -148,7 +129,7 @@ class TestMenuROS2CameraGraph(ROS2MenuTestBase):
         """Test creation of camera graph structure via menu"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Camera")
@@ -224,7 +205,7 @@ class TestMenuROS2CameraGraph(ROS2MenuTestBase):
         """Test camera graph with null target prim"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Camera")
@@ -262,7 +243,7 @@ class TestMenuROS2CameraGraph(ROS2MenuTestBase):
         """Test camera data is being properly published to ROS2 topics"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment(add_test_cubes=True)
+        robot, base_link_path, art_root_path = await self.setup_test_environment(add_test_cubes=True)
 
         await update_stage_async()
 
@@ -325,10 +306,7 @@ class TestMenuROS2CameraGraph(ROS2MenuTestBase):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
         # Run simulation
-        timeout = 3
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
+        for _ in range(10):
             await simulate_async(0.5, callback=spin_ros)
 
             # Check if we have received messages
@@ -378,7 +356,7 @@ class TestMenuROS2LidarGraph(ROS2MenuTestBase):
     async def test_lidar_graph_creation(self):
         """Test creation of RTX Lidar graph structure via menu"""
 
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/RTX Lidar")
@@ -432,7 +410,7 @@ class TestMenuROS2LidarGraph(ROS2MenuTestBase):
         """Test lidar graph with null target prim"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/RTX Lidar")
@@ -475,7 +453,7 @@ class TestMenuROS2LidarGraph(ROS2MenuTestBase):
         from pxr import Sdf
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment(add_test_cubes=True)
+        robot, base_link_path, art_root_path = await self.setup_test_environment(add_test_cubes=True)
 
         # Pre-check if this is a 3D lidar to help with setting up the right expectations
         lidar_path = "/World/test_robot/chassis_link/sensors/XT_32/PandarXT_32_10hz"
@@ -567,10 +545,7 @@ class TestMenuROS2LidarGraph(ROS2MenuTestBase):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
         # Run simulation
-        timeout = 3  # seconds
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
+        for _ in range(10):
             await simulate_async(0.5, callback=spin_ros)
 
             # check for message
@@ -613,7 +588,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
         """Test creation of Joint States graph structure via menu"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Joint States")
@@ -629,7 +604,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
 
         # Set Articulation Root
         articulation_root_field = ui_test.find(root_widget_path + "/HStack[3]/StringField[0]")
-        articulation_root_field.model.set_value("/World/test_robot")
+        articulation_root_field.model.set_value(art_root_path)
 
         # Enable Publisher
         publisher_checkbox = ui_test.find(root_widget_path + "/HStack[4]/HStack[0]/VStack[0]/ToolButton[0]")
@@ -672,7 +647,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
         """Test robot state graph with null target prim"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Joint States")
@@ -713,7 +688,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
         """Test Joint States data is being properly published to ROS2 topics"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment(articulation=True)
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         await update_stage_async()
 
@@ -738,7 +713,15 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
         self.create_subscriber(joint_states_topic, JointState, joint_states_callback)
 
         # Create graph through menu
-        await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Joint States")
+        delays = [5, 50, 100]
+        for delay in delays:
+            try:
+                await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Joint States", human_delay_speed=delay)
+                break
+            except AttributeError as e:
+                if "NoneType' object has no attribute 'center'" in str(e) and delay != delays[-1]:
+                    continue
+                raise
         await omni.kit.app.get_app().next_update_async()
 
         # Configure graph parameters
@@ -750,7 +733,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
 
         # Set Articulation Root to the robot's root prim
         articulation_root_field = ui_test.find(root_widget_path + "/HStack[3]/StringField[0]")
-        articulation_root_field.model.set_value("/World/test_robot")
+        articulation_root_field.model.set_value(art_root_path)
 
         # Enable Publisher
         publisher_checkbox = ui_test.find(root_widget_path + "/HStack[4]/HStack[0]/VStack[0]/ToolButton[0]")
@@ -765,7 +748,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
         # Click OK button
         ok_button = ui_test.find(root_widget_path + "/HStack[6]/Button[0]")
         self.assertIsNotNone(ok_button, "OK button not found")
-        await ok_button.click()
+        await ok_button.click(human_delay_speed=50)
 
         await omni.kit.app.get_app().next_update_async()
 
@@ -773,53 +756,6 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
         graph_path = "/Graph/ROS_JointStates"  # Standard path for joint states graph from menu
         graph = og.get_graph_by_path(graph_path)
         self.assertIsNotNone(graph, "ROS Joint States graph not found")
-
-        # Find the joint state publisher node and check if simulation time node exists
-        joint_state_publisher = None
-        sim_time_node = None
-
-        for node in graph.get_nodes():
-            node_type = node.get_type_name()
-
-            if "ROS2PublishJointState" in node_type:
-                joint_state_publisher = node
-            elif "IsaacReadSimulationTime" in node_type:
-                sim_time_node = node
-
-        # Create simulation time node if it doesn't exist
-        if not sim_time_node:
-            og.Controller.edit(
-                {"graph_path": graph_path, "evaluator_name": "execution"},
-                {
-                    og.Controller.Keys.CREATE_NODES: [
-                        ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
-                    ],
-                    og.Controller.Keys.CONNECT: [
-                        ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
-                    ],
-                },
-            )
-
-            # Find the newly created simulation time node
-            for node in graph.get_nodes():
-                if "IsaacReadSimulationTime" in node.get_type_name():
-                    sim_time_node = node
-                    break
-
-        # Connect simulation time to the joint state publisher's timestamp input
-        if sim_time_node and joint_state_publisher:
-            try:
-                # Get the output attribute from simulation time node
-                sim_time_attr = sim_time_node.get_attribute("outputs:simulationTime")
-
-                # Get the timestamp input attribute from publisher node
-                timestamp_attr = joint_state_publisher.get_attribute("inputs:timeStamp")
-
-                # Connect them if they exist
-                if sim_time_attr and timestamp_attr:
-                    og.Controller.connect(sim_time_attr, timestamp_attr)
-            except Exception as e:
-                print(f"{e}")
 
         # Give the graph time to initialize
         await simulate_async(1.0)
@@ -832,10 +768,7 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
         # Run simulation
-        timeout = 3
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
+        for _ in range(10):
             await simulate_async(0.5, callback=spin_ros)
 
             # Check if we have received the messages we need
@@ -871,11 +804,9 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
             # Create a command message
             command_msg = JointState()
             command_msg.header = Header()
-            command_msg.header.stamp = self.node.get_clock().now().to_msg()
 
             # Find wheel joints
             wheel_indices = [i for i, name in enumerate(self.joint_state_data.name) if "wheel" in name]
-
             if wheel_indices:
                 command_msg.name = [self.joint_state_data.name[i] for i in wheel_indices]
                 command_msg.position = [0.0] * len(wheel_indices)  # Set to zero position
@@ -889,12 +820,16 @@ class TestMenuROS2JointStatesGraph(ROS2MenuTestBase):
                 self.joint_state_data = None
 
                 # Publish command
-                command_publisher.publish(command_msg)
 
                 # Run simulation to let command take effect
                 self._timeline.play()
+                for i in range(10):
+                    command_msg.header.stamp = self.node.get_clock().now().to_msg()
+                    command_publisher.publish(command_msg)
+                    await simulate_async(0.1, callback=spin_ros)
+
                 # Run for longer to ensure joints have time to move
-                await simulate_async(5.0, callback=spin_ros)
+                await simulate_async(1.0, callback=spin_ros)
                 self._timeline.stop()
 
                 # Verify the joints moved in response to the command
@@ -943,7 +878,7 @@ class TestMenuROS2TFGraph(ROS2MenuTestBase):
         """Test creation of TF graph structure via menu"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/TF Publisher")
@@ -992,7 +927,7 @@ class TestMenuROS2TFGraph(ROS2MenuTestBase):
         """Test TF graph with null target prim"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/TF Publisher")
@@ -1033,7 +968,7 @@ class TestMenuROS2TFGraph(ROS2MenuTestBase):
         """Test TF transform data is being properly published to ROS2 topics"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment(articulation=True)
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         self.tf_data = None
 
@@ -1062,7 +997,7 @@ class TestMenuROS2TFGraph(ROS2MenuTestBase):
 
         # Set Target Prim
         target_prim_field = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
-        target_prim_field.model.set_value("/World/test_robot")
+        target_prim_field.model.set_value(art_root_path)
 
         await omni.kit.app.get_app().next_update_async()
 
@@ -1080,10 +1015,7 @@ class TestMenuROS2TFGraph(ROS2MenuTestBase):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
         # Run simulation
-        timeout = 3
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
+        for _ in range(10):
             await simulate_async(0.5, callback=spin_ros)
 
             if self.tf_data is not None:
@@ -1135,7 +1067,7 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
         """Test creation of Odometry graph structure via menu"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Odometry Publisher")
@@ -1191,7 +1123,7 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
         """Test odometry graph with null chassis prim"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Odometry Publisher", human_delay_speed=50)
@@ -1237,7 +1169,7 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
         """Test odometrydata is being properly published to ROS2 topics"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment(articulation=True)
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Setup ROS2 subscribers for both TF and Odometry messages
         self.tf_data = None
@@ -1248,10 +1180,10 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
 
         # Create callbacks to store message data
         def tf_callback(msg):
-            self.tf_data = msg
+            self.tf_data = copy.deepcopy(msg)
 
         def odom_callback(msg):
-            self.odom_data = msg
+            self.odom_data = copy.deepcopy(msg)
 
         # Create subscribers
         self.create_subscriber(tf_topic, TFMessage, tf_callback)
@@ -1288,7 +1220,7 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
 
         # Set Robot Articulation Root to the top-level robot prim
         articulation_root_field = ui_test.find(odom_root_widget_path + "/HStack[4]/StringField[0]")
-        articulation_root_field.model.set_value("/World/test_robot")
+        articulation_root_field.model.set_value(art_root_path)
 
         # Set Chassis Link Prim
         chassis_link_prim_field = ui_test.find(odom_root_widget_path + "/HStack[5]/StringField[0]")
@@ -1335,7 +1267,7 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
             # Set the target prims on the TF publisher to ensure the robot is published
             target_prims_attr = tf_publisher.get_attribute("inputs:targetPrims")
             if target_prims_attr:
-                og.Controller.set(target_prims_attr, [usdrt.Sdf.Path("/World/test_robot")])
+                og.Controller.set(target_prims_attr, [usdrt.Sdf.Path(art_root_path)])
 
         # Run simulation
         self._timeline.play()
@@ -1344,19 +1276,18 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
         # Run simulation
-        timeout = 3
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
+        frame_ids = set()
+        child_frame_ids = set()
+        for _ in range(10):
             await simulate_async(0.5, callback=spin_ros)
 
             # Check if we have received both types of messages
-            if self.tf_data is not None and self.odom_data is not None:
-                break
+            if self.tf_data and self.odom_data:
+                frame_ids.update(transform.header.frame_id for transform in self.tf_data.transforms)
+                child_frame_ids.update(transform.child_frame_id for transform in self.tf_data.transforms)
 
-        # Stop simulation
-        self._timeline.stop()
-        await omni.kit.app.get_app().next_update_async()
+                if "base_link" in frame_ids or "base_link" in child_frame_ids:
+                    break
 
         # Validate TF data
         self.assertIsNotNone(self.tf_data, "No TF messages received")
@@ -1401,6 +1332,8 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
             # Check twist data is present
             self.assertIsNotNone(self.odom_data.twist.twist.linear.x, "Missing linear.x velocity")
             self.assertIsNotNone(self.odom_data.twist.twist.angular.z, "Missing angular.z velocity")
+        # Stop simulation
+        self._timeline.stop()
 
 
 class TestMenuROS2ClockGraph(ROS2MenuTestBase):
@@ -1410,7 +1343,7 @@ class TestMenuROS2ClockGraph(ROS2MenuTestBase):
         """Test creation of Clock graph structure via menu"""
 
         # Create environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Clock")
@@ -1455,7 +1388,7 @@ class TestMenuROS2ClockGraph(ROS2MenuTestBase):
         """Test Clock data is being properly published to ROS2 topics with data validation"""
 
         # Create environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         await update_stage_async()
 
@@ -1590,7 +1523,7 @@ class TestMenuROS2GenericPublisherGraph(ROS2MenuTestBase):
         """Test generic publisher graph creation from menu"""
 
         # Creating environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Click through the menu to create the graph
         await menu_click("Tools/Robotics/ROS 2 OmniGraphs/Generic Publisher")
@@ -1635,7 +1568,7 @@ class TestMenuROS2GenericPublisherGraph(ROS2MenuTestBase):
         """Test Generic Publisher data is properly publishing RTF as Float32 to ROS2 topics"""
 
         # Create environment and Carter Robot
-        robot, base_link_path = await self.setup_test_environment()
+        robot, base_link_path, art_root_path = await self.setup_test_environment()
 
         # Setup ROS2 subscribers
         # Store actual message data for validation
@@ -1701,12 +1634,10 @@ class TestMenuROS2GenericPublisherGraph(ROS2MenuTestBase):
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
         # Run simulation
-        timeout = 3
-        start_time = time.time()
 
         print("Starting RTF Float32 Publisher data collection...")
 
-        while time.time() - start_time < timeout:
+        for _ in range(10):
             await simulate_async(0.5, callback=spin_ros)
 
             # check for message

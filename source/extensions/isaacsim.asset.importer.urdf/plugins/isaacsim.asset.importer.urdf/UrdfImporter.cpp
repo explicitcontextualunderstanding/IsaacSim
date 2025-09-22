@@ -55,6 +55,7 @@
 #include <rapidjson/writer.h>
 
 #include <OmniClient.h>
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -128,17 +129,13 @@ pxr::UsdPrim FindPrimByNameAndType(const pxr::UsdStageRefPtr& stage,
     // Define the range for traversal with type filtering
     pxr::UsdPrimRange range(stage->GetPrimAtPath(rootPath));
 
-    // Iterate over prims within the range
-    for (const pxr::UsdPrim& prim : range)
-    {
-        // Check if the prim matches the given name
-        if (prim.GetName() == primName && prim.IsA(primType))
-        {
-            return prim;
-        }
-    }
-    // If the prim is not found, return an invalid prim
-    return pxr::UsdPrim();
+    // Use std::find_if to find the prim matching the criteria
+    auto it = std::find_if(range.begin(), range.end(),
+                           [&primName, &primType](const pxr::UsdPrim& prim)
+                           { return prim.GetName() == primName && prim.IsA(primType); });
+
+    // Return the found prim or an invalid prim if not found
+    return (it != range.end()) ? *it : pxr::UsdPrim();
 }
 pxr::GfVec3d getScale(UrdfGeometry geometry)
 {
@@ -154,9 +151,9 @@ pxr::GfVec3d getScale(UrdfGeometry geometry)
 }
 pxr::UsdPrim addMeshReference(UrdfGeometry geometry,
                               pxr::UsdStageWeakPtr stage,
-                              std::string assetRoot,
-                              std::string urdfPath,
-                              std::string meshName,
+                              const std::string& assetRoot,
+                              const std::string& urdfPath,
+                              const std::string& meshName,
                               std::map<pxr::TfToken, pxr::SdfPath>& meshList,
                               std::map<pxr::TfToken, pxr::SdfPath>& materialList,
                               const pxr::SdfPath& robotRoot,
@@ -167,8 +164,8 @@ pxr::UsdPrim addMeshReference(UrdfGeometry geometry,
     pxr::SdfPath path;
     if (meshPath.empty())
     {
-        CARB_LOG_WARN("Failed to resolve mesh '%s'", meshUri.c_str());
-        return pxr::UsdPrim();
+        CARB_LOG_ERROR("Failed to resolve mesh '%s'", meshUri.c_str());
+        return usdXform.GetPrim();
     }
     else if (IsUsdFile(meshPath))
     {
@@ -180,12 +177,17 @@ pxr::UsdPrim addMeshReference(UrdfGeometry geometry,
         CARB_LOG_INFO("Found Mesh At: %s (%s)", meshPath.c_str(), meshName.c_str());
         std::string next_path = std::string("/meshes/") + makeValidUSDIdentifier(getPathStem(meshPath.c_str()));
         path = SimpleImport(stage, next_path, meshPath, meshList, materialList, robotRoot);
+        if (path.IsEmpty())
+        {
+            CARB_LOG_ERROR("Failed to import mesh '%s'", meshPath.c_str());
+            return usdXform.GetPrim();
+        }
         usdXform.GetPrim().GetReferences().AddInternalReference(path);
     }
     return usdXform.GetPrim();
 }
 
-pxr::UsdPrim addSphere(pxr::UsdStageWeakPtr stage, std::string meshName, double radius, pxr::UsdGeomXform usdXform)
+pxr::UsdPrim addSphere(pxr::UsdStageWeakPtr stage, const std::string& meshName, double radius, pxr::UsdGeomXform usdXform)
 {
     pxr::UsdGeomSphere gprim = pxr::UsdGeomSphere::Define(stage, pxr::SdfPath(meshName + "/sphere"));
     pxr::VtVec3fArray extentArray(2);
@@ -196,7 +198,7 @@ pxr::UsdPrim addSphere(pxr::UsdStageWeakPtr stage, std::string meshName, double 
 }
 
 pxr::UsdPrim addBox(pxr::UsdStageWeakPtr stage,
-                    std::string meshName,
+                    const std::string& meshName,
                     double size_x,
                     double size_y,
                     double size_z,
@@ -212,7 +214,7 @@ pxr::UsdPrim addBox(pxr::UsdStageWeakPtr stage,
 }
 
 pxr::UsdPrim addCylinder(
-    pxr::UsdStageWeakPtr stage, std::string meshName, double length, double radius, pxr::UsdGeomXform usdXform)
+    pxr::UsdStageWeakPtr stage, const std::string& meshName, double length, double radius, pxr::UsdGeomXform usdXform)
 {
     pxr::UsdGeomCylinder gprim = pxr::UsdGeomCylinder::Define(stage, pxr::SdfPath(meshName + "/cylinder"));
     pxr::VtVec3fArray extentArray(2);
@@ -225,7 +227,7 @@ pxr::UsdPrim addCylinder(
 }
 
 pxr::UsdPrim addCapsule(
-    pxr::UsdStageWeakPtr stage, std::string meshName, double length, double radius, pxr::UsdGeomXform usdXform)
+    pxr::UsdStageWeakPtr stage, const std::string& meshName, double length, double radius, pxr::UsdGeomXform usdXform)
 {
     pxr::UsdGeomCapsule gprim = pxr::UsdGeomCapsule::Define(stage, pxr::SdfPath(meshName + "/capsule"));
     pxr::VtVec3fArray extentArray(2);
@@ -239,9 +241,9 @@ pxr::UsdPrim addCapsule(
 
 pxr::UsdPrim addMesh(pxr::UsdStageWeakPtr stage,
                      UrdfGeometry geometry,
-                     std::string assetRoot,
-                     std::string urdfPath,
-                     std::string meshName,
+                     const std::string& assetRoot,
+                     const std::string& urdfPath,
+                     const std::string& meshName,
                      std::map<pxr::TfToken, pxr::SdfPath>& meshList,
                      std::map<pxr::TfToken, pxr::SdfPath>& materialList,
                      const pxr::SdfPath& robotRoot,
@@ -365,12 +367,12 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
 
         {
             setAuthoringLayer(stages["stage"], stages["robot_stage"]->GetRootLayer()->GetIdentifier());
-            pxr::UsdPrim prim = stages["stage"]->GetPrimAtPath(linkPrim.GetPrim().GetPath());
-            isaacsim::robot::schema::ApplyLinkAPI(prim);
+            pxr::UsdPrim linkPrimForRobot = stages["stage"]->GetPrimAtPath(linkPrim.GetPrim().GetPath());
+            isaacsim::robot::schema::ApplyLinkAPI(linkPrimForRobot);
             auto linksRel = robotPrim.GetPrim().GetRelationship(
                 isaacsim::robot::schema::relationNames.at(isaacsim::robot::schema::Relations::ROBOT_LINKS));
             pxr::SdfPathVector targets;
-            linksRel.AddTarget(prim.GetPath());
+            linksRel.AddTarget(linkPrimForRobot.GetPath());
         }
         setAuthoringLayer(stages["stage"], stages["physics_stage"]->GetRootLayer()->GetIdentifier());
         pxr::UsdPhysicsMassAPI massAPI = pxr::UsdPhysicsMassAPI::Apply(linkPrim.GetPrim());
@@ -441,7 +443,7 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
         pxr::UsdGeomXform::Define(stages["base_stage"], pxr::SdfPath(robotBasePath + link.name + "/visuals"));
 
     std::string source_name = "/visuals/" + link.name;
-    auto source_prim = pxr::UsdGeomXform::Define(stages["base_stage"], pxr::SdfPath(source_name));
+    pxr::UsdGeomXform source_prim;
     for (size_t i = 0; i < link.visuals.size(); i++)
     {
         std::string meshName;
@@ -468,12 +470,12 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
         {
             mat = urdfMatIter->second;
         }
-        auto& color = mat.color;
+        const auto& color = mat.color;
         loadMaterial = (color.r >= 0 && color.g >= 0 && color.b >= 0);
-        pxr::UsdPrim prim =
+        pxr::UsdPrim meshPrim =
             addMesh(stages["base_stage"], link.visuals[i].geometry, assetRoot_, urdfPath_, meshName, meshPaths,
                     materialPaths, robotPrim.GetPath(), link.visuals[i].origin, config.distanceScale, false);
-        if (!prim)
+        if (!meshPrim)
         {
             CARB_LOG_WARN("Prim %s not created", meshName.c_str());
         }
@@ -482,8 +484,8 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
             if (loadMaterial)
             {
                 // This Material was in the master list, reuse
-                auto urdfMatIter = robot.materials.find(link.visuals[i].material.name);
-                if (urdfMatIter != robot.materials.end())
+                auto materialIter = robot.materials.find(link.visuals[i].material.name);
+                if (materialIter != robot.materials.end())
                 {
                     std::string path = matPrimPaths[link.visuals[i].material.name];
 
@@ -494,7 +496,7 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
                         auto shadePrim = pxr::UsdShadeMaterial(matPrim);
                         if (shadePrim)
                         {
-                            pxr::UsdShadeMaterialBindingAPI mbi(prim);
+                            pxr::UsdShadeMaterialBindingAPI mbi(meshPrim);
                             mbi.Bind(shadePrim);
                             pxr::UsdRelationship rel;
                             mbi.ComputeBoundMaterial(pxr::UsdShadeTokens->allPurpose, &rel);
@@ -505,16 +507,16 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
                 }
                 else
                 {
-                    auto& color = link.visuals[i].material.color;
+                    const auto& materialColor = link.visuals[i].material.color;
                     std::stringstream ss;
-                    ss << std::uppercase << std::hex << (int)(256 * color.r) << std::uppercase << std::hex
-                       << (int)(256 * color.g) << std::uppercase << std::hex << (int)(256 * color.b);
+                    ss << std::uppercase << std::hex << (int)(256 * materialColor.r) << std::uppercase << std::hex
+                       << (int)(256 * materialColor.g) << std::uppercase << std::hex << (int)(256 * materialColor.b);
                     std::pair<std::string, UrdfMaterial> mat_pair(ss.str(), link.visuals[i].material);
 
                     pxr::UsdShadeMaterial matPrim = addMaterial(stages["base_stage"], mat_pair, robotPrim.GetPath());
                     if (matPrim)
                     {
-                        pxr::UsdShadeMaterialBindingAPI mbi(prim);
+                        pxr::UsdShadeMaterialBindingAPI mbi(meshPrim);
                         mbi.Bind(matPrim);
                         pxr::UsdRelationship rel;
                         mbi.ComputeBoundMaterial(pxr::UsdShadeTokens->allPurpose, &rel);
@@ -553,14 +555,14 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
         {
             CARB_LOG_INFO("Creating collider Prim %s", meshName.c_str());
         }
-        pxr::UsdPrim prim = addMesh(stages["base_stage"], link.collisions[i].geometry, assetRoot_, urdfPath_, meshName,
-                                    meshPaths, materialPaths, robotPrim.GetPath(), link.collisions[i].origin,
-                                    config.distanceScale, config.replaceCylindersWithCapsules);
+        pxr::UsdPrim collisionPrim = addMesh(
+            stages["base_stage"], link.collisions[i].geometry, assetRoot_, urdfPath_, meshName, meshPaths, materialPaths,
+            robotPrim.GetPath(), link.collisions[i].origin, config.distanceScale, config.replaceCylindersWithCapsules);
         // Enable collisions on prim
-        if (prim)
+        if (collisionPrim)
         {
             setAuthoringLayer(stages["stage"], stages["physics_stage"]->GetRootLayer()->GetIdentifier());
-            auto meshes_prim = stages["stage"]->GetPrimAtPath(prim.GetPath());
+            auto meshes_prim = stages["stage"]->GetPrimAtPath(collisionPrim.GetPath());
             // pxr::UsdPhysicsCollisionAPI::Apply(meshes_base.GetPrim());
 
             meshes_base.GetPrim().GetReferences().AddInternalReference(pxr::SdfPath(pxr::TfToken(source_name)));
@@ -594,7 +596,7 @@ void UrdfImporter::addRigidBody(std::unordered_map<std::string, pxr::UsdStageRef
         {
             CARB_LOG_WARN("Prim %s not created", meshName.c_str());
         }
-        pxr::UsdGeomMesh(prim).CreatePurposeAttr().Set(pxr::UsdGeomTokens->guide);
+        pxr::UsdGeomMesh(collisionPrim).CreatePurposeAttr().Set(pxr::UsdGeomTokens->guide);
     }
     setAuthoringLayer(stages["stage"], stages["base_stage"]->GetRootLayer()->GetIdentifier());
 
@@ -993,8 +995,6 @@ void UrdfImporter::addJoint(std::unordered_map<std::string, pxr::UsdStageRefPtr>
 
     std::string parentLinkPath = robotPrim.GetPath().GetString() + "/" + joint.parentLinkName;
     std::string childLinkPath = robotPrim.GetPath().GetString() + "/" + joint.childLinkName;
-    std::string jointPath = GetNewSdfPathString(
-        stages["stage"], robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name));
 
     setAuthoringLayer(stages["stage"], stages["physics_stage"]->GetRootLayer()->GetIdentifier());
     pxr::UsdPhysicsJoint jointPrim;
@@ -1004,26 +1004,28 @@ void UrdfImporter::addJoint(std::unordered_map<std::string, pxr::UsdStageRefPtr>
         {
             return;
         }
-        std::string jointPath = robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name);
+        std::string fixedJointPath =
+            robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name);
 
-        if (!pxr::SdfPath::IsValidPathString(jointPath))
+        if (!pxr::SdfPath::IsValidPathString(fixedJointPath))
         {
             // jn->getName starts with a number which is not valid for usd path, so prefix it with "joint"
-            jointPath = robotPrim.GetPath().GetString() + "/joints/" + "joint_" + joint.name;
+            fixedJointPath = robotPrim.GetPath().GetString() + "/joints/" + "joint_" + joint.name;
         }
-        jointPrim = pxr::UsdPhysicsFixedJoint::Define(stages["stage"], pxr::SdfPath(jointPath));
+        jointPrim = pxr::UsdPhysicsFixedJoint::Define(stages["stage"], pxr::SdfPath(fixedJointPath));
     }
     else if (joint.type == UrdfJointType::PRISMATIC)
     {
-        std::string jointPath = robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name);
+        std::string prismaticJointPath =
+            robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name);
 
-        if (!pxr::SdfPath::IsValidPathString(jointPath))
+        if (!pxr::SdfPath::IsValidPathString(prismaticJointPath))
         {
             // jn->getName starts with a number which is not valid for usd path, so prefix it with "joint"
-            jointPath = robotPrim.GetPath().GetString() + "/joints/" + "joint_" + joint.name;
+            prismaticJointPath = robotPrim.GetPath().GetString() + "/joints/" + "joint_" + joint.name;
         }
         AddSingleJoint<pxr::UsdPhysicsPrismaticJoint>(
-            joint, stages, pxr::SdfPath(jointPath), jointPrim, float(config.distanceScale), config);
+            joint, stages, pxr::SdfPath(prismaticJointPath), jointPrim, float(config.distanceScale), config);
     }
     // else if (joint.type == UrdfJointType::SPHERICAL)
     // {
@@ -1033,15 +1035,16 @@ void UrdfImporter::addJoint(std::unordered_map<std::string, pxr::UsdStageRefPtr>
     else if (joint.type == UrdfJointType::REVOLUTE || joint.type == UrdfJointType::CONTINUOUS)
     {
 
-        std::string jointPath = robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name);
+        std::string revoluteJointPath =
+            robotPrim.GetPath().GetString() + "/joints/" + pxr::TfMakeValidIdentifier(joint.name);
 
-        if (!pxr::SdfPath::IsValidPathString(jointPath))
+        if (!pxr::SdfPath::IsValidPathString(revoluteJointPath))
         {
             // jn->getName starts with a number which is not valid for usd path, so prefix it with "joint"
-            jointPath = robotPrim.GetPath().GetString() + "/joints/" + "joint_" + joint.name;
+            revoluteJointPath = robotPrim.GetPath().GetString() + "/joints/" + "joint_" + joint.name;
         }
         AddSingleJoint<pxr::UsdPhysicsRevoluteJoint>(
-            joint, stages, pxr::SdfPath(jointPath), jointPrim, float(config.distanceScale), config);
+            joint, stages, pxr::SdfPath(revoluteJointPath), jointPrim, float(config.distanceScale), config);
     }
     else if (joint.type == UrdfJointType::FLOATING)
     {
@@ -1114,12 +1117,12 @@ void UrdfImporter::addJoint(std::unordered_map<std::string, pxr::UsdStageRefPtr>
     if (jointPrim)
     {
         setAuthoringLayer(stages["stage"], stages["robot_stage"]->GetRootLayer()->GetIdentifier());
-        pxr::UsdPrim prim = stages["stage"]->GetPrimAtPath(jointPrim.GetPrim().GetPath());
-        isaacsim::robot::schema::ApplyJointAPI(prim);
+        pxr::UsdPrim jointPrimForRobot = stages["stage"]->GetPrimAtPath(jointPrim.GetPrim().GetPath());
+        isaacsim::robot::schema::ApplyJointAPI(jointPrimForRobot);
         auto jointsRel = robotPrim.GetPrim().GetRelationship(
             isaacsim::robot::schema::relationNames.at(isaacsim::robot::schema::Relations::ROBOT_JOINTS));
         pxr::SdfPathVector targets;
-        jointsRel.AddTarget(prim.GetPath());
+        jointsRel.AddTarget(jointPrimForRobot.GetPath());
     }
 }
 void UrdfImporter::addLinksAndJoints(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
@@ -1161,7 +1164,7 @@ void UrdfImporter::addLinksAndJoints(std::unordered_map<std::string, pxr::UsdSta
                         // if (!parentLink.softs.size() && !childLink.softs.size()) // rigid parent, rigid child
                         {
                             if (urdfJoint.type != UrdfJointType::FIXED || !config.mergeFixedJoints ||
-                                urdfJoint.dontCollapse)
+                                urdfJoint.dontCollapse || (childLink.inertial.hasMass && childLink.inertial.mass > 0.0f))
                             {
 
                                 addRigidBody(stages, childLink, poseLinkToWorld, robotPrim, robot);
@@ -1431,8 +1434,8 @@ std::string UrdfImporter::addToStage(std::unordered_map<std::string, pxr::UsdSta
 
     {
         setAuthoringLayer(stages["stage"], stages["robot_stage"]->GetRootLayer()->GetIdentifier());
-        pxr::UsdPrim prim = stages["stage"]->GetPrimAtPath(robotPrim.GetPrim().GetPath());
-        isaacsim::robot::schema::ApplyRobotAPI(prim);
+        pxr::UsdPrim robotPrimForAPI = stages["stage"]->GetPrimAtPath(robotPrim.GetPrim().GetPath());
+        isaacsim::robot::schema::ApplyRobotAPI(robotPrimForAPI);
     }
     setAuthoringLayer(stages["stage"], stages["base_stage"]->GetRootLayer()->GetIdentifier());
 

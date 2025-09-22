@@ -24,24 +24,78 @@ class TestIsaacThrottling(omni.kit.test.AsyncTestCase):
         self._timeline = omni.timeline.get_timeline_interface()
         self._timeline.set_start_time(0)
         self._timeline.set_end_time(1)
+        self._settings = carb.settings.get_settings()
+
+        # Reset async rendering state to clean test environment
+        self._settings.set("/app/asyncRendering", False)
+        self._settings.set("/app/asyncRenderingLowLatency", False)
         pass
 
     async def tearDown(self):
+        # Reset state after each test
+        self._settings.set("/app/asyncRendering", False)
+        self._settings.set("/app/asyncRenderingLowLatency", False)
+        pass
+
+    # async rendering always off
+    async def test_on_stop_play_toggles_off(self):
+        self._settings = carb.settings.get_settings()
+        self._settings.set("/rtx/ecoMode/enabled", True)
+        self._settings.set("/app/asyncRendering", False)
+        self._settings.set("/app/asyncRenderingLowLatency", False)
+
+        self._settings.set("/exts/isaacsim.core.throttling/enable_async", False)
+        self._settings.set("/exts/isaacsim.core.throttling/enable_manualmode", False)
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), False)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), False)
+        self.assertFalse(self._settings.get("/app/asyncRendering"))
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), True)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), True)
+        self.assertFalse(self._settings.get("/app/asyncRendering"))
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), False)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), False)
+        self.assertFalse(self._settings.get("/app/asyncRendering"))
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), True)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), True)
+        self.assertFalse(self._settings.get("/app/asyncRendering"))
         pass
 
     async def test_on_stop_play_callback(self):
         self._settings = carb.settings.get_settings()
         self._settings.set("/rtx/ecoMode/enabled", True)
+        self._settings.set("/app/asyncRendering", False)
+        self._settings.set("/app/asyncRenderingLowLatency", False)
+
+        self._settings.set("/exts/isaacsim.core.throttling/enable_async", True)
+        self._settings.set("/exts/isaacsim.core.throttling/enable_manualmode", True)
+
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), False)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), False)
+        self.assertEqual(self._settings.get("/app/asyncRendering"), False)
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), True)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), True)
+        self.assertEqual(self._settings.get("/app/asyncRendering"), True)
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), False)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), False)
+        self.assertEqual(self._settings.get("/app/asyncRendering"), False)
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), True)
+        self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), True)
+        self.assertEqual(self._settings.get("/app/asyncRendering"), True)
         pass

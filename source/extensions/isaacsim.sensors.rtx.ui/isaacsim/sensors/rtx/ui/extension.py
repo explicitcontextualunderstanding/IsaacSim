@@ -41,7 +41,6 @@ class Extension(omni.ext.IExt):
                 # Remove the vendor prefix from the sensor name
                 # Note: assumes there is a single character (eg. underscore) between the vendor and sensor name
                 sensor_name = sensor_name[len(vendor_name) + 1 :]
-            sensor_prim_type = "OmniLidar" if config_path.suffix == ".usda" else "Xform"
 
             if vendor_name not in rtx_lidar_vendor_dict:
                 rtx_lidar_vendor_dict[vendor_name] = []
@@ -49,8 +48,8 @@ class Extension(omni.ext.IExt):
                 {
                     "name": sensor_name,
                     "onclick_fn": (
-                        lambda *_, sensor_name=sensor_name, sensor_filepath=config, sensor_prim_type=sensor_prim_type: self._create_sensor(
-                            sensor_name, sensor_filepath, sensor_prim_type
+                        lambda *_, sensor_name=sensor_name, sensor_config=config_path.stem: self._create_lidar(
+                            sensor_name, sensor_config
                         )
                     ),
                 }
@@ -131,13 +130,13 @@ class Extension(omni.ext.IExt):
             curr_prim = None
         return curr_prim
 
-    def _create_sensor(self, sensor_name, sensor_filepath, sensor_prim_type):
-        add_reference_to_stage(
-            usd_path=get_assets_root_path() + sensor_filepath,
-            prim_path=get_next_free_path("/" + Tf.MakeValidIdentifier(sensor_name), None),
-            prim_type=sensor_prim_type,
+    def _create_lidar(self, sensor_name, sensor_config):
+        selected_prim = self._get_stage_and_path()
+        prim_path = get_next_free_path("/" + Tf.MakeValidIdentifier(sensor_name), None)
+        omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar", path=prim_path, parent=selected_prim, config=sensor_config
         )
 
     def _create_radar(self):
         selected_prim = self._get_stage_and_path()
-        _, radar_prim = omni.kit.commands.execute("IsaacSensorCreateRtxRadar", path="/RtxRadar", parent=selected_prim)
+        omni.kit.commands.execute("IsaacSensorCreateRtxRadar", path="/RtxRadar", parent=selected_prim)

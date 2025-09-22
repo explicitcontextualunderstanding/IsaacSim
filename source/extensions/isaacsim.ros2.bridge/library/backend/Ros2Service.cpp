@@ -30,9 +30,9 @@ Ros2ServiceImpl::Ros2ServiceImpl(Ros2NodeHandle* nodeHandle,
                                  const char* serviceName,
                                  const void* typeSupport,
                                  const Ros2QoSProfile& qos)
-    : m_nodeHandle(nodeHandle), m_waitSetInitialized(false)
-{
-    m_service = std::shared_ptr<rcl_service_t>(new rcl_service_t,
+    : m_nodeHandle(nodeHandle),
+      m_waitSetInitialized(false),
+      m_service(std::shared_ptr<rcl_service_t>(new rcl_service_t,
                                                [nodeHandle](rcl_service_t* service)
                                                {
                                                    // Intentionally capture node by copy so shared_ptr can be
@@ -44,7 +44,8 @@ Ros2ServiceImpl::Ros2ServiceImpl(Ros2NodeHandle* nodeHandle,
                                                        RCL_ERROR_MSG(Ros2ServiceImpl, rcl_service_fini);
                                                    }
                                                    delete service;
-                                               });
+                                               }))
+{
     (*m_service) = rcl_get_zero_initialized_service();
     rcl_service_options_t serviceOptions = rcl_service_get_default_options();
     serviceOptions.qos = Ros2QoSProfileConverter::convert(qos);
@@ -91,6 +92,11 @@ bool Ros2ServiceImpl::takeRequest(void* requestMsg)
     else
     {
         rcl_ret_t rc = rcl_wait_set_clear(&m_waitSet);
+        if (rc != RCL_RET_OK)
+        {
+            RCL_ERROR_MSG(takeRequest, rcl_wait_set_clear);
+            return false;
+        }
         rc = rcl_wait_set_add_service(&m_waitSet, m_service.get(), nullptr);
         if (rc != RCL_RET_OK)
         {

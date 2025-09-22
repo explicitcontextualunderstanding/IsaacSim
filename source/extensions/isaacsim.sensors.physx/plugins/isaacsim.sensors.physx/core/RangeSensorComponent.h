@@ -66,19 +66,17 @@ public:
      * @details Initializes the component with necessary interfaces and creates visualization helpers
      */
     RangeSensorComponentBase(omni::physx::IPhysx* physxPtr)
+        : m_physx(physxPtr),
+          m_timeline(carb::getCachedInterface<omni::timeline::ITimeline>()),
+          m_token(carb::getCachedInterface<omni::fabric::IToken>()),
+          m_tasking(carb::getCachedInterface<carb::tasking::ITasking>()),
+          m_lineDrawing(std::make_shared<isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper>(
+              omni::usd::UsdContext::getContext(),
+              isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::RenderingMode::eLines)),
+          m_pointDrawing(std::make_shared<isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper>(
+              omni::usd::UsdContext::getContext(),
+              isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::RenderingMode::ePoints))
     {
-        m_physx = physxPtr;
-        m_timeline = carb::getCachedInterface<omni::timeline::ITimeline>();
-        m_tasking = carb::getCachedInterface<carb::tasking::ITasking>();
-        m_token = carb::getCachedInterface<omni::fabric::IToken>();
-
-        m_lineDrawing = std::make_shared<isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper>(
-            omni::usd::UsdContext::getContext(),
-            isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::RenderingMode::eLines);
-
-        m_pointDrawing = std::make_shared<isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper>(
-            omni::usd::UsdContext::getContext(),
-            isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::RenderingMode::ePoints);
     }
 
     /**

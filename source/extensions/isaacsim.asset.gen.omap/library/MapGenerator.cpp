@@ -531,7 +531,7 @@ int g_col[] = { 0, 1, 0, -1 };
  *
  * @pre buffer must be a valid pointer to a grid buffer
  */
-bool isSafe(float* buffer, carb::Int2 numCells, int x, int y, float target)
+bool isSafe(const float* buffer, carb::Int2 numCells, int x, int y, float target)
 {
     if (x < 0 || x >= numCells.x || y < 0 || y >= numCells.y)
     {

@@ -18,13 +18,11 @@ simulation_app = SimulationApp({"headless": False})
 
 import argparse
 
-import carb
 import numpy as np
 import omni
-import omni.replicator.core as rep
 from isaacsim.core.api import World
 from isaacsim.core.utils.stage import add_reference_to_stage, get_current_stage
-from isaacsim.sensors.rtx import LidarRtx, get_gmo_data
+from isaacsim.sensors.rtx import LidarRtx
 from isaacsim.storage.native import get_assets_root_path
 
 # Parse command line arguments

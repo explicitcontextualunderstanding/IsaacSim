@@ -52,7 +52,7 @@ public:
      * @brief Constructs a new Generic Sensor instance
      * @param[in] physxPtr Pointer to the PhysX interface for physics simulation
      */
-    GenericSensor(omni::physx::IPhysx* physxPtr);
+    explicit GenericSensor(omni::physx::IPhysx* physxPtr);
 
     /**
      * @brief Virtual destructor for proper cleanup

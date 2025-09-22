@@ -18,12 +18,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
+import carb
+
 from .. import utils
 
 if TYPE_CHECKING:
     from ..settings import BenchmarkSettings
-
-logger = utils.set_up_logging(__name__)
 
 
 @dataclass
@@ -108,7 +108,7 @@ class FrametimeStats:
             result["max"] = round(max(metric), 2)
             result["one_percent"] = round(self.get_one_percent_high(metric), 2)
         except Exception as e:
-            logger.warn(f"Unable to calculate frametime stats: {e}")
+            carb.log_warn(f"Unable to calculate frametime stats: {e}")
         return result
 
     def calc_stats(self) -> None:

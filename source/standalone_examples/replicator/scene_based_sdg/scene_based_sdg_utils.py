@@ -25,7 +25,7 @@ from isaacsim.core.utils import prims
 from isaacsim.core.utils.bounds import compute_combined_aabb, compute_obb, create_bbox_cache, get_obb_corners
 from isaacsim.core.utils.rotations import euler_angles_to_quat, quat_to_euler_angles
 from isaacsim.core.utils.semantics import remove_labels
-from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
+from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
 
 # Add colliders to Gprim and Mesh descendants of the root prim
@@ -200,9 +200,9 @@ def register_lights_placement(forklift_prim, pallet_prim):
         lights = rep.create.light(
             light_type="Sphere",
             color=rep.distribution.uniform((0.2, 0.1, 0.1), (0.9, 0.8, 0.8)),
-            intensity=rep.distribution.uniform(500, 2000),
+            intensity=rep.distribution.uniform(2000, 4000),
             position=rep.distribution.uniform(pos_min, pos_max),
-            scale=rep.distribution.uniform(5, 10),
+            scale=rep.distribution.uniform(1, 4),
             count=3,
         )
         return lights.node

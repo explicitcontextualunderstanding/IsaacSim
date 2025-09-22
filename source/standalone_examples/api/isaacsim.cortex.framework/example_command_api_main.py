@@ -20,8 +20,6 @@ simulation_app = SimulationApp({"headless": False})
 import time
 
 import numpy as np
-import omni
-from isaacsim.core.api.objects import DynamicCuboid, VisualCuboid
 from isaacsim.cortex.framework.cortex_world import CortexWorld
 from isaacsim.cortex.framework.df import DfNetwork, DfState, DfStateMachineDecider, DfStateSequence
 from isaacsim.cortex.framework.dfb import DfBasicContext

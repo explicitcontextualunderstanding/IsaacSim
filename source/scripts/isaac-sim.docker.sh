@@ -25,7 +25,7 @@ if [[ -z "$@" ]]; then
     command="bash"
 fi
 # Set to desired Nucleus
-omni_server="https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.0"
+omni_server="https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1"
 if ! [[ -z "${OMNI_SERVER}" ]]; then
 	omni_server="${OMNI_SERVER}"
 fi
@@ -59,10 +59,10 @@ fi
 # docker login nvcr.io
 
 echo "Pulling docker image..."
-docker pull nvcr.io/nvidia/isaac-sim:5.0.0
+docker pull nvcr.io/nvidia/isaac-sim:5.1.0
 
 echo "Running Isaac Sim container..."
-docker run --name isaac-sim --entrypoint bash --runtime=nvidia --gpus all -e "ACCEPT_EULA=${accept_eula}" -it --rm --network=host \
+docker run --name isaac-sim --entrypoint bash --gpus all -e "ACCEPT_EULA=${accept_eula}" -it --rm --network=host \
 	-e "OMNI_USER=${omni_user}" -e "OMNI_PASS=${omni_password}" \
 	-e "OMNI_SERVER=${omni_server}" \
     -e "PRIVACY_CONSENT=${privacy_consent}" -e "PRIVACY_USERID=${privacy_userid}" \
@@ -75,7 +75,7 @@ docker run --name isaac-sim --entrypoint bash --runtime=nvidia --gpus all -e "AC
 	-v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
 	-v ~/docker/isaac-sim/pkg:/root/.local/share/ov/pkg:rw \
 	-v ~/docker/isaac-sim/documents:/root/Documents:rw \
-	nvcr.io/nvidia/isaac-sim:5.0.0 \
+	nvcr.io/nvidia/isaac-sim:5.1.0 \
 	-c "${command}"
 
 echo "Isaac Sim container run completed!"

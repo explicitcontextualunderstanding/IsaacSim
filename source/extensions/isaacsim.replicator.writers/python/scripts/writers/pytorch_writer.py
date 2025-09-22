@@ -49,6 +49,7 @@ class PytorchWriter(Writer):
             self._output_dir = None
         self._frame_id = 0
 
+        self.annotators = []
         if tiled_sensor:
             self.annotators = [AnnotatorRegistry.get_annotator("RtxSensorGpu", device="cuda", do_array_copy=False)]
         else:

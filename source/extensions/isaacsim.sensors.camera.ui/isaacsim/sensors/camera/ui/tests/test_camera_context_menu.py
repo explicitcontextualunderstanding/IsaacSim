@@ -98,15 +98,30 @@ class TestCameraContextMenu(OmniUiTest):
 
     async def test_camera_sensors_context_menu_click(self):
         """
-        Test that selecting a sensor from the Viewport context menu creates a sensor prim.
-        In this test we directly select the 'Intel Realsense D455' sensor.
+        Test the Camera and Depth Sensors are added to stage context menus correctly.
         """
-        # Clear the stage before testing.
-        clear_stage()
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
 
-        # Open the Viewport window and get the context menu with retry mechanism
+        # find the path to the last layer of the menu by randomly traversing
+        def get_all_menu_paths(menu_dict):
+            leaf_nodes = []
+            stack = [(menu_dict, "")]  # (current_dict, current_path)
+
+            while stack:
+                current_dict, current_path = stack.pop()
+
+                for key, value in current_dict.items():
+                    if key != "_":
+                        new_path = current_path + "/" + key
+                    else:
+                        new_path = current_path
+                    if isinstance(value, dict):
+                        stack.append((value, new_path))
+                    elif isinstance(value, list):
+                        for item in value:
+                            leaf_nodes.append(new_path + "/" + item)
+            return leaf_nodes
+
+        # Attempt to get the context menu once, to populate the list of menu paths
         max_attempts = 5
         retry_delay = 0.5
         viewport_context_menu = None
@@ -128,20 +143,55 @@ class TestCameraContextMenu(OmniUiTest):
                     raise  # Re-raise the last exception if all attempts failed
 
         self.assertIsNotNone(viewport_context_menu, "Failed to get viewport context menu")
+        camera_viewport_menu_dict = viewport_context_menu["Create"]["Isaac"]["Sensors"]["Camera and Depth Sensors"]
 
-        # Construct the full menu path for the 'Intel Realsense D455' sensor.
-        full_test_path = "Create/Isaac/Sensors/Camera and Depth Sensors/Intel/Intel Realsense D455"
+        # Iterate over all menu paths and test each one
+        for test_path in get_all_menu_paths(camera_viewport_menu_dict):
+            full_test_path = "Create/Isaac/Sensors/Camera and Depth Sensors" + test_path
 
-        # Select the sensor from the context menu.
-        await ui_test.select_context_menu(full_test_path)
-        for _ in range(20):
+            # Attempt to get the context menu again, this time to select the appropriate menu item
+            max_attempts = 5
+            retry_delay = 0.5
+            viewport_context_menu = None
+
+            for attempt in range(max_attempts):
+                try:
+                    viewport_window = ui_test.find("Viewport")
+                    await viewport_window.right_click()
+                    viewport_context_menu = await ui_test.get_context_menu()
+                    break  # Success, exit the loop
+                except Exception as e:
+                    if attempt < max_attempts - 1:  # Don't sleep on the last attempt
+                        carb.log_warn(f"Attempt {attempt+1} failed to get context menu: {str(e)}. Retrying...")
+                        await omni.kit.app.get_app().next_update_async()
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 1.5  # Exponential backoff
+                    else:
+                        carb.log_error(f"Failed to get context menu after {max_attempts} attempts: {str(e)}")
+                        raise  # Re-raise the last exception if all attempts failed
+
+            clear_stage()
+            await omni.kit.app.get_app().next_update_async()
             await omni.kit.app.get_app().next_update_async()
 
-        # Verify that a prim was created with a path starting with '/Realsense'.
-        stage = omni.usd.get_context().get_stage()
-        sensor_prims = [prim for prim in stage.TraverseAll() if prim.GetPath().pathString.startswith("/Realsense")]
-        self.assertGreater(
-            len(sensor_prims),
-            1,
-            f"realsense sensor not loaded correctly",
-        )
+            await ui_test.select_context_menu(full_test_path)
+
+            # Wait until stage loading finishes
+            while omni.usd.get_context().get_stage_loading_status()[2] > 0:
+                await omni.kit.app.get_app().next_update_async()
+
+            # Give one more frame to ensure everything is settled
+            for _ in range(50):
+                await omni.kit.app.get_app().next_update_async()
+
+            # check if there is more than one Camera prim on stage
+            stage = omni.usd.get_context().get_stage()
+            prims = stage.TraverseAll()
+            n_cameras = 0
+            for prim in prims:
+                if prim.GetTypeName() == "Camera":
+                    n_cameras += 1
+
+            self.assertGreater(
+                n_cameras, 1, f"There are {n_cameras} Camera prims on stage for {full_test_path}, expected at least 1."
+            )

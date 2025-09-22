@@ -607,7 +607,6 @@ class SimulationManager:
         SimulationManager._carb_settings.set_bool("/physics/updateParticlesToUsd", not enable)
         SimulationManager._carb_settings.set_bool("/physics/updateVelocitiesToUsd", not enable)
         SimulationManager._carb_settings.set_bool("/physics/updateForceSensorsToUsd", not enable)
-        SimulationManager._carb_settings.set_bool("/physics/outputVelocitiesLocalSpace", not enable)
 
     @classmethod
     def is_fabric_enabled(cls, enable):

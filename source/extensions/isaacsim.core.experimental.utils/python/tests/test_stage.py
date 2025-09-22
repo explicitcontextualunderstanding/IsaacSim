@@ -13,8 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import tempfile
+
 import isaacsim.core.experimental.utils.backend as backend_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
+import numpy as np
 import omni.kit.stage_templates
 import omni.kit.test
 import omni.usd
@@ -100,31 +104,48 @@ class TestStage(omni.kit.test.AsyncTestCase):
             )
 
     async def test_open_stage(self):
-        assets_root_path = await get_assets_root_path_async()
-        assert assets_root_path is not None, "Could not find Isaac Sim's root assets path"
+        assets_root_path = await get_assets_root_path_async(skip_check=True)
         # test cases
         # - sync
         (result, stage) = stage_utils.open_stage(
             usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
         )
         self.assertTrue(result, "Failed to open stage")
-        prim = stage.GetPrimAtPath("/panda")
-        self.assertIsInstance(prim, Usd.Prim)
-        self.assertEqual(prim.GetPath(), "/panda")
+        self.assertTrue(stage.GetPrimAtPath("/panda/panda_hand").IsValid())
         # - async
         await stage_utils.create_new_stage_async()
         (result, stage) = await stage_utils.open_stage_async(
             usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
         )
         self.assertTrue(result, "Failed to open stage")
-        prim = stage.GetPrimAtPath("/panda")
-        self.assertIsInstance(prim, Usd.Prim)
-        self.assertEqual(prim.GetPath(), "/panda")
+        self.assertTrue(stage.GetPrimAtPath("/panda/panda_hand").IsValid())
+
+    async def test_save_close_stage(self):
+        assets_root_path = await get_assets_root_path_async(skip_check=True)
+        # create and populate stage
+        await stage_utils.create_new_stage_async()
+        stage_utils.add_reference_to_stage(
+            usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
+            path="/World/panda",
+            variants=[("Gripper", "AlternateFinger"), ("Mesh", "Performance")],
+        )
+        # save and close stage, then open it again
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+            tmp_file = os.path.join(tmp_dir, "test_save_close_stage.usd")
+            # - save stage
+            stage_utils.save_stage(usd_path=tmp_file)
+            self.assertTrue(os.path.exists(tmp_file) and os.path.isfile(tmp_file))
+            # - close stage
+            self.assertTrue(stage_utils.close_stage())
+            self.assertRaises(ValueError, stage_utils.get_current_stage)
+            # - open stage
+            result, stage = stage_utils.open_stage(usd_path=tmp_file)
+            self.assertTrue(result)
+            self.assertTrue(stage.GetPrimAtPath("/World/panda/panda_hand").IsValid())
 
     async def test_add_reference_to_stage(self):
-        assets_root_path = await get_assets_root_path_async()
-        assert assets_root_path is not None, "Could not find Isaac Sim's root assets path"
-
+        assets_root_path = await get_assets_root_path_async(skip_check=True)
+        # create and populate stage
         await stage_utils.create_new_stage_async()
         prim = stage_utils.add_reference_to_stage(
             usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
@@ -148,6 +169,7 @@ class TestStage(omni.kit.test.AsyncTestCase):
             ("Mesh", UsdGeom.Mesh),
             ("Plane", UsdGeom.Plane),
             ("Points", UsdGeom.Points),
+            ("Scope", UsdGeom.Scope),
             ("Sphere", UsdGeom.Sphere),
             ("Xform", UsdGeom.Xform),
             # UsdLuxTokensType
@@ -176,3 +198,57 @@ class TestStage(omni.kit.test.AsyncTestCase):
         self.assertRaises(ValueError, stage_utils.define_prim, f"/World/")
         # - prim already exists with a different type
         self.assertRaises(RuntimeError, stage_utils.define_prim, f"/Sphere", type_name="Cube")
+
+    async def test_stage_units(self):
+        await stage_utils.create_new_stage_async()
+        # test cases
+        # - default units
+        self.assertEqual(stage_utils.get_stage_units(), (1.0, 1.0))
+        # - random units
+        for meters_per_unit, kilograms_per_unit in np.random.rand(10, 2):
+            stage_utils.set_stage_units(meters_per_unit=meters_per_unit, kilograms_per_unit=kilograms_per_unit)
+            self.assertEqual(stage_utils.get_stage_units(), (meters_per_unit, kilograms_per_unit))
+
+    async def test_stage_up_axis(self):
+        await stage_utils.create_new_stage_async()
+        # test cases
+        # - default up axis
+        self.assertEqual(stage_utils.get_stage_up_axis(), "Z")
+        # - supported up axis
+        for up_axis in ["Y", "Z", "y", "z"]:
+            stage_utils.set_stage_up_axis(up_axis)
+            self.assertEqual(stage_utils.get_stage_up_axis(), up_axis.upper())
+
+    async def test_stage_time_code(self):
+        await stage_utils.create_new_stage_async()
+        # test cases
+        # - default time code
+        self.assertEqual(stage_utils.get_stage_time_code(), (0.0, 100.0, 60.0))
+        # - random time code
+        for start_time_code, end_time_code, time_codes_per_second in np.random.rand(10, 3):
+            stage_utils.set_stage_time_code(
+                start_time_code=start_time_code,
+                end_time_code=end_time_code,
+                time_codes_per_second=time_codes_per_second,
+            )
+            self.assertEqual(stage_utils.get_stage_time_code(), (start_time_code, end_time_code, time_codes_per_second))
+
+    async def test_generate_next_free_path(self):
+        await stage_utils.create_new_stage_async()
+        stage_utils.get_current_stage(backend="usd").SetDefaultPrim(stage_utils.define_prim("/World"))
+        stage_utils.define_prim("/World/Xform")
+        for path, expected_path_with_default_prim, expected_path_without_default_prim in [
+            (None, "/World/Prim", "/Prim"),
+            ("", "/World/Prim", "/Prim"),
+            ("/", "/World/Prim", "/Prim"),
+            ("/World", "/World/World", "/World_01"),
+            ("/World/Xform", "/World/Xform_01", "/World/Xform_01"),
+            ("ABC", "/World/ABC", "/ABC"),
+            ("/ABC", "/World/ABC", "/ABC"),
+        ]:
+            for prepend_default_prim in [True, False]:
+                self.assertEqual(
+                    stage_utils.generate_next_free_path(path, prepend_default_prim=prepend_default_prim),
+                    expected_path_with_default_prim if prepend_default_prim else expected_path_without_default_prim,
+                    f"path: {path}, prepend_default_prim: {prepend_default_prim}",
+                )

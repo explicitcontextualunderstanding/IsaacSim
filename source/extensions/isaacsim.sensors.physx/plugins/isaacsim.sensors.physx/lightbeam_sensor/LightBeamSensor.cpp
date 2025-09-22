@@ -66,7 +66,7 @@ namespace sensors
 namespace physx
 {
 
-LightBeamSensor::LightBeamSensor(omni::physx::IPhysx* physxPtr) : RangeSensorComponent(physxPtr)
+LightBeamSensor::LightBeamSensor(omni::physx::IPhysx* physXInterface) : RangeSensorComponent(physXInterface)
 {
 }
 

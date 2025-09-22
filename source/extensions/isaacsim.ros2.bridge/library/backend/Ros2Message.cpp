@@ -21,10 +21,12 @@
 #include "pxr/usd/usdPhysics/joint.h"
 #include "sensor_msgs/image_encodings.hpp"
 
-#include <carb/logging/Log.h>
-
 #include <rcl/rcl.h>
 #include <sensor_msgs/msg/camera_info.h>
+
+#include <cstdio>
+#include <cstring>
+#include <limits>
 
 namespace isaacsim
 {
@@ -32,6 +34,105 @@ namespace ros2
 {
 namespace bridge
 {
+
+
+// Generic macro to define ensureSeqSize for a concrete sequence type
+#define ISAACSIM_DEFINE_ENSURE_SEQ_SIZE(SeqType, InitFn, FiniFn)                                                       \
+    inline bool ensureSeqSize(SeqType& sequence, size_t requiredSize)                                                  \
+    {                                                                                                                  \
+        if (sequence.data == NULL)                                                                                     \
+        {                                                                                                              \
+            return InitFn(&sequence, requiredSize);                                                                    \
+        }                                                                                                              \
+        if (sequence.capacity < requiredSize)                                                                          \
+        {                                                                                                              \
+            FiniFn(&sequence);                                                                                         \
+            return InitFn(&sequence, requiredSize);                                                                    \
+        }                                                                                                              \
+        sequence.size = requiredSize;                                                                                  \
+        return true;                                                                                                   \
+    }
+
+// Doubles
+ISAACSIM_DEFINE_ENSURE_SEQ_SIZE(rosidl_runtime_c__double__Sequence,
+                                rosidl_runtime_c__double__Sequence__init,
+                                rosidl_runtime_c__double__Sequence__fini)
+
+// Strings
+ISAACSIM_DEFINE_ENSURE_SEQ_SIZE(rosidl_runtime_c__String__Sequence,
+                                rosidl_runtime_c__String__Sequence__init,
+                                rosidl_runtime_c__String__Sequence__fini)
+
+// geometry_msgs/TransformStamped[]
+ISAACSIM_DEFINE_ENSURE_SEQ_SIZE(geometry_msgs__msg__TransformStamped__Sequence,
+                                geometry_msgs__msg__TransformStamped__Sequence__init,
+                                geometry_msgs__msg__TransformStamped__Sequence__fini)
+
+// sensor_msgs/PointField[]
+ISAACSIM_DEFINE_ENSURE_SEQ_SIZE(sensor_msgs__msg__PointField__Sequence,
+                                sensor_msgs__msg__PointField__Sequence__init,
+                                sensor_msgs__msg__PointField__Sequence__fini)
+
+#undef ISAACSIM_DEFINE_ENSURE_SEQ_SIZE
+
+// Dynamic symbol-based ensure function for sequences whose init/fini must be invoked via a
+// dynamically loaded library (e.g., vision_msgs sequences).
+template <typename LibraryLike, typename SequenceT>
+inline bool ensureSeqSizeDynamic(
+    LibraryLike& library, const char* initSymbol, const char* finiSymbol, SequenceT& sequence, size_t requiredSize)
+{
+    if (sequence.data == NULL)
+    {
+        return library.template callSymbolWithArg<bool>(initSymbol, &sequence, requiredSize);
+    }
+    if (sequence.capacity < requiredSize)
+    {
+        library.template callSymbolWithArg<void>(finiSymbol, &sequence);
+        return library.template callSymbolWithArg<bool>(initSymbol, &sequence, requiredSize);
+    }
+    sequence.size = requiredSize;
+    return true;
+}
+
+// Convenience macro to improve call-site readability
+#define ISAACSIM_ENSURE_SEQ_SIZE_DYNAMIC(lib, seq, n, initSym, finiSym)                                                \
+    ensureSeqSizeDynamic((lib), (initSym), (finiSym), (seq), (n))
+
+// Ensure for parent sequences that contain an inner sequence that must be finalized before
+// re-initializing the parent (when growing capacity). The accessor returns a reference to the
+// inner sequence within a parent element at index i.
+template <typename LibraryLike, typename ParentSeq, typename GetInnerSequenceFn>
+inline bool ensureSeqSizeDynamicWithInnerFini(LibraryLike& library,
+                                              const char* parentInitSymbol,
+                                              const char* parentFiniSymbol,
+                                              ParentSeq& parentSequence,
+                                              size_t requiredSize,
+                                              GetInnerSequenceFn getInnerSequence,
+                                              const char* innerFiniSymbol)
+{
+    if (parentSequence.data == NULL)
+    {
+        return library.template callSymbolWithArg<bool>(parentInitSymbol, &parentSequence, requiredSize);
+    }
+    if (parentSequence.capacity < requiredSize)
+    {
+        // Finalize inner sequences for existing elements to avoid leaks before finalizing the parent
+        for (size_t i = 0; i < parentSequence.size; ++i)
+        {
+            auto& inner = getInnerSequence(parentSequence.data[i]);
+            library.template callSymbolWithArg<void>(innerFiniSymbol, &inner);
+        }
+        library.template callSymbolWithArg<void>(parentFiniSymbol, &parentSequence);
+        return library.template callSymbolWithArg<bool>(parentInitSymbol, &parentSequence, requiredSize);
+    }
+    parentSequence.size = requiredSize;
+    return true;
+}
+
+#define ISAACSIM_ENSURE_SEQ_SIZE_DYNAMIC_WITH_INNER_FINI(                                                              \
+    lib, seq, n, parentInitSym, parentFiniSym, getInnerFn, innerFiniSym)                                               \
+    ensureSeqSizeDynamicWithInnerFini((lib), (parentInitSym), (parentFiniSym), (seq), (n), (getInnerFn), (innerFiniSym))
+
 
 // Clock message
 Ros2ClockMessageImpl::Ros2ClockMessageImpl() : Ros2MessageInterfaceImpl("rosgraph_msgs", "msg", "Clock")
@@ -41,11 +142,10 @@ Ros2ClockMessageImpl::Ros2ClockMessageImpl() : Ros2MessageInterfaceImpl("rosgrap
 
 Ros2ClockMessageImpl::~Ros2ClockMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        rosgraph_msgs__msg__Clock__destroy(static_cast<rosgraph_msgs__msg__Clock*>(m_msg));
     }
-    rosgraph_msgs__msg__Clock__destroy(static_cast<rosgraph_msgs__msg__Clock*>(m_msg));
 }
 
 const void* Ros2ClockMessageImpl::getTypeSupportHandle()
@@ -67,6 +167,7 @@ void Ros2ClockMessageImpl::readData(double& timeStamp)
 {
     if (!m_msg)
     {
+        timeStamp = 0.0;
         return;
     }
     rosgraph_msgs__msg__Clock* clockMsg = static_cast<rosgraph_msgs__msg__Clock*>(m_msg);
@@ -94,11 +195,15 @@ void Ros2ImuMessageImpl::writeHeader(double timeStamp, std::string& frameId)
     Ros2MessageInterfaceImpl::writeRosHeader(frameId, static_cast<int64_t>(timeStamp * 1e9), imuMsg->header);
 }
 
-void Ros2ImuMessageImpl::writeAcceleration(bool covariance = false,
-                                           const std::vector<double>& acceleration = std::vector<double>())
+void Ros2ImuMessageImpl::writeAcceleration(bool covariance, const std::vector<double>& acceleration)
 {
     if (!m_msg)
     {
+        return;
+    }
+    if (!covariance && acceleration.size() < 3)
+    {
+        fprintf(stderr, "[Ros2ImuMessage] Expected 3 values for acceleration, got %zu\n", acceleration.size());
         return;
     }
     sensor_msgs__msg__Imu* imuMsg = static_cast<sensor_msgs__msg__Imu*>(m_msg);
@@ -114,11 +219,15 @@ void Ros2ImuMessageImpl::writeAcceleration(bool covariance = false,
     }
 }
 
-void Ros2ImuMessageImpl::writeVelocity(bool covariance = false,
-                                       const std::vector<double>& velocity = std::vector<double>())
+void Ros2ImuMessageImpl::writeVelocity(bool covariance, const std::vector<double>& velocity)
 {
     if (!m_msg)
     {
+        return;
+    }
+    if (!covariance && velocity.size() < 3)
+    {
+        fprintf(stderr, "[Ros2ImuMessage] Expected 3 values for velocity, got %zu\n", velocity.size());
         return;
     }
     sensor_msgs__msg__Imu* imuMsg = static_cast<sensor_msgs__msg__Imu*>(m_msg);
@@ -134,11 +243,15 @@ void Ros2ImuMessageImpl::writeVelocity(bool covariance = false,
     }
 }
 
-void Ros2ImuMessageImpl::writeOrientation(bool covariance = false,
-                                          const std::vector<double>& orientation = std::vector<double>())
+void Ros2ImuMessageImpl::writeOrientation(bool covariance, const std::vector<double>& orientation)
 {
     if (!m_msg)
     {
+        return;
+    }
+    if (!covariance && orientation.size() < 4)
+    {
+        fprintf(stderr, "[Ros2ImuMessage] Expected 4 values for orientation, got %zu\n", orientation.size());
         return;
     }
     sensor_msgs__msg__Imu* imuMsg = static_cast<sensor_msgs__msg__Imu*>(m_msg);
@@ -157,21 +270,16 @@ void Ros2ImuMessageImpl::writeOrientation(bool covariance = false,
 
 Ros2ImuMessageImpl::~Ros2ImuMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        sensor_msgs__msg__Imu__destroy(static_cast<sensor_msgs__msg__Imu*>(m_msg));
     }
-    sensor_msgs__msg__Imu__destroy(static_cast<sensor_msgs__msg__Imu*>(m_msg));
 }
 
 // CameraInfo message
 Ros2CameraInfoMessageImpl::Ros2CameraInfoMessageImpl() : Ros2MessageInterfaceImpl("sensor_msgs", "msg", "CameraInfo")
 {
     m_msg = sensor_msgs__msg__CameraInfo__create();
-    if (!m_msg)
-    {
-        CARB_LOG_ERROR("Failed to create sensor_msgs CameraInfo message");
-    }
 }
 
 const void* Ros2CameraInfoMessageImpl::getTypeSupportHandle()
@@ -195,6 +303,7 @@ void Ros2CameraInfoMessageImpl::writeResolution(const uint32_t height, const uin
     {
         return;
     }
+
     sensor_msgs__msg__CameraInfo* cameraInfoMsg = static_cast<sensor_msgs__msg__CameraInfo*>(m_msg);
     cameraInfoMsg->height = height;
     cameraInfoMsg->width = width;
@@ -210,13 +319,13 @@ void Ros2CameraInfoMessageImpl::writeIntrinsicMatrix(const double array[], const
     // Validate input parameters
     if (!array)
     {
-        CARB_LOG_ERROR("writeIntrinsicMatrix: input array is null");
+        fprintf(stderr, "[Ros2CameraInfoMessage] writeIntrinsicMatrix: input array is null\n");
         return;
     }
 
     if (arraySize != 9)
     {
-        CARB_LOG_ERROR("writeIntrinsicMatrix: invalid array size %zu, expected 9 for 3x3 matrix", arraySize);
+        fprintf(stderr, "[Ros2CameraInfoMessage] Invalid array size %zu, expected 9 for 3x3 matrix\n", arraySize);
         return;
     }
 
@@ -240,6 +349,14 @@ void Ros2CameraInfoMessageImpl::writeDistortionParameters(std::vector<double>& a
         cameraInfoMsg->d.size = m_distortionBuffer.size();
         cameraInfoMsg->d.capacity = m_distortionBuffer.size();
     }
+    else
+    {
+        // Clear the sequence safely
+        cameraInfoMsg->d.data = nullptr;
+        cameraInfoMsg->d.size = 0;
+        cameraInfoMsg->d.capacity = 0;
+    }
+
     Ros2MessageInterfaceImpl::writeRosString(distortionModel, cameraInfoMsg->distortion_model);
 }
 
@@ -253,13 +370,15 @@ void Ros2CameraInfoMessageImpl::writeProjectionMatrix(const double array[], cons
     // Validate input parameters
     if (!array)
     {
-        CARB_LOG_ERROR("writeProjectionMatrix: input array is null");
+        fprintf(stderr, "[Ros2CameraInfoMessage] writeProjectionMatrix: input array is null\n");
         return;
     }
 
     if (arraySize != 12)
     {
-        CARB_LOG_ERROR("writeProjectionMatrix: invalid array size %zu, expected 12 for 3x4 matrix", arraySize);
+        fprintf(stderr,
+                "[Ros2CameraInfoMessage] writeProjectionMatrix: invalid array size %zu, expected 12 for 3x4 matrix\n",
+                arraySize);
         return;
     }
 
@@ -279,13 +398,15 @@ void Ros2CameraInfoMessageImpl::writeRectificationMatrix(const double array[], c
     // Validate input parameters
     if (!array)
     {
-        CARB_LOG_ERROR("writeRectificationMatrix: input array is null");
+        fprintf(stderr, "[Ros2CameraInfoMessage] writeRectificationMatrix: input array is null\n");
         return;
     }
 
     if (arraySize != 9)
     {
-        CARB_LOG_ERROR("writeRectificationMatrix: invalid array size %zu, expected 9 for 3x3 matrix", arraySize);
+        fprintf(stderr,
+                "[Ros2CameraInfoMessage] writeRectificationMatrix: invalid array size %zu, expected 9 for 3x3 matrix\n",
+                arraySize);
         return;
     }
 
@@ -363,7 +484,7 @@ void Ros2ImageMessageImpl::generateBuffer(const uint32_t height, const uint32_t 
     m_buffer.resize(m_totalBytes);
     imageMsg->data.size = m_totalBytes;
     imageMsg->data.capacity = m_totalBytes;
-    imageMsg->data.data = &m_buffer[0];
+    imageMsg->data.data = m_totalBytes > 0 ? m_buffer.data() : nullptr;
 }
 
 Ros2ImageMessageImpl::~Ros2ImageMessageImpl()
@@ -436,7 +557,7 @@ void Ros2NitrosBridgeImageMessageImpl::generateBuffer(const uint32_t height,
     }
     catch (std::exception& e)
     {
-        fprintf(stderr, "[Error] %s\n", e.what());
+        fprintf(stderr, "Image encoding error: %s\n", e.what());
         return;
     }
     int byteDepth = bitDepth / 8;
@@ -447,9 +568,9 @@ void Ros2NitrosBridgeImageMessageImpl::generateBuffer(const uint32_t height,
 #endif
 }
 
-void Ros2NitrosBridgeImageMessageImpl::writeData(const std::vector<int32_t>& data)
+void Ros2NitrosBridgeImageMessageImpl::writeData(const std::vector<int32_t>& imageData)
 {
-    if (!m_msg || data.empty())
+    if (!m_msg || imageData.empty())
     {
         return;
     }
@@ -457,12 +578,12 @@ void Ros2NitrosBridgeImageMessageImpl::writeData(const std::vector<int32_t>& dat
     isaac_ros_nitros_bridge_interfaces__msg__NitrosBridgeImage* imageMsg =
         static_cast<isaac_ros_nitros_bridge_interfaces__msg__NitrosBridgeImage*>(m_msg);
 
-    m_imageData.resize(data.size());
-    std::memcpy(m_imageData.data(), data.data(), data.size() * sizeof(int32_t));
+    m_imageData.resize(imageData.size());
+    std::memcpy(m_imageData.data(), imageData.data(), imageData.size() * sizeof(int32_t));
 
     imageMsg->data.size = m_imageData.size();
     imageMsg->data.capacity = m_imageData.size();
-    imageMsg->data.data = &m_imageData[0];
+    imageMsg->data.data = m_imageData.data();
 #endif
 }
 
@@ -492,7 +613,7 @@ struct Bbox2DData
     int32_t yMin;
     int32_t xMax;
     int32_t yMax;
-    float occlusionRatio;
+    float occlusionRatio; // Unused but needed to match the size of the incoming void* struct
 };
 
 Ros2BoundingBox2DMessageImpl::Ros2BoundingBox2DMessageImpl()
@@ -522,11 +643,25 @@ void Ros2BoundingBox2DMessageImpl::writeBboxData(const void* bboxArray, const si
     {
         return;
     }
+    if (bboxArray == nullptr && numBoxes > 0)
+    {
+        fprintf(stderr, "[Ros2BoundingBox2DMessage] bboxArray is null for numBoxes=%zu\n", numBoxes);
+        return;
+    }
     vision_msgs__msg__Detection2DArray* detectionMsg = static_cast<vision_msgs__msg__Detection2DArray*>(m_msg);
 
-    // Set the detection sequence size and object pose sequence size
-    m_generatorLibrary->callSymbolWithArg<void>(
-        "vision_msgs__msg__Detection2D__Sequence__init", &detectionMsg->detections, numBoxes);
+    // Ensure detection sequence capacity and reuse where possible. If parent capacity must grow,
+    // finalize inner ObjectHypothesisWithPose sequences first to avoid leaks.
+    if (!ISAACSIM_ENSURE_SEQ_SIZE_DYNAMIC_WITH_INNER_FINI(
+            *m_generatorLibrary, detectionMsg->detections, numBoxes, "vision_msgs__msg__Detection2D__Sequence__init",
+            "vision_msgs__msg__Detection2D__Sequence__fini",
+            [](vision_msgs__msg__Detection2D& det) -> vision_msgs__msg__ObjectHypothesisWithPose__Sequence&
+            { return det.results; },
+            "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__fini"))
+    {
+        fprintf(stderr, "[Ros2BoundingBox2DMessage] Failed to ensure detection sequence\n");
+        return;
+    }
 
     const Bbox2DData* bboxData = reinterpret_cast<const Bbox2DData*>(bboxArray);
 
@@ -542,10 +677,18 @@ void Ros2BoundingBox2DMessageImpl::writeBboxData(const void* bboxArray, const si
         // TODO: Detection sub message header for all detections
         // detectionMsg->detections.data[i].header
 
-        m_generatorLibrary->callSymbolWithArg<void>(
-            "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__init", &detectionMsg->detections.data[i].results, 1);
+        // Ensure results sequence has capacity 1 and reuse if possible
+        if (!ISAACSIM_ENSURE_SEQ_SIZE_DYNAMIC(*m_generatorLibrary, detectionMsg->detections.data[i].results, 1,
+                                              "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__init",
+                                              "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__fini"))
+        {
+            fprintf(stderr, "[Ros2BoundingBox2DMessage] Warning: Failed to ensure results sequence for box %zu\n", i);
+            continue;
+        }
 
         detectionMsg->detections.data[i].results.data[0].hypothesis.score = 1.0;
+
+        // Assign semantic ID
         Ros2MessageInterfaceImpl::writeRosString(
             std::to_string(box.semanticId), detectionMsg->detections.data[i].results.data[0].hypothesis.class_id);
     }
@@ -553,11 +696,10 @@ void Ros2BoundingBox2DMessageImpl::writeBboxData(const void* bboxArray, const si
 
 Ros2BoundingBox2DMessageImpl::~Ros2BoundingBox2DMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        destroy(static_cast<vision_msgs__msg__Detection2DArray*>(m_msg));
     }
-    destroy(static_cast<vision_msgs__msg__Detection2DArray*>(m_msg));
 }
 
 // 3D bounding box detection message
@@ -571,7 +713,7 @@ struct Bbox3DData
     float yMax;
     float zMax;
     pxr::GfMatrix4f transform;
-    float occlusionRatio;
+    float occlusionRatio; // Unused but needed to match the size of the incoming void* struct
 };
 
 Ros2BoundingBox3DMessageImpl::Ros2BoundingBox3DMessageImpl()
@@ -601,11 +743,25 @@ void Ros2BoundingBox3DMessageImpl::writeBboxData(const void* bboxArray, size_t n
     {
         return;
     }
+    if (bboxArray == nullptr && numBoxes > 0)
+    {
+        fprintf(stderr, "[Ros2BoundingBox3DMessage] bboxArray is null for numBoxes=%zu\n", numBoxes);
+        return;
+    }
     vision_msgs__msg__Detection3DArray* detectionMsg = static_cast<vision_msgs__msg__Detection3DArray*>(m_msg);
 
-    m_generatorLibrary->callSymbolWithArg<void>(
-        "vision_msgs__msg__Detection3D__Sequence__init", &detectionMsg->detections, numBoxes);
-
+    // Ensure detection sequence capacity and reuse where possible. If parent capacity must grow,
+    // finalize inner ObjectHypothesisWithPose sequences first to avoid leaks.
+    if (!ISAACSIM_ENSURE_SEQ_SIZE_DYNAMIC_WITH_INNER_FINI(
+            *m_generatorLibrary, detectionMsg->detections, numBoxes, "vision_msgs__msg__Detection3D__Sequence__init",
+            "vision_msgs__msg__Detection3D__Sequence__fini",
+            [](vision_msgs__msg__Detection3D& det) -> vision_msgs__msg__ObjectHypothesisWithPose__Sequence&
+            { return det.results; },
+            "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__fini"))
+    {
+        fprintf(stderr, "[Ros2BoundingBox3DMessage] Failed to ensure detection sequence\n");
+        return;
+    }
     const Bbox3DData* bboxData = reinterpret_cast<const Bbox3DData*>(bboxArray);
 
     for (size_t i = 0; i < numBoxes; i++)
@@ -636,11 +792,18 @@ void Ros2BoundingBox3DMessageImpl::writeBboxData(const void* bboxArray, size_t n
         detectionMsg->detections.data[i].bbox.size.y = (box.yMax - box.yMin) * scale[1];
         detectionMsg->detections.data[i].bbox.size.z = (box.zMax - box.zMin) * scale[2];
 
-
-        m_generatorLibrary->callSymbolWithArg<void>(
-            "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__init", &detectionMsg->detections.data[i].results, 1);
+        // Ensure results sequence has capacity 1 and reuse if possible
+        if (!ISAACSIM_ENSURE_SEQ_SIZE_DYNAMIC(*m_generatorLibrary, detectionMsg->detections.data[i].results, 1,
+                                              "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__init",
+                                              "vision_msgs__msg__ObjectHypothesisWithPose__Sequence__fini"))
+        {
+            fprintf(stderr, "[Ros2BoundingBox3DMessage] Warning: Failed to ensure results sequence for box %zu\n", i);
+            continue;
+        }
 
         detectionMsg->detections.data[i].results.data[0].hypothesis.score = 1.0;
+
+        // Assign semantic ID
         Ros2MessageInterfaceImpl::writeRosString(
             std::to_string(box.semanticId), detectionMsg->detections.data[i].results.data[0].hypothesis.class_id);
     }
@@ -648,11 +811,10 @@ void Ros2BoundingBox3DMessageImpl::writeBboxData(const void* bboxArray, size_t n
 
 Ros2BoundingBox3DMessageImpl::~Ros2BoundingBox3DMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        destroy(static_cast<vision_msgs__msg__Detection3DArray*>(m_msg));
     }
-    destroy(static_cast<vision_msgs__msg__Detection3DArray*>(m_msg));
 }
 
 // Odometry message
@@ -692,6 +854,8 @@ void Ros2OdometryMessageImpl::writeData(std::string& childFrame,
         return;
     }
     nav_msgs__msg__Odometry* odometryMsg = static_cast<nav_msgs__msg__Odometry*>(m_msg);
+
+    // Assign child frame ID
     Ros2MessageInterfaceImpl::writeRosString(childFrame, odometryMsg->child_frame_id);
 
     if (publishRawVelocities)
@@ -705,7 +869,6 @@ void Ros2OdometryMessageImpl::writeData(std::string& childFrame,
         odometryMsg->twist.twist.angular.y = angularVelocity[1];
         odometryMsg->twist.twist.angular.z = angularVelocity[2];
     }
-
     else
     {
         // Project robot velocities into robot frame using dot-products
@@ -729,11 +892,10 @@ void Ros2OdometryMessageImpl::writeData(std::string& childFrame,
 
 Ros2OdometryMessageImpl::~Ros2OdometryMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        nav_msgs__msg__Odometry__destroy(static_cast<nav_msgs__msg__Odometry*>(m_msg));
     }
-    nav_msgs__msg__Odometry__destroy(static_cast<nav_msgs__msg__Odometry*>(m_msg));
 }
 
 // Raw Tf tree message
@@ -757,8 +919,15 @@ void Ros2RawTfTreeMessageImpl::writeData(const double timeStamp,
     {
         return;
     }
+
     tf2_msgs__msg__TFMessage* tfMsg = static_cast<tf2_msgs__msg__TFMessage*>(m_msg);
-    geometry_msgs__msg__TransformStamped__Sequence__init(&tfMsg->transforms, 1);
+
+    // Ensure capacity for a single transform and reuse if possible
+    if (!ensureSeqSize(tfMsg->transforms, 1))
+    {
+        fprintf(stderr, "[Ros2RawTfTreeMessage] Failed to ensure transform sequence\n");
+        return;
+    }
 
     Ros2MessageInterfaceImpl::writeRosHeader(
         frameId, static_cast<int64_t>(timeStamp * 1e9), tfMsg->transforms.data->header);
@@ -776,11 +945,10 @@ void Ros2RawTfTreeMessageImpl::writeData(const double timeStamp,
 
 Ros2RawTfTreeMessageImpl::~Ros2RawTfTreeMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        tf2_msgs__msg__TFMessage__destroy(static_cast<tf2_msgs__msg__TFMessage*>(m_msg));
     }
-    tf2_msgs__msg__TFMessage__destroy(static_cast<tf2_msgs__msg__TFMessage*>(m_msg));
 }
 
 // Sematic label message (string type message)
@@ -800,17 +968,19 @@ void Ros2SemanticLabelMessageImpl::writeData(const std::string& data)
     {
         return;
     }
+
     std_msgs__msg__String* stringMsg = static_cast<std_msgs__msg__String*>(m_msg);
+
+    // Assign string data
     Ros2MessageInterfaceImpl::writeRosString(data, stringMsg->data);
 }
 
 Ros2SemanticLabelMessageImpl::~Ros2SemanticLabelMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        std_msgs__msg__String__destroy(static_cast<std_msgs__msg__String*>(m_msg));
     }
-    std_msgs__msg__String__destroy(static_cast<std_msgs__msg__String*>(m_msg));
 }
 
 // JointState message
@@ -867,29 +1037,32 @@ void Ros2JointStateMessageImpl::writeData(const double& timeStamp,
     bool hasDofStates = true;
     if (!articulation->getDofPositions(&positionTensor))
     {
-        printf("Failed to get dof positions\n");
+        fprintf(stderr, "[Ros2JointStateMessage] Failed to get dof positions\n");
         hasDofStates = false;
     }
     if (!articulation->getDofVelocities(&velocityTensor))
     {
-        printf("Failed to get dof velocities\n");
+        fprintf(stderr, "[Ros2JointStateMessage] Failed to get dof velocities\n");
         hasDofStates = false;
     }
     if (!articulation->getDofProjectedJointForces(&effortTensor))
     {
-        printf("Failed to get dof efforts\n");
+        fprintf(stderr, "[Ros2JointStateMessage] Failed to get dof efforts\n");
         hasDofStates = false;
     }
     if (!articulation->getDofTypes(&dofTypeTensor))
     {
-        printf("Failed to get dof types\n");
+        fprintf(stderr, "[Ros2JointStateMessage] Failed to get dof types\n");
         hasDofStates = false;
     }
 
-    rosidl_runtime_c__String__Sequence__init(&jointStateMsg->name, numDofs);
-    rosidl_runtime_c__double__Sequence__init(&jointStateMsg->position, numDofs);
-    rosidl_runtime_c__double__Sequence__init(&jointStateMsg->velocity, numDofs);
-    rosidl_runtime_c__double__Sequence__init(&jointStateMsg->effort, numDofs);
+    // Ensure sequences have enough capacity and reuse allocations where possible
+    if (!ensureSeqSize(jointStateMsg->name, numDofs) || !ensureSeqSize(jointStateMsg->position, numDofs) ||
+        !ensureSeqSize(jointStateMsg->velocity, numDofs) || !ensureSeqSize(jointStateMsg->effort, numDofs))
+    {
+        fprintf(stderr, "[Ros2JointStateMessage] Failed to ensure sequence capacities\n");
+        return;
+    }
 
     if (hasDofStates)
     {
@@ -1012,16 +1185,15 @@ void Ros2JointStateMessageImpl::readData(std::vector<char*>& jointNames,
             jointEfforts[i] = std::numeric_limits<double>::quiet_NaN();
         }
     }
-    timeStamp = jointStateMsg->header.stamp.sec;
+    timeStamp = jointStateMsg->header.stamp.sec + jointStateMsg->header.stamp.nanosec / 1e9;
 }
 
 Ros2JointStateMessageImpl::~Ros2JointStateMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        sensor_msgs__msg__JointState__destroy(static_cast<sensor_msgs__msg__JointState*>(m_msg));
     }
-    sensor_msgs__msg__JointState__destroy(static_cast<sensor_msgs__msg__JointState*>(m_msg));
 }
 
 // PointCloud2 message
@@ -1055,44 +1227,43 @@ void Ros2PointCloudMessageImpl::generateBuffer(const double& timeStamp,
 
     pointCloudMsg->row_step = pointCloudMsg->point_step * pointCloudMsg->width;
 
-    size_t totalBytes = width * sizeof(pxr::GfVec3f);
-    pointCloudMsg->data.size = totalBytes;
-    pointCloudMsg->data.capacity = totalBytes;
-    m_buffer.resize(totalBytes);
-    pointCloudMsg->data.data = &m_buffer[0];
+    m_totalBytes = width * sizeof(pxr::GfVec3f);
 
-    sensor_msgs__msg__PointField__Sequence__init(&pointCloudMsg->fields, 3);
+    // Use buffer-backed sequence for safe memory management
+    m_buffer.resize(m_totalBytes);
+    pointCloudMsg->data.size = m_totalBytes;
+    pointCloudMsg->data.capacity = m_totalBytes;
+    pointCloudMsg->data.data = m_buffer.data();
 
-    Ros2MessageInterfaceImpl::writeRosString("x", pointCloudMsg->fields.data[0].name);
-    Ros2MessageInterfaceImpl::writeRosString("y", pointCloudMsg->fields.data[1].name);
-    Ros2MessageInterfaceImpl::writeRosString("z", pointCloudMsg->fields.data[2].name);
+    // Ensure fields sequence has capacity 3 and reuse if possible
+    if (!ensureSeqSize(pointCloudMsg->fields, 3))
+    {
+        fprintf(stderr, "[Ros2PointCloudMessage] Failed to ensure fields sequence\n");
+        return;
+    }
 
-    pointCloudMsg->fields.data[0].count = 1;
-    pointCloudMsg->fields.data[1].count = 1;
-    pointCloudMsg->fields.data[2].count = 1;
-
-    pointCloudMsg->fields.data[0].datatype = sensor_msgs__msg__PointField__FLOAT32;
-    pointCloudMsg->fields.data[1].datatype = sensor_msgs__msg__PointField__FLOAT32;
-    pointCloudMsg->fields.data[2].datatype = sensor_msgs__msg__PointField__FLOAT32;
-
-
-    pointCloudMsg->fields.data[0].offset = 0;
-    pointCloudMsg->fields.data[1].offset = 4;
-    pointCloudMsg->fields.data[2].offset = 8;
+    // Assign field names
+    const char* fieldNames[] = { "x", "y", "z" };
+    for (int i = 0; i < 3; i++)
+    {
+        Ros2MessageInterfaceImpl::writeRosString(fieldNames[i], pointCloudMsg->fields.data[i].name);
+        pointCloudMsg->fields.data[i].count = 1;
+        pointCloudMsg->fields.data[i].datatype = sensor_msgs__msg__PointField__FLOAT32;
+        pointCloudMsg->fields.data[i].offset = i * 4;
+    }
 }
 
 Ros2PointCloudMessageImpl::~Ros2PointCloudMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        sensor_msgs__msg__PointCloud2* pointCloudMsg = static_cast<sensor_msgs__msg__PointCloud2*>(m_msg);
+        // memory is managed by std::vector, clear this so destruction doesn't deallocate
+        pointCloudMsg->data.size = 0;
+        pointCloudMsg->data.capacity = 0;
+        pointCloudMsg->data.data = nullptr;
+        sensor_msgs__msg__PointCloud2__destroy(pointCloudMsg);
     }
-    sensor_msgs__msg__PointCloud2* pointCloudMsg = static_cast<sensor_msgs__msg__PointCloud2*>(m_msg);
-    // memory is managed by std::vector, clear this so destruction doesn't deallocate
-    pointCloudMsg->data.size = 0;
-    pointCloudMsg->data.capacity = 0;
-    pointCloudMsg->data.data = nullptr;
-    sensor_msgs__msg__PointCloud2__destroy(pointCloudMsg);
 }
 
 // LaserScan message
@@ -1122,16 +1293,18 @@ void Ros2LaserScanMessageImpl::generateBuffers(const size_t buffSize)
     {
         return;
     }
+
     sensor_msgs__msg__LaserScan* laserScanMsg = static_cast<sensor_msgs__msg__LaserScan*>(m_msg);
 
+
+    m_rangeData.resize(buffSize);
     laserScanMsg->ranges.size = buffSize;
     laserScanMsg->ranges.capacity = buffSize;
-    m_rangeData.resize(buffSize);
     laserScanMsg->ranges.data = m_rangeData.data();
 
+    m_intensitiesData.resize(buffSize);
     laserScanMsg->intensities.size = buffSize;
     laserScanMsg->intensities.capacity = buffSize;
-    m_intensitiesData.resize(buffSize);
     laserScanMsg->intensities.data = m_intensitiesData.data();
 }
 
@@ -1161,19 +1334,18 @@ void Ros2LaserScanMessageImpl::writeData(const pxr::GfVec2f& azimuthRange,
 
 Ros2LaserScanMessageImpl::~Ros2LaserScanMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        sensor_msgs__msg__LaserScan* laserScanMsg = static_cast<sensor_msgs__msg__LaserScan*>(m_msg);
+        // Lifetime of memory is not managed by the message as we use std vectors
+        laserScanMsg->ranges.size = 0;
+        laserScanMsg->ranges.capacity = 0;
+        laserScanMsg->ranges.data = nullptr;
+        laserScanMsg->intensities.size = 0;
+        laserScanMsg->intensities.capacity = 0;
+        laserScanMsg->intensities.data = nullptr;
+        sensor_msgs__msg__LaserScan__destroy(laserScanMsg);
     }
-    sensor_msgs__msg__LaserScan* laserScanMsg = static_cast<sensor_msgs__msg__LaserScan*>(m_msg);
-    // Lifetime of memory is not managed by the message as we use std vectors
-    laserScanMsg->ranges.size = 0;
-    laserScanMsg->ranges.capacity = 0;
-    laserScanMsg->ranges.data = nullptr;
-    laserScanMsg->intensities.size = 0;
-    laserScanMsg->intensities.capacity = 0;
-    laserScanMsg->intensities.data = nullptr;
-    sensor_msgs__msg__LaserScan__destroy(laserScanMsg);
 }
 
 // Full TFMessage message
@@ -1202,7 +1374,13 @@ void Ros2TfTreeMessageImpl::writeData(const double& timeStamp, std::vector<TfTra
         return;
     }
     tf2_msgs__msg__TFMessage* tfMsg = static_cast<tf2_msgs__msg__TFMessage*>(m_msg);
-    geometry_msgs__msg__TransformStamped__Sequence__init(&tfMsg->transforms, transforms.size());
+
+    // Ensure capacity for transforms and reuse if possible
+    if (!ensureSeqSize(tfMsg->transforms, transforms.size()))
+    {
+        fprintf(stderr, "[Ros2TfTreeMessage] Failed to ensure transform sequence\n");
+        return;
+    }
 
     for (size_t i = 0; i < transforms.size(); i++)
     {
@@ -1249,11 +1427,10 @@ void Ros2TfTreeMessageImpl::readData(std::vector<TfTransformStamped>& transforms
 
 Ros2TfTreeMessageImpl::~Ros2TfTreeMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        tf2_msgs__msg__TFMessage__destroy(static_cast<tf2_msgs__msg__TFMessage*>(m_msg));
     }
-    tf2_msgs__msg__TFMessage__destroy(static_cast<tf2_msgs__msg__TFMessage*>(m_msg));
 }
 
 // Twist message
@@ -1271,6 +1448,8 @@ void Ros2TwistMessageImpl::readData(pxr::GfVec3d& linearVelocity, pxr::GfVec3d& 
 {
     if (!m_msg)
     {
+        linearVelocity = pxr::GfVec3d(0.0);
+        angularVelocity = pxr::GfVec3d(0.0);
         return;
     }
     geometry_msgs__msg__Twist* twistMsg = static_cast<geometry_msgs__msg__Twist*>(m_msg);
@@ -1286,11 +1465,10 @@ void Ros2TwistMessageImpl::readData(pxr::GfVec3d& linearVelocity, pxr::GfVec3d& 
 
 Ros2TwistMessageImpl::~Ros2TwistMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        geometry_msgs__msg__Twist__destroy(static_cast<geometry_msgs__msg__Twist*>(m_msg));
     }
-    geometry_msgs__msg__Twist__destroy(static_cast<geometry_msgs__msg__Twist*>(m_msg));
 }
 
 // AckermannDriveStamped message
@@ -1315,12 +1493,20 @@ void Ros2AckermannDriveStampedMessageImpl::readData(double& timeStamp,
 {
     if (!m_msg)
     {
+        // Set default values
+        timeStamp = 0.0;
+        frameId.clear();
+        steeringAngle = 0.0;
+        steeringAngleVelocity = 0.0;
+        speed = 0.0;
+        acceleration = 0.0;
+        jerk = 0.0;
         return;
     }
     ackermann_msgs__msg__AckermannDriveStamped* ackermannDriveMsg =
         static_cast<ackermann_msgs__msg__AckermannDriveStamped*>(m_msg);
 
-    frameId = ackermannDriveMsg->header.frame_id.data;
+    frameId = ackermannDriveMsg->header.frame_id.data ? ackermannDriveMsg->header.frame_id.data : "";
     timeStamp = ackermannDriveMsg->header.stamp.sec + ackermannDriveMsg->header.stamp.nanosec / 1e9;
 
     steeringAngle = ackermannDriveMsg->drive.steering_angle;
@@ -1363,11 +1549,10 @@ void Ros2AckermannDriveStampedMessageImpl::writeData(const double& steeringAngle
 
 Ros2AckermannDriveStampedMessageImpl::~Ros2AckermannDriveStampedMessageImpl()
 {
-    if (!m_msg)
+    if (m_msg)
     {
-        return;
+        destroy(static_cast<ackermann_msgs__msg__AckermannDriveStamped*>(m_msg));
     }
-    destroy(static_cast<ackermann_msgs__msg__AckermannDriveStamped*>(m_msg));
 }
 
 } // namespace bridge

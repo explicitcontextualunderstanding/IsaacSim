@@ -1,5 +1,5 @@
 [package]
-version = "15.5.0"
+version = "15.8.2"
 category = "Simulation"
 title = "Isaac Sim Isaac Sensor Simulation"
 description = "Provides APIs for RTX-based sensors, including RTX Lidar & RTX Radar."
@@ -14,6 +14,7 @@ writeTarget.kit = true
 "isaacsim.core.api" = {}
 "isaacsim.core.deprecation_manager" = {}
 "isaacsim.core.nodes" = {}
+"isaacsim.core.simulation_manager" = {}
 "isaacsim.gui.components" = {}
 "isaacsim.robot.schema" = {}
 "isaacsim.storage.native" = {}
@@ -24,10 +25,10 @@ writeTarget.kit = true
 "omni.kit.pip_archive" = {} # pulls in numpy
 "omni.replicator.core" = {}
 # Make sure the versions are aligned with source/apps/isaacsim.exp.extscache.kit
-"omni.sensors.nv.common" = { version = "2.7.0-coreapi", exact=true }
-"omni.sensors.nv.ids" = { version = "1.5.0-coreapi", exact=true }
-"omni.sensors.nv.lidar" = { version = "2.7.0-coreapi", exact=true }
-"omni.sensors.nv.radar" = { version = "2.8.0-coreapi", exact=true }
+"omni.sensors.nv.common" = {}
+"omni.sensors.nv.ids" = {}
+"omni.sensors.nv.lidar" = {}
+"omni.sensors.nv.radar" = {}
 "omni.syntheticdata" = {}
 "omni.timeline" = {} # Needed for simulation to occur
 "omni.usd" = {} # needed for call to add aov
@@ -64,18 +65,14 @@ app.sensors.nv.lidar.profileBaseFolder=[
     "${isaacsim.sensors.rtx}/data/lidar_configs/"
 ]
 
-# Renderer copies Lidar return buffer onto CPU before postprocessing
+# Renderer keeps Lidar return buffer on GPU for post-processing.
 app.sensors.nv.lidar.outputBufferOnGPU = true
-# Renderer copies Radar return buffer onto CPU before postprocessing
+# Renderer keeps Radar return buffer on GPU for post-processing.
 app.sensors.nv.radar.outputBufferOnGPU = true
-# Enable motion BVH for sensor motion effects
-renderer.raytracingMotion.enabled=true
-# Enable motion raytracing Hydra engine masking support
-renderer.raytracingMotion.enableHydraEngineMasking=true
-# Enable motion raytracing for Hydra engines 0-4
-renderer.raytracingMotion.enabledForHydraEngines="0,1,2,3,4"
-# Enable non-visual materials using default hard-coded map of material names to material IDs
-rtx.materialDb.rtSensorNameToIdMap="DefaultMaterial:0;AsphaltStandardMaterial:1;AsphaltWeatheredMaterial:2;VegetationGrassMaterial:3;WaterStandardMaterial:4;GlassStandardMaterial:5;FiberGlassMaterial:6;MetalAlloyMaterial:7;MetalAluminumMaterial:8;MetalAluminumOxidizedMaterial:9;PlasticStandardMaterial:10;RetroMarkingsMaterial:11;RetroSignMaterial:12;RubberStandardMaterial:13;SoilClayMaterial:14;ConcreteRoughMaterial:15;ConcreteSmoothMaterial:16;OakTreeBarkMaterial:17;FabricStandardMaterial:18;PlexiGlassStandardMaterial:19;MetalSilverMaterial:20"
+# Enable non-visual materials using USD attributes
+rtx.materialDb.nonVisualMaterialCSV.enabled=false
+# Specify non-visual material USD attribute prefix
+rtx.materialDb.nonVisualMaterialSemantics.prefix="omni:simready:nonvisual"
 
 [[test]]
 timeout = 1200
@@ -84,9 +81,17 @@ stdoutFailPatterns.exclude = [
     "*Missing call to destroyResourceBindingSignature()*",
     "*Error processing node attribute `outputs:pointInstanceDataType`: dataType attribute is empty*",
     "*RuntimeWarning: invalid value encountered in divide*",
+    "*RuntimeWarning: divide by zero encountered in divide*",
     "*[Error] [isaacsim.sensors.rtx.plugin] IsaacComputeRTXLidarFlatScan: Lidar prim is not a 2D Lidar, and node will not execute. Stop the simulation, correct the issue, and restart.*",
     "*[Error] [isaacsim.sensors.rtx.plugin] IsaacComputeRTXLidarFlatScan: Lidar prim elevationDeg contains nonzero value*",
-    "*[Error] [isaacsim.sensors.rtx.plugin] IsaacComputeRTXLidarFlatScan: renderProductPath input is empty. Skipping execution.*"
+    "*[Error] [isaacsim.sensors.rtx.plugin] IsaacComputeRTXLidarFlatScan: renderProductPath input is empty. Skipping execution.*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Attribute 'invalidattribute' not found in attributes dictionary*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Base material 'InvalidMaterial' not found in base materials dictionary*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Coating 'invalidcoating' not found in coatings dictionary*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a valid USD prim*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a material prim*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a valid USD prim*",
+    "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a material prim*",
 ]
 stdoutFailPatterns.include = [
     "*Could not open asset * for reference*",
@@ -135,6 +140,10 @@ args = [
     "--/rtx/materialDb/syncLoads=1",
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
+    ### Extension specific args
+    "--/app/hydraEngine/waitIdle=1",
+    "--/app/updateOrder/checkForHydraRenderComplete=1000",
+    "--/rtx-transient/stableIds/enabled=true",
 ]
 
 [[test]]

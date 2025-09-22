@@ -1,4 +1,14 @@
 # Changelog
+
+## [2.2.1] - 2025-09-08
+### Changed
+- Use opt-in carb setting for async rendering and manual mode toggles
+
+## [2.2.0] - 2025-09-05
+### Added
+- Add setting to enable/disable async rendering
+- Add setting to change loop runner manual mode
+
 ## [2.1.10] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 2.1.9)

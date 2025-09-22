@@ -81,13 +81,11 @@ includedirs {
     "%{root}/_build/target-deps/omni_client_library/include",
     extsbuild_dir .. "/usdrt.scenegraph/include",
     "%{root}/source/extensions/isaacsim.core.simulation_manager/include",
-    "%{root}/source/extensions/isaacsim.core.simulation_manager/plugins",
     "%{kit_sdk_bin_dir}/dev/fabric/include/",
 }
 
 libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
-    "%{root}/_build/target-deps/nv_usd/release/lib",
 }
 
 extra_usd_libs = { "usdGeom", "usdUtils", "usdPhysics" }

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import math
+import sys
 import unittest
 
 from isaacsim import SimulationApp
@@ -29,15 +30,19 @@ asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka
 
 simulation_context = SimulationContext(physics_dt=1.0 / 60.0, rendering_dt=1.0 / 60.0, stage_units_in_meters=1.0)
 if not math.isclose(simulation_context.get_physics_dt(), 1.0 / 60.0):
-    raise ValueError(f"Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
+    print(f"[FAIL] Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
+    sys.exit(1)
 if not math.isclose(simulation_context.get_rendering_dt(), 1.0 / 60.0):
-    raise ValueError(f"Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
+    print(f"[FAIL] Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
+    sys.exit(1)
 simulation_context.clear_instance()
 simulation_context = SimulationContext(stage_units_in_meters=1.0)
 if not math.isclose(simulation_context.get_physics_dt(), 1.0 / 60.0):
-    raise ValueError(f"Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
+    print(f"[FAIL] Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
+    sys.exit(1)
 if not math.isclose(simulation_context.get_rendering_dt(), 1.0 / 60.0):
-    raise ValueError(f"Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
+    print(f"[FAIL] Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
+    sys.exit(1)
 add_reference_to_stage(asset_path, "/Franka")
 # need to initialize physics getting any articulation..etc
 simulation_context.initialize_physics()

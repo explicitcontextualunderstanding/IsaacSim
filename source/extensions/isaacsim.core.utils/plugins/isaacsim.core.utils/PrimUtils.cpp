@@ -23,6 +23,8 @@
 #include <pxr/usd/usdPhysics/articulationRootAPI.h>
 #include <pxr/usd/usdPhysics/rigidBodyAPI.h>
 
+#include <algorithm>
+
 /**
  * @brief Implementation of findMatchingChildren function.
  * @details
@@ -94,10 +96,7 @@ std::vector<std::string> isaacsim::core::utils::findMatchingPrimPaths(const std:
     std::vector<std::string> tokens = pxr::TfStringSplit(trimmedPattern, "/");
 
     // need to wrap the token patterns in '^' and '$' to prevent matching anywhere in the string
-    for (std::string& tok : tokens)
-    {
-        tok = '^' + tok + '$';
-    }
+    std::transform(tokens.begin(), tokens.end(), tokens.begin(), [](const std::string& tok) { return '^' + tok + '$'; });
 
     std::vector<pxr::UsdPrim> roots;
     std::vector<pxr::UsdPrim> matches;

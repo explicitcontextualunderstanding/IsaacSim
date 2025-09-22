@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate augmented synthetic data from annotators
-"""
+"""Generate augmented synthetic data from annotators"""
 
 from isaacsim import SimulationApp
 
@@ -89,7 +88,7 @@ rep.AnnotatorRegistry.register_augmentation(
 
 # Helper functions for writing images from annotator data
 def write_rgb(data, path):
-    rgb_img = Image.fromarray(data, mode="RGBA")
+    rgb_img = Image.fromarray(data).convert("RGBA")
     rgb_img.save(path + ".png")
 
 
@@ -102,7 +101,7 @@ def write_depth(data, path):
     data = np.nan_to_num(data, nan=np.nanmean(data), copy=False)
     normalized_array = (data - np.min(data)) / (np.max(data) - np.min(data))
     integer_array = (normalized_array * 255).astype(np.uint8)
-    depth_img = Image.fromarray(integer_array, mode="L")
+    depth_img = Image.fromarray(integer_array).convert("L")
     depth_img.save(path + ".png")
 
 

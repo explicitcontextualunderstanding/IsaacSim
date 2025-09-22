@@ -147,6 +147,7 @@ class XFormPrim(Prim):
         self._default_view_indices = None
         self._fabric_data_dicts = dict()
         self._fabric_data_valid = dict()
+        self._fabric_hierarchy = None
         if SimulationManager.get_physics_sim_view() is not None:
             XFormPrim._on_physics_ready(self, None)
         if not self._non_root_link and reset_xform_properties:
@@ -516,7 +517,7 @@ class XFormPrim(Prim):
                         material = UsdShade.Material(stage.GetPrimAtPath(material_path))
                         # getting the shader
                         shader_info = material.ComputeSurfaceSource()
-                        if shader_info[0].GetPath() != "":
+                        if shader_info[0].GetPath().pathString != "":
                             shader = shader_info[0]
                         elif is_prim_path_valid(material_path + "/shader"):
                             shader_path = material_path + "/shader"
@@ -660,37 +661,26 @@ class XFormPrim(Prim):
         """
         if self._is_valid:
             if not usd:
+                self._get_fabric_hierarchy().update_world_xforms()
                 if not self._view_in_fabric_prepared:
                     self._prepare_view_in_fabric()
                 if self._selection is None:
                     self._get_fabric_selection()
-                positions = wp.fabricarray(self._selection, "_worldPosition")
-                orientations = wp.fabricarray(self._selection, "_worldOrientation")
+                world_matrix = wp.fabricarray(self._selection, "omni:fabric:worldMatrix")
                 if indices is None:
                     indices = self._default_view_indices
                 else:
                     indices = self._backend2warp(indices, dtype=wp.uint32)
                 wp.launch(
-                    fabric_utils.get_vec3d_array,
+                    fabric_utils.decompose_fabric_transformation_matrix_to_warp_arrays,
                     dim=(indices.shape[0]),
                     inputs=[
-                        positions,
-                        self._fabric_to_view,
-                        self._view_to_fabric,
+                        world_matrix,
                         self._fabric_data_dicts["world_position"],
-                        indices,
-                    ],
-                    device=self._device,
-                )
-                wp.launch(
-                    fabric_utils.get_quatf_array,
-                    dim=(indices.shape[0]),
-                    inputs=[
-                        orientations,
-                        self._fabric_to_view,
-                        self._view_to_fabric,
                         self._fabric_data_dicts["world_orientation"],
+                        None,
                         indices,
+                        self._view_to_fabric,
                     ],
                     device=self._device,
                 )
@@ -765,42 +755,30 @@ class XFormPrim(Prim):
         """
         if self._is_valid:
             if not usd:
+                fabric_hierarchy = self._get_fabric_hierarchy()
+                fabric_hierarchy.update_world_xforms()
                 if not self._view_in_fabric_prepared:
                     self._prepare_view_in_fabric()
-                if self._selection is None:
-                    self._get_fabric_selection()
                 if indices is None:
                     indices = self._default_view_indices
                 else:
                     indices = self._backend2warp(indices, dtype=wp.uint32)
                 if positions is not None:
-                    current_positions = wp.fabricarray(self._selection, "_worldPosition")
-                    wp.launch(
-                        fabric_utils.set_vec3d_array,
-                        dim=(indices.shape[0]),
-                        inputs=[
-                            current_positions,
-                            self._fabric_to_view,
-                            self._view_to_fabric,
-                            self._backend2warp(positions),
-                            indices,
-                        ],
-                        device=self._device,
-                    )
+                    positions = self._backend2warp(positions).numpy()
                 if orientations is not None:
-                    current_orientations = wp.fabricarray(self._selection, "_worldOrientation")
-                    wp.launch(
-                        fabric_utils.set_quatf_array,
-                        dim=(indices.shape[0]),
-                        inputs=[
-                            current_orientations,
-                            self._fabric_to_view,
-                            self._view_to_fabric,
-                            self._backend2warp(orientations),
-                            indices,
-                        ],
-                        device=self._device,
-                    )
+                    orientations = self._backend2warp(orientations).numpy()
+                for i, index in enumerate(indices.numpy()):
+                    path = usdrt.Sdf.Path(self._prim_paths[index])
+                    matrix = fabric_hierarchy.get_world_xform(path)
+                    if positions is not None:
+                        matrix.SetTranslateOnly(usdrt.Gf.Vec3d(*positions[i]))
+                    if orientations is not None:
+                        matrix.SetRotateOnly(usdrt.Gf.Quatd(*orientations[i]))
+                        scaling_matrix = (
+                            usdrt.Gf.Matrix4d().SetIdentity().SetScale(usdrt.Gf.Transform(matrix).GetScale())
+                        )
+                        matrix = scaling_matrix * matrix
+                    fabric_hierarchy.set_world_xform(path, matrix)
             else:
                 if positions is None or orientations is None:
                     current_positions, current_orientations = self.get_world_poses(indices=indices)
@@ -1125,9 +1103,8 @@ class XFormPrim(Prim):
     def _get_fabric_selection(self) -> None:
         self._selection = self._usdrt_stage.SelectPrims(
             require_attrs=[
-                (usdrt.Sdf.ValueTypeNames.Double3, "_worldPosition", usdrt.Usd.Access.ReadWrite),
                 (usdrt.Sdf.ValueTypeNames.UInt, self._view_index_attr, usdrt.Usd.Access.Read),
-                (usdrt.Sdf.ValueTypeNames.Quatf, "_worldOrientation", usdrt.Usd.Access.ReadWrite),
+                (usdrt.Sdf.ValueTypeNames.Matrix4d, "omni:fabric:worldMatrix", usdrt.Usd.Access.Read),
             ],
             device=self._device,
         )
@@ -1202,6 +1179,13 @@ class XFormPrim(Prim):
             SimulationManager.register_callback(self._reset_fabric_selection, event=IsaacEvents.POST_PHYSICS_STEP)
         )
         self._view_in_fabric_prepared = True
+
+    def _get_fabric_hierarchy(self):
+        if self._fabric_hierarchy is None:
+            self._fabric_hierarchy = usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
+                self._usdrt_stage.GetFabricId(), self._usdrt_stage.GetStageIdAsStageId()
+            )
+        return self._fabric_hierarchy
 
     def _on_post_reset(self, event) -> None:
         if not self._non_root_link:

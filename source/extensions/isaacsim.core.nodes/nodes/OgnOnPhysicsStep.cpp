@@ -102,7 +102,7 @@ public:
             state.m_timelineEventSub = carb::events::createSubscriptionToPopByType(
                 state.m_timeline->getTimeline()->getTimelineEventStream(),
                 static_cast<carb::events::EventType>(omni::timeline::TimelineEventType::ePlay),
-                [nodeObj, instanceId](carb::events::IEvent* e) { start(nodeObj, instanceId); }, 0,
+                [nodeObj, instanceId](const carb::events::IEvent* e) { start(nodeObj, instanceId); }, 0,
                 "IsaacSimOGNPhysicStepsTimelineEventHandler");
         }
         if (pipelineStage != kGraphPipelineStage_OnDemand)
@@ -172,7 +172,7 @@ public:
 
     static void onPhysicsStep(float timeElapsed, void* userData)
     {
-        CARB_PROFILE_ZONE(0, "OgnOnPysicsStep::onPhysicsStep");
+        CARB_PROFILE_ZONE(0, "[IsaacSim] OgnOnPysicsStep::onPhysicsStep");
         HandleIdPair* idpair = reinterpret_cast<HandleIdPair*>(userData);
         auto graphHandle = idpair->graphHandle;
         auto instanceId = idpair->instanceId;
@@ -188,8 +188,8 @@ public:
                 // Iterate over all step nodes enabling them to receive the evaluate input
                 for (auto handle : graphData->second.nodes)
                 {
-                    NodeObj node = g_iNode->getNodeFromHandle(handle);
-                    auto& state = OgnOnPhysicsStepDatabase::sPerInstanceState<OgnOnPhysicsStep>(node, instanceId);
+                    NodeObj currentNode = g_iNode->getNodeFromHandle(handle);
+                    auto& state = OgnOnPhysicsStepDatabase::sPerInstanceState<OgnOnPhysicsStep>(currentNode, instanceId);
                     state.m_dt = timeElapsed;
                     state.m_isSet = true;
                 }

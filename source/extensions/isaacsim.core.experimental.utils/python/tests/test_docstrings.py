@@ -14,9 +14,11 @@
 # limitations under the License.
 
 import isaacsim.core.experimental.utils.impl.backend as backend_utils
+import isaacsim.core.experimental.utils.impl.foundation as foundation_utils
 import isaacsim.core.experimental.utils.impl.ops as ops_utils
 import isaacsim.core.experimental.utils.impl.prim as prim_utils
 import isaacsim.core.experimental.utils.impl.stage as stage_utils
+import isaacsim.core.experimental.utils.impl.transform as transform_utils
 import isaacsim.test.docstring
 
 
@@ -34,6 +36,9 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
     async def test_backend_docstrings(self):
         await self.assertDocTests(backend_utils)
 
+    async def test_foundation_docstrings(self):
+        await self.assertDocTests(foundation_utils)
+
     async def test_ops_docstrings(self):
         await self.assertDocTests(ops_utils)
 
@@ -42,3 +47,6 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
 
     async def test_stage_docstrings(self):
         await self.assertDocTests(stage_utils)
+
+    async def test_transform_docstrings(self):
+        await self.assertDocTests(transform_utils)

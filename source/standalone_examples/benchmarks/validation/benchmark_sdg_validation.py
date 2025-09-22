@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import argparse
-from pathlib import Path
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--num-frames", type=int, default=600, help="Number of frames to capture")
@@ -79,9 +78,6 @@ print(f"\tannotators: {annotators_str}")
 print(f"\theadless: {headless}")
 print(f"\tenv_url: {env_url}")
 
-import os
-import shutil
-import time
 
 from isaacsim import SimulationApp
 
@@ -95,7 +91,6 @@ import omni.replicator.core as rep
 import omni.usd
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.storage.native import get_assets_root_path
-from omni.kit.viewport.utility import get_active_viewport
 
 enable_extension("isaacsim.benchmark.services")
 

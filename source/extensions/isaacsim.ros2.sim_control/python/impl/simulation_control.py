@@ -14,23 +14,60 @@
 # limitations under the License.
 
 import asyncio
+import os
 import threading
 
 import carb
+import isaacsim.core.utils.prims as prim_utils
 import isaacsim.core.utils.stage as stage_utils
 import nest_asyncio
+import numpy as np
 import omni
 import omni.timeline
 from isaacsim.core.experimental.prims import RigidPrim, XformPrim
+from isaacsim.storage.native import (
+    find_filtered_files_async,
+    get_assets_root_path_async,
+    is_local_path,
+    is_valid_usd_file,
+)
 from pxr import Sdf
 from usdrt import Usd
 
 from .entity_utils import create_empty_entity_state, get_entity_state, get_filtered_entities
 
+# ROS2 Interface Configuration
+# Format: (module_name, class_name, endpoint_name)
+# Example: ("simulation_interfaces.srv", "GetSimulationState", "get_simulation_state")
+#          imports GetSimulationState from simulation_interfaces.srv
+#          and registers it as ROS2 service "/get_simulation_state"
+SERVICE_TYPES = [
+    ("simulation_interfaces.srv", "GetSimulationState", "get_simulation_state"),
+    ("simulation_interfaces.srv", "SetSimulationState", "set_simulation_state"),
+    ("simulation_interfaces.srv", "GetEntities", "get_entities"),
+    ("simulation_interfaces.srv", "DeleteEntity", "delete_entity"),
+    ("simulation_interfaces.srv", "GetEntityInfo", "get_entity_info"),
+    ("simulation_interfaces.srv", "SpawnEntity", "spawn_entity"),
+    ("simulation_interfaces.srv", "ResetSimulation", "reset_simulation"),
+    ("simulation_interfaces.srv", "StepSimulation", "step_simulation"),
+    ("simulation_interfaces.srv", "GetEntityState", "get_entity_state"),
+    ("simulation_interfaces.srv", "GetEntitiesStates", "get_entities_states"),
+    ("simulation_interfaces.srv", "SetEntityState", "set_entity_state"),
+    ("simulation_interfaces.srv", "GetSimulatorFeatures", "get_simulator_features"),
+    ("simulation_interfaces.srv", "LoadWorld", "load_world"),
+    ("simulation_interfaces.srv", "UnloadWorld", "unload_world"),
+    ("simulation_interfaces.srv", "GetCurrentWorld", "get_current_world"),
+    ("simulation_interfaces.srv", "GetAvailableWorlds", "get_available_worlds"),
+]
+
+ACTION_TYPES = [
+    ("simulation_interfaces.action", "SimulateSteps", "simulate_steps"),
+]
+
 
 # Define the Singleton decorator
 def Singleton(class_):
-    """A singleton decorator to ensure only one instance of a class exists"""
+
     instances = {}
 
     def getinstance(*args, **kwargs):
@@ -50,6 +87,11 @@ class ROS2ServiceManager:
     """
 
     def __init__(self):
+        """Initialize the ROS2ServiceManager.
+
+        Sets up the initial state for managing ROS2 services and action servers
+        for Isaac Sim simulation control.
+        """
         self.node_name = "isaac_sim_control"
         self.node = None
         self.services = {}
@@ -60,7 +102,15 @@ class ROS2ServiceManager:
         self.loop = None
 
     def initialize(self):
-        """Initialize the ROS2 node for simulation control services"""
+        """Initialize the ROS2 node for simulation control services.
+
+        Creates a ROS2 node and starts a separate thread for spinning the node.
+        This method is idempotent - calling it multiple times has no effect
+        if already initialized.
+
+        Raises:
+            ImportError: If ROS2 Python libraries are not available.
+        """
 
         if self.is_initialized:
             return
@@ -101,7 +151,11 @@ class ROS2ServiceManager:
             self.is_initialized = False
 
     def shutdown(self):
-        """Shutdown the ROS2 node and clean up resources"""
+        """Shutdown the ROS2 node and clean up resources.
+
+        Stops the spinning thread, destroys all registered services and action servers,
+        and shuts down the ROS2 node. This method is safe to call multiple times.
+        """
         if not self.is_initialized:
             return
 
@@ -280,7 +334,12 @@ class ROS2ServiceManager:
             return False
 
     def _spin(self):
-        """Spin the ROS2 node in a separate thread"""
+        """Spin the ROS2 node in a separate thread.
+
+        This method runs continuously in a separate thread, processing
+        ROS2 callbacks and service requests. It stops when the running
+        flag is set to False or when ROS2 shuts down.
+        """
         import rclpy
 
         while self.running and rclpy.ok():
@@ -291,68 +350,55 @@ class ROS2ServiceManager:
 
 
 class SimulationControl:
-    SERVICE_PREFIX = "isaacsim"  # New constant for service prefix
+    SERVICE_PREFIX = ""  # New constant for service prefix
+
+    def _import_interfaces(self, interface_types, interface_kind):
+        """Import ROS2 interfaces with graceful fallback.
+
+        Args:
+            interface_types: List of tuples (module_name, class_name, endpoint_name)
+            interface_kind: String describing interface type ("service" or "action")
+        """
+        for module_name, class_name, endpoint_name in interface_types:
+            try:
+                module = __import__(module_name, fromlist=[class_name])
+                interface_class = getattr(module, class_name)
+                setattr(self, class_name, interface_class)
+                setattr(self, f"{class_name}_{interface_kind}_name", endpoint_name)
+                carb.log_info(f"Successfully imported {interface_kind} {class_name}")
+            except (ImportError, AttributeError) as e:
+                carb.log_error(f"Failed to import {interface_kind} {class_name}: {e}")
+                setattr(self, class_name, None)
+                setattr(self, f"{class_name}_{interface_kind}_name", None)
 
     def __init__(self):
+        """Initialize the SimulationControl instance.
+
+        Sets up the timeline interface, ROS2 service manager, and imports
+        all available simulation interface service and action types.
+        Services are registered automatically during initialization.
+        """
         self.timeline = omni.timeline.get_timeline_interface()
         self.service_manager = ROS2ServiceManager()
         self.is_initialized = False
 
-        # Import service types at class level
-        try:
-            from simulation_interfaces.srv import (
-                DeleteEntity,
-                GetEntities,
-                GetEntitiesStates,
-                GetEntityInfo,
-                GetEntityState,
-                GetSimulationState,
-                GetSimulatorFeatures,
-                ResetSimulation,
-                SetEntityState,
-                SetSimulationState,
-                SpawnEntity,
-                StepSimulation,
-            )
-
-            self.GetSimulationState = GetSimulationState
-            self.SetSimulationState = SetSimulationState
-            self.GetEntities = GetEntities
-            self.DeleteEntity = DeleteEntity
-            self.GetEntityInfo = GetEntityInfo
-            self.SpawnEntity = SpawnEntity
-            self.ResetSimulation = ResetSimulation
-            self.StepSimulation = StepSimulation
-            self.GetEntityState = GetEntityState
-            self.GetEntitiesStates = GetEntitiesStates
-            self.SetEntityState = SetEntityState
-            self.GetSimulatorFeatures = GetSimulatorFeatures
-
-            # Import action types
-            from simulation_interfaces.action import SimulateSteps
-
-            self.SimulateSteps = SimulateSteps
-        except ImportError as e:
-            carb.log_error(f"Failed to import simulation_interfaces services: {e}")
-            self.GetSimulationState = None
-            self.SetSimulationState = None
-            self.GetEntities = None
-            self.DeleteEntity = None
-            self.GetEntityInfo = None
-            self.SpawnEntity = None
-            self.ResetSimulation = None
-            self.StepSimulation = None
-            self.GetEntityState = None
-            self.GetEntitiesStates = None
-            self.SetEntityState = None
-            self.SimulateSteps = None
-            self.GetSimulatorFeatures = None
+        # Import interfaces using helper method
+        self._import_interfaces(SERVICE_TYPES, "service")
+        self._import_interfaces(ACTION_TYPES, "action")
 
         # Initialize and register services
         self._initialize_ros2_services()
 
     def _initialize_ros2_services(self):
-        """Initialize ROS2 services for simulation control"""
+        """Initialize ROS2 services for simulation control.
+
+        Registers all available simulation interface services and action servers
+        with the ROS2 service manager. Only services with successfully imported
+        types will be registered.
+
+        Raises:
+            ImportError: If required ROS2 message types cannot be imported.
+        """
         try:
             # Import ROS2 message and service types
             from simulation_interfaces.msg import Result, SimulationState
@@ -370,14 +416,18 @@ class SimulationControl:
             # Register the simulation state services
             if self.GetSimulationState:
                 self.service_manager.register_service(
-                    f"{service_prefix}/GetSimulationState", self.GetSimulationState, self._handle_get_simulation_state
+                    f"{service_prefix}{self.GetSimulationState_service_name}",
+                    self.GetSimulationState,
+                    self._handle_get_simulation_state,
                 )
             else:
                 carb.log_error("GetSimulationState service type not available")
 
             if self.SetSimulationState:
                 self.service_manager.register_service(
-                    f"{service_prefix}/SetSimulationState", self.SetSimulationState, self._handle_set_simulation_state
+                    f"{service_prefix}{self.SetSimulationState_service_name}",
+                    self.SetSimulationState,
+                    self._handle_set_simulation_state,
                 )
             else:
                 carb.log_error("SetSimulationState service type not available")
@@ -385,7 +435,7 @@ class SimulationControl:
             # Register the GetEntities service
             if self.GetEntities:
                 self.service_manager.register_service(
-                    f"{service_prefix}/GetEntities", self.GetEntities, self._handle_get_entities
+                    f"{service_prefix}{self.GetEntities_service_name}", self.GetEntities, self._handle_get_entities
                 )
             else:
                 carb.log_error("GetEntities service type not available")
@@ -393,7 +443,7 @@ class SimulationControl:
             # Register the DeleteEntity service
             if self.DeleteEntity:
                 self.service_manager.register_service(
-                    f"{service_prefix}/DeleteEntity", self.DeleteEntity, self._handle_delete_entity
+                    f"{service_prefix}{self.DeleteEntity_service_name}", self.DeleteEntity, self._handle_delete_entity
                 )
             else:
                 carb.log_error("DeleteEntity service type not available")
@@ -401,7 +451,9 @@ class SimulationControl:
             # Register the GetEntityInfo service
             if self.GetEntityInfo:
                 self.service_manager.register_service(
-                    f"{service_prefix}/GetEntityInfo", self.GetEntityInfo, self._handle_get_entity_info
+                    f"{service_prefix}{self.GetEntityInfo_service_name}",
+                    self.GetEntityInfo,
+                    self._handle_get_entity_info,
                 )
             else:
                 carb.log_error("GetEntityInfo service type not available")
@@ -409,7 +461,7 @@ class SimulationControl:
             # Register the SpawnEntity service
             if self.SpawnEntity:
                 self.service_manager.register_service(
-                    f"{service_prefix}/SpawnEntity", self.SpawnEntity, self._handle_spawn_entity
+                    f"{service_prefix}{self.SpawnEntity_service_name}", self.SpawnEntity, self._handle_spawn_entity
                 )
             else:
                 carb.log_error("SpawnEntity service type not available")
@@ -417,7 +469,9 @@ class SimulationControl:
             # Register the ResetSimulation service
             if self.ResetSimulation:
                 self.service_manager.register_service(
-                    f"{service_prefix}/ResetSimulation", self.ResetSimulation, self._handle_reset_simulation
+                    f"{service_prefix}{self.ResetSimulation_service_name}",
+                    self.ResetSimulation,
+                    self._handle_reset_simulation,
                 )
             else:
                 carb.log_error("ResetSimulation service type not available")
@@ -425,7 +479,9 @@ class SimulationControl:
             # Register the StepSimulation service
             if self.StepSimulation:
                 self.service_manager.register_service(
-                    f"{service_prefix}/StepSimulation", self.StepSimulation, self._handle_step_simulation
+                    f"{service_prefix}{self.StepSimulation_service_name}",
+                    self.StepSimulation,
+                    self._handle_step_simulation,
                 )
             else:
                 carb.log_error("StepSimulation service type not available")
@@ -433,7 +489,9 @@ class SimulationControl:
             # Register the GetEntityState service
             if self.GetEntityState:
                 self.service_manager.register_service(
-                    f"{service_prefix}/GetEntityState", self.GetEntityState, self._handle_get_entity_state
+                    f"{service_prefix}{self.GetEntityState_service_name}",
+                    self.GetEntityState,
+                    self._handle_get_entity_state,
                 )
             else:
                 carb.log_error("GetEntityState service type not available")
@@ -441,7 +499,9 @@ class SimulationControl:
             # Register the GetEntitiesStates service
             if self.GetEntitiesStates:
                 self.service_manager.register_service(
-                    f"{service_prefix}/GetEntitiesStates", self.GetEntitiesStates, self._handle_get_entities_states
+                    f"{service_prefix}{self.GetEntitiesStates_service_name}",
+                    self.GetEntitiesStates,
+                    self._handle_get_entities_states,
                 )
             else:
                 carb.log_error("GetEntitiesStates service type not available")
@@ -449,7 +509,9 @@ class SimulationControl:
             # Register the SetEntityState service
             if hasattr(self, "SetEntityState") and self.SetEntityState:
                 self.service_manager.register_service(
-                    f"{service_prefix}/SetEntityState", self.SetEntityState, self._handle_set_entity_state
+                    f"{service_prefix}{self.SetEntityState_service_name}",
+                    self.SetEntityState,
+                    self._handle_set_entity_state,
                 )
             else:
                 carb.log_error("SetEntityState service type not available")
@@ -457,7 +519,9 @@ class SimulationControl:
             # Register the SimulateSteps action server
             if hasattr(self, "SimulateSteps") and self.SimulateSteps:
                 self.service_manager.register_action_server(
-                    f"{service_prefix}/SimulateSteps", self.SimulateSteps, self._handle_simulate_steps_action
+                    f"{service_prefix}{self.SimulateSteps_action_name}",
+                    self.SimulateSteps,
+                    self._handle_simulate_steps_action,
                 )
             else:
                 carb.log_error("SimulateSteps action type not available")
@@ -465,12 +529,52 @@ class SimulationControl:
             # Register the GetSimulatorFeatures service
             if hasattr(self, "GetSimulatorFeatures") and self.GetSimulatorFeatures:
                 self.service_manager.register_service(
-                    f"{service_prefix}/GetSimulatorFeatures",
+                    f"{service_prefix}{self.GetSimulatorFeatures_service_name}",
                     self.GetSimulatorFeatures,
                     self._handle_get_simulator_features,
                 )
             else:
                 carb.log_error("GetSimulatorFeatures service type not available")
+
+            # Register the LoadWorld service
+            if hasattr(self, "LoadWorld") and self.LoadWorld:
+                self.service_manager.register_service(
+                    f"{service_prefix}{self.LoadWorld_service_name}",
+                    self.LoadWorld,
+                    self._handle_load_world,
+                )
+            else:
+                carb.log_error("LoadWorld service type not available")
+
+            # Register the UnloadWorld service
+            if hasattr(self, "UnloadWorld") and self.UnloadWorld:
+                self.service_manager.register_service(
+                    f"{service_prefix}{self.UnloadWorld_service_name}",
+                    self.UnloadWorld,
+                    self._handle_unload_world,
+                )
+            else:
+                carb.log_error("UnloadWorld service type not available")
+
+            # Register the GetCurrentWorld service
+            if hasattr(self, "GetCurrentWorld") and self.GetCurrentWorld:
+                self.service_manager.register_service(
+                    f"{service_prefix}{self.GetCurrentWorld_service_name}",
+                    self.GetCurrentWorld,
+                    self._handle_get_current_world,
+                )
+            else:
+                carb.log_error("GetCurrentWorld service type not available")
+
+            # Register the GetAvailableWorlds service
+            if hasattr(self, "GetAvailableWorlds") and self.GetAvailableWorlds:
+                self.service_manager.register_service(
+                    f"{service_prefix}{self.GetAvailableWorlds_service_name}",
+                    self.GetAvailableWorlds,
+                    self._handle_get_available_worlds,
+                )
+            else:
+                carb.log_error("GetAvailableWorlds service type not available")
 
             self.is_initialized = True
             carb.log_info("ROS 2 Simulation Control services initialized")
@@ -612,7 +716,6 @@ class SimulationControl:
             response: Completed DeleteEntity response
         """
         try:
-            import isaacsim.core.utils.prims as prim_utils
             from simulation_interfaces.msg import Result
 
             # First check if the entity exists
@@ -662,10 +765,9 @@ class SimulationControl:
         """
 
         try:
-            import isaacsim.core.utils.prims as prims_utils
             from simulation_interfaces.msg import EntityCategory, EntityInfo, Result
 
-            if not prims_utils.is_prim_path_valid(request.entity):
+            if not prim_utils.is_prim_path_valid(request.entity):
                 response.result = Result(
                     result=Result.RESULT_NOT_FOUND, error_message=f"Entity '{request.entity}' does not exist"
                 )
@@ -884,7 +986,6 @@ class SimulationControl:
         """
 
         try:
-            import isaacsim.core.utils.prims as prim_utils
             from simulation_interfaces.msg import Result
 
             # Set the response result
@@ -968,13 +1069,6 @@ class SimulationControl:
                 response.result.error_message = "Steps must be a positive integer"
                 return response
 
-            # Check for single step request and warn that it's not supported
-            if steps == 1:
-                carb.log_warn(
-                    "Single step (steps=1) is not supported in StepSimulation. Using steps=2 instead. Only step values greater than 1 are available."
-                )
-                steps = 2  # Override steps to 2
-
             # Ensure simulation is in paused state before stepping
             if self.timeline.is_playing():
                 response.result.result = Result.RESULT_INCORRECT_STATE
@@ -996,10 +1090,8 @@ class SimulationControl:
 
                 # Set successful response
                 response.result.result = Result.RESULT_OK
-                if request.steps == 1:
-                    response.result.error_message = f"Successfully stepped simulation by {steps} frames. Note: steps=1 was automatically changed to steps=2 as only step values greater than 1 are available."
-                else:
-                    response.result.error_message = f"Successfully stepped simulation by {steps} frames."
+
+                response.result.error_message = f"Successfully stepped simulation by {steps} frames."
 
             # Pause the simulation when done
             self.timeline.pause()
@@ -1145,8 +1237,7 @@ class SimulationControl:
         """
 
         try:
-            import isaacsim.core.utils.prims as prim_utils
-            import numpy as np
+
             from simulation_interfaces.msg import Result
 
             # Check if the entity exists
@@ -1313,13 +1404,6 @@ class SimulationControl:
                 goal_handle.abort()
                 return result_msg
 
-            # Check for single step request and warn that it's not supported
-            if steps == 1:
-                carb.log_warn(
-                    "Single step (steps=1) is not supported in MultiStepSimulation. Using steps=2 instead. Only step values greater than 1 are available."
-                )
-                steps = 2  # Override steps to 2
-
             # Ensure simulation is in paused state before stepping
             if self.timeline.is_playing():
                 result_msg.result.result = Result.RESULT_INCORRECT_STATE
@@ -1377,10 +1461,8 @@ class SimulationControl:
 
             # Set successful result
             result_msg.result.result = Result.RESULT_OK
-            if goal_handle.request.steps == 1:
-                result_msg.result.error_message = f"Successfully stepped simulation by {steps} frames. Note: steps=1 was automatically changed to steps=2 as only step values greater than 1 are available."
-            else:
-                result_msg.result.error_message = f"Successfully stepped simulation by {steps} frames"
+
+            result_msg.result.error_message = f"Successfully stepped simulation by {steps} frames"
             goal_handle.succeed()
 
         except Exception as e:
@@ -1398,6 +1480,295 @@ class SimulationControl:
             goal_handle.abort()
 
         return result_msg
+
+    async def _handle_load_world(self, request, response):
+        """Handle LoadWorld service request.
+
+        This service loads a world or environment file into the simulation,
+        clearing the current scene and setting the simulation to stopped state.
+        Currently supports USD format worlds.
+
+        Args:
+            request: LoadWorld request with world file path and parameters.
+            response: LoadWorld response with result status and world info.
+
+        Returns:
+            response: Completed LoadWorld response.
+        """
+        try:
+            from simulation_interfaces.msg import Result, WorldResource
+
+            # Initialize response
+            response.result = Result()
+            response.world = WorldResource()
+
+            # Validate USD format using Isaac Sim's utility function
+            if not is_valid_usd_file(request.uri, []):
+                response.result.result = response.UNSUPPORTED_FORMAT
+                response.result.error_message = (
+                    f"Unsupported format. Only USD files (.usd, .usda, .usdc, .usdz) are supported. Got: {request.uri}"
+                )
+                return response
+
+            # Stop the simulation first
+            carb.log_info("Stopping simulation before loading world")
+            self.timeline.stop()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Simply open the USD file as the new stage using stage_utils
+            carb.log_info(f"Loading world from USD file: {request.uri}")
+            (success, error) = await stage_utils.open_stage_async(request.uri)
+            if not success:
+                response.result.result = response.RESOURCE_PARSE_ERROR
+                response.result.error_message = f"Failed to open USD stage: {request.uri}, Error: {error}"
+                return response
+
+            # Wait for stage to be fully loaded
+            await omni.kit.app.get_app().next_update_async()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Verify stage was loaded
+            stage = stage_utils.get_current_stage(fabric=True)
+            if not stage:
+                response.result.result = Result.RESULT_OPERATION_FAILED
+                response.result.error_message = "Failed to get loaded stage"
+                return response
+
+            # Set world resource information
+            response.world.world_resource.uri = request.uri
+            response.world.name = os.path.splitext(os.path.basename(request.uri))[0]
+
+            # Success
+            response.result.result = Result.RESULT_OK
+            response.result.error_message = f"Successfully loaded world: {response.world.name}"
+            carb.log_info(f"Successfully loaded world: {response.world.name}")
+
+        except Exception as e:
+            response.result.result = Result.RESULT_OPERATION_FAILED
+            response.result.error_message = f"Error in LoadWorld service: {e}"
+            carb.log_error(f"Error in LoadWorld service handler: {e}")
+
+        return response
+
+    async def _handle_unload_world(self, request, response):
+        """Handle UnloadWorld service request.
+
+        This service unloads the current world from the simulation,
+        clearing the current scene and creating a new empty stage.
+        Any previously spawned entities will be removed.
+
+        Args:
+            request: UnloadWorld request (empty)
+            response: UnloadWorld response with result status
+
+        Returns:
+            response: Completed UnloadWorld response
+        """
+        try:
+            from simulation_interfaces.msg import Result
+
+            # Initialize response
+            response.result = Result()
+
+            usdrt_stage = stage_utils.get_current_stage(fabric=True)
+            if not usdrt_stage:
+                carb.log_warn("No stage currently loaded")
+                response.result.result = response.NO_WORLD_LOADED
+                response.result.error_message = "No world is currently loaded"
+                return response
+
+            # Stop the simulation first
+            self.timeline.stop()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Create a new empty stage
+            carb.log_info("Creating new empty stage")
+            await stage_utils.create_new_stage_async()
+
+            # Wait for the new stage to be fully initialized
+            await omni.kit.app.get_app().next_update_async()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Success
+            response.result.result = Result.RESULT_OK
+            response.result.error_message = "Successfully unloaded world and created empty stage"
+
+        except Exception as e:
+            response.result.result = Result.RESULT_OPERATION_FAILED
+            response.result.error_message = f"Error in UnloadWorld service: {e}"
+
+        return response
+
+    async def _handle_get_current_world(self, request, response):
+        """Handle GetCurrentWorld service request.
+
+        This service returns information about the currently loaded world,
+        including its URI, name, and format.
+
+        Args:
+            request: GetCurrentWorld request (empty).
+            response: GetCurrentWorld response with world information.
+
+        Returns:
+            response: Completed GetCurrentWorld response.
+        """
+        try:
+
+            from simulation_interfaces.msg import Result, WorldResource
+
+            response.result = Result()
+            response.world = WorldResource()
+
+            usdrt_stage = stage_utils.get_current_stage()
+            if not usdrt_stage:
+                carb.log_warn("No stage currently loaded")
+                response.result.result = response.NO_WORLD_LOADED
+                response.result.error_message = "No world is currently loaded"
+                return response
+
+            # Get stage information
+            root_layer = usdrt_stage.GetRootLayer()
+            if not root_layer:
+                response.result.result = response.NO_WORLD_LOADED
+                response.result.error_message = "No world is currently loaded (no root layer)"
+                return response
+
+            # Extract world information
+            stage_uri = root_layer.identifier
+            if stage_uri and not stage_uri.startswith("anon:"):
+                # World was loaded from a file
+                response.world.world_resource.uri = stage_uri
+                response.world.name = os.path.splitext(os.path.basename(stage_uri))[0]
+            else:
+                # World was created in memory (new stage or from string)
+                response.world.world_resource.uri = ""
+                response.world.name = "untitled_world"
+
+            # Success
+            response.result.result = Result.RESULT_OK
+
+        except Exception as e:
+            response.result.result = Result.RESULT_OPERATION_FAILED
+            response.result.error_message = f"Error in GetCurrentWorld service: {e}"
+            carb.log_error(f"Error in GetCurrentWorld service handler: {e}")
+
+        return response
+
+    async def _handle_get_available_worlds(self, request, response):
+        """Handle GetAvailableWorlds service request.
+
+        This service returns a list of available world files that can be loaded into the simulation.
+        It searches paths for USD world files, with support for TagsFilter-based filtering.
+
+        Args:
+            request: GetAvailableWorlds request with optional filters and search parameters.
+            response: GetAvailableWorlds response with list of available worlds.
+
+        Returns:
+            response: Completed GetAvailableWorlds response.
+        """
+        try:
+            from simulation_interfaces.msg import Result, TagsFilter, WorldResource
+
+            # Initialize response
+            response.result = Result()
+            response.worlds = []
+
+            # Get Isaac assets root path
+            try:
+                assets_root_path = await get_assets_root_path_async()
+            except Exception as e:
+                assets_root_path = None
+                carb.log_error(f"{e}")
+
+            if assets_root_path is None:
+                # Only continue if continue_on_error=True AND additional_sources exist
+                if not (request.continue_on_error and request.additional_sources):
+                    response.result.result = 101  # DEFAULT_SOURCES_FAILED
+                    response.result.error_message = "Default assets root path not accessible"
+                    return response
+
+            # Default search paths (only if assets_root_path is available)
+            default_paths = []
+            if assets_root_path is not None:
+                default_paths = [
+                    assets_root_path + "/Isaac/Environments",
+                    assets_root_path + "/Isaac/Samples/ROS2/Scenario",
+                ]
+
+            # Check if we have a tags filter with actual tags
+            has_tags_filter = bool(request.filter.tags)
+
+            filter_patterns = None
+            match_all = False
+
+            # Parse TagsFilter to extract patterns and mode if provided
+            if has_tags_filter:
+                filter_patterns = list(request.filter.tags)
+                # Get filter mode: 0 = FILTER_MODE_ANY (default), 1 = FILTER_MODE_ALL
+                match_all = request.filter.filter_mode == TagsFilter.FILTER_MODE_ALL
+
+            # Search for USD files
+            usd_files = set()
+
+            # 1. Always search default paths first with depth=1
+            for path in default_paths:
+
+                if request.offline_only and not is_local_path(path):
+                    continue
+
+                try:
+                    found_files = await find_filtered_files_async(
+                        path,
+                        filter_patterns,
+                        match_all,
+                        filepath_excludes=[".thumbs", "Props", "Materials"],
+                        max_depth=1,
+                    )
+                    usd_files.update(found_files)
+
+                except Exception as e:
+                    carb.log_warn(f"Error searching default path {path}: {e}")
+                    if not request.continue_on_error:
+                        raise
+
+            # 2. Search additional sources with unlimited depth
+            if request.additional_sources:
+                for path in request.additional_sources:
+
+                    if request.offline_only and not is_local_path(path):
+                        continue
+
+                    try:
+                        found_files = await find_filtered_files_async(path, filter_patterns, match_all, max_depth=None)
+                        usd_files.update(found_files)
+
+                    except Exception as e:
+                        carb.log_warn(f"Error searching additional source {path}: {e}")
+                        if not request.continue_on_error:
+                            raise
+
+            # Convert found worlds to WorldResource objects
+            for world_path in usd_files:
+                world_resource = WorldResource()
+                world_resource.world_resource.uri = world_path
+
+                # Extract world name from path (filename without extension)
+                world_name = os.path.splitext(os.path.basename(world_path))[0]
+                world_resource.name = world_name
+
+                response.worlds.append(world_resource)
+
+            # Set success result
+            response.result.result = Result.RESULT_OK
+            response.result.error_message = f"Found {len(response.worlds)} available worlds"
+
+        except Exception as e:
+            response.result.result = Result.RESULT_OPERATION_FAILED
+            response.result.error_message = f"Error in GetAvailableWorlds service: {e}"
+            carb.log_error(f"Error in GetAvailableWorlds service handler: {e}")
+
+        return response
 
     async def _handle_get_simulator_features(self, request, response):
         """Handle GetSimulatorFeatures service request
@@ -1427,9 +1798,14 @@ class SimulationControl:
                 SimulatorFeatures.SIMULATION_STATE_GETTING,  # Supports GetSimulationState
                 SimulatorFeatures.SIMULATION_STATE_SETTING,  # Supports SetSimulationState
                 SimulatorFeatures.SIMULATION_STATE_PAUSE,  # Supports pausing simulation
-                # SimulatorFeatures.STEP_SIMULATION_SINGLE,    # Supports single stepping
+                SimulatorFeatures.STEP_SIMULATION_SINGLE,  # Supports single stepping
                 SimulatorFeatures.STEP_SIMULATION_MULTIPLE,  # Supports multi-stepping
                 SimulatorFeatures.STEP_SIMULATION_ACTION,  # Supports SimulateSteps action
+                SimulatorFeatures.WORLD_LOADING,  # Supports LoadWorld
+                SimulatorFeatures.WORLD_TAGS,  # Supports world tags and tag filtering
+                SimulatorFeatures.WORLD_UNLOADING,  # Supports UnloadWorld
+                SimulatorFeatures.WORLD_INFO_GETTING,  # Supports GetCurrentWorld
+                SimulatorFeatures.AVAILABLE_WORLDS,  # Supports GetAvailableWorlds interface
             ]
 
             # Set the features in the response
@@ -1444,21 +1820,28 @@ class SimulationControl:
             carb.log_info("Successfully responded to GetSimulatorFeatures request")
 
         except Exception as e:
-            carb.log_error(f"Error in GetSimulatorFeatures service handler: {e}")
             # There's no result field in GetSimulatorFeatures response, so we can only log the error
+            carb.log_error(f"Error in GetSimulatorFeatures service handler: {e}")
 
         return response
 
     def shutdown(self):
-        """Shutdown the simulation control services"""
+        """Shutdown the simulation control services.
+
+        Cleanly shuts down the ROS2 service manager and all registered
+        services and action servers.
+        """
         if self.service_manager:
             self.service_manager.shutdown()
 
 
 class Extension(omni.ext.IExt):
+
     def on_startup(self, ext_id):
+
         self.sim_control = SimulationControl()
 
     def on_shutdown(self):
+
         if self.sim_control:
             self.sim_control.shutdown()

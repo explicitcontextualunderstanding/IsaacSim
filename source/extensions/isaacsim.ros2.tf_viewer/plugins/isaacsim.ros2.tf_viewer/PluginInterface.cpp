@@ -66,11 +66,15 @@ public:
         }
         if (!m_libraryLoader)
         {
-            m_libraryLoader =
-                std::make_shared<isaacsim::core::includes::LibraryLoader>("isaacsim.ros2.tf_viewer." + rosDistro);
-            if (!m_libraryLoader)
+            try
             {
-                CARB_LOG_ERROR("Unable to load the isaacsim.ros2.tf_viewer.%s library", rosDistro.c_str());
+                m_libraryLoader =
+                    std::make_shared<isaacsim::core::includes::LibraryLoader>("isaacsim.ros2.tf_viewer." + rosDistro);
+            }
+            catch (const std::exception& e)
+            {
+                CARB_LOG_ERROR(
+                    "Exception while loading isaacsim.ros2.tf_viewer.%s library: %s", rosDistro.c_str(), e.what());
                 return false;
             }
         }

@@ -18,7 +18,6 @@ from isaacsim import SimulationApp
 # MJCF import, configuration and simulation sample
 kit = SimulationApp({"renderer": "RaytracedLighting", "headless": False})
 import omni.kit.commands
-from isaacsim.core.prims import Articulation
 from isaacsim.core.utils.extensions import get_extension_path_from_name
 from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, UsdLux, UsdPhysics
 

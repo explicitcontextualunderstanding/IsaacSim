@@ -15,8 +15,6 @@
 from .. import utils
 from . import measurements
 
-logger = utils.set_up_logging(__name__)
-
 # List of other "metadata" metrics to be filtered out of each phase
 additional_metadata = ["num_cpus", "gpu_device_name"]
 # List of metrics to remove from the summary report

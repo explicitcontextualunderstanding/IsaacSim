@@ -199,8 +199,8 @@ public:
             {
                 if (state.m_velocity != 0 && db.inputs.onStep())
                 {
-                    pxr::UsdStagePtr stage = omni::usd::UsdContext::getContext()->getStage();
-                    pxr::UsdEditContext context(stage, stage->GetRootLayer());
+                    pxr::UsdStagePtr currentStage = omni::usd::UsdContext::getContext()->getStage();
+                    pxr::UsdEditContext context(currentStage, currentStage->GetRootLayer());
                     pxr::SdfChangeBlock changeBlock;
 
                     for (auto& attribute : state.m_shaderAttributes)
@@ -224,8 +224,6 @@ private:
     pxr::GfVec3f m_direction;
     bool m_onStart;
     bool m_onEnd;
-    bool m_onStep;
-    bool m_deltaTime;
     carb::eventdispatcher::ObserverGuard m_eventSubscription[2];
 };
 

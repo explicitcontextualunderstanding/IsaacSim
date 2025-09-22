@@ -19,7 +19,6 @@ import omni.kit.test
 import omni.kit.usd
 import usdrt.Sdf
 from isaacsim.core.utils.stage import open_stage_async
-from isaacsim.storage.native import get_assets_root_path_async
 from pxr import UsdGeom
 
 from .common import ROS2TestCase, add_cube, add_franka
@@ -40,12 +39,8 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_joint_state_valid_prim(self):
         # test OgnROS2PublishJointState with valid target prim
-        assets_root_path = await get_assets_root_path_async()
-        if assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
-        usd_path = assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
+        usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
         (result, error) = await open_stage_async(usd_path)
         await omni.kit.app.get_app().next_update_async()
         self.assertTrue(result)
@@ -87,12 +82,8 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_joint_state_invalid_prim(self):
         # test OgnROS2PublishJointState with invalid target prim
-        assets_root_path = await get_assets_root_path_async()
-        if assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
-        usd_path = assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
+        usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
         (result, error) = await open_stage_async(usd_path)
         await omni.kit.app.get_app().next_update_async()
         self.assertTrue(result)
@@ -134,12 +125,8 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_joint_state_empty_prim(self):
         # test OgnROS2PublishJointState with empty target prim
-        assets_root_path = await get_assets_root_path_async()
-        if assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
-        usd_path = assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
+        usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
         (result, error) = await open_stage_async(usd_path)
         await omni.kit.app.get_app().next_update_async()
         self.assertTrue(result)
@@ -181,7 +168,7 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_transform_tree_valid_prims(self):
         # test OgnROS2PublishTransformTree with valid target prims
-        await add_franka()
+        await add_franka(self._assets_root_path)
         await add_cube("/cube1", 0.5, (1.0, 0, 0.5))
         await add_cube("/cube2", 0.5, (2.0, 0, 0.5))
         await omni.kit.app.get_app().next_update_async()
@@ -230,7 +217,7 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_transform_tree_invalid_prims(self):
         # test OgnROS2PublishTransformTree with some invalid target prims
-        await add_franka()
+        await add_franka(self._assets_root_path)
         await add_cube("/cube1", 0.5, (1.0, 0, 0.5))
         await omni.kit.app.get_app().next_update_async()
 
@@ -278,7 +265,7 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_transform_tree_empty_prims(self):
         # test OgnROS2PublishTransformTree with empty target prims
-        await add_franka()
+        await add_franka(self._assets_root_path)
         await omni.kit.app.get_app().next_update_async()
 
         # Create graph with empty target prims
@@ -318,7 +305,7 @@ class TestPrimValidation(ROS2TestCase):
 
     async def test_transform_tree_all_invalid_prims(self):
         # test OgnROS2PublishTransformTree with all invalid target prims
-        await add_franka()
+        await add_franka(self._assets_root_path)
         await omni.kit.app.get_app().next_update_async()
 
         # Create graph with all invalid target prims

@@ -69,13 +69,15 @@ for annotator in [
 ]:
     getattr(camera, "add_{}_to_frame".format(annotator))()
 
-simulation_app.update()
-simulation_app.update()
+for _ in range(5):
+    simulation_app.update()
 rgba = camera.get_rgba()
 print(rgba.size)
 
 if rgba.size != 1280 * 720 * 4:
-    raise ValueError(f"RGB buffer has size of {rgba.size} which is not {1280*720*4}")
+    import carb
 
+    carb.log_error(f"[FAIL] RGB buffer has size of {rgba.size} which is not {1280*720*4}")
+    sys.exit(1)
 # Cleanup application
 simulation_app.close()

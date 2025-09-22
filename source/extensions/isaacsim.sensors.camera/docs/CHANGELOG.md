@@ -1,4 +1,16 @@
 # Changelog
+## [1.3.4] - 2025-09-04
+### Fixed
+- Camera.set_opencv_pinhole_properties and Camera.set_opencv_fisheye_properties now correctly set imageSize attribute as Camera._resolution.
+
+## [1.3.3] - 2025-08-21
+### Changed
+- Fix PIL image conversion warnings
+
+## [1.3.2] - 2025-07-29
+### Fixed
+- Added error exclusion to ignore depth sensor allocation errors in tests
+
 ## [1.3.1] - 2025-07-21
 ### Changed
 - Added explicit `destroy()` method to `CameraView`
@@ -8,9 +20,7 @@
 
 ## [1.3.0] - 2025-07-19
 ### Added
-- SingleViewDepthSensorAsset API to wrap around USDs and automatically create
-  SingleViewDepthSensor objects (including render products) for cameras with
-  associated template render products.
+- SingleViewDepthSensorAsset API to wrap around USDs and automatically create SingleViewDepthSensor objects (including render products) for cameras with associated template render products.
 
 ## [1.2.10] - 2025-07-18
 ### Changed

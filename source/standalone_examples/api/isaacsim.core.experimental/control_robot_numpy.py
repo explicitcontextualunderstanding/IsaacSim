@@ -57,7 +57,6 @@ simulation_app = SimulationApp({"headless": False})
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.timeline
-import warp as wp
 from isaacsim.core.experimental.materials import PreviewSurfaceMaterial
 from isaacsim.core.experimental.objects import Sphere
 from isaacsim.core.experimental.prims import Articulation, RigidPrim

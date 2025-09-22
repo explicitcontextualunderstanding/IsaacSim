@@ -115,7 +115,6 @@ class ActorSDG:
         ext_manager.set_extension_enabled_immediate("omni.anim.graph.core", True)
         ext_manager.set_extension_enabled_immediate("omni.anim.retarget.core", True)
         ext_manager.set_extension_enabled_immediate("omni.anim.navigation.core", True)
-        ext_manager.set_extension_enabled_immediate("omni.anim.navigation.meshtools", True)
         ext_manager.set_extension_enabled_immediate("omni.anim.people", True)
         ext_manager.set_extension_enabled_immediate("isaacsim.replicator.agent.core", True)
         ext_manager.set_extension_enabled_immediate("omni.kit.mesh.raycast", True)

@@ -20,11 +20,11 @@ class TestPipArchive(omni.kit.test.AsyncTestCase):
     # import all packages to make sure dependencies were not missed
     async def test_import_all(self):
         import imageio
-        import pyyaml
         import scipy
         import trimesh
+        import yaml
 
         self.assertIsNotNone(imageio)
         self.assertIsNotNone(scipy)
-        self.assertIsNotNone(pyyaml)
+        self.assertIsNotNone(yaml)
         self.assertIsNotNone(trimesh)

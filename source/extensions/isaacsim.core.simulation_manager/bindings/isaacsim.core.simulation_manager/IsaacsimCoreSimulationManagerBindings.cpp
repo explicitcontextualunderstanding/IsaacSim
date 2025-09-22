@@ -36,6 +36,45 @@ This module provides access to the Simulation Manager which handles events and c
 for simulation-related activities, such as physics scene additions and object deletions.
 It also manages USD notice handling to track stage changes.)pbdoc";
 
+    // Bind RationalTime (if not already bound elsewhere)
+    pybind11::class_<omni::fabric::RationalTime>(m, "RationalTime")
+        .def_readonly("numerator", &omni::fabric::RationalTime::numerator, "Numerator of the rational time")
+        .def_readonly("denominator", &omni::fabric::RationalTime::denominator, "Denominator of the rational time")
+        .def(
+            "to_float",
+            [](const omni::fabric::RationalTime& rt) {
+                return rt.denominator != 0 ? static_cast<double>(rt.numerator) / static_cast<double>(rt.denominator) :
+                                             0.0;
+            },
+            "Convert to floating point seconds")
+        .def("__repr__", [](const omni::fabric::RationalTime& rt)
+             { return "<RationalTime " + std::to_string(rt.numerator) + "/" + std::to_string(rt.denominator) + ">"; });
+
+    // Bind TimeSampleStorage::TimeData
+    pybind11::class_<TimeSampleStorage::TimeData>(m, "TimeData")
+        .def_readonly("sim_time", &TimeSampleStorage::TimeData::simTime, "Simulation time in seconds")
+        .def_readonly("sim_time_monotonic", &TimeSampleStorage::TimeData::simTimeMonotonic,
+                      "Monotonic simulation time in seconds")
+        .def_readonly("system_time", &TimeSampleStorage::TimeData::systemTime, "System (real-world) time in seconds")
+        .def("__repr__",
+             [](const TimeSampleStorage::TimeData& td)
+             {
+                 return "<TimeData sim=" + std::to_string(td.simTime) + " mono=" + std::to_string(td.simTimeMonotonic) +
+                        " sys=" + std::to_string(td.systemTime) + ">";
+             });
+
+    // Bind TimeSampleStorage::Entry
+    pybind11::class_<TimeSampleStorage::Entry>(m, "TimeSampleEntry")
+        .def_readonly("time", &TimeSampleStorage::Entry::time, "Rational time of this sample")
+        .def_readonly("data", &TimeSampleStorage::Entry::data, "Time data for this sample")
+        .def_readonly("valid", &TimeSampleStorage::Entry::valid, "Whether this entry is valid")
+        .def("__repr__",
+             [](const TimeSampleStorage::Entry& entry)
+             {
+                 return "<TimeSampleEntry time=" + std::to_string(entry.time.numerator) + "/" +
+                        std::to_string(entry.time.denominator) + " valid=" + (entry.valid ? "True" : "False") + ">";
+             });
+
     // carb interface
     carb::defineInterfaceClass<ISimulationManager>(
         m, "ISimulationManager", "acquire_simulation_manager_interface", "release_simulation_manager_interface")
@@ -136,6 +175,19 @@ It also manages USD notice handling to track stage changes.)pbdoc";
 
                 Returns:
                     double: The current system time.
+             )pbdoc")
+        .def("get_current_time", &ISimulationManager::getCurrentTime,
+             R"pbdoc(
+                Get the current frame time from best available source.
+                
+                This returns the current frame time using the same priority order as TimeSampleStorage:
+                1. StageReaderWriter's getFrameTime() - provides FSD frame time
+                2. Timeline interface - fallback for animation/UI time
+                
+                This is useful for testing to track exact frame times being written to storage.
+
+                Returns:
+                    RationalTime: Current rational time or kInvalidRationalTime if unavailable.
              )pbdoc")
         .def("get_num_physics_steps", &ISimulationManager::getNumPhysicsSteps,
              R"pbdoc(
@@ -241,6 +293,43 @@ It also manages USD notice handling to track stage changes.)pbdoc";
 
                 Returns:
                     float: The system time in seconds at the specified time.
+             )pbdoc")
+        .def("get_all_samples", &ISimulationManager::getAllSamples,
+             R"pbdoc(
+                Get all stored samples for testing and validation.
+                
+                Returns:
+                    list[TimeSampleEntry]: List of sample entries with structured data.
+                    Each entry has: 
+                        - time (RationalTime): rational time of this sample
+                        - data (TimeData): time data with sim_time, sim_time_monotonic, system_time
+                        - valid (bool): whether this entry is valid
+             )pbdoc")
+        .def("get_sample_count", &ISimulationManager::getSampleCount,
+             R"pbdoc(
+                Get the count of stored samples.
+                
+                Returns:
+                    int: Number of stored samples.
+             )pbdoc")
+        .def("log_statistics", &ISimulationManager::logStatistics,
+             R"pbdoc(
+                Log sample storage statistics for debugging.
+             )pbdoc")
+        .def("get_sample_range", &ISimulationManager::getSampleRange,
+             R"pbdoc(
+                Get the time range of stored samples.
+                
+                Returns:
+                    tuple[RationalTime, RationalTime] or None: Pair of (earliest_time, latest_time) or None if empty.
+                    Each time is a RationalTime object with numerator, denominator, and to_float() method.
+             )pbdoc")
+        .def("get_buffer_capacity", &ISimulationManager::getBufferCapacity,
+             R"pbdoc(
+                Get the maximum buffer capacity for time sample storage.
+                
+                Returns:
+                    int: Maximum number of samples that can be stored in the circular buffer.
              )pbdoc");
 }
 

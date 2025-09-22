@@ -1,4 +1,22 @@
 # Changelog
+
+## [4.7.3] - 2025-08-30
+### Changed
+- Updated Surface Gripper sample
+
+## [4.7.2] - 2025-08-27
+### Fixed
+- Fix the broken documentation links
+
+## [4.7.1] - 2025-08-20
+### Added
+- UR robot follows target example using IK
+
+## [4.7.0] - 2025-07-17
+### Added
+- Flattened pick-and-place action sequence using Franka Robot
+- Base sample class relies on new APIs
+
 ## [4.6.10] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 4.6.9)

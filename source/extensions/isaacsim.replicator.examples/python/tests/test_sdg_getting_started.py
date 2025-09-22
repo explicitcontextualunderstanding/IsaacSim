@@ -15,28 +15,15 @@
 
 import os
 import random
-from collections import Counter
 
 import omni.kit
 import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
 from isaacsim.core.utils.semantics import add_labels
+from isaacsim.test.utils.file_validation import validate_folder_contents
 from omni.replicator.core import Writer
 from pxr import Sdf, UsdGeom, UsdPhysics
-
-
-# Check the contents of a folder against expected extension counts e.g expected_counts={png: 3, json: 3, npy: 3}
-def validate_folder_contents(path: str, expected_counts: dict[str, int]) -> bool:
-    if not os.path.exists(path) or not os.path.isdir(path):
-        return False
-
-    # Count the number of files with each extension
-    file_counts = Counter(f.split(".")[-1] for f in os.listdir(path) if "." in f)
-    print(f"File counts: {file_counts}")
-
-    # Check that the counts match the expected counts
-    return all(file_counts.get(ext, 0) == count for ext, count in expected_counts.items())
 
 
 class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
@@ -97,6 +84,7 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
             def __init__(self, camera_params: bool = True, bounding_box_3d: bool = True):
                 # Organize data from render product perspective (legacy, annotator, renderProduct)
                 self.data_structure = "renderProduct"
+                self.annotators = []
                 if camera_params:
                     self.annotators.append(rep.annotators.get("camera_params"))
                 if bounding_box_3d:

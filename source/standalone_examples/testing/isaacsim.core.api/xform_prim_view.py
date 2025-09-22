@@ -23,7 +23,6 @@ import sys
 
 import carb
 import numpy as np
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.materials.omni_glass import OmniGlass
 from isaacsim.core.cloner import Cloner

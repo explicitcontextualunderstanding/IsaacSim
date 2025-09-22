@@ -89,7 +89,7 @@ PYBIND11_MODULE(_isaac_utils, m)
             :obj:`carb.Float4`: scaled vector.
         )pbdoc");
     math.def(
-        "mul", [](const carb::Float4& a, carb::Float4& x) { return a * x; }, py::is_operator(),
+        "mul", [](const carb::Float4& a, const carb::Float4& x) { return a * x; }, py::is_operator(),
         R"pbdoc( Performs a Quaternion rotation between two 4D vectors
         
         Args:
@@ -102,7 +102,7 @@ PYBIND11_MODULE(_isaac_utils, m)
         )pbdoc");
 
     math.def(
-        "add", [](const carb::Float3& a, carb::Float3& x) { return a + x; }, py::is_operator(),
+        "add", [](const carb::Float3& a, const carb::Float3& x) { return a + x; }, py::is_operator(),
         R"pbdoc( Adds two 3D vectors
         Args:
             arg0 (:obj:`carb.Float3`): First 3D vector
@@ -325,7 +325,7 @@ PYBIND11_MODULE(_isaac_utils, m)
 
     transforms.def(
         "set_transform",
-        [](const long int stageId, const std::string primPath, const carb::Float3& translation,
+        [](const long int stageId, const std::string& primPath, const carb::Float3& translation,
            const carb::Float4& rotation)
         {
             pxr::UsdStageWeakPtr stage =
@@ -362,7 +362,7 @@ PYBIND11_MODULE(_isaac_utils, m)
 
     transforms.def(
         "set_scale",
-        [](const long int stageId, const std::string primPath, const carb::Float3& scale)
+        [](const long int stageId, const std::string& primPath, const carb::Float3& scale)
         {
             pxr::UsdStageWeakPtr stage =
                 pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));

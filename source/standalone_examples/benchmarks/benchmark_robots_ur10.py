@@ -41,7 +41,6 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": not visual, "max_gpu_count": n_gpu})
 
-import asyncio
 from functools import partial
 
 import carb
@@ -51,7 +50,6 @@ import omni.timeline
 from isaacsim.core.api import PhysicsContext, World
 from isaacsim.core.prims import Articulation
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.stage import open_stage_async, update_stage_async
 from isaacsim.core.utils.types import ArticulationActions
 from isaacsim.storage.native import get_assets_root_path
 from omni.kit.viewport.utility import get_active_viewport

@@ -72,10 +72,10 @@ public:
         {
 
             const auto& prim = db.inputs.targetPrim();
-            state.m_robotPath = std::string(db.inputs.robotPath()).c_str();
+            state.m_robotPath = db.inputs.robotPath();
 
             // if robotPath field is empty
-            if (std::strcmp(state.m_robotPath.c_str(), "") == 0)
+            if (state.m_robotPath.empty())
             {
 
                 // if targetPrim field is populated
@@ -94,7 +94,7 @@ public:
 
             state.m_firstFrame = false;
             // Find our stage
-            long stageId = context.iContext->getStageId(context);
+            const auto stageId = context.iContext->getStageId(context);
             auto stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
 
             if (!stage)
@@ -104,7 +104,7 @@ public:
             }
             state.m_simView = state.m_tensorInterface->createSimulationView(stageId);
 
-            pxr::UsdPrim startPrim = stage->GetPrimAtPath(pxr::SdfPath(state.m_robotPath));
+            const pxr::UsdPrim startPrim = stage->GetPrimAtPath(pxr::SdfPath(state.m_robotPath));
 
             if (!startPrim.IsValid())
             {
@@ -112,7 +112,7 @@ public:
                 return false;
             }
 
-            IArticulationView* articulation = state.m_simView->createArticulationView(state.m_robotPath.c_str());
+            auto* articulation = state.m_simView->createArticulationView(state.m_robotPath.c_str());
             // Checking we have a valid articulation
             if (!articulation)
             {
@@ -121,14 +121,14 @@ public:
             }
 
             // Traverse from the starting prim
-            for (const pxr::UsdPrim& prim : pxr::UsdPrimRange(startPrim))
+            for (const pxr::UsdPrim& currentPrim : pxr::UsdPrimRange(startPrim))
             {
 
-                std::string primNameOverride = isaacsim::core::includes::getName(prim);
-                std::string primName = prim.GetName();
+                const std::string primNameOverride = isaacsim::core::includes::getName(currentPrim);
+                const std::string primName = currentPrim.GetName();
                 if (primNameOverride != primName)
                 {
-                    state.m_nameOverrideMap.insert({ primNameOverride, prim });
+                    state.m_nameOverrideMap.emplace(primNameOverride, currentPrim);
                 }
             }
         }
@@ -142,30 +142,22 @@ public:
     void resolvePrims(OgnIsaacJointNameResolverDatabase& db)
     {
         // Check if the input string is a key in the dictionary
-        std::vector<std::string> resultList;
+        const auto& inNames = db.inputs.jointNames();
+        auto& outNames = db.outputs.jointNames();
+        outNames.resize(inNames.size());
 
-        db.outputs.jointNames.resize(db.inputs.jointNames().size());
-
-        for (size_t i = 0; i < db.inputs.jointNames().size(); i++)
+        for (size_t i = 0; i < inNames.size(); ++i)
         {
-            std::string primNameString = db.tokenToString(db.inputs.jointNames()[i]);
-            auto it = m_nameOverrideMap.find(primNameString);
-            if (it != m_nameOverrideMap.end())
-            {
-                // Add dictionary value if key exists
-                db.outputs.jointNames().at(i) = db.stringToToken(it->second.GetName().GetText());
-            }
-            else
-            {
-                // Add original string if key doesn't exist
-                db.outputs.jointNames().at(i) = db.stringToToken(primNameString.c_str());
-            }
+            const std::string primNameString = db.tokenToString(inNames[i]);
+            const auto it = m_nameOverrideMap.find(primNameString);
+            outNames[i] = db.stringToToken(it != m_nameOverrideMap.end() ? it->second.GetName().GetText() :
+                                                                           primNameString.c_str());
         }
 
         db.outputs.robotPath() = m_robotPath;
     }
 
-    virtual void reset()
+    void reset() override
     {
         m_firstFrame = true;
         m_robotPath = "";

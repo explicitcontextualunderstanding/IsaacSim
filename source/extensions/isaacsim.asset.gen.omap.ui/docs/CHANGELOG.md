@@ -1,4 +1,8 @@
 # Changelog
+## [2.2.2] - 2025-08-04
+### Changed
+- Removed duplicated code
+
 ## [2.2.1] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

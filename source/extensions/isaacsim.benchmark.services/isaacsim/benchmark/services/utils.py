@@ -16,7 +16,6 @@ import asyncio
 import dataclasses
 import functools
 import inspect
-import logging
 import os
 import platform
 import stat
@@ -33,25 +32,6 @@ import omni.kit.app
 
 original_persistent_settings = {}
 settings_interface = None
-
-
-logger = logging.getLogger(__name__)
-
-
-def set_up_logging(name) -> logging.Logger:
-    """Set up logger."""
-    fmt = "{asctime} [{relativeCreated:,.0f}ms] [{levelname}] [{name}] {message}"
-    datfmt = "%Y-%m-%d %H:%M:%S"
-    style = "{"
-    formatter = logging.Formatter(fmt, datfmt, style)
-    formatter.converter = time.gmtime
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(formatter)
-    logger = logging.getLogger(name)
-    logger.handlers = [stdout_handler]
-    logger.propagate = False
-    logger.setLevel(logging.INFO)
-    return logger
 
 
 def set_persistent_setting(name, value, type):
@@ -257,7 +237,7 @@ def get_calling_test_id() -> str:
 def ensure_dir(file_path: Union[str, Path]) -> None:
     """Creates directory if it doesn't exist."""
     if not os.path.exists(file_path):
-        logger.info(f"Creating dir {file_path}")
+        carb.log_info(f"Creating dir {file_path}")
         os.makedirs(file_path)
 
 
@@ -283,9 +263,9 @@ async def wait_until_stage_is_fully_loaded_async(max_frames=10, frametime_thresh
         start_time = time.time()
         await omni.kit.app.get_app().next_update_async()
         elapsed_time = time.time() - start_time
-        logger.info(f"Frame {i} frametime: {elapsed_time}")
+        carb.log_info(f"Frame {i} frametime: {elapsed_time}")
         if elapsed_time < frametime_threshold or elapsed_time * time_ratio_treshold < prev_frametime:
-            logger.info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
+            carb.log_info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
             break
         prev_frametime = elapsed_time
 
@@ -300,8 +280,8 @@ def wait_until_stage_is_fully_loaded(max_frames=10, frametime_threshold=0.1, tim
         start_time = time.time()
         omni.kit.app.get_app().update()
         elapsed_time = time.time() - start_time
-        logger.info(f"Frame {i} frametime: {elapsed_time}")
+        carb.log_info(f"Frame {i} frametime: {elapsed_time}")
         if elapsed_time < frametime_threshold or elapsed_time * time_ratio_treshold < prev_frametime:
-            logger.info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
+            carb.log_info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
             break
         prev_frametime = elapsed_time

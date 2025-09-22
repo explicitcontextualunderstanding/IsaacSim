@@ -143,8 +143,14 @@ class Extension(omni.ext.IExt):
         annotator_name = "IsaacExtractRTXSensorPointCloud" + "NoAccumulator"
         register_annotator_from_node_with_telemetry(
             name=annotator_name,
-            input_rendervars=["GenericModelOutput" + "Ptr"],
-            node_type_id="isaacsim.sensors.rtx.IsaacExtractRTXSensorPointCloud",
+            input_rendervars=[
+                "GenericModelOutputPtr",
+                omni.syntheticdata.SyntheticData.NodeConnectionTemplate(
+                    "RtxSensorMetadataPtr", attributes_mapping={"outputs:dataPtr": "inputs:metadataPtr"}
+                ),
+            ],
+            node_type_id="isaacsim.sensors.rtx.IsaacCreateRTXLidarScanBuffer",
+            init_params={"enablePerFrameOutput": True},
             output_data_type=np.float32,
             output_channels=3,
         )

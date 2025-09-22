@@ -1,4 +1,17 @@
 # Changelog
+
+## [2.5.11] - 2025-08-27
+### Fixed
+- Fix the broken documentation links
+
+## [2.5.10] - 2025-08-02
+### Changed
+- Remove Direct dependency from Omniverse Asset Converter, and use omni.kit.asset_converter
+
+## [2.5.9] - 2025-07-31
+### Changed
+- Updated compiling dependency for Omniverse Asset Converter
+
 ## [2.5.8] - 2025-07-18
 ### Fixed
 - Fixed importing assets where multiple meshes are defined per body
@@ -7,12 +20,12 @@
 
 ## [2.5.7] - 2025-07-17
 ### Fixed
-- Fixed saving texture files (moving to imported folder) for materials on import. 
+- Fixed saving texture files (moving to imported folder) for materials on import.
 - Deleting partial files created when converting meshes
 
 ## [2.5.6] - 2025-07-15
 ### Fixed
-- Fixed application of Collision APIs in the collision scope and in the meshes directly as per OpenUSD Physics. 
+- Fixed application of Collision APIs in the collision scope and in the meshes directly as per OpenUSD Physics.
 - Fix cyclic import of robot schema and leave it as sublayer on the base layer
 
 ## [2.5.5] - 2025-07-07

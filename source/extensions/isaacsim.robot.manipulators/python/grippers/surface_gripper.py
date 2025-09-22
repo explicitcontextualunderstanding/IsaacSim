@@ -86,10 +86,16 @@ class SurfaceGripper(Gripper):
         return
 
     def is_closed(self) -> bool:
-        return self._surface_gripper_interface.get_gripper_status(self._surface_gripper_path) == "Closed"
+        return (
+            self._surface_gripper_interface.get_gripper_status(self._surface_gripper_path)
+            == surface_gripper.GripperStatus.Closed
+        )
 
     def is_open(self) -> bool:
-        return self._surface_gripper_interface.get_gripper_status(self._surface_gripper_path) == "Open"
+        return (
+            self._surface_gripper_interface.get_gripper_status(self._surface_gripper_path)
+            == surface_gripper.GripperStatus.Open
+        )
 
     def set_default_state(self, opened: bool):
         """Sets the default state of the gripper

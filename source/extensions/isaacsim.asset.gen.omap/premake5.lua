@@ -54,6 +54,7 @@ includedirs {
 buildoptions("-fvisibility=default")
 libdirs {
     "%{root}/_build/target-deps/octomap/%{cfg.buildcfg}/lib64",
+    "%{root}/_build/target-deps/octomap/%{cfg.buildcfg}/lib",
 }
 filter {}
 
@@ -106,6 +107,7 @@ filter { "system:linux" }
 disablewarnings { "error=pragmas" }
 libdirs {
     "%{root}/_build/target-deps/octomap/%{cfg.buildcfg}/lib64",
+    "%{root}/_build/target-deps/octomap/%{cfg.buildcfg}/lib",
 }
 filter {}
 

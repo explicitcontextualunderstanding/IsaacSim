@@ -38,7 +38,7 @@ int geomIdxCount = 0;
 int siteIdxCount = 0;
 int jointIdxCount = 0;
 
-tinyxml2::XMLElement* LoadInclude(tinyxml2::XMLDocument& doc, const tinyxml2::XMLElement* c, const std::string baseDirPath)
+tinyxml2::XMLElement* LoadInclude(tinyxml2::XMLDocument& doc, const tinyxml2::XMLElement* c, const std::string& baseDirPath)
 {
     if (c)
     {
@@ -141,15 +141,18 @@ void LoadGeom(tinyxml2::XMLElement* g,
               MJCFGeom& geom,
               std::string className,
               MJCFCompiler& compiler,
-              std::map<std::string, MJCFClass>& classes,
+              const std::map<std::string, MJCFClass>& classesInput,
               bool isDefault)
 {
     if (!g)
     {
         return;
     }
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (g->Attribute("class"))
+    {
         className = g->Attribute("class");
+    }
     geom = classes[className].dgeom;
 
     getIfExist(g, "conaffinity", geom.conaffinity);
@@ -240,15 +243,18 @@ void LoadSite(tinyxml2::XMLElement* s,
               MJCFSite& site,
               std::string className,
               MJCFCompiler& compiler,
-              std::map<std::string, MJCFClass>& classes,
+              const std::map<std::string, MJCFClass>& classesInput,
               bool isDefault)
 {
     if (!s)
     {
         return;
     }
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (s->Attribute("class"))
+    {
         className = s->Attribute("class");
+    }
     site = classes[className].dsite;
 
     getIfExist(s, "material", site.material);
@@ -315,14 +321,17 @@ void LoadMesh(tinyxml2::XMLElement* m,
               MJCFMesh& mesh,
               std::string className,
               MJCFCompiler& compiler,
-              std::map<std::string, MJCFClass>& classes)
+              const std::map<std::string, MJCFClass>& classesInput)
 {
     if (!m)
     {
         return;
     }
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (m->Attribute("class"))
+    {
         className = m->Attribute("class");
+    }
     mesh = classes[className].dmesh;
 
     getIfExist(m, "name", mesh.name);
@@ -334,13 +343,13 @@ void LoadActuator(tinyxml2::XMLElement* g,
                   MJCFActuator& actuator,
                   std::string className,
                   MJCFActuator::Type type,
-                  std::map<std::string, MJCFClass>& classes)
+                  const std::map<std::string, MJCFClass>& classesInput)
 {
     if (!g)
     {
         return;
     }
-
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (g->Attribute("class"))
     {
         className = g->Attribute("class");
@@ -389,14 +398,17 @@ void LoadTendon(tinyxml2::XMLElement* t,
                 MJCFTendon& tendon,
                 std::string className,
                 MJCFTendon::Type type,
-                std::map<std::string, MJCFClass>& classes)
+                const std::map<std::string, MJCFClass>& classesInput)
 {
     if (!t)
     {
         return;
     }
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (t->Attribute("class"))
+    {
         className = t->Attribute("class");
+    }
     tendon = classes[className].dtendon;
 
     tendon.type = type;
@@ -516,16 +528,19 @@ void LoadTendon(tinyxml2::XMLElement* t,
 void LoadJoint(tinyxml2::XMLElement* g,
                MJCFJoint& joint,
                std::string className,
-               MJCFCompiler& compiler,
-               std::map<std::string, MJCFClass>& classes,
+               const MJCFCompiler& compiler,
+               const std::map<std::string, MJCFClass>& classesInput,
                bool isDefault)
 {
     if (!g)
     {
         return;
     }
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (g->Attribute("class"))
+    {
         className = g->Attribute("class");
+    }
     joint = classes[className].djoint;
 
     std::string type = "";
@@ -592,15 +607,18 @@ void LoadFreeJoint(tinyxml2::XMLElement* g,
                    MJCFJoint& joint,
                    std::string className,
                    MJCFCompiler& compiler,
-                   std::map<std::string, MJCFClass>& classes,
+                   const std::map<std::string, MJCFClass>& classesInput,
                    bool isDefault)
 {
     if (!g)
     {
         return;
     }
+    std::map<std::string, MJCFClass> classes = classesInput;
     if (g->Attribute("class"))
+    {
         className = g->Attribute("class");
+    }
     joint = classes[className].djoint;
 
     joint.type = MJCFJoint::FREE;
@@ -614,7 +632,7 @@ void LoadFreeJoint(tinyxml2::XMLElement* g,
 }
 
 void LoadDefault(tinyxml2::XMLElement* e,
-                 const std::string className,
+                 const std::string& className,
                  MJCFClass& cl,
                  MJCFCompiler& compiler,
                  std::map<std::string, MJCFClass>& classes)
@@ -656,7 +674,7 @@ void LoadBody(tinyxml2::XMLElement* g,
               std::string className,
               MJCFCompiler& compiler,
               std::map<std::string, MJCFClass>& classes,
-              std::string baseDirPath)
+              const std::string& baseDirPath)
 {
     if (!g)
     {
@@ -764,7 +782,7 @@ void LoadEqualityConnect(tinyxml2::XMLElement* c, MJCFEqualityConnect* equalityC
            &equalityConnect->anchor.z);
 }
 
-tinyxml2::XMLElement* LoadFile(tinyxml2::XMLDocument& doc, const std::string filePath)
+tinyxml2::XMLElement* LoadFile(tinyxml2::XMLDocument& doc, const std::string& filePath)
 {
     if (doc.LoadFile(filePath.c_str()) != tinyxml2::XML_SUCCESS)
     {
@@ -782,14 +800,14 @@ tinyxml2::XMLElement* LoadFile(tinyxml2::XMLDocument& doc, const std::string fil
 }
 
 void LoadAssets(tinyxml2::XMLElement* a,
-                std::string baseDirPath,
+                const std::string& baseDirPath,
                 MJCFCompiler& compiler,
                 std::map<std::string, MeshInfo>& simulationMeshCache,
                 std::map<std::string, MJCFMesh>& meshes,
                 std::map<std::string, MJCFMaterial>& materials,
                 std::map<std::string, MJCFTexture>& textures,
-                std::string className,
-                std::map<std::string, MJCFClass>& classes,
+                const std::string& className,
+                const std::map<std::string, MJCFClass>& classes,
                 ImportConfig& config)
 {
     tinyxml2::XMLElement* m = a->FirstChildElement("mesh");
@@ -830,11 +848,7 @@ void LoadAssets(tinyxml2::XMLElement* a,
             mesh->scale.x = meshScale.x;
             mesh->scale.y = meshScale.y;
             mesh->scale.z = meshScale.z;
-
-            if (!mesh)
-            {
-                CARB_LOG_ERROR("*** Failed to load '%s'!\n", meshPath.c_str());
-            }
+            // TODO: check if the mesh is converted successfully
 
             if (meshScale.x != 1.0f || meshScale.y != 1.0f || meshScale.z != 1.0f)
             {
@@ -910,7 +924,7 @@ void LoadAssets(tinyxml2::XMLElement* a,
 
 void LoadGlobals(tinyxml2::XMLElement* root,
                  std::string& defaultClassName,
-                 std::string baseDirPath,
+                 const std::string& baseDirPath,
                  MJCFBody& worldBody,
                  std::vector<MJCFBody*>& bodies,
                  std::vector<MJCFActuator*>& actuators,
@@ -942,10 +956,7 @@ void LoadGlobals(tinyxml2::XMLElement* root,
         // if no default, set the defaultClassName to default if it does not exist
         // yet. added this condition to avoid overwriting default class parameters
         // parsed in a prior call
-        if (classes.find(defaultClassName) == classes.end())
-        {
-            classes[defaultClassName] = MJCFClass();
-        }
+        classes.try_emplace(defaultClassName, MJCFClass());
     }
     else
     {

@@ -1,5 +1,59 @@
 # Changelog
 
+## [4.12.1] - 2025-09-08
+### Changed
+- Use base test class from isaacsim.test.utils 
+- Reduce test time by using fast asset root path function
+
+## [4.12.0] - 2025-09-05
+### Changed
+- Update internal ROS 2 Humble and Jazzy libs to include common_interfaces, tf2_ros, sensor_msgs_py, Simulation Interfaces v1.1.0. 
+
+## [4.11.2] - 2025-08-29
+### Changed
+- Renamed CARB profiling zones to include [IsaacSim] prefix
+
+## [4.11.1] - 2025-08-28
+### Changed
+- Improvements to test stability and cleanup test code
+
+## [4.11.0] - 2025-08-19
+## Changed
+- Set default ROS bridge lib setting to system_default and cleanup ROS Bridge loading
+
+## [4.10.1] - 2025-08-14
+### Changed
+- Cleanup unused code in tests
+
+### Fixed
+- Fix test failures
+
+## [4.10.0] - 2025-08-12
+### Changed
+- Improve sequence memory management in ROS2 message generation
+- Cleanup and improve error messages and default values
+- Add c++ doctests for backend classes
+
+## [4.9.8] - 2025-08-08
+### Changed
+- Update odometry test case to test IsaacComputeOdometry node processing on the GPU
+
+## [4.9.7] - 2025-08-05
+### Fixed
+- Fix test failures in test_menu_graphs.py
+
+## [4.9.6] - 2025-08-05
+### Fixed
+- CameraInfoHelper node now accuately publishes system time
+
+## [4.9.5] - 2025-07-31
+### Fixed
+- Fix the length resolution of non-fixed size arrays of embedded dynamic messages
+
+## [4.9.4] - 2025-07-30
+### Changed
+- Fix bugs with registering and deregistering examples in the browser
+
 ## [4.9.3] - 2025-07-29
 ## Changed
 - CycloneDDS is now supported for Jazzy

@@ -33,7 +33,8 @@ from isaacsim.gui.components.ui_utils import setup_ui_headers
 from isaacsim.storage.native import get_assets_root_path
 from pxr import Gf
 
-MENU_NAME = "MoveIt"
+MENU_NAME = "Franka MoveIt"
+MENU_CATEGORY = "ROS2/MoveIt"
 FRANKA_STAGE_PATH = "/Franka"
 
 
@@ -46,11 +47,8 @@ class Extension(omni.ext.IExt):
         self._stage = self._usd_context.get_stage()
 
         get_browser_instance().register_example(
-            name="Franka MoveIt", execute_entrypoint=self.build_window, ui_hook=self.build_ui, category="ROS2/MoveIt"
+            name="Franka MoveIt", ui_hook=lambda a=weakref.proxy(self): a.build_ui(), category=MENU_CATEGORY
         )
-
-    def build_window(self):
-        pass
 
     def build_ui(self):
         # check if ros2 bridge is enabled before proceeding
@@ -166,6 +164,6 @@ class Extension(omni.ext.IExt):
 
     def on_shutdown(self):
         """Cleanup objects on extension shutdown"""
-        get_browser_instance().deregister_example(name=MENU_NAME, category="ROS2")
+        get_browser_instance().deregister_example(name=MENU_NAME, category=MENU_CATEGORY)
         self._timeline.stop()
         gc.collect()

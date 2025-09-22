@@ -28,8 +28,6 @@ from isaacsim.storage.native import get_assets_root_path
 from .recorders import *
 from .utils import wait_until_stage_is_fully_loaded
 
-logger = utils.set_up_logging(__name__)
-
 
 def set_sync_mode():
     """
@@ -123,12 +121,12 @@ class BaseIsaacBenchmark:
             self._metrics_output_folder = tempfile.gettempdir()
 
         # Create report
-        logger.info(f"Generating formatted report = {self.report}")
+        carb.log_info(f"Generating formatted report = {self.report}")
         if self.report:
             self.final_report = report.Report()
 
         # Get metrics backend based on user-provided type
-        logger.info(f"Using metrics backend = {backend_type}")
+        carb.log_info(f"Using metrics backend = {backend_type}")
         self._metrics = backend.MetricsBackend.get_instance(instance_type=backend_type)
 
         # Generate workflow-level metadata
@@ -136,15 +134,15 @@ class BaseIsaacBenchmark:
         if "metadata" in workflow_metadata:
             self._metadata.extend(measurements.TestPhase.metadata_from_dict(workflow_metadata))
         elif workflow_metadata:
-            logger.warning(
+            carb.log_warn(
                 "workflow_metadata provided, but missing expected `metadata' entry. Metadata will not be read."
             )
 
-        logger.info(f"Local folder location = {self._metrics_output_folder}")
-        logger.info("Starting")
+        carb.log_info(f"Local folder location = {self._metrics_output_folder}")
+        carb.log_info("Starting")
         self.benchmark_start_time = time.time()
         self.test_mode = os.getenv("ISAAC_TEST_MODE") == "1"
-        logger.info(f"Test mode = {self.test_mode}")
+        carb.log_info(f"Test mode = {self.test_mode}")
         pass
 
     def stop(self):
@@ -157,9 +155,9 @@ class BaseIsaacBenchmark:
         randomize_filename_prefix = self.settings.get(
             "/exts/isaacsim.benchmark.services/metrics/randomize_filename_prefix"
         )
-        logger.info("Stopping")
-        logger.info("Writing metrics data.")
-        logger.info(f"Metrics type = {type(self._metrics).__name__}")
+        carb.log_info("Stopping")
+        carb.log_info("Writing metrics data.")
+        carb.log_info(f"Metrics type = {type(self._metrics).__name__}")
         # Finalize by adding all test phases to the backend metrics
         for test_phase in self._test_phases:
             self._metrics.add_metrics(test_phase)
@@ -192,7 +190,7 @@ class BaseIsaacBenchmark:
             start_recording_frametime (bool): False to not start recording frametime at start of phase. Default True.
             start_recording_runtime (bool): False to not start recording runtime at start of phase. Default True.
         """
-        logger.info(f"Starting phase: {phase}")
+        carb.log_info(f"Starting phase: {phase}")
         self.context.phase = phase
         if start_recording_frametime:
             self.frametime_recorder.start_collecting()
@@ -250,7 +248,7 @@ class BaseIsaacBenchmark:
         if existing_phase:
             # Add the custom measurement to the existing phase
             existing_phase.measurements.append(custom_measurement)
-            logger.info(f"Stored {custom_measurement} for phase '{phase_name}'")
+            carb.log_info(f"Stored {custom_measurement} for phase '{phase_name}'")
         else:
             # If the phase does not exist, create a new test phase
             new_test_phase = measurements.TestPhase(
@@ -263,4 +261,4 @@ class BaseIsaacBenchmark:
             # Add the new test phase to the list of test phases
             self._test_phases.append(new_test_phase)
 
-            logger.info(f"Created new phase '{phase_name}' and stored {custom_measurement}")
+            carb.log_info(f"Created new phase '{phase_name}' and stored {custom_measurement}")

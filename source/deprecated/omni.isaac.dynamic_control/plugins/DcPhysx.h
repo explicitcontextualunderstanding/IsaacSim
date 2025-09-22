@@ -71,14 +71,14 @@ public:
      * @param[in] usdPath The USD path to register
      * @return Handle to the registered joint
      */
-    DcHandle registerJoint(const pxr::SdfPath& usdPath);
+    static DcHandle registerJoint(const pxr::SdfPath& usdPath);
 
     /**
      * @brief Registers a degree of freedom at the specified USD path
      * @param[in] usdPath The USD path to register
      * @return Handle to the registered degree of freedom
      */
-    DcHandle registerDof(const pxr::SdfPath& usdPath);
+    static DcHandle registerDof(const pxr::SdfPath& usdPath);
 
     /**
      * @brief Registers an articulation at the specified USD path

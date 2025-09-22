@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import omni.ui as ui
 from omni.ui import color as cl
 
 # Use same context menu style with content browser
@@ -24,4 +25,12 @@ CONTEXT_MENU_STYLE = {
     "Menu": {"background_color": cl.context_menu_background_color, "color": cl.context_menu_text, "border_radius": 2},
     "Menu.Item": {"background_color": 0x0, "margin": 0},
     "Separator": {"background_color": 0x0, "color": cl.context_menu_separator},
+}
+
+# Thumbnail card styles for hover and selection effects
+THUMBNAIL_STYLE = {
+    "GridView.Item:selected": {
+        "background_color": 0x44FFFFFF,
+        "color": 0xFF00B976,
+    },
 }

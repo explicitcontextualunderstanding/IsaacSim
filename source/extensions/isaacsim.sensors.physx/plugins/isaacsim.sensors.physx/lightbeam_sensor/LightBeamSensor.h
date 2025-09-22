@@ -50,7 +50,7 @@ public:
      * @brief Constructs a new Light Beam Sensor instance
      * @param[in] physXInterface Pointer to the PhysX interface for physics simulation
      */
-    LightBeamSensor(omni::physx::IPhysx* physXInterface);
+    explicit LightBeamSensor(omni::physx::IPhysx* physXInterface);
 
     /**
      * @brief Virtual destructor for proper cleanup
@@ -61,37 +61,37 @@ public:
      * @brief Initializes the light beam sensor when the component starts
      * @details Sets up initial parameters, allocates memory for beam data, and prepares the sensor for operation
      */
-    virtual void onStart();
+    virtual void onStart() override;
 
     /**
      * @brief Performs pre-tick operations before the main sensor update
      * @details Empty implementation as no pre-tick operations are needed
      */
-    virtual void preTick(){};
+    virtual void preTick() override{};
 
     /**
      * @brief Performs the main sensor update during each tick
      * @details Empty implementation as updates are handled in onPhysicsStep
      */
-    virtual void tick(){};
+    virtual void tick() override{};
 
     /**
      * @brief Cleans up resources when the component stops
      * @details Empty implementation as no specific cleanup is needed
      */
-    virtual void onStop(){};
+    virtual void onStop() override{};
 
     /**
      * @brief Updates sensor data during physics simulation steps
      * @details Performs ray casting and updates beam hit data based on the current physics state
      */
-    virtual void onPhysicsStep();
+    virtual void onPhysicsStep() override;
 
     /**
      * @brief Handles component property changes
      * @details Updates sensor configuration when properties are modified through the interface
      */
-    void onComponentChange();
+    void onComponentChange() override;
 
     /**
      * @brief Gets the number of rays in the light curtain

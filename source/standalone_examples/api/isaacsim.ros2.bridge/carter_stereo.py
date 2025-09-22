@@ -29,7 +29,6 @@ import omni.graph.core as og
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.storage.native import get_assets_root_path
-from pxr import Sdf
 
 # enable ROS2 bridge extension
 enable_extension("isaacsim.ros2.bridge")

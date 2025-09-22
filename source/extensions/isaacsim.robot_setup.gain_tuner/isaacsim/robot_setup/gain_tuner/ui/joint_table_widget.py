@@ -17,6 +17,7 @@ from enum import Enum, IntEnum, auto
 from functools import partial
 from re import I
 
+import numpy as np
 import omni.ui as ui
 import pxr
 
@@ -307,6 +308,7 @@ class JointItem(ui.AbstractItem):
         stiffness = get_stiffness_attr(joint)
         damping = get_damping_attr(joint)
         jointdrive = None
+        self.updating_damping_ratio = False
 
         if is_joint_mimic(joint):
             drive_mode = JointDriveMode.MIMIC
@@ -407,8 +409,8 @@ class JointItem(ui.AbstractItem):
             attr = get_damping_attr(self.joint)
             if attr:
                 attr.Set(model.get_value_as_float())
-        new_damping_ratio = self.compute_damping_ratio()
-        if abs(self.damping_ratio - new_damping_ratio) > 0.0001:
+        if not self.updating_damping_ratio:
+            new_damping_ratio = self.compute_damping_ratio()
             self.damping_ratio = new_damping_ratio
 
     def on_update_natural_frequency(self, model, *args):
@@ -429,7 +431,9 @@ class JointItem(ui.AbstractItem):
         if self.drive_type == JointDriveType.FORCE:
             m_eq = self.inertia
         if self.mode == JointSettingMode.NATURAL_FREQUENCY:
-            self.damping = 2 * m_eq * self.natural_frequency * self.damping_ratio
+            self.updating_damping_ratio = True
+            self.damping = self.damping_ratio * (2 * np.sqrt(m_eq * self.stiffness))
+            self.updating_damping_ratio = False
 
     def compute_damping_ratio(self):
         if self.drive_mode == JointDriveMode.MIMIC:
@@ -442,7 +446,7 @@ class JointItem(ui.AbstractItem):
         if self.drive_type == JointDriveType.FORCE:
             m_eq = self.inertia
         if self.natural_frequency > 0:
-            damping_ratio = self.damping / (2 * m_eq * self.natural_frequency)
+            damping_ratio = self.damping / (2 * np.sqrt(m_eq * self.stiffness))
             return damping_ratio
         return 0
 
@@ -539,19 +543,21 @@ class JointItem(ui.AbstractItem):
             m_eq = 1
             if self.drive_type == JointDriveType.FORCE:
                 m_eq = self.inertia
-            return (self.stiffness / m_eq) ** (0.5)
+            return (np.sqrt(self.stiffness / (m_eq))) / (2 * np.pi)
 
     def compute_drive_stiffness(self):
         m_eq = 1
         if self.drive_type == JointDriveType.FORCE:
             m_eq = self.inertia
-        stiffness = m_eq * self.natural_frequency**2
+        stiffness = m_eq * (((2 * np.pi * self.natural_frequency)) ** 2)
         value_changed = self.stiffness != stiffness
         if value_changed and self.mode == JointSettingMode.NATURAL_FREQUENCY:
             self.stiffness = stiffness
             # print(self.joint.drive.target_type)
             if self.drive_mode == JointDriveMode.POSITION:
-                self.damping = 2 * m_eq * self.natural_frequency * self.damping_ratio
+                self.updating_damping_ratio = True
+                self.damping = self.damping_ratio * ((2 * np.sqrt(m_eq * self.stiffness)))
+                self.updating_damping_ratio = False
                 # damping_attr = get_damping_attr(self.joint)
                 # if damping_attr:
                 #     damping_attr.Set(self.damping)

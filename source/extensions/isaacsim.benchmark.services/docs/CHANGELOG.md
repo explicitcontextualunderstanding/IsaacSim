@@ -1,4 +1,8 @@
 # Changelog
+## [3.0.6] - 2025-09-10
+### Changed
+- Moved all logging functionality to carb.log() module
+
 ## [3.0.5] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 3.0.4)

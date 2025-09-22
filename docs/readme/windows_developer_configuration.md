@@ -28,6 +28,16 @@ To enable the Windows C++ build process:
 
 **Note:** If you already have Visual Studio and the Windows SDK installed, this might be the only change needed. The tooling will auto-detect installed components.
 
+## Compiler Version Checking
+
+The Windows build process will check a handful of versions before starting.  It expects to find the following versions (defined in `repo.toml`):
+ * VS 2022
+ * MSVC v143
+ * MSBuild 17.*
+ * WinSDK 10.0.22621.0
+
+If you do not have these versions you can still start a build, run `build.bat --skip-compiler-version-check`
+
 ## Microsoft Visual Studio and Windows SDK Setup
 
 ### Basic Installation

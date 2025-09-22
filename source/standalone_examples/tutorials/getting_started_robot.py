@@ -24,7 +24,6 @@ import numpy as np
 from isaacsim.core.api import World
 from isaacsim.core.prims import Articulation
 from isaacsim.core.utils.stage import add_reference_to_stage, get_stage_units
-from isaacsim.core.utils.types import ArticulationAction
 from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.storage.native import get_assets_root_path
 

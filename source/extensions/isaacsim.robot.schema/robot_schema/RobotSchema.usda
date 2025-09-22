@@ -29,6 +29,38 @@ class "IsaacRobotAPI"
 {   
     string isaac:description= ""
     string isaac:namespace = ""
+    token isaac:robotType = "Default" (
+        doc = """
+        Type of robot.
+        """
+        allowedTokens = ["Default", "End Effector", "Manipulator", "Humanoid", "Wheeled", "Holonomic", "Quadruped", "Mobile Manipulators", "Aerial"]
+    )
+    token isaac:license = "Other" (
+        allowedTokens = ["MIT", "Apache-2.0", "GPL-3.0", "LGPL-3.0", "BSD-3-Clause", "BSD-2-Clause", "ISC", "MPL-2.0", "EPL-2.0", "CC0-1.0", "Unlicense", "Other"]
+        doc = """
+        License for using the robot.
+        """
+    )
+    string isaac:version = "" (
+        doc = """
+        Version of the robot.
+        """
+    )
+    string isaac:source = "" (
+        doc = """
+        Source of the robot.
+        """
+    )
+    string[] isaac:changelog = [] (
+        doc = """
+        Changelog of the robot.
+        """
+    )
+    
+    
+    
+
+
     rel isaac:physics:robotLinks (
         doc = """
         Sorted list of bodies, Reference points or Robot assemblies ( all bodies from the robot are inserted) to be listed in the robot kinematics tree. 

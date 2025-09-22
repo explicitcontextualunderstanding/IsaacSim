@@ -1466,7 +1466,7 @@ def setup_ui_headers(
     ext_id,
     file_path,
     title="My Custom Extension",
-    doc_link="https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html",
+    doc_link="https://docs.isaacsim.omniverse.nvidia.com/latest/index.html",
     overview="",
 ):
     """Creates the Standard UI Elements at the top of each Isaac Extension.
@@ -1475,7 +1475,7 @@ def setup_ui_headers(
         ext_id (str): Extension ID.
         file_path (str): File path to source code.
         title (str, optional): Name of Extension. Defaults to "My Custom Extension".
-        doc_link (str, optional): Hyperlink to Documentation. Defaults to "https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html".
+        doc_link (str, optional): Hyperlink to Documentation. Defaults to "https://docs.isaacsim.omniverse.nvidia.com/latest/index.html".
         overview (str, optional): Overview Text explaining the Extension. Defaults to "".
     """
     ext_manager = omni.kit.app.get_app().get_extension_manager()
@@ -1489,7 +1489,7 @@ def build_header(
     ext_path,
     file_path,
     title="My Custom Extension",
-    doc_link="https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html",
+    doc_link="https://docs.isaacsim.omniverse.nvidia.com/latest/index.html",
 ):
     """Title Header with Quick Access Utility Buttons."""
 

@@ -19,6 +19,7 @@
 #include <isaacsim/core/includes/utils/Path.h>
 #include <isaacsim/core/includes/utils/Usd.h>
 
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 
@@ -195,11 +196,11 @@ std::ostream& operator<<(std::ostream& out, const UrdfLink& link)
 {
     out << "Link: ";
     out << " \tName=" << link.name << std::endl;
-    for (auto& visual : link.visuals)
+    for (const auto& visual : link.visuals)
     {
         out << " \t" << visual << std::endl;
     }
-    for (auto& collision : link.collisions)
+    for (const auto& collision : link.collisions)
     {
         out << " \t" << collision << std::endl;
     }
@@ -227,15 +228,15 @@ std::ostream& operator<<(std::ostream& out, const UrdfRobot& robot)
 {
     out << "Robot: ";
     out << robot.name << std::endl;
-    for (auto& link : robot.links)
+    for (const auto& link : robot.links)
     {
         out << link.second << std::endl;
     }
-    for (auto& joint : robot.joints)
+    for (const auto& joint : robot.joints)
     {
         out << joint.second << std::endl;
     }
-    for (auto& material : robot.materials)
+    for (const auto& material : robot.materials)
     {
         out << material.second << std::endl;
     }
@@ -991,10 +992,10 @@ bool parseLinks(const XMLElement& root, std::map<std::string, UrdfLink>& urdfLin
                 do
                 {
                     UrdfVisual visual;
-                    auto name = visualElement->Attribute("name");
-                    if (name)
+                    auto visualName = visualElement->Attribute("name");
+                    if (visualName)
                     {
-                        visual.name = makeValidUSDIdentifier(name);
+                        visual.name = makeValidUSDIdentifier(visualName);
                     }
 
                     if (!parseOrigin(*visualElement, visual.origin))
@@ -1027,10 +1028,10 @@ bool parseLinks(const XMLElement& root, std::map<std::string, UrdfLink>& urdfLin
                 do
                 {
                     UrdfCollision collision;
-                    auto name = collisionElement->Attribute("name");
-                    if (name)
+                    auto collisionName = collisionElement->Attribute("name");
+                    if (collisionName)
                     {
-                        collision.name = makeValidUSDIdentifier(name);
+                        collision.name = makeValidUSDIdentifier(collisionName);
                     }
 
                     if (!parseOrigin(*collisionElement, collision.origin))
@@ -1168,11 +1169,10 @@ void compute_accumulated_inertias(const UrdfRobot& robot,
         {
             jointsToVisit current_joint = joints_to_visit.back();
             joints_to_visit.pop_back();
-            if (visited_joints.find(current_joint.name) == visited_joints.end())
+            if (visited_joints.insert(current_joint.name).second)
             {
                 // CARB_LOG_WARN("Computing Accumulated inertia:  (%s, %s)", current_joint.name.c_str(),
                 //               current_joint.is_forward ? "forward" : "backward");
-                visited_joints.insert(current_joint.name);
                 auto it = robot.joints.find(current_joint.name);
                 if (it != robot.joints.end())
                 {
@@ -1200,13 +1200,13 @@ void compute_accumulated_inertias(const UrdfRobot& robot,
                         }
                         if (!(!current_joint.is_forward && current_joint.name == start_joint.name))
                         {
-                            for (const std::string& child_joint : this_joint.childrenJoints)
-                            {
-                                // if (visited_joints.find(child_joint) == visited_joints.end()) {
-                                joints_to_visit.push_back(
-                                    { child_joint, current_joint.forward_position * this_joint.origin, true });
-                                // }
-                            }
+                            std::transform(this_joint.childrenJoints.begin(), this_joint.childrenJoints.end(),
+                                           std::back_inserter(joints_to_visit),
+                                           [&](const std::string& child_joint) {
+                                               return jointsToVisit{ child_joint,
+                                                                     current_joint.forward_position * this_joint.origin,
+                                                                     true };
+                                           });
                         }
                     }
                 }
@@ -1342,10 +1342,10 @@ bool parseJoints(const XMLElement& root, std::map<std::string, UrdfJoint>& urdfJ
         auto name = jointElement->Attribute("name");
         if (name)
         {
-            UrdfJoint& joint = urdfJoints[makeValidUSDIdentifier(name)];
             auto mimicElement = jointElement->FirstChildElement("mimic");
             if (mimicElement)
             {
+                UrdfJoint& joint = urdfJoints[makeValidUSDIdentifier(name)];
                 if (!parseJointMimic(*mimicElement, joint.mimic))
                 {
                     joint.mimic.joint = "";
@@ -1760,8 +1760,8 @@ bool parseSensors(const XMLElement& root, std::map<std::string, UrdfLink>& urdfL
                 else
                 {
                     auto name = sensorElement->Attribute("name");
-                    auto type = sensorElement->Attribute("type");
-                    CARB_LOG_WARN("Sensor %s not parsed: Sensor type unsupported (%s)", name, type);
+                    auto sensorType = sensorElement->Attribute("type");
+                    CARB_LOG_WARN("Sensor %s not parsed: Sensor type unsupported (%s)", name, sensorType);
                 }
             }
         }
@@ -1902,8 +1902,8 @@ void populateJointTree(isaacsim::asset::importer::urdf::UrdfRobot& robot)
         if (parent_joint != jointChildMap.end())
         {
             joint.second.parentJoint = parent_joint->second;
-            auto& parent_joint = robot.joints.at(joint.second.parentJoint);
-            parent_joint.childrenJoints.push_back(joint.second.name);
+            auto& parentJointRef = robot.joints.at(joint.second.parentJoint);
+            parentJointRef.childrenJoints.push_back(joint.second.name);
         }
         // CARB_LOG_WARN("Parent Joint: %s", joint.second.parentJoint.c_str());
     }

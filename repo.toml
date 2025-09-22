@@ -18,6 +18,7 @@ name = "isaac-sim"
 
 # Specify python executable path for each platform
 python_executable."platform:linux-x86_64".python_executable_path = "python3${exe_ext}"
+python_executable."platform:linux-aarch64".python_executable_path = "python3${exe_ext}"
 python_executable."platform:windows-x86_64".python_executable_path = "python${exe_ext}"
 python_executable.packman_package_name = "python"
 python_executable.packman_package_version = "3.11.11+nv3-${platform}"
@@ -68,6 +69,12 @@ fetch.pip.files_to_pull = [
 fetch.pip.licensing_enabled = false
 fetch.pip.publish_pip_cache = false
 
+enable_compiler_version_check = true
+
+"platform:linux-x86_64".version_check_gcc_version = "11.*.*"
+
+
+
 # # Extensions precache
 # # This is one way to get the headers and bin files from extensions to show up... like needed in omni.sensors.nv.common
 # pre_build.commands = [
@@ -91,6 +98,7 @@ vscode.python_env.PYTHONPATH = [
   "$root/_build/$platform/$config/exts/isaacsim.robot_motion.lula/pip_prebundle",
   "$root/_build/$platform/$config/exts/isaacsim.asset.exporter.urdf/pip_prebundle",
   "$root/_build/$platform/$config/extscache/omni.kit.pip_archive*/pip_prebundle",
+  "$root/_build/$platform/$config/kit/exts/omni.kit.pip_archive*/pip_prebundle",
   "$root/_build/$platform/$config/exts/omni.isaac.core_archive/pip_prebundle",
   "$root/_build/$platform/$config/exts/omni.isaac.ml_archive/pip_prebundle",
   "$root/_build/$platform/$config/exts/omni.pip.compute/pip_prebundle",
@@ -125,7 +133,10 @@ licensing.packages = [
   "${root}/deps/ext-deps.packman.xml",
   "${root}/deps/isaac-sim.packman.xml",
 ]
-# licensing.fail_on_missing = true
+
+"platform:linux-aarch64".licensing.fail_on_missing = false # Disable licensing for aarch64 platforms, as it is not supported.
+"platform:windows-x86_64".licensing.fail_on_missing = true
+"platform:linux-x86_64".licensing.fail_on_missing = true
 
 # By default, precache_exts is run after pull. Instead, running it after generating projects and staging files, so the necessary app file exists.
 fetch.after_pull_commands = []
@@ -186,6 +197,11 @@ vs_version = "vs2022"
 # Visual Studio path; This will be used if the user would like to point to a specific VS installation rather than rely on heuristic locating.
 # vs_path = "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\"
 
+"token:in_ci==false".version_check_vs_version = "2022"
+"token:in_ci==false".version_check_msvc_version = "v143"
+"token:in_ci==false".version_check_msbuild_version = "17"
+"token:in_ci==false".version_check_winsdk_version = "10.0.22621.0"
+
 # Filter specifically to "Enterprise", "Professional", or "Community" editions of Visual Studio
 # vs_edition = "Community"
 
@@ -242,7 +258,8 @@ links.exts.include = [
   "usdrt.scenegraph",
   "omni.graph.tools",
   "omni.kit.test",
-  "isaacsim.util.debug_draw"
+  "isaacsim.util.debug_draw",
+  "omni.kit.asset_converter"
 ]
 links.path = "${root}/_build/${platform}/${config}/extsbuild"
 
@@ -471,6 +488,7 @@ exclude = [
   "tests-standalone*${shell_ext}",
   "tests-nativepython*${shell_ext}",
   "tests-internaldocker*${shell_ext}",
+  "tests-external*${shell_ext}",
 ]
 include = ["tests-*${shell_ext}"]
 stdout_fail_patterns.exclude = [
@@ -674,22 +692,6 @@ name = "ar"
 # 	"${test_root}/tests/tests-unit-omni.isaac.range_sensor${exe_ext}",
 # ]
 
-[repo_test.suites.gympythontests]
-kind = "glob_and_exec"
-path = "${test_root}/tests"
-
-[[repo_test.suites.gympythontests.group]]
-args = ["--portable-root ${test_root}/portable_root", "--reset-user"]
-exclude = []
-include = ["tests-omni.isaac.gym${shell_ext}"]
-stdout_fail_patterns.exclude = [
-  "*Remote server does not support WebSockets*",
-  "*[Error] [rtx.optixdenoising.plugin] [Optix] [DiskCacheDatabase]*", # optix disk cache errors
-  "*[Error] [rtx.optixdenoising.plugin] [Optix] [WARNING]*",           # optix disk cache errors
-]
-tc_report_enabled = false
-timeout = 100000
-
 
 ########################################################################################################################
 # Extensions publisher
@@ -702,7 +704,7 @@ enabled = true
 platforms = [
     "windows-x86_64",
     "linux-x86_64",
-    # "linux-aarch64"
+    "linux-aarch64"
 ]
 
 publish_root = "${root}/_build/$platform/$config"
@@ -749,6 +751,10 @@ archive_pattern = "${root}/_build/packages/isaac-sim-standalone@*${publish_platf
 
 [repo_format]
 
+cpp.maintain_legal_blurbs = false
+python.maintain_legal_blurbs = false
+
+
 cpp.files.exclude = [
   "tools/container/**",
 ]
@@ -792,6 +798,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 
+
+########################################################################################################################
+# Repo Docs (see: repo docs --help)
+########################################################################################################################
+
+[repo_docs]
+"platform:linux-aarch64".enabled = false # Disable docs generation for aarch64 platforms, as it is not supported.
+"platform:windows-x86_64".enabled = false # Disable docs generation for windows64 platforms, as it is not supported.
+"platform:linux-x86_64".enabled = true
+
 ########################################################################################################################
 # Extension documentation building (see: repo extension_docs --help)
 ########################################################################################################################
@@ -800,6 +816,7 @@ limitations under the License.
 build_extension_paths = [
   "${root}/_build/${platform}/${config}/exts",
   "${root}/_build/${platform}/${config}/extsDeprecated",
+  "${root}/_build/${platform}/${config}/extsbuild",
 ]
 source_extension_paths = [
   "${root}/source/extensions",
@@ -899,6 +916,17 @@ excluded_extensions = [
     "omni.kit.property.isaac",
     "omni.replicator.isaac",
     "omni.usd.schema.isaac",
+    # extsbuild,
+    "omni.graph.tools",
+    "omni.kit.test",
+    "omni.syntheticdata",
+    "omni.usd.core",
+    "usdrt.scenegraph",
+]
+
+# Extensions from extsbuild that needed to be included in docs 
+extsbuild_exts_includes = [
+    "isaacsim.util.debug_draw",
 ]
 
 ########################################################################################################################
@@ -919,9 +947,10 @@ ogn_exts_includes = [
   "isaacsim.sensors.physx",
   "isaacsim.sensors.rtx",
   "isaacsim.core.nodes",
-  "isaacsim.util.debug_draw",
   "isaacsim.examples.interactive_nodes",
   "isaacsim.robot.wheeled_robots",
+  # "isaacsim.util.debug_draw",
+
 ]
 
 
@@ -973,27 +1002,12 @@ extra_args = [
 
 
 ########################################################################################################################
-# Custom scripts for repo_ci
-########################################################################################################################
-[repo_ci.jobs.build]
-script = "${config_root}/tools/ci/build_isaac.py"
-
-[repo_ci.jobs.test]
-script = "${config_root}/tools/ci/test_isaac.py"
-
-[repo_ci.jobs.standalone_report]
-script = "${config_root}/tools/ci/standalone_report.py"
-
-########################################################################################################################
 # Tool to pull kit kernel and extensions before running
 ########################################################################################################################
 
 [repo_kit_pull_extensions]
 precache_exts_enabled = false
 
-########################################################################################################################
-# Tool to promote extensions to the public registry pipeline
-########################################################################################################################
 
 [[repo_kit_pull_extensions.environment]]
 name = "integ"
@@ -1001,8 +1015,6 @@ app_version_regex = ""
 "tokens.registry_url" = "https://ovextensionsprod.blob.core.windows.net"
 "tokens.registry_shared_name" = "shared"
 "tokens.registry_name" = "kit/prod"
-[repo_deploy_exts.pipeline_repo.branch.prod]
-fail_if_exts_are_missing = false
 
 
 ########################################################################################################################

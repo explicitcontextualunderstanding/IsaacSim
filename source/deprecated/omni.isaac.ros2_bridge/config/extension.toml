@@ -1,5 +1,5 @@
 [package]
-version = "3.0.7"
+version = "3.0.8"
 category = "Simulation"
 title = "ROS2 Bridge"
 description = "ROS2 Bridge"
@@ -30,6 +30,7 @@ dependencies = [
     "omni.isaac.core_nodes",
     "omni.isaac.nucleus",
     "omni.isaac.sensor",
+    "isaacsim.test.utils",
 ]
 args = [
 '--/app/settings/fabricDefaultStageFrameHistoryCount = 3',

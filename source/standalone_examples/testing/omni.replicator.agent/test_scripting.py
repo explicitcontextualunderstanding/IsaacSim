@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     import omni.usd
     from omni.kit.scripting import ApplyScriptingAPICommand
-    from pxr import OmniScriptingSchema, Sdf
+    from pxr import OmniScriptingSchema
 
     async def work():
 

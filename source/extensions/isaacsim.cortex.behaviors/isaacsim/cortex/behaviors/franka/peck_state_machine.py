@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Simple example of constructing a running a state machine. This state machine will loop choosing
+"""Simple example of constructing a running a state machine. This state machine will loop choosing
 a target on the ground away from obstacles and pecking at it.
 
 In general this will loop successfully forever as long as the world is static. However, if the user

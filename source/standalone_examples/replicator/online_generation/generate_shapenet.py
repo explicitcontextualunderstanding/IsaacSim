@@ -344,7 +344,6 @@ if __name__ == "__main__":
     import argparse
     import struct
 
-    import matplotlib
     import matplotlib.pyplot as plt
 
     parser = argparse.ArgumentParser("Dataset test")

@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate synthetic data from an AMR navigating to random locations
-"""
+"""Generate synthetic data from an AMR navigating to random locations"""
 
 from isaacsim import SimulationApp
 

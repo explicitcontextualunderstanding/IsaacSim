@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.12.1] - 2025-09-15
+### Added
+- Add builtins flag to indicate that the `SimulationApp` class has been launched
+
+## [2.12.0] - 2025-09-10
+## Changed
+- Added skip_cleanup parameter to close method
+- Update docstrings
+
+### Fixed
+- Fix hang on startup when waiting for viewport to be ready
+- Fix for hang on exit
+
+## [2.11.0] - 2025-09-10
+### Fixed
+- Force headless mode if DISPLAY environment variable is not set on Linux
+
+## [2.10.1] - 2025-09-08
+### Fixed
+- Update `SimulationApp` class docstrings to clarify the default behavior when loading experience files
+
+## [2.10.0] - 2025-08-04
+### Added
+- New 'enable_motion_bvh' config to enable Motion BVH settings via extra_args
+
 ## [2.9.2] - 2025-06-19
 ### Changed
 - Remove replicator shutdown workaround

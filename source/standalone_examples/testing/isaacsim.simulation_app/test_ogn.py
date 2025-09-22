@@ -14,7 +14,6 @@
 # limitations under the License.
 import sys
 
-import numpy as np
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp()
@@ -51,14 +50,16 @@ simulation_app.update()
 value = og.DataView.get(output_attr)
 print(value)
 if value != "Hello":
-    raise ValueError("Output does not equal Hello")
+    print("[FAIL] Output does not equal Hello")
+    sys.exit(1)
 simulation_app.update()
 og.DataView.set(input_attr, "Goodbye")
 simulation_app.update()
 value = og.DataView.get(output_attr)
 print(value)
 if value != "Goodbye":
-    raise ValueError("Output does not equal Goodbye")
+    print("[FAIL] Output does not equal Goodbye")
+    sys.exit(1)
 
 simulation_app.update()
 # Cleanup application

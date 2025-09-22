@@ -385,7 +385,7 @@ void DcContext::removeUsdPath(const pxr::SdfPath& usdPath)
     {
         if (pxr::SdfPath(it->first).HasPrefix(usdPath))
         {
-            for (auto& h : it->second)
+            for (const auto& h : it->second)
             {
                 remove(h);
             }
@@ -417,7 +417,7 @@ bool DcContext::refreshPhysicsPointers(DcRigidBody* body, bool verbose)
         return false;
     }
 
-    PxActor* pxActor = (PxActor*)physx->getPhysXPtr(body->path, omni::physx::PhysXType::ePTActor);
+    PxActor* pxActor = static_cast<PxActor*>(physx->getPhysXPtr(body->path, omni::physx::PhysXType::ePTActor));
     if (pxActor)
     {
         PxActorType::Enum type = pxActor->getType();
@@ -433,7 +433,8 @@ bool DcContext::refreshPhysicsPointers(DcRigidBody* body, bool verbose)
     }
     else
     {
-        PxArticulationLink* link = (PxArticulationLink*)physx->getPhysXPtr(body->path, omni::physx::PhysXType::ePTLink);
+        PxArticulationLink* link =
+            static_cast<PxArticulationLink*>(physx->getPhysXPtr(body->path, omni::physx::PhysXType::ePTLink));
         if (link)
         {
             body->pxRigidBody = static_cast<PxRigidBody*>(link);
@@ -463,8 +464,8 @@ bool DcContext::refreshPhysicsPointers(DcJoint* joint, bool verbose)
     }
 
     // we only support articulation joints, for now
-    PxArticulationJointReducedCoordinate* pxArticulationJoint =
-        (PxArticulationJointReducedCoordinate*)physx->getPhysXPtr(joint->path, omni::physx::PhysXType::ePTLinkJoint);
+    PxArticulationJointReducedCoordinate* pxArticulationJoint = static_cast<PxArticulationJointReducedCoordinate*>(
+        physx->getPhysXPtr(joint->path, omni::physx::PhysXType::ePTLinkJoint));
 
     if (pxArticulationJoint)
     {
@@ -519,8 +520,8 @@ bool DcContext::refreshPhysicsPointers(DcArticulation* art, bool verbose)
     art->pxArticulation = nullptr;
     art->cacheAge = -1;
 
-    PxArticulationReducedCoordinate* abase =
-        (PxArticulationReducedCoordinate*)physx->getPhysXPtr(art->path, omni::physx::PhysXType::ePTArticulation);
+    PxArticulationReducedCoordinate* abase = static_cast<PxArticulationReducedCoordinate*>(
+        physx->getPhysXPtr(art->path, omni::physx::PhysXType::ePTArticulation));
     if (!abase || abase->getConcreteType() != PxConcreteType::eARTICULATION_REDUCED_COORDINATE)
     {
         if (verbose)
@@ -558,7 +559,7 @@ bool DcContext::refreshPhysicsPointers(DcAttractor* att, bool verbose)
 
     att->pxJoint = nullptr;
 
-    PxJoint* pxJoint = (PxJoint*)physx->getPhysXPtr(att->path, omni::physx::PhysXType::ePTJoint);
+    PxJoint* pxJoint = static_cast<PxJoint*>(physx->getPhysXPtr(att->path, omni::physx::PhysXType::ePTJoint));
     if (!pxJoint || pxJoint->getConcreteType() != PxJointConcreteType::eD6)
     {
         if (verbose)
@@ -576,34 +577,34 @@ bool DcContext::refreshPhysicsPointers(DcAttractor* att, bool verbose)
     return true;
 }
 
-bool DcContext::refreshPhysicsPointers(DcD6Joint* j, bool verbose)
+bool DcContext::refreshPhysicsPointers(DcD6Joint* d6joint, bool verbose)
 {
-    if (!j)
+    if (!d6joint)
     {
         return false;
     }
 
-    j->pxJoint = nullptr;
+    d6joint->pxJoint = nullptr;
     // The joint exists in usd stage
-    PxJoint* pxJoint = (PxJoint*)physx->getPhysXPtr(j->path, omni::physx::PhysXType::ePTJoint);
+    PxJoint* pxJoint = static_cast<PxJoint*>(physx->getPhysXPtr(d6joint->path, omni::physx::PhysXType::ePTJoint));
     if (pxJoint && pxJoint->getConcreteType() == PxJointConcreteType::eD6)
     {
-        j->pxJoint = static_cast<PxD6Joint*>(pxJoint);
+        d6joint->pxJoint = static_cast<PxD6Joint*>(pxJoint);
 
         if (verbose)
         {
-            CARB_LOG_INFO("Refreshed joint %s\n", j->path.GetString().c_str());
+            CARB_LOG_INFO("Refreshed joint %s\n", d6joint->path.GetString().c_str());
         }
         return true;
     }
     // Joint was destroyed as it was not in stage, clear handles:
-    j->pxJoint = nullptr;
+    d6joint->pxJoint = nullptr;
     return false;
 }
 
 void DcContext::refreshPhysicsPointers(bool verbose)
 {
-    for (auto& kv : mArticulationMap)
+    for (const auto& kv : mArticulationMap)
     {
         DcArticulation* art = getArticulation(kv.second);
         if (art)
@@ -615,7 +616,7 @@ void DcContext::refreshPhysicsPointers(bool verbose)
         }
     }
 
-    for (auto& kv : mRigidBodyMap)
+    for (const auto& kv : mRigidBodyMap)
     {
         DcRigidBody* body = getRigidBody(kv.second);
         if (body)
@@ -627,7 +628,7 @@ void DcContext::refreshPhysicsPointers(bool verbose)
         }
     }
 
-    for (auto& kv : mJointMap)
+    for (const auto& kv : mJointMap)
     {
         DcJoint* joint = getJoint(kv.second);
         if (joint)
@@ -639,7 +640,7 @@ void DcContext::refreshPhysicsPointers(bool verbose)
         }
     }
 
-    for (auto& kv : mAttractorMap)
+    for (const auto& kv : mAttractorMap)
     {
         DcAttractor* att = getAttractor(kv.second);
         if (att)
@@ -651,7 +652,7 @@ void DcContext::refreshPhysicsPointers(bool verbose)
         }
     }
 
-    for (auto& kv : mD6JointMap)
+    for (const auto& kv : mD6JointMap)
     {
         DcD6Joint* j = getD6Joint(kv.second);
         if (j)
@@ -674,13 +675,13 @@ DcHandle DcContext::registerRigidBody(const pxr::SdfPath& usdPath)
     }
 
     // check if it's a single body
-    PxActor* pxActor = (PxActor*)physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTActor);
+    PxActor* pxActor = static_cast<PxActor*>(physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTActor));
     if (pxActor)
     {
-        CARB_LOG_INFO("Got %s at %p\n", pxActor->getConcreteTypeName(), (void*)pxActor);
+        CARB_LOG_INFO("Got %s at %p\n", pxActor->getConcreteTypeName(), static_cast<void*>(pxActor));
         if (pxActor->getType() == PxActorType::eRIGID_DYNAMIC)
         {
-            PxRigidDynamic* rd = (PxRigidDynamic*)pxActor;
+            PxRigidDynamic* rd = static_cast<PxRigidDynamic*>(pxActor);
             PxTransform pose = rd->getGlobalPose();
             CARB_LOG_INFO("  Pos: (%f, %f, %f)\n", pose.p.x, pose.p.y, pose.p.z);
             CARB_LOG_INFO("  Rot: (%f, %f, %f, %f)\n", pose.q.x, pose.q.y, pose.q.z, pose.q.w);
@@ -692,15 +693,16 @@ DcHandle DcContext::registerRigidBody(const pxr::SdfPath& usdPath)
             auto stage = omni::usd::UsdContext::getContext()->getStage();
             body->name = isaacsim::core::includes::getName(stage->GetPrimAtPath(usdPath));
             DcRigidBody* bodyPtr = body.get();
-            DcHandle h = addRigidBody(std::move(body), usdPath);
-            bodyPtr->handle = h;
-            return h;
+            DcHandle bodyHandle = addRigidBody(std::move(body), usdPath);
+            bodyPtr->handle = bodyHandle;
+            return bodyHandle;
         }
     }
     else
     {
         // check if it's an articulation link
-        PxArticulationLink* link = (PxArticulationLink*)physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTLink);
+        PxArticulationLink* link =
+            static_cast<PxArticulationLink*>(physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTLink));
         if (link)
         {
             // register the whole articulation
@@ -737,25 +739,26 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
         (PxArticulationReducedCoordinate*)physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTArticulation);
     if (abase)
     {
-        CARB_LOG_INFO("Got %s at %p\n", abase->getConcreteTypeName(), (void*)abase);
+        CARB_LOG_INFO("Got %s at %p\n", abase->getConcreteTypeName(), static_cast<void*>(abase));
     }
     else
     {
         // check if it's an articulation link
-        PxArticulationLink* link = (PxArticulationLink*)physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTLink);
+        PxArticulationLink* link =
+            static_cast<PxArticulationLink*>(physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTLink));
         if (link)
         {
-            CARB_LOG_INFO("Got %s at %p\n", link->getConcreteTypeName(), (void*)link);
+            CARB_LOG_INFO("Got %s at %p\n", link->getConcreteTypeName(), static_cast<void*>(link));
             abase = &link->getArticulation();
         }
         else
         {
             // check if it's an articulation joint
-            PxArticulationJointReducedCoordinate* joint =
-                (PxArticulationJointReducedCoordinate*)physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTLinkJoint);
+            PxArticulationJointReducedCoordinate* joint = static_cast<PxArticulationJointReducedCoordinate*>(
+                physx->getPhysXPtr(usdPath, omni::physx::PhysXType::ePTLinkJoint));
             if (joint)
             {
-                CARB_LOG_INFO("Got %s at %p\n", joint->getConcreteTypeName(), (void*)joint);
+                CARB_LOG_INFO("Got %s at %p\n", joint->getConcreteTypeName(), static_cast<void*>(joint));
                 abase = &joint->getChildArticulationLink().getArticulation();
             }
         }
@@ -763,7 +766,7 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
     auto atype = mStage->GetPrimAtPath(SdfPath(usdPath)).GetTypeName();
 
     if (!abase || abase->getConcreteType() != PxConcreteType::eARTICULATION_REDUCED_COORDINATE ||
-        (abase && atype == "PhysicsFixedJoint"))
+        atype == "PhysicsFixedJoint")
     {
         CARB_LOG_WARN("Failed to find articulation at '%s'", usdPath.GetString().c_str());
         return kDcInvalidHandle;
@@ -829,8 +832,8 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
 
         art->componentPaths.insert(body->path);
 
-        DcRigidBody* bodyPtr = body.get();
         DcHandle bodyHandle = addRigidBody(std::move(body), linkPath);
+        DcRigidBody* bodyPtr = getRigidBody(bodyHandle);
         bodyPtr->handle = bodyHandle;
 
         bodyMap[link] = bodyPtr;
@@ -839,7 +842,8 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
         // register joint and dofs
         //
 
-        PxArticulationJointReducedCoordinate* pxJoint = (PxArticulationJointReducedCoordinate*)link->getInboundJoint();
+        PxArticulationJointReducedCoordinate* pxJoint =
+            static_cast<PxArticulationJointReducedCoordinate*>(link->getInboundJoint());
         if (pxJoint)
         {
             size_t jointId = (size_t)pxJoint->userData;
@@ -853,8 +857,8 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
             joint->pxArticulationJoint = pxJoint;
             joint->art = art.get();
             joint->path = jointPath;
-            auto stage = omni::usd::UsdContext::getContext()->getStage();
-            joint->name = isaacsim::core::includes::getName(stage->GetPrimAtPath(jointPath));
+            auto usdStage = omni::usd::UsdContext::getContext()->getStage();
+            joint->name = isaacsim::core::includes::getName(usdStage->GetPrimAtPath(jointPath));
 
             CARB_LOG_INFO("  Joint name: %s\n", joint->name.c_str());
 
@@ -885,8 +889,8 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
                 break;
             }
 
-            DcJoint* jointPtr = joint.get();
             DcHandle jointHandle = addJoint(std::move(joint), jointPath);
+            DcJoint* jointPtr = getJoint(jointHandle);
             jointPtr->handle = jointHandle;
 
             if (jointType == PxArticulationJointType::eREVOLUTE ||
@@ -948,8 +952,8 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
                 pxJoint->setDrive(dof->pxAxis, stiffness, damping, maxForce, driveType);
 #endif
 
-                DcDof* dofPtr = dof.get();
                 DcHandle dofHandle = addDof(std::move(dof), jointPath);
+                DcDof* dofPtr = getDof(dofHandle);
                 dofPtr->handle = dofHandle;
 
                 art->dofs.push_back(dofPtr);
@@ -1008,9 +1012,9 @@ DcHandle DcContext::registerArticulation(const pxr::SdfPath& usdPath)
     CARB_LOG_INFO("Articulation path is '%s'\n", artPath.GetString().c_str());
     art->path = artPath;
 
-    DcArticulation* artPtr = art.get();
     // DcHandle artHandle = addArticulation(std::move(art), usdPath);
     DcHandle artHandle = addArticulation(std::move(art), artPath);
+    DcArticulation* artPtr = getArticulation(artHandle);
     artPtr->handle = artHandle;
 
     return artHandle;
@@ -1024,7 +1028,7 @@ DcHandle DcContext::registerD6Joint(const pxr::SdfPath& usdPath)
         return h;
     }
     // check if it's a d6joint
-    PxD6Joint* joint = (PxD6Joint*)physx->getPhysXPtr(SdfPath(usdPath), omni::physx::PhysXType::ePTJoint);
+    PxD6Joint* joint = static_cast<PxD6Joint*>(physx->getPhysXPtr(SdfPath(usdPath), omni::physx::PhysXType::ePTJoint));
     if (joint)
     {
         std::unique_ptr<DcD6Joint> dcJoint(new DcD6Joint{});

@@ -2,7 +2,7 @@
 description = "Main Omniverse Isaac Sim Application with XR OpenXR"
 execFile = "isaac-sim.app.xr.openxr"
 title = "Isaac Sim XR OpenXR"
-version = "5.0.0"
+version = "5.1.0"
 keywords = ["experience", "app", "usd", "isaacsim", "xr"] # That makes it browsable in UI with "experience" filter
 
 
@@ -16,8 +16,8 @@ keywords = ["experience", "app", "usd", "isaacsim", "xr"] # That makes it browsa
 app.xr.enabled = true
 app.fastShutdown = true
 app.name = "Isaac-Sim XR OpenXR"
-app.version = "5.0.0"
-app.vulkan = true                   # Explicitly enable Vulkan (on by default on Linux, off by default on Windows)
+app.version = "5.1.0"
+app.vulkan = true                   # Explicitly enable Vulkan
 app.enableDeveloperWarnings = false # disable developer warnings to reduce log noise
 
 ### async rendering settings
@@ -53,10 +53,3 @@ xr.openxr.components."isaacsim.xr.openxr.hand_tracking".enabled = true
 [settings.app.window]
 hideUi = false
 title = "Isaac Sim XR OpenXR"
-
-[settings.exts."omni.kit.registry.nucleus"]
-registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
-	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
-	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
-]

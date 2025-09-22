@@ -70,9 +70,10 @@ namespace pose
  * @param[in] usdrtStage Reference to the USDRT stage
  * @param[in] path Path to the prim whose transform to compute
  * @param[in] timecode Time code for the transform evaluation (default: Default())
- * @param[in] useFabricHierarchy Whether to use IFabricHierarchy (default: false). If enabled, but Fabric Scene Delegate
- * (/app/useFabricSceneDelegate) is not enabled, the call will fall back to non-IFabricHierarchy implementation.
- * Note: Using IFabricHierarchy is experimental and enabling it may result in undefined behavior.
+ * @param[in] useFabricHierarchy Whether to use IFabricHierarchy (default: true).
+ * If enabled, but Fabric Scene Delegate (/app/useFabricSceneDelegate) is disabled or the retrieved data is invalid,
+ * the call will fall back to non-IFabricHierarchy implementation.
+ * @param[in] logWarningOnFallback Whether to log a warning when falling back to non-IFabricHierarchy (default: false).
  * @return usdrt::GfMatrix4d The computed world transform matrix
  *
  * @warning May be computationally expensive for deep hierarchies
@@ -81,7 +82,8 @@ static usdrt::GfMatrix4d computeWorldXformNoCache(pxr::UsdStageRefPtr usdStage,
                                                   usdrt::UsdStageRefPtr usdrtStage,
                                                   const pxr::SdfPath& path,
                                                   pxr::UsdTimeCode timecode = pxr::UsdTimeCode::Default(),
-                                                  bool useFabricHierarchy = false)
+                                                  bool useFabricHierarchy = true,
+                                                  bool logWarningOnFallback = false)
 {
     // Compute the world transform using IFabricHierarchy
     if (useFabricHierarchy)
@@ -95,6 +97,11 @@ static usdrt::GfMatrix4d computeWorldXformNoCache(pxr::UsdStageRefPtr usdStage,
             if (!iFabricHierarchy)
             {
                 // Fall back to non-IFabricHierarchy call
+                if (logWarningOnFallback)
+                {
+                    CARB_LOG_WARN(
+                        "Unable to get the IFabricHierarchy interface. Falling back to non-IFabricHierarchy call");
+                }
                 return computeWorldXformNoCache(usdStage, usdrtStage, path, timecode, false);
             }
             auto fabricHierarchy =
@@ -102,16 +109,15 @@ static usdrt::GfMatrix4d computeWorldXformNoCache(pxr::UsdStageRefPtr usdStage,
             if (!fabricHierarchy)
             {
                 // Fall back to non-IFabricHierarchy call
+                if (logWarningOnFallback)
+                {
+                    CARB_LOG_WARN(
+                        "Unable to get the IFabricHierarchy instance. Falling back to non-IFabricHierarchy call");
+                }
                 return computeWorldXformNoCache(usdStage, usdrtStage, path, timecode, false);
             }
 
             // Get the world transform of the prim
-            // - Always-computed transform
-            {
-                // Regardless of when `fabricHierarchy->updateWorldXforms();` was last called, `getWorldXform()` will
-                // calculate the correct value using the omni:fabric:localMatrix values of the prim and its ancestors.
-                return fabricHierarchy->getWorldXform(omni::fabric::asInt(path));
-            }
             // - Cached transform (with explicit update call)
             {
                 // Update all `omni:fabric:worldMatrix` values for any prim whose local matrix value has changed.
@@ -123,11 +129,23 @@ static usdrt::GfMatrix4d computeWorldXformNoCache(pxr::UsdStageRefPtr usdStage,
                 if (!worldMatrixAttr.IsValid())
                 {
                     // Fall back to non-IFabricHierarchy call
+                    if (logWarningOnFallback)
+                    {
+                        CARB_LOG_WARN(
+                            "Invalid omni:fabric:worldMatrix for prim at path: '%s'. Falling back to non-IFabricHierarchy call",
+                            path.GetString().c_str());
+                    }
                     return computeWorldXformNoCache(usdStage, usdrtStage, path, timecode, false);
                 }
                 usdrt::GfMatrix4d transform(1.0);
                 worldMatrixAttr.Get(&transform);
                 return transform;
+            }
+            // - Always-computed transform
+            {
+                // Regardless of when `fabricHierarchy->updateWorldXforms();` was last called, `getWorldXform()` will
+                // calculate the correct value using the omni:fabric:localMatrix values of the prim and its ancestors.
+                return fabricHierarchy->getWorldXform(omni::fabric::asInt(path));
             }
         }
     }

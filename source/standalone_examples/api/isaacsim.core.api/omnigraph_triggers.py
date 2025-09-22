@@ -14,8 +14,6 @@
 # limitations under the License.
 
 
-import time
-
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"renderer": "RaytracedLighting", "headless": True})

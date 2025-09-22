@@ -47,7 +47,7 @@ struct PriorityQueueItem
 
 struct PriorityQueueCompare
 {
-    bool operator()(const PriorityQueueItem& a, const PriorityQueueItem& b)
+    bool operator()(const PriorityQueueItem& a, const PriorityQueueItem& b) const
     {
         return a.priority > b.priority;
     }

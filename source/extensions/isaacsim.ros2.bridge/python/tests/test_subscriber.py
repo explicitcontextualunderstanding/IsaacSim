@@ -38,7 +38,10 @@ class TestRos2Subscriber(ROS2TestCase):
     # ----------------------------------------------------------------------
     async def test_subscriber(self):
         import builtin_interfaces.msg
+        import geometry_msgs.msg
         import rclpy
+        import std_msgs.msg
+        import tf2_msgs.msg
 
         # define graph
         (test_graph, new_nodes, _, _) = og.Controller.edit(
@@ -61,84 +64,78 @@ class TestRos2Subscriber(ROS2TestCase):
         ros2_publisher = None
         ros2_node = rclpy.create_node("isaac_sim_test_subscriber")
 
+        # define messages
         messages = []
-
-        # std_msgs
-        try:
-            import std_msgs.msg
-        except ModuleNotFoundError:
-            pass
-        else:
-            _layout = std_msgs.msg.MultiArrayLayout()
-            _layout.data_offset = 100
-            _layout.dim = [
-                std_msgs.msg.MultiArrayDimension(label="dim0", size=1, stride=2),
-                std_msgs.msg.MultiArrayDimension(label="dim1", size=2, stride=3),
-            ]
-            messages += [
-                ("std_msgs.msg.Bool", std_msgs.msg.Bool(data=True)),
-                ("std_msgs.msg.Byte", std_msgs.msg.Byte(data=b"a")),
-                ("std_msgs.msg.ByteMultiArray", std_msgs.msg.ByteMultiArray(layout=_layout, data=[b"a", b"0"])),
-                ("std_msgs.msg.Char", std_msgs.msg.Char(data=ord("b"))),
-                # ("std_msgs.msg.Empty", None),
-                ("std_msgs.msg.Float32", std_msgs.msg.Float32(data=1.0e-38)),
-                (
-                    "std_msgs.msg.Float32MultiArray",
-                    std_msgs.msg.Float32MultiArray(layout=_layout, data=[-1.0e-38, 0.0, 1.0e-38]),
+        # - std_msgs
+        _layout = std_msgs.msg.MultiArrayLayout()
+        _layout.data_offset = 100
+        _layout.dim = [
+            std_msgs.msg.MultiArrayDimension(label="dim0", size=1, stride=2),
+            std_msgs.msg.MultiArrayDimension(label="dim1", size=2, stride=3),
+        ]
+        messages += [
+            ("std_msgs.msg.Bool", std_msgs.msg.Bool(data=True)),
+            ("std_msgs.msg.Byte", std_msgs.msg.Byte(data=b"a")),
+            ("std_msgs.msg.ByteMultiArray", std_msgs.msg.ByteMultiArray(layout=_layout, data=[b"a", b"0"])),
+            ("std_msgs.msg.Char", std_msgs.msg.Char(data=ord("b"))),
+            # ("std_msgs.msg.Empty", None),
+            ("std_msgs.msg.Float32", std_msgs.msg.Float32(data=1.0e-38)),
+            (
+                "std_msgs.msg.Float32MultiArray",
+                std_msgs.msg.Float32MultiArray(layout=_layout, data=[-1.0e-38, 0.0, 1.0e-38]),
+            ),
+            # ("std_msgs.msg.Float64", 1.0e-38),
+            # ("std_msgs.msg.Float64MultiArray", ),
+            # ("std_msgs.msg.Header", ),
+            ("std_msgs.msg.Int16", std_msgs.msg.Int16(data=-(2**15))),
+            (
+                "std_msgs.msg.Int16MultiArray",
+                std_msgs.msg.Int16MultiArray(layout=_layout, data=[-(2**15), 0, 2**15 - 1]),
+            ),
+            ("std_msgs.msg.Int32", std_msgs.msg.Int32(data=-(2**31))),
+            (
+                "std_msgs.msg.Int32MultiArray",
+                std_msgs.msg.Int32MultiArray(layout=_layout, data=[-(2**31), 0, 2**31 - 1]),
+            ),
+            # ("std_msgs.msg.Int64", -(2**63)),
+            # ("std_msgs.msg.Int64MultiArray", ),
+            ("std_msgs.msg.Int8", std_msgs.msg.Int8(data=-(2**7))),
+            (
+                "std_msgs.msg.Int8MultiArray",
+                std_msgs.msg.Int8MultiArray(layout=_layout, data=[-(2**7), 0, 2**7 - 1]),
+            ),
+            # ("std_msgs.msg.MultiArrayDimension", ),
+            # ("std_msgs.msg.MultiArrayLayout", ),
+            ("std_msgs.msg.String", std_msgs.msg.String(data="abc")),
+            ("std_msgs.msg.UInt16", std_msgs.msg.UInt16(data=2**16 - 1)),
+            ("std_msgs.msg.UInt16MultiArray", std_msgs.msg.UInt16MultiArray(layout=_layout, data=[0, 2**16 - 1])),
+            ("std_msgs.msg.UInt32", std_msgs.msg.UInt32(data=2**32 - 1)),
+            ("std_msgs.msg.UInt32MultiArray", std_msgs.msg.UInt32MultiArray(layout=_layout, data=[0, 2**32 - 1])),
+            # ("std_msgs.msg.UInt64", 2**64 - 1),
+            # ("std_msgs.msg.UInt64MultiArray", ),
+            ("std_msgs.msg.UInt8", std_msgs.msg.UInt8(data=2**8 - 1)),
+            ("std_msgs.msg.UInt8MultiArray", std_msgs.msg.UInt8MultiArray(layout=_layout, data=[0, 2**8 - 1])),
+        ]
+        # - tf2_msgs
+        _transforms = [
+            geometry_msgs.msg.TransformStamped(
+                header=std_msgs.msg.Header(
+                    frame_id=f"header_{i}", stamp=builtin_interfaces.msg.Time(sec=i, nanosec=int(2 * i))
                 ),
-                # ("std_msgs.msg.Float64", 1.0e-38),
-                # ("std_msgs.msg.Float64MultiArray", ),
-                # ("std_msgs.msg.Header", ),
-                ("std_msgs.msg.Int16", std_msgs.msg.Int16(data=-(2**15))),
-                (
-                    "std_msgs.msg.Int16MultiArray",
-                    std_msgs.msg.Int16MultiArray(layout=_layout, data=[-(2**15), 0, 2**15 - 1]),
+                child_frame_id=f"child_{i}",
+                transform=geometry_msgs.msg.Transform(
+                    translation=geometry_msgs.msg.Vector3(x=float(i), y=float(i + 1), z=float(i + 2)),
+                    rotation=geometry_msgs.msg.Quaternion(x=float(i), y=float(i - 1), z=float(i - 2), w=float(i - 3)),
                 ),
-                ("std_msgs.msg.Int32", std_msgs.msg.Int32(data=-(2**31))),
-                (
-                    "std_msgs.msg.Int32MultiArray",
-                    std_msgs.msg.Int32MultiArray(layout=_layout, data=[-(2**31), 0, 2**31 - 1]),
-                ),
-                # ("std_msgs.msg.Int64", -(2**63)),
-                # ("std_msgs.msg.Int64MultiArray", ),
-                ("std_msgs.msg.Int8", std_msgs.msg.Int8(data=-(2**7))),
-                (
-                    "std_msgs.msg.Int8MultiArray",
-                    std_msgs.msg.Int8MultiArray(layout=_layout, data=[-(2**7), 0, 2**7 - 1]),
-                ),
-                # ("std_msgs.msg.MultiArrayDimension", ),
-                # ("std_msgs.msg.MultiArrayLayout", ),
-                ("std_msgs.msg.String", std_msgs.msg.String(data="abc")),
-                ("std_msgs.msg.UInt16", std_msgs.msg.UInt16(data=2**16 - 1)),
-                ("std_msgs.msg.UInt16MultiArray", std_msgs.msg.UInt16MultiArray(layout=_layout, data=[0, 2**16 - 1])),
-                ("std_msgs.msg.UInt32", std_msgs.msg.UInt32(data=2**32 - 1)),
-                ("std_msgs.msg.UInt32MultiArray", std_msgs.msg.UInt32MultiArray(layout=_layout, data=[0, 2**32 - 1])),
-                # ("std_msgs.msg.UInt64", 2**64 - 1),
-                # ("std_msgs.msg.UInt64MultiArray", ),
-                ("std_msgs.msg.UInt8", std_msgs.msg.UInt8(data=2**8 - 1)),
-                ("std_msgs.msg.UInt8MultiArray", std_msgs.msg.UInt8MultiArray(layout=_layout, data=[0, 2**8 - 1])),
-            ]
-        # trajectory_msgs
-        try:
-            import trajectory_msgs.msg
-        except ModuleNotFoundError:
-            pass
-        else:
-            _duration = builtin_interfaces.msg.Duration(sec=10, nanosec=20)
-            _points = [
-                trajectory_msgs.msg.JointTrajectoryPoint(
-                    positions=[1.0, 2.0, 3.0], velocities=[-1.0, -2.0, -3.0], time_from_start=_duration
-                ),
-                trajectory_msgs.msg.JointTrajectoryPoint(
-                    accelerations=[4.0, 5.0, 6.0], effort=[-4.0, -5.0, -6.0], time_from_start=_duration
-                ),
-            ]
-            messages += [
-                (
-                    "trajectory_msgs.msg.JointTrajectory",
-                    trajectory_msgs.msg.JointTrajectory(joint_names=["abc", "def"], points=_points),
-                ),
-            ]
+            )
+            for i in range(2**16 + 1)
+        ]
+        messages += [
+            (
+                "tf2_msgs.msg.TFMessage",
+                tf2_msgs.msg.TFMessage(transforms=_transforms),
+            ),
+        ]
 
         for message_type, message_value in messages:
             print(message_type)
@@ -167,28 +164,24 @@ class TestRos2Subscriber(ROS2TestCase):
             await simulate_async(0.5)
 
             # check node output
-            if message_type.startswith("trajectory_msgs"):
-                joint_names = og.Controller.attribute("outputs:joint_names", subscriber_node).get()
-                points = og.Controller.attribute("outputs:points", subscriber_node).get()
-
-                for md, d in zip(message_value.joint_names, joint_names):
-                    self.assertEqual(md, d)
-                self.assertEqual(len(message_value.points), len(points))
-                for md, d in zip(message_value.points, points):
-                    point = json.loads(d)
-                    for mv, v in zip(md.positions, point["positions"]):
-                        self.assertAlmostEqual(mv, v)
-                    for mv, v in zip(md.velocities, point["velocities"]):
-                        self.assertAlmostEqual(mv, v)
-                    for mv, v in zip(md.accelerations, point["accelerations"]):
-                        self.assertAlmostEqual(mv, v)
-                    for mv, v in zip(md.effort, point["effort"]):
-                        self.assertAlmostEqual(mv, v)
-                    time_from_start = point["time_from_start"]
-                    self.assertEqual(md.time_from_start.sec, time_from_start["sec"])
-                    self.assertEqual(md.time_from_start.nanosec, time_from_start["nanosec"])
-
-            # array
+            # - tf2_msgs
+            if message_type.startswith("tf2_msgs"):
+                transforms = og.Controller.attribute("outputs:transforms", subscriber_node).get()
+                self.assertEqual(len(message_value.transforms), len(transforms))
+                for md, d in zip(message_value.transforms, transforms):
+                    transform = json.loads(d)
+                    self.assertEqual(md.header.frame_id, transform["header"]["frame_id"])
+                    self.assertEqual(md.header.stamp.sec, transform["header"]["stamp"]["sec"])
+                    self.assertEqual(md.header.stamp.nanosec, transform["header"]["stamp"]["nanosec"])
+                    self.assertEqual(md.child_frame_id, transform["child_frame_id"])
+                    self.assertEqual(md.transform.translation.x, transform["transform"]["translation"]["x"])
+                    self.assertEqual(md.transform.translation.y, transform["transform"]["translation"]["y"])
+                    self.assertEqual(md.transform.translation.z, transform["transform"]["translation"]["z"])
+                    self.assertEqual(md.transform.rotation.x, transform["transform"]["rotation"]["x"])
+                    self.assertEqual(md.transform.rotation.y, transform["transform"]["rotation"]["y"])
+                    self.assertEqual(md.transform.rotation.z, transform["transform"]["rotation"]["z"])
+                    self.assertEqual(md.transform.rotation.w, transform["transform"]["rotation"]["w"])
+            # - array
             elif message_type.endswith("Array"):
                 data = og.Controller.attribute("outputs:data", subscriber_node).get()
                 layout_data_offset = og.Controller.attribute("outputs:layout:data_offset", subscriber_node).get()
@@ -208,8 +201,7 @@ class TestRos2Subscriber(ROS2TestCase):
                     self.assertEqual(md.label, dim["label"])
                     self.assertEqual(md.size, dim["size"])
                     self.assertEqual(md.stride, dim["stride"])
-
-            # single value
+            # - single value
             else:
                 data = og.Controller.attribute("outputs:data", subscriber_node).get()
 

@@ -14,12 +14,14 @@
 # limitations under the License.
 from functools import partial
 
+import carb
 import omni.ui as ui
 import omni.usd
 from omni.kit.widget.filter import FilterButton
 from omni.kit.widget.options_button import OptionsButton
 from omni.kit.widget.options_menu import OptionItem
 from omni.kit.widget.searchfield import SearchField
+from omni.usd import Sdf
 from pxr import UsdGeom
 
 from ..builders.joint_helper import (
@@ -193,7 +195,9 @@ class JointsandDrives:
                                 word_wrap=True,
                             )
                             ui.Spacer(height=20)
-
+                            self._invalid_joint_name_label = ui.Label(
+                                "Invalid Joint Name", visible=False, style={"color": "red"}
+                            )
                             with ui.ZStack(height=0):
                                 ui.Rectangle(name="treeview")
                                 with ui.HStack():
@@ -422,6 +426,15 @@ class JointsandDrives:
         if item:
             # we only update the settings panel when the item triggers the change is the same as the one selected in the
             # tree view, which means the item properties the settings panel is showing
+            # check if the joint name is valid
+            if not Sdf.Path.IsValidIdentifier(item.name.get_value_as_string()):
+                self._invalid_joint_name_label.visible = True
+                self._next_step_button.enabled = False
+                carb.log_error(f"Invalid joint name: {item.name.get_value_as_string()}")
+            else:
+                self._invalid_joint_name_label.visible = False
+                self._next_step_button.enabled = True
+
             if self._tree_view.selection and item == self._tree_view.selection[0]:
                 # update the settings panel
                 return
@@ -779,7 +792,11 @@ class CreateJointWindow:
                     idx = self._current_joint_model._searchable_num + 1
                     name_value = self._current_joint_item.name.get_value_as_string() if self._is_edit else f"Joint{idx}"
                     self._joint_name_widget.model.set_value(name_value)
+                    self._joint_name_widget.model.add_value_changed_fn(lambda m: self._on_joint_name_changed(m))
                     ui.Spacer(width=10)
+                    self._invalid_joint_name_label = ui.Label(
+                        "Invalid Joint Name", visible=False, style={"color": "red"}
+                    )
                 with ui.HStack(height=30):
                     idx = (
                         self.joint_types.index(self._current_joint_item.joint_type.get_value_as_string())
@@ -912,3 +929,10 @@ class CreateJointWindow:
         else:
             self._select_new_joint_target_window.set_on_selected(partial(self.select, model))
         self._select_new_joint_target_window.visible = True
+
+    def _on_joint_name_changed(self, m):
+        joint_name_value = m.get_value_as_string()
+        if Sdf.Path.IsValidIdentifier(joint_name_value):
+            self._invalid_joint_name_label.visible = False
+        else:
+            self._invalid_joint_name_label.visible = True

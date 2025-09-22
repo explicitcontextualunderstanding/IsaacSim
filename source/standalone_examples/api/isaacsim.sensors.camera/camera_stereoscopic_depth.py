@@ -31,7 +31,7 @@ from isaacsim.core.api import World
 from isaacsim.core.api.objects import VisualCone, VisualCuboid
 from isaacsim.sensors.camera import SingleViewDepthSensor
 from isaacsim.storage.native.nucleus import get_assets_root_path
-from PIL import Image, ImageDraw
+from PIL import Image
 
 # Create a world
 world = World(stage_units_in_meters=1.0)

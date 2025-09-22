@@ -1,4 +1,22 @@
 # Changelog
+## [1.2.2] - 2025-09-15
+### Changed
+- switched to isaacsim.test.utils for folder contents validation and goldenimage comparison in tests
+
+## [1.2.1] - 2025-09-01
+### Fixed
+- Make sure custom writers reset annotators list (`self.annotators = []`) on initialization
+
+## [1.2.0] - 2025-08-22
+### Changed
+- Moved randomizer snippets tests from `isaacsim.test.collection` to `test_sdg_randomizer_snippets.py`
+
+### Fixed
+- Fixed `get_shapes()` new semantics label check in texture randomization test
+
+## [1.1.32] - 2025-08-21
+### Changed
+- Fix PIL image conversion warnings
 
 ## [1.1.31] - 2025-07-18
 ### Changed

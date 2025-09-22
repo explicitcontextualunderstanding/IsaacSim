@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.2] - 2025-05-30
+### Changed
+- Update nvidia-srl-usd-to-urdf==1.0.2
+- Update nvidia-srl-usd==2.0.0
+
+## [1.3.1] - 2025-08-28
+### Fixed
+- Fix test cleanup behavior
+
+## [1.3.0] - 2025-07-21
+### Added
+- Add unit tests on robots `ur10e`, `2f-140-base`, `nova-carter`,  `tien-kung`, `go2`
+
 ## [1.2.5] - 2025-06-02
 ### Changed
 - Update lxml==5.4.0

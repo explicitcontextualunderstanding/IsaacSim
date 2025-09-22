@@ -14,11 +14,13 @@
 # limitations under the License.
 
 import re
+from typing import List
 
 import carb
 import isaacsim.core.utils.prims as prim_utils
 from geometry_msgs.msg import Accel, Point, Pose, Quaternion, Twist, Vector3
 from isaacsim.core.experimental.prims import RigidPrim, XformPrim
+from isaacsim.storage.native import find_filtered_files
 from simulation_interfaces.msg import EntityState, Result
 from std_msgs.msg import Header
 
@@ -44,7 +46,11 @@ def get_filtered_entities(usdrt_stage, filter_pattern=None):
         return [], "usdrt Stage not available for traversing"
 
     # Get all prim paths from the usdrt stage
-    all_prim_paths = [prim.GetPrimPath().pathString for prim in list(usdrt_stage.Traverse())[1:]]
+
+    all_prim_paths = []
+    for prim in list(usdrt_stage.Traverse())[1:]:
+        if not prim.GetPrimPath().pathString.startswith("/Render"):
+            all_prim_paths.append(prim.GetPrimPath().pathString)
 
     # Filter entities based on pattern if provided
     if filter_pattern:

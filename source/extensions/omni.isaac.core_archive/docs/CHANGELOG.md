@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.0] - 2025-08-25
+### Changed
+- Removed unused python packages: numpy-quaternion, selenium, construct, nvsmi, plotly
+
+## [2.7.0] - 2025-08-08
+### Changed
+- Update to osqp==0.6.7.post3
+- Remove jinja2 as its in omni.kit.pip_archive
+
+## [2.6.2] - 2025-07-29
+### Changed
+- Update to qdldl==0.1.7.post5
+- Update to tornado==6.5.1
+
 ## [2.6.1] - 2025-06-05
 ### Fixed
 - Fixed broken test

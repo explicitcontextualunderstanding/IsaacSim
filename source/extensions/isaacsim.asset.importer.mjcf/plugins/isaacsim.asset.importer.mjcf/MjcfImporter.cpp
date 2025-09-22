@@ -63,11 +63,12 @@ std::vector<JointDefinition> analyzeConstraints(const std::vector<MJCFEqualityCo
 
     std::vector<JointDefinition> jointDefinitions;
 
-    for (const auto& [bodyPair, constraints] : constraintGroups)
+    // cppcheck-suppress unusedVariable
+    for (const auto& [_, groupConstraints] : constraintGroups)
     {
         JointDefinition jointDef;
-        jointDef.body1 = constraints[0]->body1;
-        jointDef.body2 = constraints[0]->body2;
+        jointDef.body1 = groupConstraints[0]->body1;
+        jointDef.body2 = groupConstraints[0]->body2;
 
         switch (constraints.size())
         {
@@ -113,7 +114,7 @@ std::vector<JointDefinition> analyzeConstraints(const std::vector<MJCFEqualityCo
             // Fixed joint
             jointDef.type = "fixed";
             jointDef.position = Vec3(0, 0, 0);
-            for (const auto& constraint : constraints)
+            for (const auto* const constraint : constraints)
             {
                 jointDef.position = jointDef.position + constraint->anchor;
             }
@@ -894,17 +895,17 @@ void MJCFImporter::AddTendons(pxr::UsdStageWeakPtr stage, std::string rootPath)
                     if (t->fixedJoints[i]->joint != rootJoint->joint)
                     {
                         MJCFTendon::FixedJoint* childJoint = t->fixedJoints[i];
-                        pxr::VtArray<float> coef = { childJoint->coef };
+                        pxr::VtArray<float> childCoef = { childJoint->coef };
                         if (revoluteJointsMap.find(childJoint->joint) != revoluteJointsMap.end())
                         {
                             pxr::UsdPhysicsRevoluteJoint childJointPrim = revoluteJointsMap[childJoint->joint];
                             pxr::PhysxSchemaPhysxTendonAxisAPI axisAPI = pxr::PhysxSchemaPhysxTendonAxisAPI::Apply(
                                 childJointPrim.GetPrim(), pxr::TfToken(tendonName));
-                            axisAPI.CreateGearingAttr().Set(coef);
+                            axisAPI.CreateGearingAttr().Set(childCoef);
                             pxr::VtArray<float> forcecoeffs;
-                            for (int i = 0; i < (int)coef.size(); i++)
+                            for (int j = 0; j < (int)childCoef.size(); j++)
                             {
-                                auto forcecoeff = coef[i];
+                                auto forcecoeff = childCoef[j];
                                 if (abs(forcecoeff) < 1e-6)
                                 {
                                     forcecoeff = 1.0f * sign(forcecoeff);
@@ -924,9 +925,9 @@ void MJCFImporter::AddTendons(pxr::UsdStageWeakPtr stage, std::string rootPath)
                                 childJointPrim.GetPrim(), pxr::TfToken(tendonName));
                             axisAPI.CreateGearingAttr().Set(coef);
                             pxr::VtArray<float> forcecoeffs;
-                            for (int i = 0; i < (int)coef.size(); i++)
+                            for (int k = 0; k < (int)coef.size(); k++)
                             {
-                                auto forcecoeff = coef[i];
+                                auto forcecoeff = coef[k];
                                 if (abs(forcecoeff) < 1e-6)
                                 {
                                     forcecoeff = 1.0f * sign(forcecoeff);
@@ -946,9 +947,9 @@ void MJCFImporter::AddTendons(pxr::UsdStageWeakPtr stage, std::string rootPath)
                                 childJointPrim.GetPrim(), pxr::TfToken(tendonName));
                             axisAPI.CreateGearingAttr().Set(coef);
                             pxr::VtArray<float> forcecoeffs;
-                            for (int i = 0; i < (int)coef.size(); i++)
+                            for (int m = 0; m < (int)coef.size(); m++)
                             {
-                                auto forcecoeff = coef[i];
+                                auto forcecoeff = coef[m];
                                 if (abs(forcecoeff) < 1e-6)
                                 {
                                     forcecoeff = 1.0f * sign(forcecoeff);
@@ -977,10 +978,10 @@ void MJCFImporter::AddTendons(pxr::UsdStageWeakPtr stage, std::string rootPath)
         else if (t->type == MJCFTendon::SPATIAL)
         {
             std::map<std::string, int> attachmentNames;
-            bool isFirstAttachment = true;
 
             if (t->spatialAttachments.size() > 0)
             {
+                bool isFirstAttachment = true;
                 for (auto it = t->spatialBranches.begin(); it != t->spatialBranches.end(); it++)
                 {
                     std::vector<MJCFTendon::SpatialAttachment*> attachments = it->second;
@@ -1054,8 +1055,6 @@ void MJCFImporter::AddTendons(pxr::UsdStageWeakPtr stage, std::string rootPath)
                         if (isFirstAttachment)
                         {
                             isFirstAttachment = false;
-                            parentPrim = linkPrim;
-                            parentName = name;
                             auto rootApi =
                                 pxr::PhysxSchemaPhysxTendonAttachmentRootAPI::Apply(linkPrim, pxr::TfToken(name));
                             pxr::GfVec3f localPos = GetLocalPos(*attachment);
@@ -1176,7 +1175,6 @@ void MJCFImporter::CreatePhysicsBodyAndJoint(std::unordered_map<std::string, pxr
     }
     else
     {
-        pxr::UsdEditContext context(stages["stage"], stages["base_stage"]->GetRootLayer());
         if (!body->inertial && body->geoms.size() == 0)
         {
             CARB_LOG_WARN("*** Neither inertial nor geometries where specified for %s", body->name.c_str());
@@ -1185,7 +1183,7 @@ void MJCFImporter::CreatePhysicsBodyAndJoint(std::unordered_map<std::string, pxr
         std::string bodyPath = rootPrimPath + "/" + SanitizeUsdName(body->name);
         pxr::UsdGeomXformable bodyPrim = createBody(stages["stage"], bodyPath, myTrans, config);
         {
-            pxr::UsdEditContext context(stages["stage"], stages["robot_stage"]->GetRootLayer());
+            pxr::UsdEditContext robotContext(stages["stage"], stages["robot_stage"]->GetRootLayer());
             pxr::UsdPrim linkPrim = stages["stage"]->GetPrimAtPath(pxr::SdfPath(bodyPath));
             isaacsim::robot::schema::ApplyLinkAPI(linkPrim);
             auto linksRel = stages["stage"]
@@ -1213,7 +1211,7 @@ void MJCFImporter::CreatePhysicsBodyAndJoint(std::unordered_map<std::string, pxr
         {
             pxr::UsdGeomXform rootPrim = pxr::UsdGeomXform::Define(stages["stage"], pxr::SdfPath(bodyPath));
             {
-                pxr::UsdEditContext context(stages["stage"], stages["physics_stage"]->GetRootLayer());
+                pxr::UsdEditContext physicsContext(stages["stage"], stages["physics_stage"]->GetRootLayer());
                 applyArticulationAPI(stages, rootPrim, config);
                 if (config.fixBase || numJoints == 0)
                 {
@@ -1229,7 +1227,7 @@ void MJCFImporter::CreatePhysicsBodyAndJoint(std::unordered_map<std::string, pxr
         // add collision geoms first to detect whether visuals are available
         {
 
-            pxr::UsdEditContext context(stages["stage"], stages["physics_stage"]->GetRootLayer());
+            pxr::UsdEditContext collisionContext(stages["stage"], stages["physics_stage"]->GetRootLayer());
             std::string uniqueName = bodyPrim.GetPrim().GetName().GetString();
             std::string baseCollisionsPath = "/collisions/" + uniqueName;
             pxr::UsdPrim basePrim =
@@ -1244,7 +1242,7 @@ void MJCFImporter::CreatePhysicsBodyAndJoint(std::unordered_map<std::string, pxr
                 }
                 else
                 {
-                    pxr::UsdEditContext context(stages["stage"], stages["physics_stage"]->GetRootLayer());
+                    pxr::UsdEditContext meshContext(stages["stage"], stages["physics_stage"]->GetRootLayer());
                     std::string meshName = body->geoms[i]->name;
                     if (body->geoms[i]->type == MJCFVisualElement::MESH)
                     {
@@ -1377,12 +1375,12 @@ void MJCFImporter::addJoints(std::unordered_map<std::string, pxr::UsdStageRefPtr
                 actuatorIdx = actuatorIterator->second;
                 actuator = actuators[actuatorIdx];
             }
-            std::string jointPath = rootPath + "/joints/" + SanitizeUsdName(joint->name);
+            std::string currentJointPath = rootPath + "/joints/" + SanitizeUsdName(joint->name);
 
             if (joint->type == MJCFJoint::HINGE)
             {
                 pxr::UsdPhysicsRevoluteJoint jointPrim =
-                    pxr::UsdPhysicsRevoluteJoint::Define(stages["stage"], pxr::SdfPath(jointPath));
+                    pxr::UsdPhysicsRevoluteJoint::Define(stages["stage"], pxr::SdfPath(currentJointPath));
                 initPhysicsJoint(jointPrim, poseJointToParentBody, poseJointToChildBody, parentBodyPath, bodyPath,
                                  config.distanceScale);
                 applyPhysxJoint(jointPrim, joint);
@@ -1408,7 +1406,7 @@ void MJCFImporter::addJoints(std::unordered_map<std::string, pxr::UsdStageRefPtr
             else if (joint->type == MJCFJoint::SLIDE)
             {
                 pxr::UsdPhysicsPrismaticJoint jointPrim =
-                    pxr::UsdPhysicsPrismaticJoint::Define(stages["stage"], pxr::SdfPath(jointPath));
+                    pxr::UsdPhysicsPrismaticJoint::Define(stages["stage"], pxr::SdfPath(currentJointPath));
                 initPhysicsJoint(jointPrim, poseJointToParentBody, poseJointToChildBody, parentBodyPath, bodyPath,
                                  config.distanceScale);
                 applyPhysxJoint(jointPrim, joint);
@@ -1507,7 +1505,7 @@ void MJCFImporter::addJoints(std::unordered_map<std::string, pxr::UsdStageRefPtr
             }
         }
         {
-            pxr::UsdEditContext context(stages["stage"], stages["robot_stage"]->GetRootLayer());
+            pxr::UsdEditContext robotContext(stages["stage"], stages["robot_stage"]->GetRootLayer());
             pxr::UsdPrim jointPrim = stages["stage"]->GetPrimAtPath(pxr::SdfPath(jointPath));
             if (jointPrim)
             {
@@ -1710,11 +1708,10 @@ void MJCFImporter::computeKinematicHierarchy()
     }
 
     int level_num = 0;
-    int num_bodies_at_level;
 
     while (bodyQueue.size() != 0)
     {
-        num_bodies_at_level = (int)bodyQueue.size();
+        int num_bodies_at_level = (int)bodyQueue.size();
 
         for (int i = 0; i < num_bodies_at_level; i++)
         {

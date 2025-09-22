@@ -1,4 +1,14 @@
 # Changelog
+
+## [0.2.1] - 2025-08-25
+### Changed
+- Highlight the selected item label green
+
+## [0.2.0] - 2025-07-28
+### Changed
+- Add exceptions when deregistering an example that does not exist
+- Add exceptions when registering an example with missing parameters
+
 ## [0.1.12] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

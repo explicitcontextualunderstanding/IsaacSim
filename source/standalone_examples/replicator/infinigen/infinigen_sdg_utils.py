@@ -28,7 +28,7 @@ import omni.usd
 from isaacsim.core.utils.semantics import add_labels, remove_labels
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path
-from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
+from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
 
 
 def set_transform_attributes(
@@ -117,7 +117,7 @@ def get_random_pose_on_sphere(
     camera_forward_axis: tuple[float, float, float] = (0, 0, -1),
 ) -> tuple[Gf.Vec3d, Gf.Quatf]:
     """Generate a random pose on a sphere looking at the origin, with specified radius and polar angle ranges."""
-    # https://docs.omniverse.nvidia.com/isaacsim/latest/reference_conventions.html
+    # https://docs.isaacsim.omniverse.nvidia.com/latest/reference_material/reference_conventions.html
     # Convert degrees to radians for polar angles (theta)
     polar_angle_min_rad = math.radians(polar_angle_range[0])
     polar_angle_max_rad = math.radians(polar_angle_range[1])

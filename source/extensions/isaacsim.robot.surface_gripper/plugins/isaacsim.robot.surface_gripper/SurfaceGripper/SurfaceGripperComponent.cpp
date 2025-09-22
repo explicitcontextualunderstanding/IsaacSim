@@ -48,12 +48,12 @@ inline const pxr::SdfPath& intToPath(const uint64_t& path)
 }
 
 
-void SurfaceGripperComponent::initialize(const pxr::UsdPrim& prim, const pxr::UsdStageWeakPtr stage)
+void SurfaceGripperComponent::initialize(const pxr::UsdPrim& prim, const pxr::UsdStageWeakPtr stage, bool writeToUsd)
 {
     g_physx = carb::getCachedInterface<omni::physx::IPhysx>();
     isaacsim::core::includes::ComponentBase<pxr::UsdPrim>::initialize(prim, stage);
     m_primPath = prim.GetPath();
-
+    m_writeToUsd = writeToUsd;
     mDoStart = true;
 
     updateGripperProperties();
@@ -97,7 +97,7 @@ void SurfaceGripperComponent::onPhysicsStep(double dt)
     {
         if (m_jointSettlingCounters[attachmentPath] > 0)
         {
-            m_jointSettlingCounters[attachmentPath]--;
+            m_jointSettlingCounters[attachmentPath] = m_jointSettlingCounters[attachmentPath] - 1;
         }
     }
 
@@ -160,12 +160,9 @@ void SurfaceGripperComponent::onStop()
     mDoStart = true;
 }
 
-bool SurfaceGripperComponent::setGripperStatus(const std::string& status)
+bool SurfaceGripperComponent::setGripperStatus(GripperStatus status)
 {
-    auto gripperStatus = GripperStatusFromToken(pxr::TfToken(status));
-    pxr::UsdAttribute gripperStatusAttr =
-        m_stage->GetPrimAtPath(m_primPath)
-            .GetAttribute(isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::STATUS));
+    GripperStatus gripperStatus = status;
     if (gripperStatus != GripperStatus::Open && gripperStatus != GripperStatus::Closed &&
         gripperStatus != GripperStatus::Closing)
         return false;
@@ -178,14 +175,14 @@ bool SurfaceGripperComponent::setGripperStatus(const std::string& status)
             m_status = GripperStatus::Open;
             m_retryCloseActive = false;
         }
-        else if (gripperStatus == GripperStatus::Closed || gripperStatus == GripperStatus::Closing)
+        else if ((gripperStatus == GripperStatus::Closed && m_status != GripperStatus::Closing) ||
+                 gripperStatus == GripperStatus::Closing)
         {
             m_status = GripperStatus::Closing;
             m_retryCloseActive = true;
             updateClosedGripper();
             if (m_retryInterval > 0)
             {
-                gripperStatusAttr.Set(pxr::TfToken("Closing"));
                 // Start retry timer
                 m_retryElapsed = 0.0;
             }
@@ -276,6 +273,14 @@ void SurfaceGripperComponent::updateAttachmentPoints()
     m_activeAttachmentPoints.reserve(attachmentPaths.size());
     m_inactiveAttachmentPoints.reserve(attachmentPaths.size());
     m_jointSettlingCounters.reserve(attachmentPaths.size());
+    m_jointForwardAxis.clear();
+    m_jointClearanceOffset.clear();
+    std::vector<std::string> applyApiPaths;
+    std::vector<std::string> excludeFromArticulationPaths;
+    std::vector<std::pair<std::string, float>> clearanceOffsets;
+    applyApiPaths.reserve(attachmentPaths.size());
+    excludeFromArticulationPaths.reserve(attachmentPaths.size());
+    clearanceOffsets.reserve(attachmentPaths.size());
     for (const auto& path : attachmentPaths)
     {
         pxr::UsdPrim attachmentPrim = prim.GetPrimAtPath(path);
@@ -284,8 +289,7 @@ void SurfaceGripperComponent::updateAttachmentPoints()
             if (!attachmentPrim.HasAPI(
                     isaacsim::robot::schema::className(isaacsim::robot::schema::Classes::ATTACHMENT_POINT_API)))
             {
-                pxr::UsdEditContext context(m_stage, m_stage->GetRootLayer());
-                isaacsim::robot::schema::ApplyAttachmentPointAPI(attachmentPrim);
+                applyApiPaths.push_back(path.GetString());
             }
             pxr::UsdPhysicsJoint joint(attachmentPrim);
 
@@ -293,9 +297,10 @@ void SurfaceGripperComponent::updateAttachmentPoints()
             joint.GetExcludeFromArticulationAttr().Get(&excludeFromArticulation);
             if (!excludeFromArticulation)
             {
-                joint.GetExcludeFromArticulationAttr().Set(true);
+                excludeFromArticulationPaths.push_back(path.GetString());
             }
-            physx::PxJoint* px_joint = (physx::PxJoint*)g_physx->getPhysXPtr((path), omni::physx::PhysXType::ePTJoint);
+            physx::PxJoint* px_joint =
+                static_cast<physx::PxJoint*>(g_physx->getPhysXPtr((path), omni::physx::PhysXType::ePTJoint));
             if (!px_joint)
             {
                 CARB_LOG_WARN("   Gripper %s has no joint at attachment point %s", m_primPath.GetText(), path.GetText());
@@ -304,10 +309,49 @@ void SurfaceGripperComponent::updateAttachmentPoints()
             px_joint->setConstraintFlag(physx::PxConstraintFlag::eDISABLE_CONSTRAINT, m_status == GripperStatus::Open);
             m_attachmentPoints.insert(path.GetString());
             m_jointSettlingCounters[path.GetString()] = 0;
+
+            // Cache per-joint forward axis
+            pxr::TfToken jointAxisToken;
+            attachmentPrim
+                .GetAttribute(isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::FORWARD_AXIS))
+                .Get(&jointAxisToken);
+            Axis axisEnum = Axis::Z;
+            if (!jointAxisToken.IsEmpty())
+            {
+                const char c = std::toupper(jointAxisToken.GetText()[0]);
+                axisEnum = (c == 'X') ? Axis::X : (c == 'Y') ? Axis::Y : Axis::Z;
+            }
+            m_jointForwardAxis[path.GetString()] = axisEnum;
+
+            // Cache clearance offset if present
+            float clearanceOffset = 0.0f;
+            pxr::UsdAttribute clearanceOffsetAttr = attachmentPrim.GetAttribute(
+                isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET));
+            if (clearanceOffsetAttr)
+            {
+                clearanceOffsetAttr.Get(&clearanceOffset);
+            }
+            m_jointClearanceOffset[path.GetString()] = clearanceOffset;
+
+            // Cache body0 path for filtered pairs from the first joint
+            if (m_body0PathForFilterPairs.empty())
+            {
+                pxr::SdfPathVector targets0;
+                joint.GetBody0Rel().GetTargets(&targets0);
+                if (!targets0.empty())
+                {
+                    m_body0PathForFilterPairs = targets0[0].GetString();
+                }
+            }
         }
     }
     m_activeAttachmentPoints.clear();
     m_inactiveAttachmentPoints = m_attachmentPoints;
+
+    if (m_writeToUsd)
+    {
+        _queueWriteAttachmentPointBatch(applyApiPaths, excludeFromArticulationPaths, clearanceOffsets);
+    }
 }
 
 void SurfaceGripperComponent::updateGrippedObjectsList()
@@ -319,31 +363,10 @@ void SurfaceGripperComponent::updateGrippedObjectsList()
         if (!m_grippedObjects.empty())
         {
             m_grippedObjects.clear();
-
-            // Clear the GRIPPED_OBJECTS relationship if it exists
-            auto grippedObjectsRel = m_stage->GetPrimAtPath(m_primPath)
-                                         .GetRelationship(isaacsim::robot::schema::relationNames.at(
-                                             isaacsim::robot::schema::Relations::GRIPPED_OBJECTS));
-            if (grippedObjectsRel)
+            if (m_writeToUsd)
             {
-                grippedObjectsRel.ClearTargets(true);
-            }
-            pxr::UsdPrim jointPrim = m_stage->GetPrimAtPath(pxr::SdfPath(m_attachmentPoints.begin()->c_str()));
-            pxr::UsdPhysicsJoint joint(jointPrim);
-
-            // Get body0 targets
-            pxr::SdfPathVector targets0;
-            joint.GetBody0Rel().GetTargets(&targets0);
-
-            if (!targets0.empty())
-            {
-                // Update filtered pairs to disable collision with gripped objects
-                pxr::UsdPhysicsFilteredPairsAPI filterPairsAPI =
-                    pxr::UsdPhysicsFilteredPairsAPI(m_stage->GetPrimAtPath(targets0[0]));
-                if (filterPairsAPI)
-                {
-                    filterPairsAPI.GetFilteredPairsRel().ClearTargets(true);
-                }
+                std::vector<std::string> objectPaths; // empty -> clear targets
+                _queueWriteGrippedObjectsAndFilters(objectPaths, m_body0PathForFilterPairs);
             }
         }
     }
@@ -387,39 +410,11 @@ void SurfaceGripperComponent::updateGrippedObjectsList()
         m_grippedObjects = m_grippedObjectsBuffer;
 
 
-        // Convert to path vectors for USD API
-
-        objectPathsVec.reserve(m_grippedObjects.size());
-
-        for (const auto& objectPath : m_grippedObjects)
+        if (m_writeToUsd)
         {
-            objectPathsVec.push_back(pxr::SdfPath(objectPath));
+            std::vector<std::string> objectPaths(m_grippedObjects.begin(), m_grippedObjects.end());
+            _queueWriteGrippedObjectsAndFilters(objectPaths, m_body0PathForFilterPairs);
         }
-        // Get the first joint to find the body to apply filtered pairs to
-        pxr::UsdPrim jointPrim = m_stage->GetPrimAtPath(pxr::SdfPath(m_attachmentPoints.begin()->c_str()));
-        pxr::UsdPhysicsJoint joint(jointPrim);
-
-        // Get body0 targets
-        pxr::SdfPathVector targets0;
-        joint.GetBody0Rel().GetTargets(&targets0);
-
-        if (!targets0.empty())
-        {
-            // Update filtered pairs to disable collision with gripped objects
-            pxr::UsdPhysicsFilteredPairsAPI filterPairsAPI =
-                pxr::UsdPhysicsFilteredPairsAPI(m_stage->GetPrimAtPath(targets0[0]));
-            if (!filterPairsAPI)
-            {
-                filterPairsAPI = pxr::UsdPhysicsFilteredPairsAPI::Apply(m_stage->GetPrimAtPath(targets0[0]));
-            }
-            filterPairsAPI.GetFilteredPairsRel().SetTargets(objectPathsVec);
-        }
-
-        // Update the gripper's GRIPPED_OBJECTS relationship
-        m_stage->GetPrimAtPath(m_primPath)
-            .GetRelationship(
-                isaacsim::robot::schema::relationNames.at(isaacsim::robot::schema::Relations::GRIPPED_OBJECTS))
-            .SetTargets(objectPathsVec);
     }
 }
 
@@ -431,10 +426,6 @@ void SurfaceGripperComponent::updateClosedGripper()
         return;
     }
 
-    // Get status attribute once for efficiency
-    pxr::UsdAttribute gripperStatusAttr =
-        m_stage->GetPrimAtPath(m_primPath)
-            .GetAttribute(isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::STATUS));
     if (!m_inactiveAttachmentPoints.empty() && (m_status == GripperStatus::Closing || m_retryCloseActive))
     {
         findObjectsToGrip();
@@ -463,12 +454,16 @@ void SurfaceGripperComponent::updateClosedGripper()
     if (newStatus != m_status)
     {
         m_status = newStatus;
-        gripperStatusAttr.Set(GripperStatusToToken(newStatus));
 
         // Reset retry elapsed time if we've finished closing
         if (newStatus == GripperStatus::Closed)
         {
             m_retryElapsed = 0.0f;
+        }
+
+        if (m_writeToUsd)
+        {
+            _queueWriteStatus(GripperStatusToToken(m_status).GetString());
         }
     }
 }
@@ -476,8 +471,8 @@ void SurfaceGripperComponent::updateClosedGripper()
 void SurfaceGripperComponent::checkForceLimits()
 {
     // Pre-allocate the vector to avoid resizing
-    std::vector<std::string> ap_to_remove;
-    ap_to_remove.reserve(m_activeAttachmentPoints.size());
+    std::vector<std::string> apToRemove;
+    apToRemove.reserve(m_activeAttachmentPoints.size());
 
     // Only check force limits if they are set
     const bool checkShearForce = m_shearForceLimit > 0.0f;
@@ -493,10 +488,9 @@ void SurfaceGripperComponent::checkForceLimits()
             continue;
         }
 
-        // Get the joint prim and PhysX joint
-        pxr::UsdPrim jointPrim = m_stage->GetPrimAtPath(pxr::SdfPath(attachmentPath));
-        physx::PxJoint* px_joint =
-            (physx::PxJoint*)g_physx->getPhysXPtr(jointPrim.GetPath(), omni::physx::PhysXType::ePTJoint);
+        // Get PhysX joint
+        physx::PxJoint* px_joint = static_cast<physx::PxJoint*>(
+            g_physx->getPhysXPtr(pxr::SdfPath(attachmentPath), omni::physx::PhysXType::ePTJoint));
 
         if (!px_joint)
             continue;
@@ -505,7 +499,7 @@ void SurfaceGripperComponent::checkForceLimits()
         auto flags = px_joint->getConstraintFlags();
         if (flags & (physx::PxConstraintFlag::eDISABLE_CONSTRAINT | physx::PxConstraintFlag::eBROKEN))
         {
-            ap_to_remove.push_back(attachmentPath);
+            apToRemove.push_back(attachmentPath);
             continue;
         }
 
@@ -520,28 +514,10 @@ void SurfaceGripperComponent::checkForceLimits()
         px_joint->getConstraint()->getForce(force, torque);
 
 
-        // Get joint axis direction
-        pxr::TfToken jointAxis;
-        jointPrim
-            .GetAttribute(isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::FORWARD_AXIS))
-            .Get(&jointAxis);
-
-        // Create direction vector based on joint axis
-        physx::PxVec3 direction(0.0f, 0.0f, 0.0f);
-        char axis = jointAxis.GetText()[0];
-        if (axis == 'X')
-            direction.x = 1.0f;
-        else if (axis == 'Y')
-            direction.y = 1.0f;
-        else
-            direction.z = 1.0f;
-
-        // Transform direction to world space
-        physx::PxTransform localPose0 = px_joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-        physx::PxTransform actorPose = px_actor0->getGlobalPose();
-        physx::PxTransform worldTransform = actorPose * localPose0;
-        direction = worldTransform.q.rotate(direction);
-        direction.normalize();
+        // Compute world-space direction along joint axis
+        Axis axis = _getJointForwardAxis(attachmentPath);
+        physx::PxTransform worldTransform = _computeJointWorldTransform(px_joint, px_actor0);
+        physx::PxVec3 direction = _directionFromAxisAndWorld(axis, worldTransform);
 
         // Calculate force components
         float coaxialForce = force.dot(direction);
@@ -563,14 +539,13 @@ void SurfaceGripperComponent::checkForceLimits()
 
         if (shouldRelease)
         {
-            ap_to_remove.push_back(attachmentPath);
-            px_joint->setConstraintFlag(physx::PxConstraintFlag::eDISABLE_CONSTRAINT, true);
-            px_joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, true);
+            apToRemove.push_back(attachmentPath);
+            _queueDetachJoint(attachmentPath);
         }
     }
 
     // Process all joints to be removed
-    for (const auto& ap : ap_to_remove)
+    for (const auto& ap : apToRemove)
     {
         m_activeAttachmentPoints.erase(ap);
         m_inactiveAttachmentPoints.insert(ap);
@@ -587,172 +562,134 @@ void SurfaceGripperComponent::findObjectsToGrip()
 
     std::set<pxr::SdfPath> targetSet(m_grippedObjects.begin(), m_grippedObjects.end());
 
-    // Iterate through each attachment point
-    std::vector<std::string> ap_to_remove;
-    physx::PxRigidActor *actor0, *actor1;
+    // Iterate through each attachment point sequentially
+    std::vector<std::string> apToRemove;
+    std::vector<std::pair<std::string, float>> clearanceOffsetsToPersist;
+
     for (const auto& attachmentPath : m_inactiveAttachmentPoints)
     {
-        if (m_jointSettlingCounters[attachmentPath] > 0)
-        {
-            m_jointSettlingCounters[attachmentPath]--;
-            continue;
-        }
-        pxr::UsdPrim jointPrim = m_stage->GetPrimAtPath(pxr::SdfPath(attachmentPath));
-
-        pxr::UsdPhysicsJoint joint(jointPrim);
-
-        // Get PhysX joint pointer
-        physx::PxJoint* px_joint =
-            (physx::PxJoint*)g_physx->getPhysXPtr(pxr::SdfPath(attachmentPath), omni::physx::PhysXType::ePTJoint);
-        if (!px_joint)
-            continue;
-
-        // Get actors connected to joint
-        px_joint->getActors(actor0, actor1);
-        if (!actor0)
-            continue;
-
-        // Get joint's local poses
-        physx::PxTransform localPose0 = px_joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-
-        // Get actor's global pose
-        physx::PxTransform actorPose = actor0->getGlobalPose();
-
-        // Calculate world transform
-        physx::PxTransform worldTransform = actorPose * localPose0;
-
-        // Get joint axis (assuming Z is default)
-        pxr::GfVec3f direction(0.0, 0.0, 1.0);
-
-        pxr::TfToken jointAxis;
-        jointPrim
-            .GetAttribute(isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::FORWARD_AXIS))
-            .Get(&jointAxis);
-        switch (jointAxis.GetText()[0])
-        {
-        case 'X':
-            direction = pxr::GfVec3f(1.0, 0.0, 0.0);
-            break;
-        case 'Y':
-            direction = pxr::GfVec3f(0.0, 1.0, 0.0);
-            break;
-        default:
-            direction = pxr::GfVec3f(0.0, 0.0, 1.0);
-            break;
-        }
-
-        // Transform direction to world space
-        auto rotated = worldTransform.q.rotate(physx::PxVec3(direction[0], direction[1], direction[2]));
-        direction = pxr::GfVec3f(rotated.x, rotated.y, rotated.z);
-        direction.Normalize();
-
-        // Get world position
-        pxr::GfVec3f worldPos(worldTransform.p.x, worldTransform.p.y, worldTransform.p.z);
-        float clearanceOffset = 0.0f;
-        pxr::UsdAttribute clearanceOffsetAttr = jointPrim.GetAttribute(
-            isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET));
-        if (clearanceOffsetAttr)
-        {
-            clearanceOffsetAttr.Get(&clearanceOffset);
-        }
-        else
-        {
-            jointPrim
-                .CreateAttribute(
-                    isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET),
-                    pxr::SdfValueTypeNames->Float, false)
-                .Set(clearanceOffset);
-        }
-        bool selfCollision = true;
-        while (selfCollision)
-        {
-            pxr::GfVec3f rayStart = worldPos + direction * static_cast<float>(clearanceOffset);
-
-            // Convert to carb types for raycast
-            carb::Float3 _rayStart{ static_cast<float>(rayStart[0]), static_cast<float>(rayStart[1]),
-                                    static_cast<float>(rayStart[2]) };
-
-            // Scale distance before adding to start to get the correct starting point.
-            carb::Float3 _rayDir{ static_cast<float>(direction[0]), static_cast<float>(direction[1]),
-                                  static_cast<float>(direction[2]) };
-
-            // Perform raycast
-            omni::physx::RaycastHit result;
-            float rayLength = static_cast<float>(m_maxGripDistance) - clearanceOffset;
-            if (rayLength <= 0.0f)
-            {
-                rayLength = 0.001f;
-            }
-            bool hit = physxQuery->raycastClosest(_rayStart, _rayDir, rayLength, result, false);
-
-            if (hit)
-            {
-                // Get the hit object's prim path
-                pxr::SdfPath hitPath = pxr::SdfPath(intToPath(result.rigidBody).GetString());
-                // Skip if we hit the gripper itself or its parent
-                if (hitPath == pxr::SdfPath(actor0->getName()))
-                {
-                    selfCollision = true;
-                    clearanceOffset += 0.001f;
-                    continue;
-                }
-                selfCollision = false;
-                if (clearanceOffset > 0.0f)
-                {
-                    float originalOffset;
-                    clearanceOffsetAttr.Get(&originalOffset);
-                    if (originalOffset != clearanceOffset)
-                    {
-                        CARB_LOG_WARN("   Gripper Attachment %s hit itself, adjust Clearance Offset at the joint to %f",
-                                      attachmentPath.c_str(), clearanceOffset);
-                    }
-                    clearanceOffsetAttr.Set(clearanceOffset);
-                }
-                // Calculate the relative transform for the joint connection
-                physx::PxRigidActor* hitActor =
-                    (physx::PxRigidActor*)g_physx->getPhysXPtr(hitPath, omni::physx::PhysXType::ePTActor);
-                if (!hitActor)
-                    continue;
-                // Calculate the relative transform for the joint connection
-                physx::PxTransform hitWorldTransform = hitActor->getGlobalPose();
-
-                // Calculate offset transform to place object at grip distance
-
-                physx::PxVec3 offsetTranslation =
-                    -physx::PxVec3(direction[0], direction[1], direction[2]) * (result.distance - clearanceOffset);
-                physx::PxTransform offsetTransform(offsetTranslation, physx::PxQuat(physx::PxIdentity));
-
-                // Apply offset to get the desired world transform
-                physx::PxTransform adjustedWorldTransform = offsetTransform * worldTransform;
-
-                // Calculate the local transform for body1 (relative to hit actor)
-                physx::PxTransform hitLocalTransform = hitWorldTransform.transformInv(adjustedWorldTransform);
-
-                // Update joint's Body1 actor and transform
-                px_joint->setActors(actor0, hitActor);
-                px_joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, hitLocalTransform);
-                auto constraintFlags = px_joint->getConstraintFlags();
-                px_joint->setConstraintFlags(constraintFlags);
-                // Enable the joint
-                px_joint->setConstraintFlag(physx::PxConstraintFlag::eDISABLE_CONSTRAINT, false);
-                // This should be the way to disable collision, but it doesn't work
-                px_joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, false);
-
-
-                ap_to_remove.push_back(attachmentPath);
-            }
-            else
-            {
-                break;
-            }
-        }
+        _processAttachmentForGrip(attachmentPath, apToRemove, clearanceOffsetsToPersist);
     }
-    for (const auto& ap : ap_to_remove)
+    // Persist all clearance offset changes in one USD write
+    if (!clearanceOffsetsToPersist.empty() && m_writeToUsd)
+    {
+
+        std::vector<std::string> emptyVec;
+        _queueWriteAttachmentPointBatch(emptyVec, emptyVec, clearanceOffsetsToPersist);
+    }
+    for (const auto& ap : apToRemove)
     {
         m_inactiveAttachmentPoints.erase(ap);
         m_activeAttachmentPoints.insert(ap);
 
         m_jointSettlingCounters[ap] = m_settlingDelay; // Initialize settling counter
+    }
+}
+
+void SurfaceGripperComponent::_processAttachmentForGrip(const std::string& attachmentPath,
+                                                        std::vector<std::string>& apToRemove,
+                                                        std::vector<std::pair<std::string, float>>& clearanceOffsetsToPersist)
+{
+    auto physxQuery = carb::getCachedInterface<omni::physx::IPhysxSceneQuery>();
+    if (!physxQuery)
+        return;
+
+    if (m_jointSettlingCounters[attachmentPath] > 0)
+    {
+        m_jointSettlingCounters[attachmentPath]--;
+        return;
+    }
+
+    physx::PxJoint* px_joint = static_cast<physx::PxJoint*>(
+        g_physx->getPhysXPtr(pxr::SdfPath(attachmentPath), omni::physx::PhysXType::ePTJoint));
+    if (!px_joint)
+        return;
+
+    physx::PxRigidActor *local_actor0 = nullptr, *local_actor1 = nullptr;
+    px_joint->getActors(local_actor0, local_actor1);
+    if (!local_actor0)
+        return;
+
+    physx::PxTransform worldTransform = _computeJointWorldTransform(px_joint, local_actor0);
+
+    Axis axis = _getJointForwardAxis(attachmentPath);
+    physx::PxVec3 dirPx = _directionFromAxisAndWorld(axis, worldTransform);
+    pxr::GfVec3f direction(dirPx.x, dirPx.y, dirPx.z);
+
+    pxr::GfVec3f worldPos(worldTransform.p.x, worldTransform.p.y, worldTransform.p.z);
+    float clearanceOffset = 0.0f;
+    auto itClear = m_jointClearanceOffset.find(attachmentPath);
+    if (itClear != m_jointClearanceOffset.end())
+    {
+        clearanceOffset = itClear->second;
+    }
+    bool selfCollision = true;
+    bool clearanceChanged = false;
+    while (selfCollision)
+    {
+        pxr::GfVec3f rayStart = worldPos + direction * static_cast<float>(clearanceOffset);
+
+        carb::Float3 _rayStart{ static_cast<float>(rayStart[0]), static_cast<float>(rayStart[1]),
+                                static_cast<float>(rayStart[2]) };
+        carb::Float3 _rayDir{ static_cast<float>(direction[0]), static_cast<float>(direction[1]),
+                              static_cast<float>(direction[2]) };
+
+        omni::physx::RaycastHit result;
+        float rayLength = static_cast<float>(m_maxGripDistance) - clearanceOffset;
+        if (rayLength <= 0.0f)
+        {
+            rayLength = 0.001f;
+        }
+        bool hit = physxQuery->raycastClosest(_rayStart, _rayDir, rayLength, result, false);
+
+        if (hit)
+        {
+            pxr::SdfPath hitPath = pxr::SdfPath(intToPath(result.rigidBody).GetString());
+            if (hitPath == pxr::SdfPath(local_actor0->getName()))
+            {
+                selfCollision = true;
+                clearanceOffset += 0.001f;
+                continue;
+            }
+            selfCollision = false;
+            if (clearanceOffset > 0.0f)
+            {
+                float originalOffset = 0.0f;
+                auto itC = m_jointClearanceOffset.find(attachmentPath);
+                if (itC != m_jointClearanceOffset.end())
+                {
+                    originalOffset = itC->second;
+                }
+                if (originalOffset != clearanceOffset)
+                {
+                    clearanceChanged = true;
+                    m_jointClearanceOffset[attachmentPath] = clearanceOffset;
+                }
+            }
+            physx::PxRigidActor* hitActor =
+                static_cast<physx::PxRigidActor*>(g_physx->getPhysXPtr(hitPath, omni::physx::PhysXType::ePTActor));
+            if (!hitActor)
+                return;
+            physx::PxTransform hitWorldTransform = hitActor->getGlobalPose();
+
+            physx::PxVec3 offsetTranslation =
+                -physx::PxVec3(direction[0], direction[1], direction[2]) * (result.distance - clearanceOffset);
+            physx::PxTransform offsetTransform(offsetTranslation, physx::PxQuat(physx::PxIdentity));
+            physx::PxTransform adjustedWorldTransform = offsetTransform * worldTransform;
+            physx::PxTransform hitLocalTransform = hitWorldTransform.transformInv(adjustedWorldTransform);
+
+            _queueAttachJoint(attachmentPath, local_actor0, hitActor, hitLocalTransform);
+
+            apToRemove.push_back(attachmentPath);
+        }
+        else
+        {
+            break;
+        }
+    }
+    if (clearanceChanged)
+    {
+        clearanceOffsetsToPersist.emplace_back(attachmentPath, clearanceOffset);
     }
 }
 
@@ -762,16 +699,18 @@ void SurfaceGripperComponent::updateOpenGripper()
     // Make sure we've released any gripped objects
     if (!m_grippedObjects.empty())
     {
-        releaseAllObjects();
+        _queueReleaseAllObjectsActions();
         updateGrippedObjectsList();
         m_activeAttachmentPoints.clear();
+        m_inactiveAttachmentPoints.insert(m_attachmentPoints.begin(), m_attachmentPoints.end());
     }
     if (m_status != GripperStatus::Open)
     {
         m_status = GripperStatus::Open;
-        m_stage->GetPrimAtPath(m_primPath)
-            .GetAttribute(isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::STATUS))
-            .Set(pxr::TfToken("Open"));
+        if (m_writeToUsd)
+        {
+            _queueWriteStatus(GripperStatusToToken(m_status).GetString());
+        }
     }
 }
 
@@ -786,13 +725,12 @@ void SurfaceGripperComponent::releaseAllObjects()
     // Release all objects by disabling constraints on all attachment points
     for (const auto& attachmentPath : m_attachmentPoints)
     {
-        // Get the PhysX joint directly
-        physx::PxJoint* px_joint =
-            (physx::PxJoint*)g_physx->getPhysXPtr(pxr::SdfPath(attachmentPath), omni::physx::PhysXType::ePTJoint);
+        // Immediate release used for non-physics-step flows (e.g., onStop)
+        physx::PxJoint* px_joint = static_cast<physx::PxJoint*>(
+            g_physx->getPhysXPtr(pxr::SdfPath(attachmentPath), omni::physx::PhysXType::ePTJoint));
 
         if (px_joint)
         {
-            // Disable the constraint and enable collision
             px_joint->setConstraintFlag(physx::PxConstraintFlag::eDISABLE_CONSTRAINT, true);
             px_joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, true);
         }
@@ -806,6 +744,132 @@ void SurfaceGripperComponent::releaseAllObjects()
     {
         m_jointSettlingCounters[ap] = m_settlingDelay;
     }
+}
+
+void SurfaceGripperComponent::consumePhysxActions(std::vector<PhysxAction>& outActions)
+{
+    if (!m_physxActions.empty())
+    {
+        outActions.insert(outActions.end(), std::make_move_iterator(m_physxActions.begin()),
+                          std::make_move_iterator(m_physxActions.end()));
+        m_physxActions.clear();
+    }
+}
+
+void SurfaceGripperComponent::_queueReleaseAllObjectsActions()
+{
+    for (const auto& attachmentPath : m_attachmentPoints)
+    {
+        PhysxAction a;
+        a.type = PhysxActionType::Detach;
+        a.jointPath = attachmentPath;
+        m_physxActions.push_back(std::move(a));
+    }
+}
+
+void SurfaceGripperComponent::_queueDetachJoint(const std::string& jointPath)
+{
+    PhysxAction a;
+    a.type = PhysxActionType::Detach;
+    a.jointPath = jointPath;
+    m_physxActions.push_back(std::move(a));
+}
+
+void SurfaceGripperComponent::_queueAttachJoint(const std::string& jointPath,
+                                                physx::PxRigidActor* actor0,
+                                                physx::PxRigidActor* actor1,
+                                                const physx::PxTransform& localPose1)
+{
+    PhysxAction a;
+    a.type = PhysxActionType::Attach;
+    a.jointPath = jointPath;
+    a.actor0 = actor0;
+    a.actor1 = actor1;
+    a.localPose1 = localPose1;
+    m_physxActions.push_back(std::move(a));
+}
+
+
+// Removed unused direct USD writer helpers; writes are now queued and executed in the manager.
+
+
+void SurfaceGripperComponent::consumeUsdActions(std::vector<UsdAction>& outActions)
+{
+    if (!m_usdActions.empty())
+    {
+        outActions.insert(outActions.end(), std::make_move_iterator(m_usdActions.begin()),
+                          std::make_move_iterator(m_usdActions.end()));
+        m_usdActions.clear();
+    }
+}
+
+void SurfaceGripperComponent::_queueWriteStatus(const std::string& statusToken)
+{
+    UsdAction a;
+    a.type = UsdActionType::WriteStatus;
+    a.primPath = m_primPath.GetString();
+    a.statusToken = statusToken;
+    m_usdActions.push_back(std::move(a));
+}
+
+void SurfaceGripperComponent::_queueWriteGrippedObjectsAndFilters(const std::vector<std::string>& objectPaths,
+                                                                  const std::string& body0PathForFilterPairs)
+{
+    UsdAction a;
+    a.type = UsdActionType::WriteGrippedObjectsAndFilters;
+    a.primPath = m_primPath.GetString();
+    a.grippedObjectPaths = objectPaths;
+    a.body0PathForFilterPairs = body0PathForFilterPairs;
+    m_usdActions.push_back(std::move(a));
+}
+
+void SurfaceGripperComponent::_queueWriteAttachmentPointBatch(
+    const std::vector<std::string>& applyApiPaths,
+    const std::vector<std::string>& excludeFromArticulationPaths,
+    const std::vector<std::pair<std::string, float>>& clearanceOffsets)
+{
+    UsdAction a;
+    a.type = UsdActionType::WriteAttachmentPointBatch;
+    a.primPath = m_primPath.GetString();
+    a.apiPathsToApply = applyApiPaths;
+    a.excludeFromArticulationPaths = excludeFromArticulationPaths;
+    a.clearanceOffsets = clearanceOffsets;
+    m_usdActions.push_back(std::move(a));
+}
+
+Axis SurfaceGripperComponent::_getJointForwardAxis(const std::string& attachmentPath) const
+{
+    auto itAxis = m_jointForwardAxis.find(attachmentPath);
+    Axis axis = (itAxis != m_jointForwardAxis.end()) ? itAxis->second : Axis::Z;
+    return axis;
+}
+
+physx::PxTransform SurfaceGripperComponent::_computeJointWorldTransform(physx::PxJoint* joint,
+                                                                        physx::PxRigidActor* actor0) const
+{
+    physx::PxTransform localPose0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
+    physx::PxTransform actorPose = actor0->getGlobalPose();
+    return actorPose * localPose0;
+}
+
+physx::PxVec3 SurfaceGripperComponent::_directionFromAxisAndWorld(Axis axis, const physx::PxTransform& worldTransform) const
+{
+    physx::PxVec3 local(0.0f, 0.0f, 0.0f);
+    switch (axis)
+    {
+    case Axis::X:
+        local.x = 1.0f;
+        break;
+    case Axis::Y:
+        local.y = 1.0f;
+        break;
+    default:
+        local.z = 1.0f;
+        break;
+    }
+    physx::PxVec3 dir = worldTransform.q.rotate(local);
+    dir.normalize();
+    return dir;
 }
 
 } // namespace surface_gripper

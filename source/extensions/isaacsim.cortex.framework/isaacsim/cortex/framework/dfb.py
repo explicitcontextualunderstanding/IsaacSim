@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" A collection of behavior tools for the decision framework (df).
+"""A collection of behavior tools for the decision framework (df).
 
 This library is built on the underlying decision framework tooling of df.py. It provides specific
 behaviors useful in concrete cases, sometimes tailored to specific robots. Pragmatically, we can

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from typing import Optional
 
 import isaacsim.core.api.tasks as tasks
@@ -55,7 +54,7 @@ class PickPlace(tasks.PickPlace):
             joint_prim_names=["finger_joint", "right_outer_knuckle_joint"],
             joint_opened_positions=np.array([0, 0]),
             joint_closed_positions=np.array([0.628, -0.628]),
-            action_deltas=np.array([-0.3, 0.3]),
+            action_deltas=np.array([-0.0175, 0.0175]),
         )
         manipulator = SingleManipulator(
             prim_path="/World/cobotta",

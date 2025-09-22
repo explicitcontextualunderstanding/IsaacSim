@@ -116,7 +116,7 @@ public:
     void tick(double dt)
     {
         std::unique_lock<std::mutex> lck(m_componentMtx);
-        CARB_PROFILE_ZONE(0, "Isaac Range Sensor Tick");
+        CARB_PROFILE_ZONE(0, "[IsaacSim] Isaac Range Sensor Tick");
         if (m_components.empty())
         {
             return;

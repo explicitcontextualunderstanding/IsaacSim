@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Cortex-specific utilities and helper methods
-"""
+"""Cortex-specific utilities and helper methods"""
 
 from types import ModuleType
 from typing import Union

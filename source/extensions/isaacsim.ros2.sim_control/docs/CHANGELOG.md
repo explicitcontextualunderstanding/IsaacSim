@@ -1,4 +1,12 @@
 # Changelog
+## [1.2.0] - 2025-09-02
+### Added
+- Simulation Interfaces v1.1.0 (World services) now supported. 
+
+### Changed
+- Hidden /Render* prims are excluded from Entity retrieval services
+- Extension initialization such that missing ROS service dependencies no longer cause a fatal error.
+
 ## [1.1.6] - 2025-07-18
 ### Fixed
 - Velocity states correctly retrieved for rigid body prims.

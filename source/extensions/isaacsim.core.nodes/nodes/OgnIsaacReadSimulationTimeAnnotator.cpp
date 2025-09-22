@@ -51,8 +51,8 @@ public:
     static bool compute(OgnIsaacReadSimulationTimeAnnotatorDatabase& db)
     {
         auto& state = db.perInstanceState<OgnIsaacReadSimulationTimeAnnotator>();
-
         state.m_resetOnStop = db.inputs.resetOnStop();
+
         if (db.inputs.referenceTimeNumerator() > 0 || db.inputs.referenceTimeDenominator() > 0)
         {
             if (state.m_resetOnStop)
@@ -85,7 +85,7 @@ public:
 
 private:
     bool m_resetOnStop = true;
-    isaacsim::core::simulation_manager::ISimulationManager* m_simulationManagerFramework;
+    isaacsim::core::simulation_manager::ISimulationManager* m_simulationManagerFramework = nullptr;
 };
 
 REGISTER_OGN_NODE()

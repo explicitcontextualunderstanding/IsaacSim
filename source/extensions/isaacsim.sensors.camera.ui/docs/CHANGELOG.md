@@ -1,4 +1,8 @@
 # Changelog
+## [0.2.1] - 2025-08-04
+### Fixed
+- Asset path for ZED X sensor
+
 ## [0.2.0] - 2025-07-17
 ### Changed
 - Depth sensors now added using SingleViewDepthSensorAsset API

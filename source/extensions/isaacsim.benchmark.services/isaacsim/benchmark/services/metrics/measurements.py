@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Union
 
-logger = logging.getLogger(__name__)
+import carb
 
 
 @dataclass
@@ -174,7 +173,7 @@ class TestPhase(object):
                                 run = cls.from_json(m)
                                 test_runs.append(run)
                         except json.JSONDecodeError:
-                            logger.exception(
+                            carb.log_error(
                                 f'aggregate_json_files, problems parsing field {f} with content "{json_file.read()}"'
                             )
         return test_runs

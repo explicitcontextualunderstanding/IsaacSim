@@ -1,4 +1,9 @@
 # Changelog
+
+## [4.0.24] - 2025-08-20
+### Changed
+- Add Error messages when holonomic controller is not initialized correctly
+
 ## [4.0.23] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 4.0.22)

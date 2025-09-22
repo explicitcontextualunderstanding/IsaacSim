@@ -46,6 +46,11 @@ enum class Attributes
 {
     DESCRIPTION,
     NAMESPACE,
+    ROBOT_TYPE,
+    LICENSE,
+    VERSION,
+    SOURCE,
+    CHANGELOG,
     INDEX,
     NAME_OVERRIDE,
     FORWARD_AXIS,
@@ -123,6 +128,11 @@ struct hash
 const std::unordered_map<Attributes, std::pair<pxr::TfToken, pxr::SdfValueTypeName>> attributeNames = {
     { Attributes::DESCRIPTION, { pxr::TfToken("description"), pxr::SdfValueTypeNames->String } },
     { Attributes::NAMESPACE, { pxr::TfToken("namespace"), pxr::SdfValueTypeNames->String } },
+    { Attributes::ROBOT_TYPE, { pxr::TfToken("robotType"), pxr::SdfValueTypeNames->Token } },
+    { Attributes::LICENSE, { pxr::TfToken("license"), pxr::SdfValueTypeNames->Token } },
+    { Attributes::VERSION, { pxr::TfToken("version"), pxr::SdfValueTypeNames->String } },
+    { Attributes::SOURCE, { pxr::TfToken("source"), pxr::SdfValueTypeNames->String } },
+    { Attributes::CHANGELOG, { pxr::TfToken("changelog"), pxr::SdfValueTypeNames->StringArray } },
     { Attributes::INDEX, { pxr::TfToken("physics:index"), pxr::SdfValueTypeNames->Int } },
     { Attributes::NAME_OVERRIDE, { pxr::TfToken("nameOverride"), pxr::SdfValueTypeNames->String } },
     { Attributes::FORWARD_AXIS, { pxr::TfToken("forwardAxis"), pxr::SdfValueTypeNames->Token } },
@@ -162,7 +172,8 @@ inline pxr::TfToken getAttributeName(Attributes attr)
 inline void ApplyRobotAPI(pxr::UsdPrim& prim)
 {
     prim.AddAppliedSchema(pxr::TfToken(classNames[static_cast<int>(Classes::ROBOT_API)]));
-    for (const auto& attr : { Attributes::DESCRIPTION, Attributes::NAMESPACE })
+    for (const auto& attr : { Attributes::DESCRIPTION, Attributes::NAMESPACE, Attributes::ROBOT_TYPE,
+                              Attributes::LICENSE, Attributes::VERSION, Attributes::SOURCE, Attributes::CHANGELOG })
     {
         prim.CreateAttribute(getAttributeName(attr), attributeNames.at(attr).second, false);
     }

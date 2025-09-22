@@ -38,11 +38,15 @@ class TestBehaviorsBasic(omni.kit.test.AsyncTestCase):
     Test the basic functionality of the behavior scripts.
     """
 
-    async def setup(self):
-        pass
+    async def setUp(self):
+        await omni.kit.app.get_app().next_update_async()
+        omni.usd.get_context().new_stage()
+        await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
-        pass
+        await omni.kit.app.get_app().next_update_async()
+        omni.usd.get_context().close_stage()
+        await omni.kit.app.get_app().next_update_async()
 
     async def check_exposed_variables(self, behavior_class):
         # Make sure behavior_class is of type BehaviorScript

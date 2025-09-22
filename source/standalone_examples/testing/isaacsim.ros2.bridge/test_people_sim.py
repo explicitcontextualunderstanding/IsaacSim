@@ -17,7 +17,7 @@ import sys
 from isaacsim import SimulationApp
 
 # The most basic usage for creating a simulation app
-kit = SimulationApp()
+simulation_app = SimulationApp()
 
 ADDITIONAL_EXTENSIONS_PEOPLE = [
     "omni.isaac.core",
@@ -36,32 +36,42 @@ ADDITIONAL_EXTENSIONS_PEOPLE = [
 import carb
 import omni
 from isaacsim.core.utils.extensions import enable_extension
+from isaacsim.storage.native import get_assets_root_path
 
 for e in ADDITIONAL_EXTENSIONS_PEOPLE:
     enable_extension(e)
-    kit.update()
+    simulation_app.update()
 
 enable_extension("isaacsim.ros2.bridge")
-kit.update()
+simulation_app.update()
 
 # Locate Isaac Sim assets folder to load sample
-from isaacsim.storage.native import get_assets_root_path, is_file
-
 assets_root_path = get_assets_root_path()
 if assets_root_path is None:
     carb.log_error("Could not find Isaac Sim assets folder")
-    kit.close()
+    simulation_app.close()
     sys.exit()
 usd_path = assets_root_path + "/Isaac/Samples/NvBlox/nvblox_sample_scene.usd"
 
 omni.usd.get_context().open_stage(usd_path)
 
-for i in range(100):
-    kit.update()
+# Wait two frames so that stage starts loading
+simulation_app.update()
+simulation_app.update()
+
+print("Loading stage...")
+from isaacsim.core.utils.stage import is_stage_loading
+
+while is_stage_loading():
+    simulation_app.update()
+print("Loading Complete")
 
 omni.timeline.get_timeline_interface().play()
 
-for i in range(100):
-    kit.update()
+frame = 0
 
-kit.close()  # Cleanup application
+while simulation_app.is_running() and frame < 10:
+    simulation_app.update()
+    frame = frame + 1
+
+simulation_app.close()  # Cleanup application

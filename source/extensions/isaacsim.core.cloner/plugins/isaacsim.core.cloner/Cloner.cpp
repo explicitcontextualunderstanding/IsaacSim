@@ -154,7 +154,7 @@ bool isaacsim::core::cloner::fabricClone(long int stageId,
     }
 
     {
-        CARB_PROFILE_ZONE(0, "fabricClone - fabric get or create");
+        CARB_PROFILE_ZONE(0, "[IsaacSim] fabricClone - fabric get or create");
 
         omni::fabric::FabricId fabricId{};
         omni::fabric::StageReaderWriterId stageReaderWriterId = iStageReaderWriter->get(stageId);
@@ -193,7 +193,7 @@ bool isaacsim::core::cloner::fabricClone(long int stageId,
 
             // Fill the stage in progress with USD values
             {
-                CARB_PROFILE_ZONE(0, "fabricClone - fabric populate");
+                CARB_PROFILE_ZONE(0, "[IsaacSim] fabricClone - fabric populate");
                 populationUtils->populateFromUsd(stageReaderWriterId, stageId,
                                                  omni::fabric::asInt(PXR_NS::SdfPath::AbsoluteRootPath()), nullptr, 0.0);
             }
@@ -220,7 +220,7 @@ bool isaacsim::core::cloner::fabricClone(long int stageId,
 
             // Fill the stage in progress with USD values
             {
-                CARB_PROFILE_ZONE(0, "fabricClone - fabric populate");
+                CARB_PROFILE_ZONE(0, "[IsaacSim] fabricClone - fabric populate");
                 populationUtils->populateFromUsd(stageReaderWriterId, stageId,
                                                  omni::fabric::asInt(PXR_NS::SdfPath::AbsoluteRootPath()), nullptr, 0.0);
             }
@@ -233,7 +233,7 @@ bool isaacsim::core::cloner::fabricClone(long int stageId,
         {
             // prepare the rigid bodies before cloning creating all attributes
             {
-                CARB_PROFILE_ZONE(0, "FabricManager::resume:rigidBodyInitialization");
+                CARB_PROFILE_ZONE(0, "[IsaacSim] FabricManager::resume:rigidBodyInitialization");
                 usdrt::UsdStageRefPtr usdrtStage = usdrt::UsdStage::Attach(stageId, stageReaderWriterId);
                 initializeRigidBodyBatched(usdrtStage->GetPrimsWithAppliedAPIName(usdrt::TfToken("PhysicsRigidBodyAPI")),
                                            iStageReaderWriter, stageReaderWriterId, usdrtStage);
@@ -256,7 +256,7 @@ bool isaacsim::core::cloner::fabricClone(long int stageId,
         // convert prim_paths to fabric paths, this is quite unfortunate and will slow down the cloning process
         std::vector<omni::fabric::Path> list_of_clones;
         {
-            CARB_PROFILE_ZONE(0, "fabricClone - prim_paths to fabric paths");
+            CARB_PROFILE_ZONE(0, "[IsaacSim] fabricClone - prim_paths to fabric paths");
             for (const auto& prim_path : prim_paths)
             {
                 // compare if its not the same as the source prim path
@@ -269,9 +269,10 @@ bool isaacsim::core::cloner::fabricClone(long int stageId,
 
         if (!list_of_clones.empty())
         {
-            CARB_PROFILE_ZONE(0, "fabricClone - fabric batch clone");
-            isrwLegacy->batchClone(iStageReaderWriter->getFabricId(stageInProgress), world_envs_env_0,
-                                   { (const omni::fabric::PathC*)list_of_clones.data(), list_of_clones.size() });
+            CARB_PROFILE_ZONE(0, "[IsaacSim] fabricClone - fabric batch clone");
+            isrwLegacy->batchClone(
+                iStageReaderWriter->getFabricId(stageInProgress), world_envs_env_0,
+                { reinterpret_cast<const omni::fabric::PathC*>(list_of_clones.data()), list_of_clones.size() });
         }
         else
         {

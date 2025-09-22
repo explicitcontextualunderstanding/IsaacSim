@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import asyncio
 import os
-import time
 
 import numpy as np
 from isaacsim import SimulationApp
@@ -31,19 +29,13 @@ simulation_app = SimulationApp(
 )
 
 # Import post-launch modules
-import carb
-import isaacsim.core.utils.numpy.rotations as rot_utils
 import omni.graph.core as og
 import omni.usd
 import usdrt.Sdf
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.prims import is_prim_path_valid
-from isaacsim.core.utils.string import find_unique_string_name
 from isaacsim.core.utils.viewports import set_camera_view
-from isaacsim.sensors.camera import Camera
 
 enable_extension("isaacsim.ros2.bridge")
 simulation_app.update()

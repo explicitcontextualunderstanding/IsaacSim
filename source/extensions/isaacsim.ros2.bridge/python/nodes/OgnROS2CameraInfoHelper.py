@@ -62,8 +62,8 @@ class OgnROS2CameraInfoHelper:
         return OgnROS2CameraInfoHelperInternalState()
 
     @staticmethod
-    def add_camera_info_writer(db, frameId, topicName, camera_info, render_product_path: str):
-        writer = rep.writers.get(f"ROS2PublishCameraInfo")
+    def add_camera_info_writer(db, frameId, topicName, camera_info, render_product_path: str, time_type: str = ""):
+        writer = rep.writers.get(f"ROS2{time_type}PublishCameraInfo")
         writer.initialize(
             frameId=frameId,
             nodeNamespace=collect_namespace(db.inputs.nodeNamespace, render_product_path),
@@ -109,6 +109,12 @@ class OgnROS2CameraInfoHelper:
 
                 db.per_instance_state.resetSimulationTimeOnStop = db.inputs.resetSimulationTimeOnStop
                 db.per_instance_state.publishStepSize = db.inputs.frameSkipCount + 1
+
+                time_type_input = ""
+                if db.inputs.useSystemTime:
+                    time_type_input = "SystemTime"
+                    if db.inputs.resetSimulationTimeOnStop:
+                        carb.log_warn("System timestamp is being used. Ignoring resetSimulationTimeOnStop input")
 
                 camera_info_left, camera_left = read_camera_info(render_product_path=db.inputs.renderProductPath)
 
@@ -182,6 +188,7 @@ class OgnROS2CameraInfoHelper:
                         frameId=db.inputs.frameIdRight,
                         camera_info=camera_info_right,
                         render_product_path=db.inputs.renderProductPathRight,
+                        time_type=time_type_input,
                     )
 
                 # Create left-side writer
@@ -192,6 +199,7 @@ class OgnROS2CameraInfoHelper:
                     frameId=db.inputs.frameId,
                     camera_info=camera_info_left,
                     render_product_path=db.inputs.renderProductPath,
+                    time_type=time_type_input,
                 )
 
         else:

@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate offline synthetic dataset
-"""
+"""Generate offline synthetic dataset"""
 
 import argparse
 import json

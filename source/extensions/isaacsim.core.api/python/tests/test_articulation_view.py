@@ -2666,6 +2666,23 @@ class TestArticulationView(CoreTestCase):
                         await self.setUpWorld(backend=backend, device=device)
                         await self.add_frankas(backend=backend)
                         cur_value = self._frankas_view.get_measured_joint_forces(clone=clone)
+                        # check joint name/index conversion
+                        value_by_index = self._frankas_view.get_measured_joint_forces(
+                            joint_indices=[self._frankas_view._metadata.joint_indices["panda_joint5"] + 1], clone=clone
+                        )
+                        value_by_name = self._frankas_view.get_measured_joint_forces(
+                            joint_names=["panda_joint5"], clone=clone
+                        )
+                        if backend == "torch":
+                            value_by_index = value_by_index.cpu().numpy()
+                            value_by_name = value_by_name.cpu().numpy()
+                        elif backend == "warp":
+                            value_by_index = value_by_index.numpy()
+                            value_by_name = value_by_name.numpy()
+                        self.assertTrue(
+                            np.allclose(value_by_index, value_by_name, atol=1e-05),
+                            f"value_by_index: {value_by_index}, value_by_name: {value_by_name}",
+                        )
 
     @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
     async def test_pause_resume_motion(self):

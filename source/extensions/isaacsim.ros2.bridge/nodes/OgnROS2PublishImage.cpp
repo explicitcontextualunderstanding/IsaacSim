@@ -40,6 +40,17 @@ class PublishImageThreadData
 {
 public:
     PublishImageThreadData()
+        : inputDataPtr(nullptr),
+          outputDataPtr(nullptr),
+          resourceFormat(carb::Format::eUnknown),
+          width(0),
+          height(0),
+          bufferSize(0),
+          totalBytes(0),
+          cudaDeviceIndex(-1),
+          stream(nullptr),
+          streamDevice(nullptr),
+          mStreamNotCreated(nullptr)
     {
     }
 
@@ -64,6 +75,17 @@ class PublishNitrosBridgeImageThreadData
 {
 public:
     PublishNitrosBridgeImageThreadData()
+        : inputDataPtr(nullptr),
+          outputDataPtr(nullptr),
+          resourceFormat(carb::Format::eUnknown),
+          width(0),
+          height(0),
+          bufferSize(0),
+          totalBytes(0),
+          cudaDeviceIndex(-1),
+          nitrosBridgeStream(nullptr),
+          nitrosBridgeStreamDevice(nullptr),
+          nitrosBridgeStreamNotCreated(nullptr)
     {
     }
 
@@ -117,7 +139,7 @@ public:
         // Publisher was not valid, create a new one
         if (!state.m_publisher)
         {
-            CARB_PROFILE_ZONE(0, "setup publisher");
+            CARB_PROFILE_ZONE(0, "[IsaacSim] setup publisher");
             // Setup ROS publisher
             const std::string& topicName = db.inputs.topicName();
             std::string fullTopicName = addTopicPrefix(state.m_namespaceName, topicName);
@@ -186,12 +208,12 @@ public:
 
     bool publishImage(OgnROS2PublishImageDatabase& db)
     {
-        CARB_PROFILE_ZONE(1, "publish image function");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] publish image function");
         auto& state = db.perInstanceState<OgnROS2PublishImage>();
         auto tasking = carb::getCachedInterface<carb::tasking::ITasking>();
 
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message to publish before starting next
             state.m_tasks.wait();
         }
@@ -216,7 +238,7 @@ public:
 
         if (db.inputs.cudaDeviceIndex() == -1)
         {
-            CARB_PROFILE_ZONE(1, "Data on host");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Data on host");
             if (db.inputs.dataPtr() != 0 && totalBytes == db.inputs.bufferSize())
             {
                 // Data is on host as ptr, buffer size matches
@@ -238,7 +260,7 @@ public:
 
             if (state.m_multithreadingDisabled)
             {
-                CARB_PROFILE_ZONE(1, "image publisher publish");
+                CARB_PROFILE_ZONE(1, "[IsaacSim] image publisher publish");
                 state.m_publisher.get()->publish(state.m_message->getPtr());
             }
             else
@@ -246,7 +268,7 @@ public:
                 tasking->addTask(carb::tasking::Priority::eHigh, state.m_tasks,
                                  [&state]
                                  {
-                                     CARB_PROFILE_ZONE(1, "image publisher publish");
+                                     CARB_PROFILE_ZONE(1, "[IsaacSim] image publisher publish");
                                      state.m_publisher.get()->publish(state.m_message->getPtr());
                                  });
             }
@@ -296,13 +318,13 @@ public:
 
     static bool publishImageHelper(PublishImageThreadData& data)
     {
-        CARB_PROFILE_ZONE(1, "Publish Image Thread");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] Publish Image Thread");
         isaacsim::core::includes::ScopedDevice scopedDev(data.cudaDeviceIndex);
 
         // If the device doesn't match and we have created a stream, destroy it
         if (*data.streamDevice != data.cudaDeviceIndex && *data.mStreamNotCreated == false)
         {
-            CARB_PROFILE_ZONE(1, "Destroy stream");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Destroy stream");
             CUDA_CHECK(cudaStreamDestroy(*data.stream));
             *data.mStreamNotCreated = true;
             *data.streamDevice = -1;
@@ -310,7 +332,7 @@ public:
         // Create a stream if it does not exist
         if (*data.mStreamNotCreated)
         {
-            CARB_PROFILE_ZONE(1, "Create stream");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Create stream");
             CUDA_CHECK(cudaStreamCreate(data.stream));
             *data.mStreamNotCreated = false;
             *data.streamDevice = data.cudaDeviceIndex;
@@ -318,7 +340,7 @@ public:
 
         if (data.bufferSize == 0)
         {
-            CARB_PROFILE_ZONE(1, "data in gpu texture");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] data in gpu texture");
             cudaArray_t levelArray = 0;
             CUDA_CHECK(
                 cudaGetMipmappedArrayLevel(&levelArray, reinterpret_cast<cudaMipmappedArray_t>(data.inputDataPtr), 0));
@@ -347,14 +369,14 @@ public:
         }
         else
         {
-            CARB_PROFILE_ZONE(1, "data in cuda memory");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] data in cuda memory");
             CUDA_CHECK(cudaMemcpyAsync(data.outputDataPtr, reinterpret_cast<void*>(data.inputDataPtr), data.bufferSize,
                                        cudaMemcpyDeviceToHost, *data.stream));
             CUDA_CHECK(cudaStreamSynchronize(*data.stream));
         }
 
         {
-            CARB_PROFILE_ZONE(1, "image publisher publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] image publisher publish");
             data.publisher.get()->publish(data.message->getPtr());
         }
         return true;
@@ -393,12 +415,12 @@ public:
     void publishNitrosBridgeImage(OgnROS2PublishImageDatabase& db)
     {
 #if !defined(_WIN32)
-        CARB_PROFILE_ZONE(1, "publish nitros bridge image function");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] publish nitros bridge image function");
         auto& state = db.perInstanceState<OgnROS2PublishImage>();
         auto tasking = carb::getCachedInterface<carb::tasking::ITasking>();
 
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message to publish before starting next
             state.m_nitrosBridgeTasks.wait();
         }
@@ -444,12 +466,12 @@ public:
             }
         }
 
-        void* dataPtr = (void*)state.m_ipcBufferManager->getCurBufferPtr();
+        void* dataPtr = reinterpret_cast<void*>(state.m_ipcBufferManager->getCurBufferPtr());
 
         // Data on host
         if (db.inputs.cudaDeviceIndex() == -1)
         {
-            CARB_PROFILE_ZONE(1, "Data on host");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Data on host");
             // Data is on host as ptr, buffer size matches
             if (db.inputs.dataPtr() != 0 && totalBytes == db.inputs.bufferSize())
             {
@@ -476,7 +498,7 @@ public:
 
             if (state.m_multithreadingDisabled)
             {
-                CARB_PROFILE_ZONE(1, "nitros image publisher publish");
+                CARB_PROFILE_ZONE(1, "[IsaacSim] nitros image publisher publish");
                 state.m_nitrosBridgePublisher.get()->publish(state.m_nitrosBridgeMessage->getPtr());
             }
             else
@@ -484,7 +506,7 @@ public:
                 tasking->addTask(carb::tasking::Priority::eHigh, state.m_nitrosBridgeTasks,
                                  [&state]
                                  {
-                                     CARB_PROFILE_ZONE(1, "nitros image publisher publish");
+                                     CARB_PROFILE_ZONE(1, "[IsaacSim] nitros image publisher publish");
                                      state.m_nitrosBridgePublisher.get()->publish(state.m_nitrosBridgeMessage->getPtr());
                                  });
             }
@@ -513,13 +535,13 @@ public:
     static void publishNitrosBridgeHelper(PublishNitrosBridgeImageThreadData& data)
     {
 #if !defined(_WIN32)
-        CARB_PROFILE_ZONE(1, "publish nitros image thread");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] publish nitros image thread");
         isaacsim::core::includes::ScopedDevice scopedDev(data.cudaDeviceIndex);
 
         // If the device doesn't match and we have created a stream, destroy it
         if (*data.nitrosBridgeStreamDevice != data.cudaDeviceIndex && *data.nitrosBridgeStreamNotCreated == false)
         {
-            CARB_PROFILE_ZONE(1, "Destroy stream");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Destroy stream");
             cudaStreamDestroy(*data.nitrosBridgeStream);
             *data.nitrosBridgeStreamNotCreated = true;
             *data.nitrosBridgeStreamDevice = -1;
@@ -527,7 +549,7 @@ public:
         // Create a stream if it does not exist
         if (*data.nitrosBridgeStreamNotCreated)
         {
-            CARB_PROFILE_ZONE(1, "Create stream");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Create stream");
             cudaStreamCreate(&*data.nitrosBridgeStream);
             *data.nitrosBridgeStreamNotCreated = false;
             *data.nitrosBridgeStreamDevice = data.cudaDeviceIndex;
@@ -536,7 +558,7 @@ public:
         // Data in gpu texture
         if (data.bufferSize == 0)
         {
-            CARB_PROFILE_ZONE(1, "data in gpu texture");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] data in gpu texture");
             cudaArray_t levelArray = 0;
             CUDA_CHECK(
                 cudaGetMipmappedArrayLevel(&levelArray, reinterpret_cast<cudaMipmappedArray_t>(data.inputDataPtr), 0));
@@ -565,7 +587,7 @@ public:
         // Data in CUDA memory
         else
         {
-            CARB_PROFILE_ZONE(1, "data in cuda memory");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] data in cuda memory");
             CUDA_CHECK(cudaMemcpyAsync(data.outputDataPtr, reinterpret_cast<void*>(data.inputDataPtr), data.bufferSize,
                                        cudaMemcpyDeviceToDevice, *data.nitrosBridgeStream));
             CUDA_CHECK(cudaStreamSynchronize(*data.nitrosBridgeStream));
@@ -574,7 +596,7 @@ public:
         data.nitrosBridgeMessage->writeData(data.ipcBufferManager->getCurIpcMemHandle());
         data.ipcBufferManager->next();
         {
-            CARB_PROFILE_ZONE(1, "nitros image publisher publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] nitros image publisher publish");
             data.nitrosBridgePublisher.get()->publish(data.nitrosBridgeMessage->getPtr());
         }
 #endif
@@ -589,7 +611,7 @@ public:
     virtual void reset()
     {
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message to publish before starting next
             m_tasks.wait();
             m_nitrosBridgeTasks.wait();

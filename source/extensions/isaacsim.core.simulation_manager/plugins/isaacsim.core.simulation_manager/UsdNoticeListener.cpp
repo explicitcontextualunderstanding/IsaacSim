@@ -60,7 +60,7 @@ void UsdNoticeListener::handle(const pxr::UsdNotice::ObjectsChanged& objectsChan
                 }
                 std::vector<int> deletionKeys;
                 std::transform(this->m_deletionCallbacks.begin(), this->m_deletionCallbacks.end(),
-                               std::back_inserter(deletionKeys), [](auto& p) { return p.first; });
+                               std::back_inserter(deletionKeys), [](const auto& p) { return p.first; });
                 for (auto const& key : deletionKeys)
                 {
                     this->m_deletionCallbacks[key](primPath.GetString());

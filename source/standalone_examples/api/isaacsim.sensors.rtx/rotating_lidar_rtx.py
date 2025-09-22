@@ -19,7 +19,7 @@ import sys
 
 from isaacsim import SimulationApp
 
-simulation_app = SimulationApp({"headless": False})
+simulation_app = SimulationApp({"headless": False, "enable_motion_bvh": True})
 
 import carb
 import numpy as np

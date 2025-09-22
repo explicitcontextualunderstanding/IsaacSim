@@ -41,6 +41,12 @@ Carbonite SDK API:
 
 #include <cstdint>
 #include <functional>
+#include <optional>
+#include <tuple>
+#include <vector>
+
+// Need full definition for Entry type
+#include "TimeSampleStorage.h"
 
 namespace isaacsim
 {
@@ -143,6 +149,17 @@ struct ISimulationManager
     DLL_EXPORT virtual double getSystemTime() = 0;
 
     /**
+     * @brief Gets the current frame time from StageReaderWriter.
+     * @details
+     * Returns the current frame time from StageReaderWriter's getFrameTime() to ensure
+     * temporal consistency between time sample storage and frame timing.
+     *
+     * This is useful for testing to track exact frame times being written to storage.
+     * @return Current rational time or kInvalidRationalTime if unavailable.
+     */
+    DLL_EXPORT virtual omni::fabric::RationalTime getCurrentTime() = 0;
+
+    /**
      * @brief Gets the current physics step count.
      * @return The current physics step count.
      */
@@ -186,6 +203,35 @@ struct ISimulationManager
      * @return System time in seconds at the specified time.
      */
     DLL_EXPORT virtual double getSystemTimeAtTime(const omni::fabric::RationalTime& rtime) = 0;
+
+    /**
+     * @brief Gets all stored samples for testing and validation.
+     * @return Vector of all stored sample entries.
+     */
+    DLL_EXPORT virtual std::vector<TimeSampleStorage::Entry> getAllSamples() = 0;
+
+    /**
+     * @brief Gets the count of stored samples.
+     * @return Number of stored samples.
+     */
+    DLL_EXPORT virtual size_t getSampleCount() = 0;
+
+    /**
+     * @brief Logs sample storage statistics for debugging.
+     */
+    DLL_EXPORT virtual void logStatistics() = 0;
+
+    /**
+     * @brief Gets the time range of stored samples.
+     * @return Pair of (earliest_time, latest_time), or nullopt if empty.
+     */
+    DLL_EXPORT virtual std::optional<std::pair<omni::fabric::RationalTime, omni::fabric::RationalTime>> getSampleRange() = 0;
+
+    /**
+     * @brief Gets the maximum buffer capacity for time sample storage.
+     * @return Maximum number of samples that can be stored in the buffer.
+     */
+    DLL_EXPORT virtual size_t getBufferCapacity() = 0;
 };
 
 } // namespace isaacsim

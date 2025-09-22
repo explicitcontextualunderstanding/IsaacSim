@@ -18,14 +18,11 @@ import time
 
 import carb
 import numpy as np
-import omni.graph.core as og
-import omni.graph.core.tests as ogts
 import omni.kit.test
 import omni.replicator.core as rep
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.api.objects.ground_plane import GroundPlane
-from isaacsim.core.api.robots import Robot
-from isaacsim.core.nodes.bindings import _isaacsim_core_nodes
+from isaacsim.core.simulation_manager import _simulation_manager
 from isaacsim.core.utils.stage import get_current_stage, open_stage_async
 from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.storage.native import get_assets_root_path
@@ -99,12 +96,11 @@ class TestAnnotators(omni.kit.test.AsyncTestCase):
         )  # Two extra steps happen to init physics on play
         self.assertAlmostEqual(data_read_system_time["systemTime"], time.time(), delta=0.5)
 
-        # TODO: Its not clear why reading the time directly from the rational time results in time being one frame ahead of the annotatot time
-        self._core_nodes_interface = _isaacsim_core_nodes.acquire_interface()
-        current_sim_time = self._core_nodes_interface.get_sim_time_at_time(
+        self._simulation_manager_interface = _simulation_manager.acquire_simulation_manager_interface()
+        current_sim_time = self._simulation_manager_interface.get_simulation_time_at_time(
             (fabric_time_data["referenceTimeNumerator"], fabric_time_data["referenceTimeDenominator"])
         )
-        self.assertAlmostEqual(current_sim_time, 0.01666666753590107 * 13)
+        self.assertAlmostEqual(current_sim_time, 0.01666666753590107 * 12)
         annotator_read_sim_time.detach()
         annotator_read_system_time.detach()
         fabric_time_annotator.detach()

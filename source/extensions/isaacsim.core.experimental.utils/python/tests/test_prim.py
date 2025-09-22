@@ -14,13 +14,14 @@
 # limitations under the License.
 
 import isaacsim.core.experimental.utils.backend as backend_utils
+import isaacsim.core.experimental.utils.foundation as foundation_utils
 import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.stage_templates
 import omni.kit.test
 import usdrt
 from isaacsim.storage.native import get_assets_root_path_async
-from pxr import Usd, UsdLux, UsdPhysics
+from pxr import Sdf, Usd, UsdLux, UsdPhysics
 
 
 class TestPrim(omni.kit.test.AsyncTestCase):
@@ -37,16 +38,17 @@ class TestPrim(omni.kit.test.AsyncTestCase):
     # --------------------------------------------------------------------
 
     async def test_prim_variants(self):
-        assets_root_path = await get_assets_root_path_async()
-        assert assets_root_path is not None, "Could not find Isaac Sim's root assets path"
-
+        assets_root_path = await get_assets_root_path_async(skip_check=True)
         prim = stage_utils.add_reference_to_stage(
             usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
             path="/franka",
         )
         # test cases
         # - collection
-        ground_truth = {"Mesh": ["Performance", "Quality"], "Gripper": ["AlternateFinger", "Default"]}
+        ground_truth = {
+            "Mesh": ["Performance", "Quality"],
+            "Gripper": ["AlternateFinger", "Default", "None", "Robotiq_2F_85"],
+        }
         self.assertEqual(prim_utils.get_prim_variant_collection(prim), ground_truth, "Wrong variant collection")
         # - get variants (default)
         ground_truth = [("Gripper", "Default"), ("Mesh", "Performance")]
@@ -212,3 +214,17 @@ class TestPrim(omni.kit.test.AsyncTestCase):
         )
         # exceptions
         self.assertRaises(ValueError, prim_utils.has_api, "/World/A", "UnexistingAPI", test="unknown")
+
+    async def test_attributes(self):
+        stage_utils.define_prim(path := "/World/A", "Xform")
+        for i, format_ in enumerate([str, Sdf.ValueTypeNames, usdrt.Sdf.ValueTypeNames]):
+            for j, value_type_name in enumerate(foundation_utils.get_value_type_names(format=format_)):
+                for backend in ["usd", "usdrt", "fabric"]:
+                    with backend_utils.use_backend(backend):
+                        name = f"{backend}_attr_{i}_{j}"
+                        attribute = prim_utils.create_prim_attribute(path, name=name, type_name=value_type_name)
+                        self.assertIsInstance(attribute, Usd.Attribute if backend == "usd" else usdrt.Usd.Attribute)
+                        attribute.Get()
+                        # exceptions
+                        with self.assertRaises(RuntimeError):
+                            prim_utils.create_prim_attribute(path, name=name, type_name=value_type_name, exist_ok=False)

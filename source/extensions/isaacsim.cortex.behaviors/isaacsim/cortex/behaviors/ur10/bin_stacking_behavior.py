@@ -150,6 +150,20 @@ def get_bin_under(p, stacked_bins):
     return None
 
 
+def adjust_about_x_if_opposite(eff_R, target_R, threshold=-0.9):
+    """Rotate target_R by 180 degrees about its X axis if X axes are nearly opposite.
+
+    This avoids a configuration where the end-effector's X axis is nearly anti-parallel
+    to the target pose's X axis, which can cause undesirable wrist flips.
+    """
+    target_x = target_R[:3, 0]
+    eff_x = eff_R[:3, 0]
+    if np.dot(target_x, eff_x) < threshold:
+        rot180_x = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
+        return target_R @ rot180_x
+    return target_R
+
+
 class BinStackingContext(ObstacleMonitorContext):
     def __init__(self, robot, monitor_fn=None):
         super().__init__(robot.arm)
@@ -282,7 +296,7 @@ class BinStackingContext(ObstacleMonitorContext):
         if self.has_active_bin:
             fk_T = self.robot.arm.get_fk_T()
             self.active_bin.is_grasp_reached = math_util.transforms_are_close(
-                self.active_bin.grasp_T, fk_T, p_thresh=0.005, R_thresh=0.01
+                self.active_bin.grasp_T, fk_T, p_thresh=0.01, R_thresh=0.01
             )
             # We can be looser with this proximity check.
             self.active_bin.is_attached = (
@@ -332,7 +346,7 @@ class ReachToPick(MoveWithNavObs):
     """
 
     def __init__(self):
-        super().__init__(p_thresh=0.001, R_thresh=2.0)
+        super().__init__(p_thresh=0.005, R_thresh=2.0)
 
     def enter(self):
         super().enter()
@@ -347,6 +361,15 @@ class ReachToPick(MoveWithNavObs):
             approach_length = 0.3
         else:
             approach_length = 0.1
+
+        # Adjust orientation to avoid X-axis anti-parallel configuration.
+        eff_T = self.context.robot.arm.get_fk_T()
+        eff_R, eff_p = math_util.unpack_T(eff_T)
+        R = adjust_about_x_if_opposite(eff_R, R)
+
+        distance_to_target = np.linalg.norm(p - self.context.robot.arm.get_fk_p())
+        if distance_to_target < approach_length:
+            approach_length = distance_to_target
 
         self.update_command(
             MotionCommand(
@@ -386,9 +409,23 @@ class ReachToPlace(MoveWithNavObs):
             if np.linalg.norm(xy_err) < 0.02:
                 self.target_p[:2] += 0.1 * (bin_under_p[:2] - bin_grasped_p[:2])
 
-        target_pose = PosePq(self.target_p, math_util.matrix_to_quat(self.target_R))
+        p = self.target_p
+        R = self.target_R
 
-        approach_params = ApproachParams(direction=0.35 * np.array([0.0, 0.0, -1.0]), std_dev=0.005)
+        # Adjust orientation to avoid X-axis anti-parallel configuration and persist it.
+        eff_T = self.context.robot.arm.get_fk_T()
+        eff_R, eff_p = math_util.unpack_T(eff_T)
+        R = adjust_about_x_if_opposite(eff_R, R)
+        self.target_R = R
+        target_pose = PosePq(p, math_util.matrix_to_quat(R))
+
+        approach_length = 0.35
+        distance_to_target = np.linalg.norm(p - self.context.robot.arm.get_fk_p())
+        if distance_to_target < 0.35:
+            approach_length = distance_to_target
+
+        approach_params = ApproachParams(direction=approach_length * np.array([0.0, 0.0, -1.0]), std_dev=0.005)
+
         posture_config = self.context.robot.default_config
         self.update_command(
             MotionCommand(target_pose=target_pose, approach_params=approach_params, posture_config=posture_config)
@@ -415,7 +452,10 @@ class CloseSuctionGripper(DfState):
         self.context.robot.suction_gripper.close()
 
     def step(self):
-        return None
+        if self.context.robot.suction_gripper.is_closed():
+            return None
+        self.context.robot.suction_gripper.close()
+        return self
 
 
 class OpenSuctionGripper(DfState):
@@ -438,7 +478,7 @@ class DoNothing(DfState):
 
 class LiftAndTurn(Move):
     def __init__(self):
-        super().__init__(p_thresh=0.05, R_thresh=0.1)
+        super().__init__(p_thresh=0.005, R_thresh=0.1)
 
     def step(self):
         home_config = self.context.robot.default_config
@@ -458,10 +498,10 @@ class PickBin(DfStateMachineDecider):
             DfStateSequence(
                 [
                     ReachToPick(),
-                    DfWaitState(wait_time=0.5),
+                    DfWaitState(wait_time=1.0),
                     DfSetLockState(set_locked_to=True, decider=self),
                     CloseSuctionGripper(),
-                    DfTimedDeciderState(DfLift(0.3), activity_duration=0.4),
+                    DfTimedDeciderState(DfLift(0.3), activity_duration=0.1),
                     DfSetLockState(set_locked_to=False, decider=self),
                 ]
             )

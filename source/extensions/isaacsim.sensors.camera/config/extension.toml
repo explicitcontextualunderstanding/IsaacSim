@@ -1,5 +1,5 @@
 [package]
-version = "1.3.1"
+version = "1.3.4"
 category = "Simulation"
 title = "Isaac Sim Camera Simulation"
 description = "Provides APIs for camera prims, eg. setting lens distortion and enabling tiled rendering."
@@ -84,7 +84,7 @@ args = [
 ]
 stdoutFailPatterns.exclude = [
     '*[Error] [rtx.postprocessing.plugin] DepthSensor: Texture sizes do not match: inColorTexDesc 1920x1080x1:11@0 inDepthTexDesc 1500x843x1:33@0*',
-    '*[Error] [rtx.postprocessing.plugin] DepthSensor: Failed to allocate view resources for view 1 device 0*',
+    '*[Error] [rtx.postprocessing.plugin] DepthSensor: Failed to allocate view resources for view * device **',
     '*[Error] [carb.scenerenderer-rtx.plugin] Failed to export AOV 38 to render product. The renderer did not generate the AOV texture.*',
 ]
 

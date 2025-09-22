@@ -59,7 +59,13 @@ class SimulationApp:
 
     Arguments:
         config (dict): A dictionary containing the configuration for the app. (default: None)
-        experience (str): Path to the application config loaded by the launcher (default: "", will load apps/isaacsim.kit if left blank)
+        experience (str): Path to the application config loaded by the launcher.
+            If not specified, the launcher will load one of the following experience files in order
+            (where ``$EXP_PATH`` points to the ``apps`` folder in a default Isaac Sim setup):
+
+            - ``$EXP_PATH/omni.isaac.sim.python.kit``
+            - ``$EXP_PATH/isaacsim.exp.base.python.kit``
+            - ``$EXP_PATH/isaacsim.exp.base.kit``
     """
 
     DEFAULT_LAUNCHER_CONFIG = {
@@ -127,6 +133,31 @@ class SimulationApp:
     """
 
     def __init__(self, launch_config: dict = None, experience: str = "") -> None:
+        """Initialize the SimulationApp with specified configuration.
+
+        Launches the Omniverse Toolkit with the provided configuration settings.
+        The settings in DEFAULT_LAUNCHER_CONFIG are overwritten by those in launch_config.
+
+        Args:
+            launch_config: A dictionary containing the configuration for the app.
+                See DEFAULT_LAUNCHER_CONFIG for available options.
+            experience: Path to the application config loaded by the launcher.
+                If not specified, loads one of the default experience files in order.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.simulation_app import SimulationApp
+            >>> config = {
+            ...     "width": 1280,
+            ...     "height": 720,
+            ...     "headless": False,
+            ... }
+            >>> simulation_app = SimulationApp(config)
+            >>> # Rest of the code follows
+            >>> simulation_app.close()
+        """
         # Enable callstack on crash
         faulthandler.enable()
         # Sanity check to see if any extra omniverse modules are loaded
@@ -188,6 +219,8 @@ class SimulationApp:
             carb.log_warn(
                 "Please check to make sure no extra omniverse or pxr modules are imported before the call to SimulationApp(...)"
             )
+        else:
+            carb.log_info("SimulationApp.__init__: Module validation passed - no problematic modules found")
 
         # Initialize variables
         builtins.ISAAC_LAUNCHED_FROM_TERMINAL = False
@@ -225,6 +258,7 @@ class SimulationApp:
             loaded_file_wildcards=wildcards,
             search_paths=[os.path.abspath(f'{os.environ["CARB_APP_PATH"]}/kernel/plugins')],
         )
+        carb.log_info("SimulationApp.__init__: Loaded framework plugins")
         # Get Omniverse application
         self._app = omni.kit.app.get_app()
         self._start_app()
@@ -262,6 +296,7 @@ class SimulationApp:
                 print("Done.")
 
         if self.config["create_new_stage"] is True:
+            carb.log_info("SimulationApp.__init__: Creating new stage")
             create_new_stage()
 
         # Update the app
@@ -317,8 +352,14 @@ class SimulationApp:
             benchmark.store_measurements()
             benchmark.stop()
 
+        builtins.ISAACSIM_APP_LAUNCHED = True
+
     def __del__(self):
-        """Destructor for the class."""
+        """Destructor for the SimulationApp class.
+
+        Warns if the application is still running when Python exits,
+        indicating that close() was not called properly.
+        """
         if self._exiting is False and sys.meta_path is None:
             print(
                 "\033[91m"
@@ -330,7 +371,9 @@ class SimulationApp:
 
     def _start_app(self) -> None:
         """Launch the Omniverse application."""
+        carb.log_info("SimulationApp._start_app: Starting app launch process")
         exe_path = os.path.abspath(f'{os.environ["CARB_APP_PATH"]}')
+        carb.log_info(f"SimulationApp._start_app: Using executable path: {exe_path}")
         # input arguments to the application
         args = [
             os.path.abspath(__file__),
@@ -366,6 +409,10 @@ class SimulationApp:
             args.append(f'--/physics/cudaDevice={self.config["physics_gpu"]}')
         if self.config.get("max_gpu_count") is not None:
             args.append(f'--/renderer/multiGpu/maxGpuCount={self.config["max_gpu_count"]}')
+        if self.config.get("enable_motion_bvh"):
+            args.append("--/renderer/raytracingMotion/enabled=true")
+            args.append("--/renderer/raytracingMotion/enableHydraEngineMasking=true")
+            args.append("--/renderer/raytracingMotion/enabledForHydraEngines='0'")
 
         # limit the number of CPU threads created to lesser of: num_cpu_cores or config-set limit
         num_cpu_cores = os.cpu_count()
@@ -379,14 +426,26 @@ class SimulationApp:
 
         # parse any extra command line args here
         # user script should provide its own help, otherwise we default to printing the kit app help output
+        carb.log_info("SimulationApp._start_app: Parsing command line arguments")
         parser = argparse.ArgumentParser(add_help=False)
         _, unknown_args = parser.parse_known_args()
+        carb.log_info(f"SimulationApp._start_app: Unknown args: {unknown_args}")
         # is user did not request portable root,
         # we still run apps as portable to prevent them writing extra files to user directory
         if "--portable-root" not in unknown_args:
             args.append("--portable")
-        if self.config.get("headless") and "--no-window" not in unknown_args:
+
+        # Check for DISPLAY environment variable on Linux
+        display_not_available = sys.platform.startswith("linux") and os.environ.get("DISPLAY") is None
+        headless_mode = self.config.get("headless")
+
+        if "--no-window" not in unknown_args and (headless_mode or display_not_available):
             args.append("--no-window")
+            if display_not_available and not headless_mode:
+                carb.log_warn(
+                    "DISPLAY environment variable is not set, running in headless mode with --no-window flag. "
+                    "Set DISPLAY environment variable if you want to run in non-headless mode."
+                )
 
         # if the user forces hideUi via commandline, use that setting
         if "--/app/window/hideUi" not in unknown_args:
@@ -464,9 +523,11 @@ class SimulationApp:
         print("Passing the following args to the base kit application: ", unknown_args)
         args.extend(unknown_args)
         self.app.startup("kit", os.environ["CARB_APP_PATH"], args)
+        carb.log_info("SimulationApp._start_app: Kit application startup completed")
         # if user called with -h kit auto exits so we force exit the script here as well
         if "-h" in unknown_args or "--help" in unknown_args:
-            sys.exit()
+            carb.log_info("SimulationApp._start_app: Help requested, exiting")
+            self.close(skip_cleanup=True)
 
     def _set_render_settings(self, default: bool = False) -> None:
         """Set render settings to those in config.
@@ -521,9 +582,11 @@ class SimulationApp:
         set_carb_setting(self._carb_settings, rtx_mode + "/materialDb/syncLoads", self.config["sync_loads"])
         set_carb_setting(self._carb_settings, rtx_mode + "/hydra/materialSyncLoads", self.config["sync_loads"])
         set_carb_setting(self._carb_settings, "/omni.kit.plugin/syncUsdLoads", self.config["sync_loads"])
+        carb.log_info("SimulationApp._set_render_settings: Completed render settings configuration")
 
     def _prepare_ui(self) -> None:
         """Dock the windows in the UI if they exist."""
+        carb.log_info("SimulationApp._prepare_ui: Starting UI setup")
         try:
             import omni.ui
 
@@ -543,8 +606,13 @@ class SimulationApp:
             pass
 
         self._app.update()
+        carb.log_info("SimulationApp._prepare_ui: UI setup completed")
 
     def _wait_for_viewport(self) -> None:
+        MAX_FRAMES = 25
+        DOCKING_FRAMES = 10
+        frame_count = 0
+        carb.log_info("SimulationApp._wait_for_viewport: Starting viewport wait")
         try:
             from omni.kit.viewport.utility import get_active_viewport
 
@@ -554,43 +622,83 @@ class SimulationApp:
 
             # Get every ViewportWindow, regardless of UsdContext it is attached to
             viewport_api = get_active_viewport()
-            frame = 0
-            while viewport_api.frame_info.get("viewport_handle", None) is None:
+
+            while viewport_api.frame_info.get("viewport_handle", None) is None and frame_count < MAX_FRAMES:
+                carb.log_info(f"SimulationApp._wait_for_viewport: Waiting for viewport... frame {frame_count}")
                 self._app.update()
-                frame += 1
-        except Exception:
+                frame_count += 1
+            if frame_count == MAX_FRAMES:
+                raise Exception("Timeout waiting for viewport")
+        except Exception as e:
+            carb.log_info(f"SimulationApp._wait_for_viewport: Exception during viewport wait: {e}")
             pass
 
         # once we load, we need a few frames so everything docks itself
-        for _ in range(10):
-            self._app.update()
+        if frame_count < DOCKING_FRAMES:
+            carb.log_info("SimulationApp._wait_for_viewport: Running final update frames for docking")
+            for _ in range(DOCKING_FRAMES):
+                self._app.update()
+        carb.log_info("SimulationApp._wait_for_viewport: Viewport wait completed")
 
     ### Public methods
 
     def update(self) -> None:
-        """
-        Convenience function to step the application forward one frame
+        """Step the application forward by one frame.
+
+        This is a convenience function that advances the simulation by a single frame,
+        updating all systems and rendering.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> # Run simulation for 10 frames
+            >>> for _ in range(10):
+            ...     simulation_app.update()
+            >>> simulation_app.close()
         """
         self._app.update()
 
     def set_setting(self, setting: str, value) -> None:
-        """
-        Set a carbonite setting
+        """Set a Carbonite framework setting.
+
+        Sets a configuration value in the Carbonite settings system.
+        The value type is automatically detected and used for proper setting assignment.
 
         Args:
-            setting (str): carb setting path
-            value: value to set the setting to, type is used to properly set the setting.
+            setting: The Carbonite setting path (e.g., "/app/window/width").
+            value: The value to set. Type is automatically detected.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> simulation_app.set_setting("/app/window/width", 1920)
+            >>> simulation_app.set_setting("/rtx/rendermode", "PathTracing")
+            >>> simulation_app.close()
         """
         from .utils import set_carb_setting
 
         set_carb_setting(self._carb_settings, setting, value)
 
     def reset_render_settings(self):
-        """Reset render settings to those in config.
+        """Reset render settings to those specified in the launch configuration.
 
-        Note:
-            This should be used in case a new stage is opened and the desired config needs
-            to be re-applied.
+        Re-applies the rendering settings from the initial configuration.
+        This should be used when a new stage is opened and the desired
+        render configuration needs to be re-applied.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> config = {"renderer": "PathTracing", "samples_per_pixel_per_frame": 128}
+            >>> simulation_app = SimulationApp(config)
+            >>> # Open a new stage
+            >>> simulation_app.reset_render_settings()  # Re-apply config settings
+            >>> simulation_app.close()
         """
         # Set rtx settings renderer settings
         self._set_render_settings(default=False)
@@ -598,19 +706,37 @@ class SimulationApp:
     def run_coroutine(
         self, coroutine: asyncio.Coroutine, run_until_complete: bool = True
     ) -> asyncio.Task | asyncio.Future | Any:
-        """Run a coroutine using the Kit's asynchronous task engine.
+        """Run a coroutine using Kit's asynchronous task engine.
+
+        Executes the provided coroutine within Kit's event loop system.
+        The Kit's asynchronous task engine runs the event loop every IApp update.
 
         Args:
-            coroutine: The coroutine to run.
-            run_until_complete: Whether to run the coroutine until it is complete.
+            coroutine: The coroutine to execute.
+            run_until_complete: Whether to block and wait for coroutine completion.
 
         Returns:
-            The result of the coroutine if ``run_until_complete`` is True,
-            otherwise an asyncio task (if called from the main thread)
-            or a future (if called from any other non-main thread) instance.
+            If run_until_complete is True, returns the coroutine result.
+            Otherwise returns an asyncio.Task (from main thread) or asyncio.Future
+            (from other threads).
 
         Raises:
             Exception: Any exception raised by the coroutine.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import asyncio
+            >>> async def my_async_task():
+            ...     await asyncio.sleep(0.1)
+            ...     return "completed"
+            >>>
+            >>> simulation_app = SimulationApp()
+            >>> result = simulation_app.run_coroutine(my_async_task())
+            >>> print(result)
+            completed
+            >>> simulation_app.close()
         """
         task_or_future = omni.kit.async_engine.run_coroutine(coroutine)
         if run_until_complete:
@@ -623,16 +749,47 @@ class SimulationApp:
             return task_or_future.result()
         return task_or_future
 
-    def close(self, wait_for_replicator=True) -> None:
-        """Close the running Omniverse Toolkit."""
+    def close(self, wait_for_replicator=True, skip_cleanup=False) -> None:
+        """Close the running Omniverse Toolkit application.
 
+        Performs cleanup and shuts down the application. Can either perform
+        a graceful shutdown with full cleanup or an immediate exit.
+
+        Args:
+            wait_for_replicator: Whether to wait for replicator workflows to complete
+                before shutdown.
+            skip_cleanup: If True, performs immediate exit without cleanup.
+                If False, performs graceful shutdown with full cleanup.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> # Do simulation work...
+            >>> simulation_app.close(wait_for_replicator=True)
+            >>>
+            >>> # For immediate exit without cleanup:
+            >>> simulation_app = SimulationApp()
+            >>> simulation_app.close(skip_cleanup=True)
+        """
+        carb.log_info("SimulationApp.close: Closing application")
+        if skip_cleanup:
+            self._exiting = True
+            carb.log_info("SimulationApp.close: immediate_exit")
+            _logging = carb.logging.acquire_logging()
+            _logging.set_log_enabled(False)
+            self._app.shutdown_and_release_framework()
         try:
             # make sure that any replicator workflows finish rendering/writing
             import omni.replicator.core as rep
 
+            need_to_wait_for_replicator = False
             if rep.orchestrator.get_status() not in [rep.orchestrator.Status.STOPPED, rep.orchestrator.Status.STOPPING]:
+                need_to_wait_for_replicator = True
                 rep.orchestrator.stop()
-            if wait_for_replicator:
+            # only wait if status was not stopped or stopping
+            if wait_for_replicator and need_to_wait_for_replicator:
                 rep.orchestrator.wait_until_complete()
                 time.sleep(1.0)
 
@@ -640,38 +797,11 @@ class SimulationApp:
             rep.orchestrator.set_capture_on_play(False)
         except Exception:
             pass
-
-        # workaround for exit issues, clean the stage first:
-        try:
-            if omni.usd.get_context().can_close_stage():
-                omni.usd.get_context().close_stage()
-        except Exception:
-            pass
-        # omni.kit.app.get_app().update()
+        carb.log_info("SimulationApp.close: Replicator shutdown finished")
         # check if exited already
         if not self._exiting:
             self._exiting = True
             self._app.print_and_log("Simulation App Shutting Down")
-
-            # We are exisitng but something is still loading, wait for it to load to avoid a deadlock
-            from .utils import is_stage_loading
-
-            if is_stage_loading():
-                self._app.print_and_log(
-                    "Waiting for USD resource operations to complete (this may take a few seconds), use Ctrl-C to exit immediately"
-                )
-
-            # Add timeout to prevent infinite loop (max 300 iterations = ~5 seconds at 60fps)
-            max_iterations = 300
-            iteration_count = 0
-            while is_stage_loading() and iteration_count < max_iterations:
-                self._app.update()
-                iteration_count += 1
-
-            if iteration_count >= max_iterations:
-                self._app.print_and_log(
-                    "Warning: {max_iterations} frame timeout reached while waiting for USD resource operations to complete"
-                )
 
             # Cleanup any running tracy intances so data is not lost
             try:
@@ -683,43 +813,97 @@ class SimulationApp:
             except RuntimeError:
                 # Tracy plugin was not loaded, so profiler never started - skip checks.
                 pass
-
+            carb.log_info("SimulationApp.close: shutting down app and releasing framework")
             # Disable logging before shutdown to keep the log clean
             # Warnings at this point don't matter as the python process is about to be terminated
             _logging = carb.logging.acquire_logging()
             _logging.set_log_enabled(False)
-            # Disabled to prevent crashes on shutdown, terminating carb is faster
-            self._app.shutdown()
-            self._framework.unload_all_plugins()
-            # Force all omni module to unload on close
-            # This prevents crash on exit
-            # for m in list(sys.modules.keys()):
-            #     if "omni" in m and m != "omni.kit.app":
-            #         del sys.modules[m]
+            self._app.shutdown_and_release_framework()
 
     def is_running(self) -> bool:
-        """
-        bool: convenience function to see if app is running. True if running, False otherwise
+        """Check if the simulation application is currently running.
+
+        Returns True if the application is running and has a valid stage,
+        False if the application is stopped or exiting.
+
+        Returns:
+            True if the application is running, False otherwise.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> simulation_app.is_running()
+            True
+            >>> simulation_app.close()
+            >>> simulation_app.is_running()
+            False
         """
         # If there is no stage, we can assume that the app is about to close
         return self._app.is_running() and not self.is_exiting() and self.context.get_stage() is not None
 
     def is_exiting(self) -> bool:
-        """
-        bool: True if close() was called previously, False otherwise
+        """Check if the simulation application is in the process of exiting.
+
+        Returns True if close() has been called and the application is shutting down,
+        False if the application is still running normally.
+
+        Returns:
+            True if close() was called previously, False otherwise.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> simulation_app.is_exiting()
+            False
+            >>> simulation_app.close()
+            >>> simulation_app.is_exiting()
+            True
         """
         return self._exiting
 
     @property
     def app(self) -> omni.kit.app.IApp:
-        """
-        omni.kit.app.IApp: omniverse kit application object
+        """Get the underlying Omniverse Kit application object.
+
+        Provides access to the low-level Kit application interface for advanced
+        operations and direct framework access.
+
+        Returns:
+            The Omniverse Kit application interface object.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> app = simulation_app.app
+            >>> app.update()  # Direct app update
+            >>> simulation_app.close()
         """
         return self._app
 
     @property
     def context(self) -> omni.usd.UsdContext:
-        """
-        omni.usd.UsdContext: the current USD context
+        """Get the current USD context for stage operations.
+
+        Provides access to the USD context which manages the current stage
+        and USD-related operations.
+
+        Returns:
+            The current USD context object.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> simulation_app = SimulationApp()
+            >>> context = simulation_app.context
+            >>> stage = context.get_stage()
+            >>> print(stage.GetRootLayer().identifier)
+            >>> simulation_app.close()
         """
         return omni.usd.get_context()

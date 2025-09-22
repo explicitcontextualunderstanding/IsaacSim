@@ -32,7 +32,7 @@ from PIL import Image
 
 # Util function to save rgb annotator data
 def write_rgb_data(rgb_data, file_path):
-    rgb_img = Image.fromarray(rgb_data, "RGBA")
+    rgb_img = Image.fromarray(rgb_data).convert("RGBA")
     rgb_img.save(file_path + ".png")
 
 
@@ -41,8 +41,8 @@ def write_sem_data(sem_data, file_path):
     id_to_labels = sem_data["info"]["idToLabels"]
     with open(file_path + ".json", "w") as f:
         json.dump(id_to_labels, f)
-    sem_image_data = np.frombuffer(sem_data["data"], dtype=np.uint8).reshape(*sem_data["data"].shape, -1)
-    sem_img = Image.fromarray(sem_image_data, "RGBA")
+    sem_image_data = sem_data["data"]
+    sem_img = Image.fromarray(sem_image_data).convert("RGBA")
     sem_img.save(file_path + ".png")
 
 

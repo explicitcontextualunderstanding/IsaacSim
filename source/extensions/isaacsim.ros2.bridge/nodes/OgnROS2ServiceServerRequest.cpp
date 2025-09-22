@@ -125,8 +125,8 @@ public:
         if (!state.m_serviceServer || state.m_serviceUpdateNeeded)
         {
             // Setup ROS ServiceServer
-            const std::string& serviceName = db.inputs.serviceName();
-            std::string fullServiceName = addTopicPrefix(db.inputs.nodeNamespace(), serviceName);
+            const std::string& currentServiceName = db.inputs.serviceName();
+            std::string fullServiceName = addTopicPrefix(db.inputs.nodeNamespace(), currentServiceName);
             if (!state.m_factory->validateTopicName(fullServiceName))
             {
                 db.logWarning("No Valid Topic : %s", fullServiceName.c_str());
@@ -201,14 +201,14 @@ private:
     bool m_serviceUpdateNeeded = true;
     bool m_messageUpdateNeeded = true;
     NodeObj m_nodeObj;
-    uint64_t m_serverHandle;
+    uint64_t m_serverHandle = 0;
 
     std::string m_messagePackage;
     std::string m_messageSubfolder;
     std::string m_messageName;
     std::string m_serviceName;
     std::string m_qosProfile;
-    isaacsim::core::nodes::CoreNodes* m_coreNodeFramework;
+    isaacsim::core::nodes::CoreNodes* m_coreNodeFramework = nullptr;
 
     static void onPackageChanged(AttributeObj const& attrObj, void const* userData)
     {

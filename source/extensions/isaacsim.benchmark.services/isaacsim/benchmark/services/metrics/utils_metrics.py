@@ -51,8 +51,6 @@ from isaacsim.benchmark.services.metrics.schemas import (
 
 from .. import utils
 
-logger = utils.set_up_logging(__name__)
-
 
 def get_execution_environment() -> Tuple[str, str]:
     """Creates a source and a build id for metrics api"""
@@ -124,7 +122,7 @@ def get_app_info() -> Tuple[str, str, str]:
         app_build = ".".join(ci_build_number.rsplit(".", 3)[1:4])
         return app_name, app_version, app_build
     except Exception as e:
-        logger.warn(f"Unable to find app_version and/or app_build. {str(e)}")
+        carb.log_warn(f"Unable to find app_version and/or app_build. {str(e)}")
         return app_name, "Unknown", "Unknown"
 
 
@@ -133,13 +131,13 @@ def get_kit_build_date() -> Optional[int]:
     yaml_contents = get_package_info_yaml()
     try:
         time = yaml_contents["Time"]
-        logger.info(f"PACKAGE-INFO.yaml Time = {time}")
+        carb.log_info(f"PACKAGE-INFO.yaml Time = {time}")
         # Convert time from "Wed May 25 13:38:50 2022" to UNIX epoch time in millisecond.
         epoch_time_ms = int(calendar.timegm(datetime.strptime(time, "%a %b %d %H:%M:%S %Y").timetuple()) * 1000)
-        logger.info(f"PACKAGE-INFO.yaml Epoch Time (ms) = {epoch_time_ms}")
+        carb.log_info(f"PACKAGE-INFO.yaml Epoch Time (ms) = {epoch_time_ms}")
         return epoch_time_ms
     except Exception as e:
-        logger.warn(f"Unable to find Time with PACKAGE-INFO.yaml. {str(e)}")
+        carb.log_warn(f"Unable to find Time with PACKAGE-INFO.yaml. {str(e)}")
         return None
 
 
@@ -157,12 +155,12 @@ def get_package_info_yaml(yaml_path=None) -> dict:
 
     yaml_contents = {}
     try:
-        logger.info(f"PACKAGE-INFO.yaml path = {yaml_path}")
+        carb.log_info(f"PACKAGE-INFO.yaml path = {yaml_path}")
         with open(yaml_path, "r") as f:
             yaml_contents = yaml.safe_load(f)
-            logger.info(f"PACKAGE-INFO.yaml contents: {yaml_contents}")
+            carb.log_info(f"PACKAGE-INFO.yaml contents: {yaml_contents}")
     except Exception as e:
-        logger.warn(f"Unable to find PACKAGE-INFO.yaml. {str(e)}")
+        carb.log_warn(f"Unable to find PACKAGE-INFO.yaml. {str(e)}")
 
     return yaml_contents
 

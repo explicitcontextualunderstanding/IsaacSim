@@ -179,6 +179,7 @@ def set_prim_attribute_value(prim_path: str, attribute_name: str, value: typing.
     if isinstance(value, np.ndarray):
         value = value.tolist()
     if type_name in SDF_type_to_Gf:
+        value = np.array(value).flatten().tolist()
         if fabric:
             eval("attr.Set(usdrt." + SDF_type_to_Gf[type_name] + "(*value))")
         else:

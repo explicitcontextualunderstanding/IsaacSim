@@ -27,7 +27,6 @@ enable_extension("isaacsim.ros2.bridge")
 
 simulation_app.update()
 
-import time
 
 # Note that this is not the system level rclpy, but one compiled for omniverse
 import numpy as np

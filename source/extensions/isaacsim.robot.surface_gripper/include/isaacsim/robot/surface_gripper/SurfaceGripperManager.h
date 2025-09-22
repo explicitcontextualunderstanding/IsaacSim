@@ -115,19 +115,25 @@ public:
     virtual void tick(double dt);
 
     /**
-     * @brief Sets the status of a specific gripper
-     * @param[in] primPath The USD path of the gripper to control
-     * @param[in] status The new status to set ("Open" or "Closed")
-     * @return True if the status was set successfully, false otherwise
+     * @brief Sets whether to write to USD or keep state in memory only
+     * @param[in] writeToUsd Whether to write to USD or keep state in memory only
      */
-    bool setGripperStatus(const std::string& primPath, const std::string& status);
+    void setWriteToUsd(bool writeToUsd);
 
     /**
-     * @brief Gets the status of a specific gripper
-     * @param[in] primPath The USD path of the gripper
-     * @return The current status of the gripper or empty string if not found
+     * @brief Sets the status of a specific gripper.
+     * @param[in] primPath The USD path of the gripper to control.
+     * @param[in] status The new status code to set (0: Open, 1: Closed, 2: Closing).
+     * @return True if the status was set successfully, false otherwise.
      */
-    std::string getGripperStatus(const std::string& primPath);
+    bool setGripperStatus(const std::string& primPath, GripperStatus status);
+
+    /**
+     * @brief Gets the status code of a specific gripper.
+     * @param[in] primPath The USD path of the gripper.
+     * @return The current status code of the gripper, or -1 if not found.
+     */
+    GripperStatus getGripperStatus(const std::string& primPath);
 
     /**
      * @brief Gets all grippers currently managed by this manager
@@ -155,6 +161,7 @@ public:
 private:
     omni::physx::IPhysx* m_physXInterface = nullptr; ///< Pointer to the PhysX interface
     pxr::SdfLayerRefPtr m_gripperLayer; ///< The gripper layer for this gripper
+    bool m_writeToUsd = false; ///< Whether to write to USD or keep state in memory only
 };
 
 } // namespace surface_gripper

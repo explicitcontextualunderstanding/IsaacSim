@@ -263,7 +263,7 @@ private:
     pxr::SdfPath m_parentPath;
     pxr::SdfPathVector m_targets;
 
-    long m_stageId;
+    long m_stageId = 0;
     pxr::UsdStageRefPtr m_usdStage;
     std::unique_ptr<isaacsim::core::includes::posetree::PoseTree> m_poseTree;
 };

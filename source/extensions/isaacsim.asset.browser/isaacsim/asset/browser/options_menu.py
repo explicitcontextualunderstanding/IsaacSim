@@ -21,8 +21,8 @@ import omni.ui as ui
 from omni.kit.browser.core import OptionMenuDescription
 from omni.kit.browser.folder.core import FolderOptionsMenu
 
-DOCS_URL = "https://docs.omniverse.nvidia.com"
-ASSETS_GUIDE_URL = DOCS_URL + "/isaacsim/latest/installation/install_faq.html#setting-the-default-nuc-short-server"
+DOCS_URL = "https://docs.isaacsim.omniverse.nvidia.com"
+ASSETS_GUIDE_URL = DOCS_URL + "/latest/installation/install_faq.html#isaac-sim-setup-faq"
 
 
 class FolderOptionsMenu(FolderOptionsMenu):

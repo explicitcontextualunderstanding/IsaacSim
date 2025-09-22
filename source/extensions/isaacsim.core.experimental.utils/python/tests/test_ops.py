@@ -27,7 +27,17 @@ class TestOps(omni.kit.test.AsyncTestCase):
         # Do custom setUp
         # ---------------
         self.parametrize_device = ["cpu", "cuda:0", None]
-        self.parametrize_dtype = [wp.int8, wp.int16, wp.int32, wp.int64, wp.float16, wp.float32, wp.float64, None]
+        self.parametrize_dtype = [
+            wp.bool,
+            wp.int8,
+            wp.int16,
+            wp.int32,
+            wp.int64,
+            wp.float16,
+            wp.float32,
+            wp.float64,
+            None,
+        ]
         self.parametrize_dim = [1, 2, 3, 4]
 
     async def tearDown(self):
@@ -82,18 +92,30 @@ class TestOps(omni.kit.test.AsyncTestCase):
         for device in self.parametrize_device:
             for dtype in self.parametrize_dtype:
                 for dim in self.parametrize_dim:
+                    # Python primitive
+                    shape = (1,)
+                    # - bool
+                    output = ops_utils.place(True, dtype=dtype, device=device)
+                    self.check_array(output, shape=shape, dtype=dtype, device=device)
+                    # - int
+                    output = ops_utils.place(10, dtype=dtype, device=device)
+                    self.check_array(output, shape=shape, dtype=dtype, device=device)
+                    # - float
+                    output = ops_utils.place(100.0, dtype=dtype, device=device)
+                    self.check_array(output, shape=shape, dtype=dtype, device=device)
+                    # Non-primitive types
                     shape = (*([1] * (dim - 1)),) + (5,)
-                    # list
+                    # - list
                     x = list(range(5))
                     for _ in range(dim - 1):
                         x = [x]
                     output = ops_utils.place(x, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
-                    # NumPy array
+                    # - NumPy array
                     x = np.arange(5).reshape(*([1] * (dim - 1)), -1)
                     output = ops_utils.place(x, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
-                    # Warp array
+                    # - Warp array
                     x = wp.array(x)
                     output = ops_utils.place(x, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
@@ -102,18 +124,30 @@ class TestOps(omni.kit.test.AsyncTestCase):
         for device in self.parametrize_device:
             for dtype in self.parametrize_dtype:
                 for dim in self.parametrize_dim:
+                    # Python primitive
+                    shape = (1,)
+                    # - bool
+                    output = ops_utils.resolve_indices(True, count=-1, dtype=dtype, device=device)
+                    self.check_array(output, shape=shape, dtype=dtype, device=device)
+                    # - int
+                    output = ops_utils.resolve_indices(10, count=-1, dtype=dtype, device=device)
+                    self.check_array(output, shape=shape, dtype=dtype, device=device)
+                    # - float
+                    output = ops_utils.resolve_indices(100.0, count=-1, dtype=dtype, device=device)
+                    self.check_array(output, shape=shape, dtype=dtype, device=device)
+                    # Non-primitive types
                     shape = (5,)
-                    # list
+                    # - list
                     x = list(range(5))
                     for _ in range(dim - 1):
                         x = [x]
                     output = ops_utils.resolve_indices(x, count=5, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
-                    # NumPy array
+                    # - NumPy array
                     x = np.arange(5).reshape(*([1] * (dim - 1)), -1)
                     output = ops_utils.resolve_indices(x, count=5, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
-                    # Warp array
+                    # - Warp array
                     x = wp.array(x)
                     output = ops_utils.resolve_indices(x, count=5, dtype=dtype, device=device)
                     self.check_array(output, shape=shape, dtype=dtype, device=device)
@@ -123,14 +157,32 @@ class TestOps(omni.kit.test.AsyncTestCase):
             for dtype in self.parametrize_dtype:
                 for shape in [(5,), (11, 5), (22, 11, 5), (33, 22, 11, 5)]:
                     for n in (1, 5):
-                        x = np.arange(n).reshape(-1)
-                        broadcasted = np.broadcast_to(x, shape=shape)
-                        # - NumPy array
+                        # Python primitive
+                        # - bool
+                        x = bool(n)
                         output = ops_utils.broadcast_to(x, shape=shape, dtype=dtype, device=device)
                         self.check_array(output, shape=shape, dtype=dtype, device=device)
-                        self.check_equal(broadcasted, output)
+                        self.check_equal(np.broadcast_to(x, shape=shape), output)
+                        # - int
+                        x = int(n)
+                        output = ops_utils.broadcast_to(x, shape=shape, dtype=dtype, device=device)
+                        self.check_array(output, shape=shape, dtype=dtype, device=device)
+                        self.check_equal(np.broadcast_to(x != 0 if dtype is wp.bool else x, shape=shape), output)
+                        # - float
+                        x = float(n)
+                        output = ops_utils.broadcast_to(x, shape=shape, dtype=dtype, device=device)
+                        self.check_array(output, shape=shape, dtype=dtype, device=device)
+                        self.check_equal(np.broadcast_to(x != 0 if dtype is wp.bool else x, shape=shape), output)
+                        # Non-primitive types
+                        x = np.arange(n).reshape(-1)
+                        broadcasted = np.broadcast_to(x, shape=shape)
+                        broadcasted = broadcasted != 0 if dtype is wp.bool else broadcasted
                         # - list
                         output = ops_utils.broadcast_to(x.tolist(), shape=shape, dtype=dtype, device=device)
+                        self.check_array(output, shape=shape, dtype=dtype, device=device)
+                        self.check_equal(broadcasted, output)
+                        # - NumPy array
+                        output = ops_utils.broadcast_to(x, shape=shape, dtype=dtype, device=device)
                         self.check_array(output, shape=shape, dtype=dtype, device=device)
                         self.check_equal(broadcasted, output)
                         # - Warp array

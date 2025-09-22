@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This module provides a motion commander that wraps a motion policy to give it a standard
+"""This module provides a motion commander that wraps a motion policy to give it a standard
 flexible command interface.
 
 The command, defined by the MotionCommand class, allows users to specify not only a target pose, but

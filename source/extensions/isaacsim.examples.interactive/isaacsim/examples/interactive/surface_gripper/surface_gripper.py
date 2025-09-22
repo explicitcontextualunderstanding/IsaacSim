@@ -153,7 +153,7 @@ class Extension(omni.ext.IExt):
     def _toggle_gripper_button_ui(self):
         # Checks if the surface gripper has been created
         status = self.gripper_interface.get_gripper_status(self.gripper_prim_path)
-        if status == "Open":
+        if status == surface_gripper.GripperStatus.Open:
             self._models["toggle_button"].text = "OPEN"
         else:
             self._models["toggle_button"].text = "CLOSED"
@@ -162,10 +162,8 @@ class Extension(omni.ext.IExt):
         # Checks if the simulation is playing, and if the stage has been loaded
         if self._timeline.is_playing() and self._stage_id != -1:
             self._toggle_gripper_button_ui()
-            surface_gripper = self._stage.GetPrimAtPath(self.gripper_prim_path)
-            gripped_objs_rel = surface_gripper.GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name)
-            gripped_objects = [f"{a}" for a in gripped_objs_rel.GetTargets()]
-            self._models["gripped_objects"].set_value("\n".join(gripped_objects))
+            objects = self.gripper_interface.get_gripped_objects(self.gripper_prim_path)
+            self._models["gripped_objects"].set_value("\n".join(objects))
 
     def _on_reset_scenario_button_clicked(self):
         pass
@@ -185,6 +183,7 @@ class Extension(omni.ext.IExt):
 
             self.gripper_prim_path = "/World/SurfaceGripper"
             self.gripper_interface = surface_gripper.acquire_surface_gripper_interface()
+            self.gripper_interface.set_write_to_usd(True)
 
             # Create the Surface Gripper Prim
             # This prim could be already defined in the stage,
@@ -251,7 +250,7 @@ class Extension(omni.ext.IExt):
     def _on_toggle_gripper_button_clicked(self, val=False):
         if self._timeline.is_playing():
             status = self.gripper_interface.get_gripper_status(self.gripper_prim_path)
-            if status == "Open":
+            if status == surface_gripper.GripperStatus.Open:
                 self.gripper_interface.close_gripper(self.gripper_prim_path)
             else:
                 self.gripper_interface.open_gripper(self.gripper_prim_path)

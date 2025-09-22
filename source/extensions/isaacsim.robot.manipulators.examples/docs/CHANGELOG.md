@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1] - 2025-08-20
+### Added
+- UR robot functionality based on Warp APIs
+- Target-following task for the UR robot using inverse kinematics (IK)
+
+## [1.1.0] - 2025-07-08
+### Changed
+- Merged task wrapper and pick-and-place controller into a single file for the Franka robot
+
 ## [1.0.17] - 2025-07-07
 ### Changed
 - updated path to Universal Robot's config file

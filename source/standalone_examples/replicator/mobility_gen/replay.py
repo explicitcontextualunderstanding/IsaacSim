@@ -25,20 +25,17 @@ from isaacsim import SimulationApp
 simulation_app = SimulationApp(launch_config={"headless": True})
 
 import argparse
-import glob
 import os
 import shutil
 import time
 
 import carb
-import numpy as np
 import omni.replicator.core as rep
 import tqdm
 from isaacsim.replicator.mobility_gen.impl.build import load_scenario
 from isaacsim.replicator.mobility_gen.impl.reader import MobilityGenReader
 from isaacsim.replicator.mobility_gen.impl.utils.global_utils import get_world
 from isaacsim.replicator.mobility_gen.impl.writer import MobilityGenWriter
-from PIL import Image
 
 if __name__ == "__main__":
 

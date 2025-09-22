@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" A commander implements an abstraction of a policy controlling a subset of joints. Each commander
+"""A commander implements an abstraction of a policy controlling a subset of joints. Each commander
 defines its own command API accessed by the decision layer. This abstract base class defines the
 methods used by the cortex framework behind the scenes for processing, resetting, etc. the
 commanders.

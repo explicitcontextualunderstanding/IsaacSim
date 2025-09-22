@@ -1,5 +1,5 @@
 [package]
-version = "4.9.3"
+version = "4.12.1"
 category = "Simulation"
 title = "ROS 2 Bridge"
 description = "The ROS 2 Bridge extension enables communication between the Isaac Sim and ROS 2 systems. It allows for the publishing and subscribing of ROS 2 topics and services via OmniGraph nodes and Action graphs. ROS 2 publishers, subscribers and services are only active when play is pressed. To enable this extension, ensure ROS 2 libraries are sourced in the terminal before running Isaac Sim or source the lightweight ROS 2 libraries included with Isaac Sim as an alternative."
@@ -54,7 +54,7 @@ name = "isaacsim.ros2.bridge.impl.og_shortcuts.og_shortcut_menu"
 
 [settings]
 # ROS 2 distributions to fallback onto if none were sourced.
-exts."isaacsim.ros2.bridge".ros_distro = "humble"
+exts."isaacsim.ros2.bridge".ros_distro = "system_default"
 # Whether ROS 2 publishers are allowed to publish even if there is no active subscription for their topics.
 exts."isaacsim.ros2.bridge".publish_without_verification = false
 # Whether to disable multithreading use in the *ROS2PublishImage* OmniGraph node.
@@ -75,6 +75,7 @@ timeout = 900
 dependencies = [
     "isaacsim.robot.wheeled_robots",
     "omni.graph.ui",
+    "isaacsim.test.utils",
 ]
 
 stdoutFailPatterns.exclude = [
@@ -143,7 +144,7 @@ args = [
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
     ### Extension specific args
-    '--/exts/isaacsim.ros2.bridge/ros_distro = "humble"',
+    '--/exts/isaacsim.ros2.bridge/ros_distro = "system_default"',
     "--/exts/isaacsim.ros2.bridge/publish_without_verification=1",
 
 ]
@@ -152,4 +153,23 @@ args = [
 name = "startup"
 args = [
     "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
+]
+
+
+[[test]]
+name = "doctest"
+enabled = true
+timeout = 900
+dependencies = [
+    "isaacsim.test.utils", # needed for test discovery to pass, python tests are excluded already
+]
+# apps = [""]
+args = ["--/app/settings/fabricDefaultStageFrameHistoryCount=3",]
+pythonTests.include = []
+pythonTests.exclude = ["*"]
+cppTests.libraries = ["bin/${lib_prefix}isaacsim.ros2.bridge.backend_tests${lib_ext}"]
+stdoutFailPatterns.exclude = [
+  "*[Error] Node name * not valid*",
+  "*[Error] Namespace name * not valid*",
+  "*[Error] Topic name * not valid*",
 ]

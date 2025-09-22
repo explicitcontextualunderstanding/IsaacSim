@@ -278,7 +278,7 @@ std::string importRobot(const std::string& assetRoot,
     stages["base_stage"] = pxr::UsdStageRefPtr();
     stages["robot_stage"] = pxr::UsdStageRefPtr();
     bool multi_layer = true;
-    std::string name = "";
+    std::string name;
     if (stage_identifier != "" && pxr::UsdStage::IsSupportedFile(stage_identifier))
     {
         OpenOrCreateNew(stages["stage"], stage_identifier);
@@ -322,11 +322,11 @@ std::string importRobot(const std::string& assetRoot,
         else
         {
             std::string directoryPath = pxr::TfGetPathName(identifier);
-            std::string name = pxr::TfGetBaseName(identifier);
-            OpenOrCreateNew(stages["sensor_stage"], directoryPath + "/configuration/" + name + "_sensor.usd");
-            OpenOrCreateNew(stages["physics_stage"], directoryPath + "/configuration/" + name + "_physics.usd");
-            OpenOrCreateNew(stages["base_stage"], directoryPath + "/configuration/" + name + "_base.usd");
-            OpenOrCreateNew(stages["robot_stage"], directoryPath + "/configuration/" + name + "_robot.usd");
+            std::string stageName = pxr::TfGetBaseName(identifier);
+            OpenOrCreateNew(stages["sensor_stage"], directoryPath + "/configuration/" + stageName + "_sensor.usd");
+            OpenOrCreateNew(stages["physics_stage"], directoryPath + "/configuration/" + stageName + "_physics.usd");
+            OpenOrCreateNew(stages["base_stage"], directoryPath + "/configuration/" + stageName + "_base.usd");
+            OpenOrCreateNew(stages["robot_stage"], directoryPath + "/configuration/" + stageName + "_robot.usd");
         }
     }
 
@@ -458,12 +458,12 @@ std::string importRobot(const std::string& assetRoot,
                                                      stages["sensor_stage"]->GetRootLayer()->GetIdentifier())));
             }
 
-            pxr::UsdVariantSet robot = variantSets.AddVariantSet("Robot");
-            robot.AddVariant("None");
-            robot.AddVariant("Robot");
-            robot.SetVariantSelection("Robot");
+            pxr::UsdVariantSet robotVariantSet = variantSets.AddVariantSet("Robot");
+            robotVariantSet.AddVariant("None");
+            robotVariantSet.AddVariant("Robot");
+            robotVariantSet.SetVariantSelection("Robot");
             {
-                pxr::UsdEditContext ctxt(robot.GetVariantEditContext());
+                pxr::UsdEditContext ctxt(robotVariantSet.GetVariantEditContext());
                 root_prim.GetPayloads().AddPayload(
                     pxr::SdfPayload(resolve_relative(stages["stage"]->GetRootLayer()->GetIdentifier(),
                                                      stages["robot_stage"]->GetRootLayer()->GetIdentifier())));

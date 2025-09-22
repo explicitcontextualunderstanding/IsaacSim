@@ -255,7 +255,7 @@ public:
      * @return String containing the complete file contents
      * @throws std::runtime_error If file cannot be opened or read
      */
-    static std::string ReadWholeTextFile(std::string fullPath);
+    static std::string ReadWholeTextFile(const std::string& fullPath);
 };
 
 }

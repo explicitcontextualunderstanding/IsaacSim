@@ -45,7 +45,6 @@ import carb
 import omni
 import omni.replicator.core as rep
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.prims import delete_prim
 from pxr import Gf
 
 enable_extension("isaacsim.benchmark.services")

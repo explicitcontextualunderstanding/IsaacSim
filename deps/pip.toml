@@ -47,13 +47,9 @@
 [[dependency]]
 python = "../_build/target-deps/python"
 packages = [
-    "numpy-quaternion==2023.0.3",           # SWIPAT filed under: https://nvbugs/3430427
     "numba==0.59.1",                        # SWIPAT filed under: https://nvbugs/3430475
-    "selenium==4.14.0",                     # SWIPAT filed under: https://nvbugs/3430533
-    "construct==2.10.68",                   # SWIPAT filed under: https://nvbugs/3433745
     "llvmlite==0.42.0",                     # SWIPAT filed under: https://nvbugs/3433740
     "nest_asyncio==1.5.6",                  # SWIPAT filed under: https://nvbugs/3433748
-    "jinja2==3.1.4",                        # SWIPAT filed under: https://nvbugs/3433752
     "markupsafe==2.1.3",                    # SWIPAT filed under: https://nvbugs/3433754
     "matplotlib==3.10.3",                   # SWIPAT filed under: https://nvbugs/3430500
     "contourpy==1.3.1",                     # SWIPAT filed under: https://nvbugs/5303073
@@ -64,18 +60,16 @@ packages = [
     "pint==0.20.1",                         # SWIPAT filed under: https://nvbugs/3433818
     "packaging==23.0",                      # SWIPAT filed under: https://nvbugs/3433815
     "gunicorn==23.0.0",                     # SWIPAT filed under: https://nvbugs/3439010
-    "osqp==0.6.5",                          # SWIPAT filed under: https://nvbugs/3577752
-    "qdldl==0.1.7.post1",                   # SWIPAT filed under: https://nvbugs/3577749
-    "nvsmi==0.4.2",                         # SWIPAT filed under: https://nvbugs/3639810
-    "tornado==6.5.0",                       # For omni.sensors.nv.lidar_tools SWIPAT filed under: http://nvbugs/200609232
-    "plotly==5.3.1",                        # For omni.sensors.nv.material_tools SWIPAT filed under: http://nvbugs/3453142
+    "osqp==0.6.7.post3",                    # SWIPAT filed under: https://nvbugs/3577752
+    "qdldl==0.1.7.post5",                   # SWIPAT filed under: https://nvbugs/3577749
+    "tornado==6.5.1",                       # For omni.sensors.nv.lidar_tools SWIPAT filed under: http://nvbugs/200609232
     "pyperclip==1.8.0",                     # SWIPAT filed under: https://nvbugs/5326856
     "python-dateutil==2.9.0.post0",         # SWIPAT filed under: https://nvbugs/5303032
     "six==1.17.0",                          # SWIPAT filed under: https://nvbugs/5303087
 ]
 
 target = "../_build/target-deps/isaac_core_prebundle"
-platforms = ["*-x86_64"]
+platforms = ["*-x86_64", "*-aarch64"]
 download_only = false
 install_dependencies = false
 append_to_install_folder = true

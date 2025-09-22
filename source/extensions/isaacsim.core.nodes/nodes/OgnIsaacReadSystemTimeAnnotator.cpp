@@ -23,7 +23,7 @@
 #include <carb/logging/Logger.h>
 
 #include <isaacsim/core/includes/BaseResetNode.h>
-#include <isaacsim/core/nodes/ICoreNodes.h>
+#include <isaacsim/core/simulation_manager/ISimulationManager.h>
 #include <omni/usd/UsdContextIncludes.h>
 //
 #include <omni/usd/UsdContext.h>
@@ -44,7 +44,8 @@ public:
     {
         auto& state = OgnIsaacReadSystemTimeAnnotatorDatabase::sPerInstanceState<OgnIsaacReadSystemTimeAnnotator>(
             nodeObj, instanceId);
-        state.m_coreNodeFramework = carb::getCachedInterface<isaacsim::core::nodes::CoreNodes>();
+        state.m_simulationManagerFramework =
+            carb::getCachedInterface<isaacsim::core::simulation_manager::ISimulationManager>();
     }
 
     static bool compute(OgnIsaacReadSystemTimeAnnotatorDatabase& db)
@@ -53,12 +54,12 @@ public:
 
         if (db.inputs.referenceTimeNumerator() > 0 || db.inputs.referenceTimeDenominator() > 0)
         {
-            db.outputs.systemTime() = state.m_coreNodeFramework->getSystemTimeAtTime(
+            db.outputs.systemTime() = state.m_simulationManagerFramework->getSystemTimeAtTime(
                 omni::fabric::RationalTime(db.inputs.referenceTimeNumerator(), db.inputs.referenceTimeDenominator()));
         }
         else
         {
-            db.outputs.systemTime() = state.m_coreNodeFramework->getSystemTime();
+            db.outputs.systemTime() = state.m_simulationManagerFramework->getSystemTime();
         }
         db.outputs.execOut() = ExecutionAttributeState::kExecutionAttributeStateEnabled;
         return true;
@@ -66,7 +67,7 @@ public:
 
 
 private:
-    isaacsim::core::nodes::CoreNodes* m_coreNodeFramework;
+    isaacsim::core::simulation_manager::ISimulationManager* m_simulationManagerFramework = nullptr;
 };
 
 REGISTER_OGN_NODE()

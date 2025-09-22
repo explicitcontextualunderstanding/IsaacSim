@@ -38,6 +38,14 @@ class PublishPointCloudThreadData
 {
 public:
     PublishPointCloudThreadData()
+        : inputDataPtr(nullptr),
+          outputDataPtr(nullptr),
+          bufferSize(0),
+          totalBytes(0),
+          cudaDeviceIndex(-1),
+          stream(nullptr),
+          streamDevice(nullptr),
+          mStreamNotCreated(nullptr)
     {
     }
 
@@ -85,7 +93,7 @@ public:
         // Publisher was not valid, create a new one
         if (!state.m_publisher)
         {
-            CARB_PROFILE_ZONE(0, "setup point cloud publisher");
+            CARB_PROFILE_ZONE(0, "[IsaacSim] setup point cloud publisher");
             // Setup ROS publisher
             const std::string& topicName = db.inputs.topicName();
             std::string fullTopicName = addTopicPrefix(state.m_namespaceName, topicName);
@@ -151,13 +159,13 @@ public:
 
     static bool publishPointCloudHelper(PublishPointCloudThreadData& data)
     {
-        CARB_PROFILE_ZONE(1, "Publish PointCloud Thread");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] Publish PointCloud Thread");
         isaacsim::core::includes::ScopedDevice scopedDev(data.cudaDeviceIndex);
 
         // If the device doesn't match and we have created a stream, destroy it
         if (*data.streamDevice != data.cudaDeviceIndex && *data.mStreamNotCreated == false)
         {
-            CARB_PROFILE_ZONE(1, "Destroy stream");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Destroy stream");
             CUDA_CHECK(cudaStreamDestroy(*data.stream));
             *data.mStreamNotCreated = true;
             *data.streamDevice = -1;
@@ -165,19 +173,19 @@ public:
         // Create a stream if it does not exist
         if (*data.mStreamNotCreated)
         {
-            CARB_PROFILE_ZONE(1, "Create stream");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] Create stream");
             CUDA_CHECK(cudaStreamCreate(data.stream));
             *data.mStreamNotCreated = false;
             *data.streamDevice = data.cudaDeviceIndex;
         }
 
-        CARB_PROFILE_ZONE(1, "data in cuda memory");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] data in cuda memory");
         CUDA_CHECK(cudaMemcpyAsync(
             data.outputDataPtr, data.inputDataPtr, data.bufferSize, cudaMemcpyDeviceToHost, *data.stream));
         CUDA_CHECK(cudaStreamSynchronize(*data.stream));
 
         {
-            CARB_PROFILE_ZONE(1, "pcl publisher publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] pcl publisher publish");
             data.publisher.get()->publish(data.message->getPtr());
         }
         return true;
@@ -185,12 +193,12 @@ public:
 
     bool publishLidar(OgnROS2PublishPointCloudDatabase& db)
     {
-        CARB_PROFILE_ZONE(0, "Lidar Point Cloud Pub");
+        CARB_PROFILE_ZONE(0, "[IsaacSim] Lidar Point Cloud Pub");
         auto& state = db.perInstanceState<OgnROS2PublishPointCloud>();
         auto tasking = carb::getCachedInterface<carb::tasking::ITasking>();
 
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message publish
             state.m_tasks.wait();
         }
@@ -234,7 +242,7 @@ public:
 
             if (state.m_multithreadingDisabled)
             {
-                CARB_PROFILE_ZONE(1, "Publish PCL");
+                CARB_PROFILE_ZONE(1, "[IsaacSim] Publish PCL");
                 state.m_publisher.get()->publish(state.m_message->getPtr());
             }
             else
@@ -242,7 +250,7 @@ public:
                 tasking->addTask(carb::tasking::Priority::eHigh, state.m_tasks,
                                  [&state]
                                  {
-                                     CARB_PROFILE_ZONE(1, "Publish PCL Thread");
+                                     CARB_PROFILE_ZONE(1, "[IsaacSim] Publish PCL Thread");
                                      state.m_publisher.get()->publish(state.m_message->getPtr());
                                  });
             }
@@ -285,7 +293,7 @@ public:
     virtual void reset()
     {
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message to publish before starting next
             m_tasks.wait();
         }

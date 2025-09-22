@@ -39,13 +39,11 @@ includedirs {
     "%{root}/_build/target-deps/omni_client_library/include",
     extsbuild_dir .. "/usdrt.scenegraph/include",
     "%{root}/source/extensions/isaacsim.core.utils/include",
-    "%{root}/source/extensions/isaacsim.core.utils/plugins",
     "%{root}/_build/target-deps/omni_physics/%{config}/include",
 }
 
 libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
-    "%{root}/_build/target-deps/nv_usd/release/lib",
     extsbuild_dir .. "/omni.usd.core/bin",
 }
 links { "omni.usd" }

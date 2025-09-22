@@ -45,7 +45,7 @@ inline std::string GetFilePathByPlatform(const char* path)
 
 // pulls out an option in the form option=value, must have no spaces
 template <typename T>
-bool GetCmdLineArg(const char* arg, T& out, int argc, char* argv[])
+bool GetCmdLineArg(const char* arg, T& out, int argc, const char* const argv[])
 {
     // iterate over all the arguments
     for (int i = 0; i < argc; ++i)
@@ -77,25 +77,7 @@ bool GetCmdLineArg(const char* arg, T& out, int argc, char* argv[])
 
     return false;
 }
-// return the full path to a file
-std::string ExpandPath(const char* path);
-// takes a full file path and returns just the folder (with trailing slash)
-std::string StripFilename(const char* path);
-// strips the path from a file name
-std::string StripPath(const char* path);
-// strips the extension from a path
-std::string StripExtension(const char* path);
-// returns the file extension (excluding period)
-std::string GetExtension(const char* path);
-// normalize path
-std::string NormalizePath(const char* path);
 
-// loads a file to a text string
-std::string LoadFileToString(const char* filename);
-// loads a file to a binary buffer (free using delete[])
-uint8_t* LoadFileToBuffer(const char* filename, uint32_t* sizeRead = nullptr);
-// save whole string to a file
-bool SaveStringToFile(const char* filename, const char* s);
 
 bool FileMove(const char* src, const char* dest);
 bool FileScan(const char* pattern, std::vector<std::string>& files);
@@ -123,14 +105,3 @@ const uint32_t kMaxPathLength = 2048;
 #    endif // _MSC_VER
 
 #endif // WIN32
-
-
-inline std::string ExpandPath(const char* p)
-{
-    return p;
-}
-
-inline std::string DataPath(const char* p)
-{
-    return ExpandPath((std::string("Data/") + p).c_str());
-}

@@ -35,7 +35,6 @@ includedirs {
     "%{kit_sdk_bin_dir}/dev/fabric/include/",
     extsbuild_dir .. "/usdrt.scenegraph/include",
     "%{root}/source/extensions/isaacsim.core.cloner/include",
-    "%{root}/source/extensions/isaacsim.core.cloner/plugins",
 }
 
 libdirs {

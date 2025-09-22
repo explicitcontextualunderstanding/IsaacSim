@@ -29,7 +29,6 @@ import usdrt.Sdf
 from isaacsim.core.prims import SingleArticulation
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import open_stage_async
-from isaacsim.storage.native import get_assets_root_path_async
 from numpy import pi as PI
 
 from .common import ROS2TestCase, get_qos_profile, set_joint_drive_parameters
@@ -41,11 +40,6 @@ class TestRos2JointStatePublisher(ROS2TestCase):
         await super().setUp()
 
         await omni.usd.get_context().new_stage_async()
-
-        self._assets_root_path = await get_assets_root_path_async()
-        if self._assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
         await omni.kit.app.get_app().next_update_async()
 
@@ -181,11 +175,6 @@ class TestRos2JointStateSubscriber(ROS2TestCase):
     async def setUp(self):
         await super().setUp()
         await omni.usd.get_context().new_stage_async()
-
-        self._assets_root_path = await get_assets_root_path_async()
-        if self._assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
         await omni.kit.app.get_app().next_update_async()
 

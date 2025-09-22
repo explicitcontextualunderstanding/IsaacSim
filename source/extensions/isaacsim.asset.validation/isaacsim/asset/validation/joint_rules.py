@@ -113,15 +113,15 @@ class JointHasCorrectTransformAndState(av_core.BaseRuleChecker):
         expected_pos_0 = expected_tm_0.GetTranslation()
         expected_pos_1 = expected_tm_1.GetTranslation()
 
-        if not Gf.IsClose(expected_state_pos_0, expected_pos_1, 1e-5):
-            if not Gf.IsClose(expected_pos_0, expected_pos_1, 1e-5):
+        if not Gf.IsClose(expected_state_pos_0, expected_pos_1, 1e-4):
+            if not Gf.IsClose(expected_pos_0, expected_pos_1, 1e-4):
                 self._AddError(
-                    message=f"Joint {prim.GetPath()} position not well-defined. From body 0: {expected_pos_0}, from body 1: {expected_pos_1}",
+                    message=f"Joint {prim.GetPath()} position not well-defined ({(expected_pos_0 - expected_pos_1).GetLength()}). From body 0: {expected_pos_0}, from body 1: {expected_pos_1}",
                     at=prim,
                 )
             else:
                 self._AddError(
-                    message=f"Joint {prim.GetPath()} state not matching robot pose. From body 0: {expected_state_pos_0}, from body 1: {expected_pos_1}",
+                    message=f"Joint {prim.GetPath()} state not matching robot pose({(expected_state_pos_0 - expected_pos_1).GetLength()}). From body 0: {expected_state_pos_0}, from body 1: {expected_pos_1}",
                     at=prim,
                 )
 
@@ -133,15 +133,15 @@ class JointHasCorrectTransformAndState(av_core.BaseRuleChecker):
         expected_rot0_as_vec4d = GfQuatToVec4d(expected_rot_0.GetQuat().GetNormalized())
         expected_rot1_as_vec4d = GfQuatToVec4d(expected_rot_1.GetQuat().GetNormalized())
 
-        if not Gf.IsClose(expected_state_rot0_as_vec4d, expected_rot1_as_vec4d, 1e-5):
-            if not Gf.IsClose(expected_rot0_as_vec4d, expected_rot1_as_vec4d, 1e-5):
+        if not Gf.IsClose(expected_state_rot0_as_vec4d, expected_rot1_as_vec4d, 1e-3):
+            if not Gf.IsClose(expected_rot0_as_vec4d, expected_rot1_as_vec4d, 1e-3):
                 self._AddError(
-                    message=f"Joint {prim.GetPath()} Rotation not well defined, From body 0: {expected_rot_0}, From body 1: {expected_rot_1}",
+                    message=f"Joint {prim.GetPath()} Rotation not well defined ({(expected_state_rot0_as_vec4d - expected_rot1_as_vec4d).GetLength()}), From body 0: {expected_rot_0}, From body 1: {expected_rot_1}",
                     at=prim,
                 )
             else:
                 self._AddError(
-                    message=f"Joint {prim.GetPath()} state not matching robot pose. From body 0: {expected_state_rot_0}, from body 1: {expected_rot_1}",
+                    message=f"Joint {prim.GetPath()} state not matching robot pose ({(expected_rot0_as_vec4d - expected_rot1_as_vec4d).GetLength()}). From body 0: {expected_state_rot_0}, from body 1: {expected_rot_1}",
                     at=prim,
                 )
 

@@ -31,13 +31,11 @@ import shutil
 import time
 
 import carb
-import numpy as np
 import omni.replicator.core as rep
 from isaacsim.replicator.mobility_gen.impl.build import load_scenario
 from isaacsim.replicator.mobility_gen.impl.reader import MobilityGenReader
 from isaacsim.replicator.mobility_gen.impl.utils.global_utils import get_world
 from isaacsim.replicator.mobility_gen.impl.writer import MobilityGenWriter
-from PIL import Image
 
 if "MOBILITY_GEN_DATA" in os.environ:
     DATA_DIR = os.environ["MOBILITY_GEN_DATA"]

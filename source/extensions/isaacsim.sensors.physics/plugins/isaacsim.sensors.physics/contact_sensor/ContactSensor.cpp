@@ -102,7 +102,7 @@ CsReading ContactSensor::getSensorReading(const bool& getLatestValue)
 
 void ContactSensor::processRawContacts(CsRawData* rawContact, const size_t& size, const size_t& index, const double& time)
 {
-    CARB_PROFILE_ZONE(0, "Contact Sensor::processRawContacts");
+    CARB_PROFILE_ZONE(0, "[IsaacSim] Contact Sensor::processRawContacts");
     m_readingPair[index].value = 0.0f;
     m_readingPair[index].inContact = false;
     m_readingPair[index].time = static_cast<float>(time);
@@ -157,7 +157,7 @@ void ContactSensor::processRawContacts(CsRawData* rawContact, const size_t& size
 
 void ContactSensor::onPhysicsStep()
 {
-    CARB_PROFILE_ZONE(0, "ContactSensor::physics step");
+    CARB_PROFILE_ZONE(0, "[IsaacSim] ContactSensor::physics step");
     if (m_contactManagerPtr == nullptr)
     {
         CARB_LOG_ERROR("*** error: ContactManager not found");
@@ -254,7 +254,7 @@ bool ContactSensor::findValidParent()
 
 void ContactSensor::onComponentChange()
 {
-    CARB_PROFILE_ZONE(0, "Contact Sensor - component change");
+    CARB_PROFILE_ZONE(0, "[IsaacSim] Contact Sensor - component change");
     IsaacSensorComponentBase::onComponentChange();
     float sensorPeriod = 0.0f;
     float radius = 0.0f;

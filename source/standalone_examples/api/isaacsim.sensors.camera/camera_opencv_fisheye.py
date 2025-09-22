@@ -17,19 +17,17 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True})
 
+import cv2
 import isaacsim.core.utils.numpy.rotations as rot_utils
 import numpy as np
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
 from isaacsim.sensors.camera import Camera
-from PIL import Image, ImageDraw
+from scipy.spatial.transform import Rotation
 
 # Given the OpenCV camera matrix and distortion coefficients (Fisheye, Kannala-Brandt model),
 # creates a camera and a sample scene, renders an image and saves it to
 # camera_opencv_fisheye.png file. The asset is also saved to camera_opencv_fisheye.usd file.
-
-# Currently only supports square images (there is an issue in the rendering pipeline).
-# To produce non-square images, the region of the image that is not used should be cropped
 width, height = 1920, 1200
 camera_matrix = [[455.8, 0.0, 943.8], [0.0, 454.7, 602.3], [0.0, 0.0, 1.0]]
 distortion_coefficients = [0.05, 0.01, -0.003, -0.0005]
@@ -43,55 +41,51 @@ pixel_size = 3
 # Set f-number, the ratio of the lens focal length to the diameter of the entrance pupil (unitless)
 f_stop = 1.8
 # Set focus distance (meters) - chosen as distance from camera to cube
-focus_distance = 1.5
+focus_distance = 3.0
 
 # Create a world, add a 1x1x1 meter cube, a ground plane, and a camera
 # Note: stage units are set to meters.
 world = World(stage_units_in_meters=1.0)
 world.scene.add_default_ground_plane()
+# Define the position, scale and color of each cube, then add them to the stage
+cube_positions = [
+    np.array([0, 0, 0.5]),
+    np.array([2, 0, 0.5]),
+    np.array([0, 4, 1]),
+]
 
-cube_1 = world.scene.add(
-    DynamicCuboid(
-        prim_path="/new_cube_1",
-        name="cube_1",
-        position=np.array([0, 0, 0.5]),
-        scale=np.array([1.0, 1.0, 1.0]),
-        size=1.0,
-        color=np.array([255, 0, 0]),
+cube_scale = [1.0, 1.0, 2.0]
+
+cube_colors = [
+    np.array([255, 0, 0]),
+    np.array([0, 255, 0]),
+    np.array([0, 0, 255]),
+]
+
+for i, (position, scale, color) in enumerate(zip(cube_positions, cube_scale, cube_colors)):
+    cube = world.scene.add(
+        DynamicCuboid(
+            prim_path=f"/new_cube_{i}",
+            name=f"cube_{i}",
+            position=position,
+            scale=scale * np.ones((1, 3)),
+            size=1.0,
+            color=color,
+        )
     )
-)
 
-cube_2 = world.scene.add(
-    DynamicCuboid(
-        prim_path="/new_cube_2",
-        name="cube_2",
-        position=np.array([2, 0, 0.5]),
-        scale=np.array([1.0, 1.0, 1.0]),
-        size=1.0,
-        color=np.array([0, 255, 0]),
-    )
-)
-
-cube_3 = world.scene.add(
-    DynamicCuboid(
-        prim_path="/new_cube_3",
-        name="cube_3",
-        position=np.array([0, 4, 1]),
-        scale=np.array([2.0, 2.0, 2.0]),
-        size=1.0,
-        color=np.array([0, 0, 255]),
-    )
-)
-
+# Define camera position and orientation, then add the camera to the stage
+camera_position = np.array([0.0, 0.0, 3.5])
+camera_rotation_as_euler = np.array([0, 90, 0])
 camera = Camera(
     prim_path="/World/camera",
-    position=np.array([0.0, 0.0, 2.0]),  # 1 meter away from the side of the cube
+    position=camera_position,
     frequency=30,
     resolution=(width, height),
-    orientation=rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True),
+    orientation=rot_utils.euler_angles_to_quats(camera_rotation_as_euler, degrees=True),
 )
 
-# Setup the scene and render a frame
+# Initialize the camera, creating the render product and setting its resolution
 world.reset()
 camera.initialize()
 
@@ -115,48 +109,72 @@ camera.set_clipping_range(0.05, 1.0e5)
 # Set the distortion coefficients
 camera.set_opencv_fisheye_properties(cx=cx, cy=cy, fx=fx, fy=fy, fisheye=distortion_coefficients)
 
-# Get the rendered frame and save it to a file
-for i in range(100):
+# Render 10 frames, then load the rendered image into a CV2-compatible format
+for i in range(10):
     world.step(render=True)
-camera.get_current_frame()
-img = Image.fromarray(camera.get_rgba()[:, :, :3])
+img = cv2.cvtColor(camera.get_rgb().astype(np.uint8), cv2.COLOR_RGB2BGR)
 
-
-# Optional step, draw the 3D points to the image plane using the OpenCV fisheye model
-def draw_points_opencv_fisheye(points3d):
-    import cv2
-
-    rvecs, tvecs = np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0])
-    points, jac = cv2.fisheye.projectPoints(
-        np.expand_dims(points3d, 1), rvecs, tvecs, np.array(camera_matrix), np.array(distortion_coefficients)
-    )
-    draw = ImageDraw.Draw(img)
-    for pt in points:
-        x, y = pt[0]
-        print("Drawing point at: ", x, y)
-        draw.ellipse((x - 4, y - 4, x + 4, y + 4), fill="yellow", outline="yellow")
-
-
-# Draw a few 3D points at the image plane (camera is pointing down to the ground plane).
-# OpenCV doen't support projecting points behind the camera, so we avoid that.
-draw_points_opencv_fisheye(
-    points3d=np.array(
-        [
-            [0.5, 0.5, 1.0],
-            [-0.5, 0.5, 1.0],
-            [0.5, -0.5, 1.0],
-            [-0.5, -0.5, 1.0],
-            [-3.0, -1.0, 0.0],
-            [-3.0, 1.0, 0.0],
-            [-0.5, -1.5, 1.0],
-            [0.5, -1.5, 1.0],
-        ]
-    )
+# Plot cube corners on the rendered image. Code adapted from snippet provided by forum user @ericpedley.
+# Resolve the corners of each cube in world space
+cube_corners = np.array(
+    [
+        [0.5, 0.5, 0.5],
+        [-0.5, 0.5, 0.5],
+        [0.5, -0.5, 0.5],
+        [-0.5, -0.5, 0.5],
+        [0.5, 0.5, -0.5],
+        [-0.5, 0.5, -0.5],
+        [0.5, -0.5, -0.5],
+        [-0.5, -0.5, -0.5],
+    ],
+    dtype=np.float64,
 )
 
+cube_corners_world = []
+for position, scale in zip(cube_positions, cube_scale):
+    cube_corners_world.append(cube_corners * scale + position)
+object_points_world = np.vstack(cube_corners_world)
+
+# Transform from Isaac Sim (Y-forward, Z-up) to OpenCV (Z-forward, Y-down) coordinates
+isaac_to_cv2_mat = np.array([[0, -1, 0], [0, 0, -1], [1, 0, 0]], dtype=np.float64)
+isaac_to_cv2 = Rotation.from_matrix(isaac_to_cv2_mat)
+
+# Convert camera rotation to OpenCV coordinate system
+cam_rotation = Rotation.from_euler("xyz", camera_rotation_as_euler, degrees=True)
+cam_rotation_cv2 = isaac_to_cv2 * cam_rotation.inv() * isaac_to_cv2.inv()
+
+# Transform object points to OpenCV coordinates for projection
+object_points_cv2 = np.expand_dims(object_points_world @ isaac_to_cv2_mat.T, axis=1)
+
+# Camera rotation vector in OpenCV coordinates
+rvec_cv2 = cam_rotation_cv2.as_rotvec()
+
+# Translation vector (world origin to camera) in OpenCV coordinates
+tvec_cv2 = -cam_rotation_cv2.apply(camera_position @ isaac_to_cv2_mat.T)
+
+# Camera intrinsic matrix
+K = np.array(camera_matrix, dtype=np.float64)
+
+# Distortion coefficients (Kannala-Brandt model)
+D = np.array(distortion_coefficients, dtype=np.float64)
+
+# Project 3D points to 2D image coordinates
+image_points, _ = cv2.fisheye.projectPoints(object_points_cv2, rvec_cv2, tvec_cv2, K, D)
+
+# Draw the projected corners of each cube on the rendered image
+for i, pt in enumerate(image_points):
+    # Map cube color from RGB to BGR
+    cube_color = cube_colors[i // 8].astype(np.uint8)[::-1]
+    color = tuple(cube_color.tolist())
+    # Skip points outside the camera field of view
+    if np.any(pt[0] < 0):
+        continue
+    # Draw the point as a filled circle with yellow border for contrast
+    cv2.circle(img, tuple(pt[0].astype(int)), 5, (0, 255, 255), -1)
+    cv2.circle(img, tuple(pt[0].astype(int)), 3, color, -1)
 
 print("Saving the rendered image to: camera_opencv_fisheye.png")
-img.save("camera_opencv_fisheye.png")
+cv2.imwrite("camera_opencv_fisheye.png", img)
 
 print("Saving the asset to camera_opencv_fisheye.usd")
 world.scene.stage.Export("camera_opencv_fisheye.usd")

@@ -146,7 +146,7 @@ T PlyRead(ifstream& s, PlyFormat format)
         char c[sizeof(T)];
         s.read(c, sizeof(T));
         reverse(c, c + sizeof(T));
-        data = *(T*)c;
+        data = *reinterpret_cast<T*>(c);
         break;
     }
     default:
@@ -274,7 +274,7 @@ void Mesh::Flip()
         swap(m_indices[i * 3 + 0], m_indices[i * 3 + 1]);
     }
 
-    for (int i = 0; i < (int)m_normals.size(); ++i)
+    for (int i = 0; i < static_cast<int>(m_normals.size()); ++i)
         m_normals[i] *= -1.0f;
 }
 

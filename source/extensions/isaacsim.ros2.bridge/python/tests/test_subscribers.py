@@ -24,13 +24,11 @@ import omni.kit.commands
 import omni.kit.test
 import omni.kit.usd
 from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import open_stage_async
 from isaacsim.core.utils.xforms import get_world_pose
-from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Gf, Sdf, UsdGeom, UsdPhysics
 
-from .common import ROS2TestCase, get_qos_profile
+from .common import ROS2TestCase
 
 
 class TestRos2Subscribers(ROS2TestCase):
@@ -39,32 +37,31 @@ class TestRos2Subscribers(ROS2TestCase):
         await super().setUp()
 
         await omni.usd.get_context().new_stage_async()
-        self._assets_root_path = await get_assets_root_path_async()
-        if self._assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
         self.sub_data = []
         self.prev_seq = 0
         self.MAX_COUNT = 100
-        self.MAX_OFFSET = abs(self.MAX_COUNT - 95)
+        self.MAX_OFFSET = int(self.MAX_COUNT * 0.75)  # 75% of the total count
         self.queue_size = 10
 
         await omni.kit.app.get_app().next_update_async()
-
+        self.sub_node_time_attribute_path = None
         pass
 
     # After running each test
     async def tearDown(self):
+
         await super().tearDown()
 
     def spin(self):
+        if self.sub_node_time_attribute_path is None:
+            return
         seq = og.Controller.get(og.Controller.attribute(self.sub_node_time_attribute_path))
         if isinstance(seq, np.ndarray):
             seq = seq[0] if seq is not None else self.prev_seq
 
         if self.prev_seq != seq:
-            self.sub_data.append(seq)
+            self.sub_data.append(int(seq))
             self.prev_seq = seq
 
     def reset_queue_size(self, path, queue_size):
@@ -72,11 +69,35 @@ class TestRos2Subscribers(ROS2TestCase):
         self.prev_seq = 0
         og.Controller.set(og.Controller.attribute(path), queue_size)
         self.queue_size = queue_size
+        self.expected_data = [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)]
 
     def choose_queue_size(self):
         queue_size = random.randint(1, self.MAX_COUNT - self.MAX_OFFSET)
         print("Choosing queue size of", queue_size)
         return queue_size
+
+    async def simulate_until_condition(self, condition_func, max_frames=180, frames_per_step=1):
+        """Simulate until condition is met or maximum frames reached.
+
+        This method runs simulation in steps until a specified condition function
+        returns True or the maximum frame limit is exceeded.
+
+        Args:
+            condition_func: Function that returns True when condition is met.
+            max_frames: Maximum number of simulation frames to run.
+            frames_per_step: Number of frames to simulate in each step.
+
+        Returns:
+            True if condition was met, False if max frames reached.
+        """
+        frames_run = 0
+        while frames_run < max_frames:
+            await omni.kit.app.get_app().next_update_async()
+            self.spin()
+            frames_run += frames_per_step
+            if condition_func():
+                return True
+        return False
 
     async def test_joint_state_subscriber_queue(self):
 
@@ -129,6 +150,7 @@ class TestRos2Subscribers(ROS2TestCase):
 
         def publish_data():
             # We are using timestamp to store message sequence
+
             for count in range(1, self.MAX_COUNT):
                 msg = JointState()
                 time_obj = Time()
@@ -137,15 +159,26 @@ class TestRos2Subscribers(ROS2TestCase):
                 msg.name = ["test1", "test2"]
                 msg.position = [0.0, 0.0]
                 test_pub.publish(msg)
-                time.sleep(0.01)
+                time.sleep(0.02)
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
 
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+        self.assertTrue(
+            condition_met,
+            msg=f"Joint State Subscriber Queue Test Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Joint State Subscriber Queue Test Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         ## Change queue size to random value
         self.reset_queue_size(sub_node_queue_attribute_path, queue_size=self.choose_queue_size())
@@ -157,11 +190,22 @@ class TestRos2Subscribers(ROS2TestCase):
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
 
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+        self.assertTrue(
+            condition_met,
+            msg=f"Joint State Subscriber Queue Test (Second Run) Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Joint State Subscriber Queue Test (Second Run) Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         pass
 
@@ -222,15 +266,26 @@ class TestRos2Subscribers(ROS2TestCase):
                 time_obj.sec = count
                 msg.clock = time_obj
                 test_pub.publish(msg)
-                time.sleep(0.01)
+                time.sleep(0.02)
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
 
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+        self.assertTrue(
+            condition_met,
+            msg=f"Clock Subscriber Queue Test Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Clock Subscriber Queue Test Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         ## Change queue size to random value
         self.reset_queue_size(sub_node_queue_attribute_path, queue_size=self.choose_queue_size())
@@ -242,10 +297,22 @@ class TestRos2Subscribers(ROS2TestCase):
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+
+        self.assertTrue(
+            condition_met,
+            msg=f"Clock Subscriber Queue Test (Second Run) Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Clock Subscriber Queue Test (Second Run) Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         pass
 
@@ -303,15 +370,26 @@ class TestRos2Subscribers(ROS2TestCase):
                 msg = Twist()
                 msg.linear.x = float(count)
                 test_pub.publish(msg)
-                time.sleep(0.01)
+                time.sleep(0.02)
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
 
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+        self.assertTrue(
+            condition_met,
+            msg=f"Twist Subscriber Queue Test Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Twist Subscriber Queue Test Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         ## Change queue size to random value
         self.reset_queue_size(sub_node_queue_attribute_path, queue_size=self.choose_queue_size())
@@ -323,10 +401,22 @@ class TestRos2Subscribers(ROS2TestCase):
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+
+        self.assertTrue(
+            condition_met,
+            msg=f"Twist Subscriber Queue Test (Second Run) Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Twist Subscriber Queue Test (Second Run) Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         pass
 
@@ -387,15 +477,26 @@ class TestRos2Subscribers(ROS2TestCase):
                 time_obj.sec = count
                 msg.header.stamp = time_obj
                 test_pub.publish(msg)
-                time.sleep(0.01)
+                time.sleep(0.02)
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
 
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+        self.assertTrue(
+            condition_met,
+            msg=f"Ackermann Subscriber Queue Test Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Ackermann Subscriber Queue Test Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         ## Change queue size to random value
         self.reset_queue_size(sub_node_queue_attribute_path, queue_size=self.choose_queue_size())
@@ -407,10 +508,22 @@ class TestRos2Subscribers(ROS2TestCase):
 
         publish_data()
 
-        await simulate_async(2, 60, self.spin)
+        # Wait until we receive enough data or timeout
+        condition_met = await self.simulate_until_condition(
+            lambda: len(self.sub_data) >= self.queue_size,
+        )
 
         self._timeline.stop()
-        self.assertTrue(self.sub_data == [self.MAX_COUNT - self.queue_size + i for i in range(self.queue_size)])
+
+        self.assertTrue(
+            condition_met,
+            msg=f"Ackermann Subscriber Queue Test (Second Run) Timeout: Failed to receive data within time limit.\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
+
+        self.assertTrue(
+            self.sub_data == self.expected_data,
+            msg=f"Ackermann Subscriber Queue Test (Second Run) Failed:\n  Expected: {self.expected_data}\n  Actual: {self.sub_data}\n  Queue Size: {self.queue_size}\n  MAX_COUNT: {self.MAX_COUNT}",
+        )
 
         pass
 
@@ -489,10 +602,21 @@ class TestRos2Subscribers(ROS2TestCase):
 
             test_pub.publish(tf_msg)
 
-            time.sleep(0.01)
+            time.sleep(0.02)
 
-            await simulate_async(1.0, 60)
-            await omni.kit.app.get_app().next_update_async()
+            # Wait until pose condition is met or timeout
+            def pose_condition():
+                x, r = get_world_pose("/World/cube")
+                pos_match = np.linalg.norm(x - pos) < 1e-5
+                rot_match = np.linalg.norm(r - rot) < 1e-5 or np.linalg.norm(r + rot) < 1e-5
+                return pos_match and rot_match
+
+            condition_met = await self.simulate_until_condition(pose_condition)
+
+            self.assertTrue(
+                condition_met,
+                msg=f"Transform tree test failed for iteration {i}: Pose condition not met within time limit",
+            )
 
             x, r = get_world_pose("/World/cube")
 
@@ -578,10 +702,21 @@ class TestRos2Subscribers(ROS2TestCase):
 
             test_pub.publish(tf_msg)
 
-            time.sleep(0.01)
+            time.sleep(0.02)
 
-            await simulate_async(1.0, 60)
-            await omni.kit.app.get_app().next_update_async()
+            # Wait until pose condition is met or timeout
+            def pose_condition():
+                x, r = get_world_pose("/nova_carter/chassis_link")
+                pos_match = np.linalg.norm(x - pos) < 1e-5
+                rot_match = np.linalg.norm(r - rot) < 1e-5 or np.linalg.norm(r + rot) < 1e-5
+                return pos_match and rot_match
+
+            condition_met = await self.simulate_until_condition(pose_condition)
+
+            self.assertTrue(
+                condition_met,
+                msg=f"Nova Carter transform tree test failed for iteration {i}: Pose condition not met within time limit",
+            )
 
             x, r = get_world_pose("/nova_carter/chassis_link")
 

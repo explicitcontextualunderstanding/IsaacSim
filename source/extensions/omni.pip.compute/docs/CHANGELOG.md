@@ -1,4 +1,9 @@
 # Changelog
+
+## [1.6.3] - 2025-08-26
+### Changed
+- Fix yamlimport used in test
+
 ## [1.6.2] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

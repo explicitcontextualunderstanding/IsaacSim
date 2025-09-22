@@ -19,7 +19,6 @@ import omni.kit.test
 class TestPipArchive(omni.kit.test.AsyncTestCase):
     # import all packages to make sure dependencies were not missed
     async def test_import_all(self):
-        import construct
         import cycler
         import gunicorn
         import jinja2
@@ -29,22 +28,15 @@ class TestPipArchive(omni.kit.test.AsyncTestCase):
         import matplotlib
         import nest_asyncio
         import numba
-        import nvsmi
         import osqp
         import packaging
         import pint
-        import plotly
         import pyparsing
         import pyperclip
         import qdldl
-        import quaternion
-        import selenium
         import tornado
 
-        self.assertIsNotNone(quaternion)
         self.assertIsNotNone(numba)
-        self.assertIsNotNone(selenium)
-        self.assertIsNotNone(construct)
         self.assertIsNotNone(llvmlite)
         self.assertIsNotNone(nest_asyncio)
         self.assertIsNotNone(jinja2)
@@ -58,7 +50,5 @@ class TestPipArchive(omni.kit.test.AsyncTestCase):
         self.assertIsNotNone(gunicorn)
         self.assertIsNotNone(osqp)
         self.assertIsNotNone(qdldl)
-        self.assertIsNotNone(nvsmi)
         self.assertIsNotNone(tornado)
-        self.assertIsNotNone(plotly)
         self.assertIsNotNone(pyperclip)

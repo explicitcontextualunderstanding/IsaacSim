@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Module containing a collection of math utilities.
+"""Module containing a collection of math utilities.
 
 Conventions:
 - Quaternion has elements (w,x,y,z) compatible with the core API.

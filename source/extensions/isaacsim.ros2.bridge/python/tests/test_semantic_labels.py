@@ -26,7 +26,6 @@ from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.semantics import add_labels
 from isaacsim.core.utils.stage import open_stage_async
 from isaacsim.core.utils.viewports import set_camera_view
-from isaacsim.storage.native import get_assets_root_path_async
 
 from .common import ROS2TestCase, get_qos_profile
 
@@ -62,11 +61,6 @@ class TestRos2SemanticLabels(ROS2TestCase):
 
         BACKGROUND_USD_PATH = "/Isaac/Environments/Grid/default_environment.usd"
 
-        self._assets_root_path = await get_assets_root_path_async()
-        if self._assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
-
         # Add Small Warehouse environment to the stage
         (result, error) = await open_stage_async(self._assets_root_path + BACKGROUND_USD_PATH)
         await omni.kit.app.get_app().next_update_async()
@@ -86,16 +80,18 @@ class TestRos2SemanticLabels(ROS2TestCase):
                         ("CameraHelper", "isaacsim.ros2.bridge.ROS2CameraHelper"),
                         ("IsaacClock", "isaacsim.core.nodes.IsaacReadSimulationTime"),
                         ("ClockPublisher", "isaacsim.ros2.bridge.ROS2PublishClock"),
+                        ("GetRenderProduct", "isaacsim.core.nodes.IsaacGetViewportRenderProduct"),
                     ],
                     og.Controller.Keys.SET_VALUES: [
-                        ("CameraHelper.inputs:viewport", viewport_window.title),
                         ("CameraHelper.inputs:topicName", "semantic_segmentation"),
                         ("CameraHelper.inputs:type", "semantic_segmentation"),
                         ("CameraHelper.inputs:enableSemanticLabels", True),
                         ("CameraHelper.inputs:semanticLabelsTopicName", "semantic_labels"),
                     ],
                     og.Controller.Keys.CONNECT: [
-                        ("OnPlaybackTick.outputs:tick", "CameraHelper.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "GetRenderProduct.inputs:execIn"),
+                        ("GetRenderProduct.outputs:execOut", "CameraHelper.inputs:execIn"),
+                        ("GetRenderProduct.outputs:renderProductPath", "CameraHelper.inputs:renderProductPath"),
                         ("OnPlaybackTick.outputs:tick", "ClockPublisher.inputs:execIn"),
                         ("IsaacClock.outputs:simulationTime", "ClockPublisher.inputs:timeStamp"),
                     ],

@@ -62,7 +62,6 @@ for _, ros_distro in ipairs(ros_distributions) do
     includedirs {
         "%{root}/source/extensions/isaacsim.core.includes/include",
         "%{root}/_build/target-deps/cuda/include",
-        "%{root}/_build/target-deps/nv_usd/%{cfg.buildcfg}/include",
         "%{root}/_build/target-deps/omni_physics/%{config}/include",
         "%{root}/_build/target-deps/nv_ros2_" .. ros_distro .. "/include",
         "%{root}/_build/target-deps/nlohmann_json/include",
@@ -75,7 +74,6 @@ for _, ros_distro in ipairs(ros_distributions) do
         "%{root}/_build/target-deps/nv_ros2_" .. ros_distro .. "/include/rosidl_dynamic_typesupport",
     }
     libdirs {
-        "%{root}/_build/target-deps/nv_usd/%{cfg.buildcfg}/lib",
         extsbuild_dir .. "/omni.usd.core/bin",
         "%{root}/_build/target-deps/nv_ros2_" .. ros_distro .. "/lib",
     }
@@ -256,4 +254,49 @@ if os.target() == "windows" then
         { "%{root}/_build/target-deps/nv_ros2_humble/Lib/site-packages", ext.target_dir .. "/humble/rclpy" },
         { "%{root}/_build/target-deps/tinyxml2/bin/**.dll", ext.target_dir .. "/humble/lib" },
     }
+    repo_build.prebuild_copy {
+        { "%{root}/_build/target-deps/nv_ros2_jazzy/bin/**.dll", ext.target_dir .. "/jazzy/lib" },
+        { "%{root}/_build/target-deps/nv_ros2_jazzy/Lib/site-packages", ext.target_dir .. "/jazzy/rclpy" },
+        { "%{root}/_build/target-deps/nv_ros2_jazzy/opt/libyaml_vendor/bin/**.dll", ext.target_dir .. "/jazzy/lib" },
+        { "%{root}/_build/target-deps/nv_ros2_jazzy/opt/spdlog_vendor/bin/**.dll", ext.target_dir .. "/jazzy/lib" },
+        { "%{root}/_build/target-deps/tinyxml2/bin/**.dll", ext.target_dir .. "/jazzy/lib" },
+    }
 end
+
+
+
+-- Build the C++ plugin that will be loaded by the tests
+project_ext_tests(ext, "isaacsim.ros2.bridge.backend_tests")
+cppdialect("C++17")
+    add_files("source", "library/tests")
+    -- Ensure factory symbol is compiled into the test library so tests can call createFactory()
+    includedirs {
+        "include",
+        "plugins/",
+        "%{target_deps}/doctest/include",
+        "%{root}/source/extensions/isaacsim.ros2.bridge/include",
+        "%{root}/_build/target-deps/nlohmann_json/include",
+        "%{root}/_build/target-deps/cuda/include",
+        "%{root}/source/deprecated/omni.isaac.dynamic_control/include",
+        "%{root}/source/extensions/isaacsim.core.includes/include",
+        "%{root}/_build/target-deps/python/include/python3.11",
+        "%{root}/_build/target-deps/python/include",
+        "%{kit_sdk_bin_dir}/dev/fabric/include/",
+
+    }
+    -- link omni.kit.test (path or 'repo_precache_exts' config may need to be adjusted)
+    libdirs {
+        extsbuild_dir.."/omni.kit.test/bin",
+    }
+    add_usd()
+    filter { "system:linux" }
+    disablewarnings { "error=narrowing", "error=unused-but-set-variable", "error=unused-variable" }
+    links { "boost_system", "stdc++fs" }
+    filter { "system:windows" }
+    filter {}
+
+    filter { "configurations:debug" }
+        defines { "_DEBUG" }
+    filter { "configurations:release" }
+        defines { "NDEBUG" }
+    filter {}

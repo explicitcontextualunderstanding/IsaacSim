@@ -29,7 +29,7 @@ from isaacsim.core.utils.stage import (
 from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.robot_setup.grasp_editor import GraspSpec, import_grasps_from_file
 from isaacsim.storage.native import get_assets_root_path_async
-from pxr import Sdf, UsdLux, UsdPhysics
+from pxr import Sdf, UsdGeom, UsdLux, UsdPhysics
 
 
 class TestGraspImporter(omni.kit.test.AsyncTestCase):
@@ -47,7 +47,7 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
 
         asset_root_path = await get_assets_root_path_async()
 
-        gripper_usd_path = asset_root_path + "/Isaac/Robots/Robotiq/2F-85/Robotiq_2F_85_flattened.usd"
+        gripper_usd_path = asset_root_path + "/Isaac/Robots/Robotiq/2F-85/Robotiq_2F_85_edit.usd"
         self._gripper_path = "/gripper"
         add_reference_to_stage(gripper_usd_path, self._gripper_path)
         self._gripper_xform = SingleXFormPrim(self._gripper_path)
@@ -91,14 +91,14 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
         d = self._grasp_spec.get_grasp_dicts()
         self.assertTrue(d["grasp_1"]["confidence"] == 1.0)
         self.assertAlmostEqual(
-            d["grasp_1"]["position"], [-0.13256364870261714, -0.06671887519456805, -0.14897155140648582]
+            d["grasp_1"]["position"], [0.07278040418583424, 0.1386934914438153, 0.0003092657331517473]
         )
-        self.assertAlmostEqual(d["grasp_1"]["orientation"]["w"], 0.8342422246932983)
+        self.assertAlmostEqual(d["grasp_1"]["orientation"]["w"], -0.16540821860820776)
         self.assertAlmostEqual(
-            d["grasp_1"]["orientation"]["xyz"], [0.1769535725646071, -0.42840731993728665, 0.2986545025937998]
+            d["grasp_1"]["orientation"]["xyz"], [0.16535619382785066, 0.6884872031442437, -0.6865004162316599]
         )
-        self.assertAlmostEqual(d["grasp_1"]["cspace_position"]["finger_joint"], 0.1758938431739807)
-        self.assertAlmostEqual(d["grasp_1"]["pregrasp_cspace_position"]["finger_joint"], 0.1758938431739807)
+        self.assertAlmostEqual(d["grasp_1"]["cspace_position"]["finger_joint"], 0.17335550487041473)
+        self.assertAlmostEqual(d["grasp_1"]["pregrasp_cspace_position"]["finger_joint"], 1.1851336920380408e-16)
 
         self.assertTrue(d["grasp_0"] == self._grasp_spec.get_grasp_dict_by_name("grasp_0"))
         self.assertTrue(d["grasp_1"] == self._grasp_spec.get_grasp_dict_by_name("grasp_1"))
@@ -110,13 +110,22 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
     async def test_compute_gripper_pose(self):
         rb_trans, rb_quat = self._cube_xform.get_world_pose()
 
+        print(f"rb_trans: {rb_trans}, rb_quat: {rb_quat}")
         pos, orient = self._grasp_spec.compute_gripper_pose_from_rigid_body_pose("grasp_0", rb_trans, rb_quat)
-        self.assertAlmostEqual(pos, [0.87771687, -0.06043073, 0.08953029])
-        self.assertAlmostEqual(orient, [0.90047985, -0.09601596, 0.27552128, 0.32249805])
+        grasp_xform_0 = SingleXFormPrim("/grasp_0")
+        grasp_xform_0.set_world_pose(pos, orient)
+        self._gripper_xform.set_world_pose(pos, orient)
+        self.assertAlmostEqual(pos, [0.83907737, -0.03842877, 0.00609728])
+        self.assertAlmostEqual(orient, [-0.56469814, 0.58969032, -0.41637607, 0.40001538])
 
         pos, orient = self._grasp_spec.compute_gripper_pose_from_rigid_body_pose("grasp_1", rb_trans, rb_quat)
-        self.assertAlmostEqual(pos, [0.86743635, -0.06671888, -0.14897155])
-        self.assertAlmostEqual(orient, [0.83424222, 0.17695357, -0.42840732, 0.2986545])
+
+        grasp_xform_1 = SingleXFormPrim("/grasp_1")
+        grasp_xform_1.set_world_pose(pos, orient)
+
+        print(f"pos: {pos}, orient: {orient}")
+        self.assertAlmostEqual(pos, [1.07278040e00, 1.38693491e-01, -3.09265733e-04])
+        self.assertAlmostEqual(orient, [-0.16540822, 0.16535619, 0.6884872, -0.68650042])
 
         # This line was used to visually verify that pos, orient are correct for both grasps
         # self._gripper_xform.set_world_pose(pos, orient)
@@ -125,13 +134,15 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
         gripper_trans, gripper_quat = self._gripper_xform.get_world_pose()
 
         pos, orient = self._grasp_spec.compute_rigid_body_pose_from_gripper_pose("grasp_0", gripper_trans, gripper_quat)
-        self.assertAlmostEqual(pos, [0.14131404, 0.16882488, -0.07536021])
-        self.assertAlmostEqual(orient, [0.94041753, 0.01493187, -0.04889638, -0.3361563])
+        print(f"pos: {pos}, orient: {orient}")
+        self.assertAlmostEqual(pos, [0.09281761, 0.19917378, 0.13709212])
+        self.assertAlmostEqual(orient, [0.64882371, 0.66910164, -0.26698466, 0.24505096])
 
         pos, orient = self._grasp_spec.compute_rigid_body_pose_from_gripper_pose("grasp_1", gripper_trans, gripper_quat)
+        print(f"pos: {pos}, orient: {orient}")
         self._cube_xform.set_world_pose(pos, orient)
-        self.assertAlmostEqual(pos, [0.16610557, 0.17034578, -0.12548552])
-        self.assertAlmostEqual(orient, [0.70542973, -0.24410456, 0.61794968, -0.24681987])
+        self.assertAlmostEqual(pos, [0.07523923, 0.19988537, 0.13737544])
+        self.assertAlmostEqual(orient, [-0.00651318, -0.00608179, 0.70804808, -0.70610868])
 
         # This line was used to visually verify that pos, orient are correct for both grasps
         # self._cube_xform.set_world_pose(pos, orient)

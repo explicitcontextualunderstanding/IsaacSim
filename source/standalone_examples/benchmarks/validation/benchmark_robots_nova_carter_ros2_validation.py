@@ -81,9 +81,6 @@ gpu_frametime = args.gpu_frametime
 headless = args.non_headless
 
 
-import os
-from pathlib import Path
-
 import numpy as np
 from isaacsim import SimulationApp
 
@@ -93,7 +90,6 @@ import carb
 import omni
 import omni.graph.core as og
 import omni.kit.test
-import omni.replicator.core as rep
 from isaacsim.core.api import PhysicsContext
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.core.utils.stage import get_current_stage

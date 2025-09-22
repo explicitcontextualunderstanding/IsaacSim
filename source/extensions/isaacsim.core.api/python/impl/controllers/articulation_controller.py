@@ -21,8 +21,7 @@ from isaacsim.core.utils.types import ArticulationAction, ArticulationActions
 class ArticulationController(object):
     """PD Controller of all degrees of freedom of an articulation, can apply position targets, velocity targets and efforts.
 
-    Checkout the required tutorials at
-     https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+    Checkout the required tutorials at https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
     """
 
     def __init__(self) -> None:

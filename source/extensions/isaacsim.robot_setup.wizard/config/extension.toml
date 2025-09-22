@@ -1,5 +1,5 @@
 [package]
-version = "0.0.7"
+version = "0.0.8"
 category = "other"
 title = "Isaac Sim Robot Wizard [Beta]"
 description = "Wizard to guide through robot import and configuration"

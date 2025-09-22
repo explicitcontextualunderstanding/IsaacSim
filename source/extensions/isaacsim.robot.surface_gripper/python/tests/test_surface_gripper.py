@@ -33,6 +33,7 @@ from isaacsim.core.utils.stage import (
     update_stage_async,
 )
 from isaacsim.robot.surface_gripper import GripperView
+from isaacsim.robot.surface_gripper._surface_gripper import GripperStatus
 from pxr import Gf, PhysxSchema
 from usd.schema.isaac import robot_schema
 
@@ -83,6 +84,7 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         joint_z = self._stage.GetPrimAtPath("/World/Joints/z_joint")
         joint_z.GetAttribute("drive:linear:physics:targetPosition").Set(joint_z_target)
         await update_stage_async()
+        await simulate_async(1)
 
     async def setUp(self):
         World.clear_instance()
@@ -97,7 +99,7 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
 
     async def tearDown(self):
         await update_stage_async()
-        self._timeline.stop()
+        # self._timeline.stop()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await simulate_async(1.0)
         await update_stage_async()
@@ -128,86 +130,75 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
-        await self.update_joint_target_positions(0.0, 0.0, 0.145)
+        await self.update_joint_target_positions(0.0, 0.0, 0.140)
         await simulate_async(1.0)
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
         await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
 
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_28")
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
+
         await update_stage_async()
         await update_stage_async()
 
         # Open the gripper
         self.gripper_view.apply_gripper_action([-0.5])
         await update_stage_async()
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
         await update_stage_async()
         await update_stage_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_28")
+        await simulate_async(2.0)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
     async def test_multi_object_close(self):
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
-        await self.update_joint_target_positions(0.175, 0.0, 0.145)
+        await self.update_joint_target_positions(0.175, 0.0, 0.140)
         await simulate_async(1.0)
 
         expected_gripped_object_list = ["/World/Boxes/Cube_20", "/World/Boxes/Cube_24"]
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
         await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
         await update_stage_async()
 
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 2)
-        self.assertTrue(sorted(set(gripped_object_list)) == sorted(set(expected_gripped_object_list)))
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 2)
+        self.assertTrue(sorted(set(gripped_object_list[0])) == sorted(set(expected_gripped_object_list)))
         await update_stage_async()
         await update_stage_async()
 
         # Open the gripper
         self.gripper_view.apply_gripper_action([-0.5])
         await update_stage_async()
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
         await update_stage_async()
         await update_stage_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
         await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 2)
-        self.assertTrue(sorted(set(gripped_object_list)) == sorted(set(expected_gripped_object_list)))
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 2)
+        self.assertTrue(sorted(set(gripped_object_list[0])) == sorted(set(expected_gripped_object_list)))
 
     async def test_close_threshold(self):
         gripper_count = 1
@@ -220,34 +211,28 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
         await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
 
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
         await update_stage_async()
         await update_stage_async()
 
         # Open the gripper
         self.gripper_view.apply_gripper_action([-0.5])
         await update_stage_async()
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
         await update_stage_async()
         await update_stage_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
         await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
 
     async def test_retry_interval(self):
         gripper_count = 1
@@ -259,29 +244,26 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
 
         # Begin closing the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await self.update_joint_target_positions(0.0, 0.0, 0.145)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closing")
+        await simulate_async(0.1)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closing)
 
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
 
+        await self.update_joint_target_positions(0.0, 0.0, 0.140)
         await simulate_async(1.0)
 
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_28")
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
     async def test_shear_break_forces(self):
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
-        await self.update_joint_target_positions(0.0, 0.0, 0.145)
+        await self.update_joint_target_positions(0.0, 0.0, 0.140)
         await simulate_async(1.0)
 
         # Close the gripper
@@ -295,29 +277,25 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         forceApi = PhysxSchema.PhysxForceAPI.Apply(box_28_prim)
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, -4, 0.0))
         await update_stage_async()
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
 
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], box_28_prim_path)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], box_28_prim_path)
 
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, -500, 0.0))
         await update_stage_async()
         await simulate_async(1.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
 
     async def test_coaxial_break_force(self):
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
-        await self.update_joint_target_positions(0.0, 0.0, 0.145)
+        await self.update_joint_target_positions(0.0, 0.0, 0.140)
         await simulate_async(1.0)
 
         # Close the gripper
@@ -331,13 +309,11 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         forceApi = PhysxSchema.PhysxForceAPI.Apply(box_28_prim)
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, 0.0, -0.003))
         await update_stage_async()
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Closed")
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
 
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], box_28_prim_path)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], box_28_prim_path)
 
         await self.update_joint_target_positions(0.0, 0.0, 0.0)
         await simulate_async(1.0)
@@ -345,11 +321,9 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, 0.0, -1000))
         await update_stage_async()
         await simulate_async(2.0)
-        self.assertEqual(self.gripper_view.get_surface_gripper_status()[0], "Open")
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
 
     async def test_multi_gripper_scene(self):
         gripper_count = 2
@@ -359,74 +333,59 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         # Move grippers down to touch the boxes
         # First gripper should be "Closing" (Some gripper joints are off the box)
         # Second gripper should be "Closed"
-        await self.update_joint_target_positions(0.0, 0.05, 0.15)
+        await self.update_joint_target_positions(0.0, 0.05, 0.14)
         await simulate_async(1.0)
 
         gripper_prim_paths = ["/World/SurfaceGripper", "/World/SurfaceGripper_01"]
 
         # Close the grippers
         actions = [0.5, 0.5]
-        expected_statuses = ["Closing", "Closed"]
+        expected_statuses = [GripperStatus.Closing, GripperStatus.Closed]
 
         self.gripper_view.apply_gripper_action(actions)
         await simulate_async(1.0)
         statuses = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
-            self.assertEqual(statuses[i], expected_statuses[i])
+            self.assertEqual(GripperStatus(statuses[i]), expected_statuses[i])
 
         # Check gripped objects
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_28")
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
-        gripped_object_list = (
-            self.gripper_view.prims[1].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_30")
+        self.assertEqual(len(gripped_object_list[1]), 1)
+        self.assertEqual(gripped_object_list[1][0], "/World/Boxes/Cube_30")
 
         # Open the grippers
         actions = [-0.5, -0.5]
-        expected_statuses = ["Open", "Open"]
+        expected_statuses = [GripperStatus.Open, GripperStatus.Open]
 
         self.gripper_view.apply_gripper_action(actions)
         await simulate_async(1.0)
         statuses = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
-            self.assertEqual(statuses[i], expected_statuses[i])
+            self.assertEqual(GripperStatus(statuses[i]), expected_statuses[i])
 
         # Check gripped objects
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 0)
 
-        gripped_object_list = (
-            self.gripper_view.prims[1].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 0)
+        self.assertEqual(len(gripped_object_list[1]), 0)
 
         # Close the grippers
         actions = [0.5, 0.5]
-        expected_statuses = ["Closing", "Closed"]
+        expected_statuses = [GripperStatus.Closing, GripperStatus.Closed]
 
         self.gripper_view.apply_gripper_action(actions)
         await simulate_async(1.0)
         statuses = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
-            self.assertEqual(statuses[i], expected_statuses[i])
+            self.assertEqual(GripperStatus(statuses[i]), expected_statuses[i])
 
         # Check gripped objects
-        gripped_object_list = (
-            self.gripper_view.prims[0].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_28")
+        gripped_object_list = self.gripper_view.get_gripped_objects()
+        self.assertEqual(len(gripped_object_list[0]), 1)
+        self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
-        gripped_object_list = (
-            self.gripper_view.prims[1].GetRelationship(robot_schema.Relations.GRIPPED_OBJECTS.name).GetTargets()
-        )
-        self.assertEqual(len(gripped_object_list), 1)
-        self.assertEqual(gripped_object_list[0], "/World/Boxes/Cube_30")
+        self.assertEqual(len(gripped_object_list[1]), 1)
+        self.assertEqual(gripped_object_list[1][0], "/World/Boxes/Cube_30")

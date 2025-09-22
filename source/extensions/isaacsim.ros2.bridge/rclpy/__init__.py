@@ -19,12 +19,17 @@ import sys
 import carb
 import omni.ext
 import omni.kit
+from isaacsim.ros2.bridge.impl.ros2_common import (
+    SUPPORTED_ROS_DISTROS,
+    print_environment_setup_instructions,
+    setup_ros2_environment,
+)
 
 
 class Extension(omni.ext.IExt):
     def on_startup(self, ext_id):
         ros_distro = os.environ.get("ROS_DISTRO")
-        if ros_distro in ["humble", "jazzy"] and os.path.join(f"{ros_distro}", "rclpy") in os.path.join(
+        if ros_distro in SUPPORTED_ROS_DISTROS.values() and os.path.join(f"{ros_distro}", "rclpy") in os.path.join(
             os.path.dirname(__file__)
         ):
             omni.kit.app.get_app().print_and_log("Attempting to load system rclpy")
@@ -47,12 +52,9 @@ class Extension(omni.ext.IExt):
                 sys.path.append(os.path.join(os.path.dirname(__file__)))
                 ext_manager = omni.kit.app.get_app().get_extension_manager()
                 self._extension_path = ext_manager.get_extension_path(ext_id)
-                if sys.platform == "win32":
-                    if os.environ.get("PATH"):
-                        os.environ["PATH"] = os.environ.get("PATH") + ";" + self._extension_path + f"/{ros_distro}/lib"
-                    else:
-                        os.environ["PATH"] = self._extension_path + f"/{ros_distro}/lib"
-                        os.environ["RMW_IMPLEMENTATION"] = "rmw_fastrtps_cpp"
+
+                setup_ros2_environment(self._extension_path, ros_distro)
+
                 try:
                     import rclpy
 
@@ -61,31 +63,7 @@ class Extension(omni.ext.IExt):
                     omni.kit.app.get_app().print_and_log("rclpy loaded")
                 except Exception as e:
                     omni.kit.app.get_app().print_and_log(f"Could not import internal rclpy: {e}")
-                    if sys.platform == "linux":
-                        omni.kit.app.get_app().print_and_log(
-                            f"To use the internal libraries included with the extension please set the following environment variables to use with FastDDS (default) or CycloneDDS before starting Isaac Sim:\n\n"
-                            f"FastDDS (default):\n"
-                            f"export ROS_DISTRO={ros_distro}\n"
-                            f"export RMW_IMPLEMENTATION=rmw_fastrtps_cpp\n"
-                            f"export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self._extension_path}/{ros_distro}/lib\n\n"
-                            f"OR\n\n"
-                            f"CycloneDDS:\n"
-                            f"export ROS_DISTRO={ros_distro}\n"
-                            f"export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp\n"
-                            f"export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self._extension_path}/{ros_distro}/lib\n\n"
-                        )
-                    else:
-                        omni.kit.app.get_app().print_and_log(
-                            f"To use the internal libraries included with the extension, please set the environment variables using one of the following methods before starting Isaac Sim:\n\n"
-                            f"Command Prompt (CMD):\n"
-                            f"set ROS_DISTRO={ros_distro}\n"
-                            f"set RMW_IMPLEMENTATION=rmw_fastrtps_cpp\n"
-                            f"set PATH=%PATH%;{self._extension_path}/{ros_distro}/lib\n\n"
-                            f"PowerShell:\n"
-                            f'$env:ROS_DISTRO = "{ros_distro}"\n'
-                            f'$env:RMW_IMPLEMENTATION = "rmw_fastrtps_cpp"\n'
-                            f'$env:PATH = "$env:PATH;{self._extension_path}/{ros_distro}/lib"\n\n'
-                        )
+                    print_environment_setup_instructions(self._extension_path, ros_distro)
                 try:
                     import rclpy
 

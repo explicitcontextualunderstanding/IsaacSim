@@ -1,4 +1,20 @@
 # Changelog
+
+## [3.3.1] - 2025-08-30
+### Changed
+- Performance improvements
+
+## [3.3.0] - 2025-08-30
+### Added
+- Added Option to Write or not to USD on simulation
+- C++ Interface for batched updates
+### Changed
+- Made all possible processing threaded
+
+## [3.2.7] - 2025-08-29
+### Changed
+- Renamed CARB profiling zones to include [IsaacSim] prefix
+
 ## [3.2.6] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 3.2.5)

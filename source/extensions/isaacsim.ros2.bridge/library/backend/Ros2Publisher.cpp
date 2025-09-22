@@ -30,10 +30,8 @@ Ros2PublisherImpl::Ros2PublisherImpl(Ros2NodeHandle* nodeHandle,
                                      const char* topicName,
                                      const void* typeSupport,
                                      const Ros2QoSProfile& qos)
-    : m_nodeHandle(nodeHandle)
-{
-    // Allocate memory for publisher
-    m_publisher = std::shared_ptr<rcl_publisher_t>(new rcl_publisher_t,
+    : m_nodeHandle(nodeHandle),
+      m_publisher(std::shared_ptr<rcl_publisher_t>(new rcl_publisher_t,
                                                    [nodeHandle](rcl_publisher_t* pub)
                                                    {
                                                        rcl_ret_t ret = rcl_publisher_fini(
@@ -43,7 +41,9 @@ Ros2PublisherImpl::Ros2PublisherImpl(Ros2NodeHandle* nodeHandle,
                                                            RCL_ERROR_MSG(Ros2PublisherImpl, rcl_publisher_fini);
                                                        }
                                                        delete pub;
-                                                   });
+                                                   }))
+{
+    // Allocate memory for publisher
     // Init publisher
     (*m_publisher) = rcl_get_zero_initialized_publisher();
     rcl_publisher_options_t publisherOptions = rcl_publisher_get_default_options();

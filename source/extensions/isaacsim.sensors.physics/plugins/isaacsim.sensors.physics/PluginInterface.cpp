@@ -34,6 +34,7 @@
 #include <carb/logging/Log.h>
 #include <carb/settings/ISettings.h>
 
+#include <isaacsim/core/includes/Buffer.h>
 #include <isaacsim/sensors/physics/IPhysicsSensor.h>
 #include <omni/fabric/usd/PathConversion.h>
 #include <omni/graph/core/ogn/Registration.h>
@@ -74,12 +75,13 @@ pxr::UsdStageWeakPtr g_stage = nullptr;
 omni::physics::tensors::TensorApi* g_tensorApi = nullptr;
 omni::physics::tensors::ISimulationView* g_simulationView = nullptr;
 omni::physics::tensors::IRigidBodyView* g_rigidBodyView = nullptr;
-omni::physics::tensors::TensorDesc g_rigidBodyData;
+omni::physics::tensors::TensorDesc g_rigidBodyVelocitiesTensor;
+isaacsim::core::includes::GenericBufferBase<float> g_rigidBodyVelocitiesBuffer;
+std::vector<float> g_rigidBodyVelocitiesData;
 std::vector<std::string> g_rigidBodyPaths;
 carb::settings::ISettings* g_settings = nullptr;
 std::unique_ptr<isaacsim::sensors::physics::IsaacSensorManager> g_isaacSensorManager;
 omni::physx::SubscriptionId g_stepSubscription;
-std::vector<float> g_rigidBodyDataBuffer;
 bool g_firstFrame = true;
 long int g_stageID;
 std::unordered_map<std::string, size_t> g_rigidBodyToDataBufferMap;
@@ -283,13 +285,16 @@ void onPlay()
         g_rigidBodyToDataBufferMap[g_rigidBodyPaths[i]] = i * 6;
     }
 
-    g_rigidBodyDataBuffer.resize(6 * g_rigidBodyPaths.size(), 0);
-    g_rigidBodyData.dtype = omni::physics::tensors::TensorDataType::eFloat32;
-    g_rigidBodyData.numDims = 2;
-    g_rigidBodyData.dims[0] = static_cast<int>(g_rigidBodyPaths.size());
-    g_rigidBodyData.dims[1] = 6;
-    g_rigidBodyData.data = g_rigidBodyDataBuffer.data();
-    g_rigidBodyData.ownData = true;
+    g_rigidBodyVelocitiesData.resize(6 * g_rigidBodyPaths.size(), 0);
+    g_rigidBodyVelocitiesBuffer.resize(6 * g_rigidBodyPaths.size());
+    g_rigidBodyVelocitiesBuffer.setDevice(g_simulationView->getDeviceOrdinal());
+    g_rigidBodyVelocitiesTensor.dtype = omni::physics::tensors::TensorDataType::eFloat32;
+    g_rigidBodyVelocitiesTensor.numDims = 2;
+    g_rigidBodyVelocitiesTensor.dims[0] = static_cast<int>(g_rigidBodyPaths.size());
+    g_rigidBodyVelocitiesTensor.dims[1] = 6;
+    g_rigidBodyVelocitiesTensor.data = g_rigidBodyVelocitiesBuffer.data();
+    g_rigidBodyVelocitiesTensor.ownData = true;
+    g_rigidBodyVelocitiesTensor.device = g_simulationView->getDeviceOrdinal();
 
     // pass in the view data and index to the sensor
     for (const usdrt::SdfPath& usdrtPath : imuSensorPaths)
@@ -302,7 +307,7 @@ void onPlay()
         if (imuSensor != nullptr)
         {
             size_t sensorDataIndex = g_rigidBodyToDataBufferMap[imuSensor->getParentPrim().GetPath().GetString()];
-            imuSensor->initialize(&g_rigidBodyDataBuffer, sensorDataIndex);
+            imuSensor->initialize(&g_rigidBodyVelocitiesData, sensorDataIndex);
         }
     }
 }
@@ -339,7 +344,7 @@ static void onStop(void* userData)
         g_rigidBodyView = nullptr;
     }
     g_rigidBodyPaths.clear();
-    g_rigidBodyDataBuffer.clear();
+    g_rigidBodyVelocitiesData.clear();
     g_rigidBodyToDataBufferMap.clear();
 }
 
@@ -353,19 +358,20 @@ void onComponentChange(const pxr::SdfPath& primOrPropertyPath, void* userData)
 
 void onPhysicsStep(float dt, void* userData)
 {
-    CARB_PROFILE_ZONE(0, "IsaacSensor::onPhysicsStep");
+    CARB_PROFILE_ZONE(0, "[IsaacSim] IsaacSensor::onPhysicsStep");
     if (g_isaacSensorManager)
     {
         if (g_firstFrame)
         {
-            CARB_PROFILE_ZONE(0, "IsaacSensor::firstFramePlay");
+            CARB_PROFILE_ZONE(0, "[IsaacSim] IsaacSensor::firstFramePlay");
             onPlay();
             g_firstFrame = false;
         }
 
         if (g_rigidBodyView != nullptr)
         {
-            g_rigidBodyView->getVelocities(&g_rigidBodyData);
+            g_rigidBodyView->getVelocities(&g_rigidBodyVelocitiesTensor);
+            g_rigidBodyVelocitiesBuffer.copyTo(g_rigidBodyVelocitiesData.data(), g_rigidBodyVelocitiesBuffer.size());
         }
 
         g_isaacSensorManager->onPhysicsStep(static_cast<double>(dt));

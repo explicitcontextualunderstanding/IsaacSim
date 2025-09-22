@@ -102,12 +102,11 @@ void createAssetFromMJCF(const char* fileName,
     stages["robot_stage"] = pxr::UsdStageRefPtr();
 
     bool multi_layer = true;
-    std::string name = "";
     if (stage_identifier != "" && pxr::UsdStage::IsSupportedFile(stage_identifier))
     {
         OpenOrCreateNew(stages["stage"], stage_identifier);
         std::string directoryPath = pxr::TfGetPathName(stage_identifier);
-        name = pxr::TfStringGetBeforeSuffix(pxr::TfGetBaseName(stage_identifier));
+        std::string name = pxr::TfStringGetBeforeSuffix(pxr::TfGetBaseName(stage_identifier));
 
         // CARB_LOG_WARN(stage_identifier.c_str());
         // CARB_LOG_WARN(directoryPath.c_str());
@@ -147,11 +146,11 @@ void createAssetFromMJCF(const char* fileName,
         else
         {
             std::string directoryPath = pxr::TfGetPathName(identifier);
-            std::string name = pxr::TfGetBaseName(identifier);
-            OpenOrCreateNew(stages["sensor_stage"], directoryPath + "/configuration/" + name + "_sensor.usd");
-            OpenOrCreateNew(stages["physics_stage"], directoryPath + "/configuration/" + name + "_physics.usd");
-            OpenOrCreateNew(stages["base_stage"], directoryPath + "/configuration/" + name + "_base.usd");
-            OpenOrCreateNew(stages["robot_stage"], directoryPath + "/configuration/" + name + "_robot.usd");
+            std::string stageName = pxr::TfGetBaseName(identifier);
+            OpenOrCreateNew(stages["sensor_stage"], directoryPath + "/configuration/" + stageName + "_sensor.usd");
+            OpenOrCreateNew(stages["physics_stage"], directoryPath + "/configuration/" + stageName + "_physics.usd");
+            OpenOrCreateNew(stages["base_stage"], directoryPath + "/configuration/" + stageName + "_base.usd");
+            OpenOrCreateNew(stages["robot_stage"], directoryPath + "/configuration/" + stageName + "_robot.usd");
         }
     }
 
@@ -199,7 +198,6 @@ void createAssetFromMJCF(const char* fileName,
             stages["base_stage"]->GetRootLayer()->GetSubLayerPaths().push_back(robot_layer);
         }
     }
-    std::string result = "";
 
     if (stages["stage"])
     {
@@ -275,7 +273,6 @@ void createAssetFromMJCF(const char* fileName,
             stages["base_stage"]->Save();
             stages["robot_stage"]->Save();
             pxr::UsdEditContext context(stages["stage"], stages["stage"]->GetRootLayer());
-            result = stages["base_stage"]->GetDefaultPrim().GetPath().GetString();
             // Remove the physics and sensor stages from sublayers, and add them as payloads through variants
             rootLayer->GetSubLayerPaths().clear();
 

@@ -1,4 +1,21 @@
 # Changelog
+
+## [3.5.1] - 2025-09-08
+### Fixed
+- Fix test configuration to allow runing all tests
+
+## [3.5.0] - 2025-08-27
+### Added
+- Add Warp kernels to compose/decompose fabric transformation matrices from/to Warp arrays
+
+## [3.4.7] - 2025-08-15
+### Fixed
+- Fix Sdf/Gf casting when setting/getting prim attribute's value
+
+## [3.4.6] - 2025-08-11
+### Removed
+- No-longer-necessary TODO statement.
+
 ## [3.4.5] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 3.4.4)

@@ -20,6 +20,7 @@
 #include <isaacsim/core/includes/utils/Path.h>
 
 #include <OmniClient.h>
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <map>
@@ -65,19 +66,6 @@ std::string StatusToString(OmniConverterStatus status)
 
 
 const static size_t INVALID_MATERIAL_INDEX = SIZE_MAX;
-
-
-std::string ReplaceBackwardSlash(std::string in)
-{
-    for (auto& c : in)
-    {
-        if (c == '\\')
-        {
-            c = '/';
-        }
-    }
-    return in;
-}
 
 
 pxr::TfToken getMaterialToken(pxr::UsdStageWeakPtr stage, const pxr::SdfPath& materialPath)
@@ -168,15 +156,9 @@ void moveMeshAndMaterials(const pxr::UsdStageRefPtr& sourceStage,
                           std::map<pxr::TfToken, pxr::SdfPath>& materialList)
 {
     // Get the mesh from stage A
-    pxr::UsdGeomMesh mesh = pxr::UsdGeomMesh(sourceStage->GetPrimAtPath(meshPath));
-    if (!mesh)
-    {
-        CARB_LOG_ERROR("Error: Could not find mesh at path %s", meshPath.GetText());
-        return;
-    }
 
     // Create a new mesh in stage B
-    pxr::UsdGeomMesh newMesh = pxr::UsdGeomMesh::Define(dstStage, targetPrimPath);
+    pxr::UsdGeomXform newMesh = pxr::UsdGeomXform::Define(dstStage, targetPrimPath);
     if (!newMesh)
     {
         CARB_LOG_ERROR("Error: Could not create new mesh at path %s", targetPrimPath.GetText());
@@ -185,95 +167,8 @@ void moveMeshAndMaterials(const pxr::UsdStageRefPtr& sourceStage,
 
     // Copy the mesh attributes from stage A to stage B
     pxr::SdfCopySpec(sourceStage->GetRootLayer(), meshPath, dstStage->GetRootLayer(), targetPrimPath);
-
-    // Move materials and bind them to the new mesh
-    for (const auto& subset : pxr::UsdGeomSubset::GetAllGeomSubsets(mesh))
-    {
-        pxr::TfToken subsetName = subset.GetPrim().GetName();
-        pxr::UsdGeomSubset dstSubset =
-            pxr::UsdGeomSubset(dstStage->GetPrimAtPath(newMesh.GetPath().AppendChild(pxr::TfToken(subsetName))));
-        moveAndBindMaterial(sourceStage, dstStage, rootPath, subset.GetPath(), dstSubset.GetPath(), materialList);
-    }
-
-    // Bind the material to the new mesh
-    moveAndBindMaterial(sourceStage, dstStage, rootPath, mesh.GetPath(), newMesh.GetPath(), materialList);
 }
 
-enum class UpAxis
-{
-    X_UP,
-    Y_UP,
-    Z_UP,
-    UNKNOWN
-};
-
-const static std::map<std::string, UpAxis> upAxisMap = { { "X_UP", UpAxis::Y_UP },
-                                                         { "Y_UP", UpAxis::Y_UP },
-                                                         { "Z_UP", UpAxis::Z_UP } };
-
-UpAxis UpAxisFromString(const std::string& str)
-{
-    auto it = upAxisMap.find(str);
-    if (it != upAxisMap.end())
-    {
-        return it->second;
-    }
-    else
-    {
-        return UpAxis::UNKNOWN;
-    }
-}
-
-UpAxis getColladaUpAxis(const std::string& filePath)
-{
-    // Load the COLLADA file
-    tinyxml2::XMLDocument doc;
-    doc.LoadFile(filePath.c_str());
-
-    // Check if the file was loaded successfully
-    if (doc.ErrorID() != 0)
-    {
-        CARB_LOG_ERROR("Error loading file: %s", doc.ErrorStr());
-        return UpAxis::UNKNOWN;
-    }
-
-    // Get the root element of the COLLADA document
-    tinyxml2::XMLElement* root = doc.RootElement();
-
-    // Get the asset element
-    tinyxml2::XMLElement* asset = root->FirstChildElement("asset");
-
-    // Get the up_axis element
-    tinyxml2::XMLElement* up_axis = asset->FirstChildElement("up_axis");
-
-    // Check the value of the up_axis element
-    std::string up_axis_value = up_axis->GetText();
-    return UpAxisFromString(up_axis_value);
-}
-
-bool isColladaFile(const std::string& filePath)
-{
-    // Get the file extension
-    std::string ext = filePath.substr(filePath.find_last_of(".") + 1);
-
-    // Convert the file extension to lower case
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-    // Check if the file extension is "dae"
-    return !strcmp(ext.c_str(), "dae");
-}
-
-
-void rotateMeshX(pxr::UsdGeomXformable mesh)
-{
-
-
-    mesh.ClearXformOpOrder();
-
-    mesh.AddTranslateOp(pxr::UsdGeomXformOp::PrecisionDouble).Set(pxr::GfVec3d(0, 0, 0));
-    mesh.AddOrientOp(pxr::UsdGeomXformOp::PrecisionDouble).Set(pxr::GfQuatd(0.70711, 0.70711, 0, 0));
-    mesh.AddScaleOp(pxr::UsdGeomXformOp::PrecisionDouble).Set(pxr::GfVec3d(1, 1, 1));
-}
 
 pxr::SdfPath waitForConverter(OmniConverterFuture* future,
                               pxr::UsdStageRefPtr usdStage,
@@ -283,9 +178,7 @@ pxr::SdfPath waitForConverter(OmniConverterFuture* future,
                               const pxr::SdfPath& rootPath,
                               std::map<pxr::TfToken, pxr::SdfPath>& materialPaths)
 {
-    OmniConverterStatus status = OmniConverterStatus::OK;
-    bool isCollada = isColladaFile(meshPath);
-    UpAxis upAxis = isCollada ? getColladaUpAxis(meshPath) : UpAxis::UNKNOWN;
+    OmniConverterStatus status;
 
     // Wait for the converter to finish
     while (omniConverterCheckFutureStatus(future) == OmniConverterStatus::IN_PROGRESS)
@@ -307,19 +200,7 @@ pxr::SdfPath waitForConverter(OmniConverterFuture* future,
 
     // Open the mesh stage and get the mesh prims
     pxr::UsdStageRefPtr meshStage = pxr::UsdStage::Open(mesh_usd_path);
-    pxr::UsdPrimRange primRange(meshStage->GetDefaultPrim());
-    std::vector<pxr::UsdPrim> meshPrims;
-    std::copy_if(primRange.begin(), primRange.end(), std::back_inserter(meshPrims),
-                 [](pxr::UsdPrim const& prim) { return prim.IsA<pxr::UsdGeomMesh>(); });
-
-    // Rotate meshes if necessary (Collada files with Z-up axis)
-    if (isCollada && upAxis == UpAxis::Z_UP)
-    {
-        for (const auto& mesh : meshPrims)
-        {
-            rotateMeshX(pxr::UsdGeomXformable(mesh));
-        }
-    }
+    std::vector<pxr::UsdPrim> meshPrims{ meshStage->GetDefaultPrim() };
 
     // Create a base prim and move meshes and materials
     auto basePrim = pxr::UsdGeomXform::Define(usdStage, pxr::SdfPath(meshStagePath));
@@ -367,7 +248,7 @@ pxr::SdfPath SimpleImport(pxr::UsdStageRefPtr usdStage,
         int flags = OMNI_CONVERTER_FLAGS_SINGLE_MESH_FILE | OMNI_CONVERTER_FLAGS_IGNORE_CAMERAS |
                     OMNI_CONVERTER_FLAGS_USE_METER_PER_UNIT | OMNI_CONVERTER_FLAGS_MERGE_ALL_MESHES |
                     OMNI_CONVERTER_FLAGS_IGNORE_LIGHTS | OMNI_CONVERTER_FLAGS_FBX_CONVERT_TO_Z_UP |
-                    OMNI_CONVERTER_FLAGS_FBX_BAKING_SCALES_INTO_MESH | OMNI_CONVERTER_FLAGS_IGNORE_PIVOTS;
+                    OMNI_CONVERTER_FLAGS_IGNORE_PIVOTS | OMNI_CONVERTER_FLAGS_STAGE_UP_Z;
 
         // Set up the log and progress callbacks for the Omni Converter
         omniConverterSetLogCallback([](const char* message) { CARB_LOG_INFO("%s", message); });

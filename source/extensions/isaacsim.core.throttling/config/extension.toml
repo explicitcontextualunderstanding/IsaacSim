@@ -1,5 +1,5 @@
 [package]
-version = "2.1.10"
+version = "2.2.1"
 category = "Other"
 title = "Isaac Sim Throttling"
 description = "Control throttling behaviors for isaac sim"
@@ -19,6 +19,12 @@ name = "isaacsim.core.throttling"
 
 [[python.module]]
 name = "isaacsim.core.throttling.tests"
+
+[settings]
+# Whether to enable runtime toggle of async rendering
+exts."isaacsim.core.throttling".enable_async = false
+# Whether to enable runtime toggle of manual mode 
+exts."isaacsim.core.throttling".enable_manualmode = false
 
 [[test]]
 dependencies = ["omni.kit.test"]

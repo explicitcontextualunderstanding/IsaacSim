@@ -6,7 +6,7 @@ packages = [
     "nvidia_lula_no_cuda==0.10.1"            # SWIPAT filed under: N/A (NVIDIA-authored)
 ]
 target = "../_build/target-deps/isaac_lula_prebundle"
-platforms = ["*-x86_64"]
+platforms = ["*-x86_64", "*aarch64"]
 download_only = false
 install_dependencies = false
 append_to_install_folder = true

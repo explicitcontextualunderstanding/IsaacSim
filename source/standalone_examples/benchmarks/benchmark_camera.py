@@ -42,7 +42,6 @@ gpu_frametime = args.gpu_frametime
 headless = args.non_headless
 viewport_updates = args.viewport_updates
 
-import numpy as np
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp(
@@ -54,7 +53,6 @@ import omni
 import omni.replicator.core as rep
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.core.utils.stage import is_stage_loading
-from omni.kit.viewport.utility import get_active_viewport
 
 enable_extension("isaacsim.benchmark.services")
 from isaacsim.benchmark.services import BaseIsaacBenchmark

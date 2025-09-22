@@ -34,6 +34,14 @@ from isaacsim.examples.extension.core_connectors import LoadButton, ResetButton
 from isaacsim.storage.native import get_assets_root_path
 
 
+async def wait_until_stage_loaded(timeout_s: float = 20.0):
+    async def _wait():
+        while omni.usd.get_context().get_stage_loading_status()[2] > 0:
+            await omni.kit.app.get_app().next_update_async()
+
+    await asyncio.wait_for(_wait(), timeout=timeout_s)
+
+
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestUICoreConnectors(omni.kit.test.AsyncTestCase):
     # Before running each test
@@ -90,8 +98,11 @@ class TestUICoreConnectors(omni.kit.test.AsyncTestCase):
             world.scene.add(art)
             world.scene.add(cuboid)
 
+        loaded = asyncio.Event()
+
         def setup_post_load_fn():
             self.setup_post_load_called = True
+            loaded.set()
 
             # Assert that the timeline is paused when this callback is called
             self.assertFalse(self._timeline.is_playing() or self._timeline.is_stopped())
@@ -105,9 +116,9 @@ class TestUICoreConnectors(omni.kit.test.AsyncTestCase):
         await button.click()
         await update_stage_async()
 
-        # The LoadButton resets the Core World asynchronously, so it can take some time to get to the setup_post_load_fn
-        for _ in range(30):
-            await update_stage_async()
+        # Wait for asset streaming to finish with timeout, then await post-load completion deterministically
+        await wait_until_stage_loaded(timeout_s=20.0)
+        await asyncio.wait_for(loaded.wait(), timeout=10.0)
 
         self.assertTrue(self.setup_scene_called)
         self.assertTrue(self.setup_post_load_called)

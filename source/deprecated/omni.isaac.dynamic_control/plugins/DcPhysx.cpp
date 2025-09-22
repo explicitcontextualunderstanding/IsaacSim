@@ -249,6 +249,17 @@ inline void ZeroArray(T* arr, size_t count)
     }
 }
 
+// Specialization to avoid potential use of uninitialized fields in PhysX types during assignment.
+template <>
+inline void ZeroArray<PxSpatialVelocity>(PxSpatialVelocity* arr, size_t count)
+{
+    for (size_t i = 0; i < count; ++i)
+    {
+        arr[i].linear = PxVec3(0.0f, 0.0f, 0.0f);
+        arr[i].angular = PxVec3(0.0f, 0.0f, 0.0f);
+    }
+}
+
 inline carb::Float3 asFloat3(const PxVec3& v)
 {
     return carb::Float3{ v.x, v.y, v.z };

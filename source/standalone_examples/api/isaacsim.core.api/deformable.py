@@ -27,8 +27,8 @@ from isaacsim.core.api import World
 from isaacsim.core.api.materials.deformable_material import DeformableMaterial
 from isaacsim.core.prims import DeformablePrim, SingleDeformablePrim
 from isaacsim.storage.native import get_assets_root_path
-from omni.physx.scripts import deformableUtils, physicsUtils
-from pxr import Gf, UsdGeom, UsdLux
+from omni.physx.scripts import physicsUtils
+from pxr import Gf, UsdGeom
 
 # The example shows how to create and manipulate environments with deformable prim through the DeformablePrim
 parser = argparse.ArgumentParser()

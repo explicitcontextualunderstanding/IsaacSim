@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" The CortexWorld extends from the core API's world object and adds the behavior portion of the
+"""The CortexWorld extends from the core API's world object and adds the behavior portion of the
 Cortex processing pipeline.
 
 The full Cortex processing pipeline includes:

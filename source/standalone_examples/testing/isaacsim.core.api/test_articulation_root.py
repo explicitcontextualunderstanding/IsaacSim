@@ -18,6 +18,8 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True})
 
+import sys
+
 import numpy as np
 from isaacsim.core.api import World
 from isaacsim.core.prims import Articulation
@@ -32,9 +34,8 @@ my_world.reset()
 for i in range(3):
     my_world.step(render=True)
 if not (np.isclose(articulated.get_world_poses()[1], [-0.50, -0.49, 0.49, 0.50], atol=1e-02)).all():
-    raise (
-        ValueError(
-            f"Articulation is not using the correct default state due to a mismatch in the ArticulationRoot representation"
-        )
+    print(
+        f"[FAIL] Articulation is not using the correct default state due to a mismatch in the ArticulationRoot representation"
     )
+    sys.exit(1)
 simulation_app.close()

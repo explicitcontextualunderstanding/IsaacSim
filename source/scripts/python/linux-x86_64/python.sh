@@ -34,6 +34,18 @@ source ${SCRIPT_DIR}/setup_python_env.sh
 # By default use our python, but allow overriding it by checking if PYTHONEXE env var is defined:
 python_exe=${PYTHONEXE:-"${SCRIPT_DIR}/kit/python/bin/python3"}
 
+# Parse command line arguments to check for --lldb-debug flag
+use_lldb=false
+filtered_args=()
+
+for arg in "$@"; do
+    if [[ "$arg" == "--lldb-debug" ]]; then
+        use_lldb=true
+    else
+        filtered_args+=("$arg")
+    fi
+done
+
 
 if ! [[ -z "${CONDA_PREFIX}" ]]; then
   echo "Warning: running in conda env, please deactivate before executing this script"
@@ -52,4 +64,10 @@ fi
 export RESOURCE_NAME="IsaacSim"
 # WAR for missing libcarb.so
 export LD_PRELOAD=$SCRIPT_DIR/kit/libcarb.so
-$python_exe "$@" $args || error_exit
+
+# Run with lldb if --lldb-debug flag was specified, otherwise run normally
+if [[ "$use_lldb" == true ]]; then
+    lldb -o run $python_exe -- "${filtered_args[@]}" $args || error_exit
+else
+    $python_exe "${filtered_args[@]}" $args || error_exit
+fi

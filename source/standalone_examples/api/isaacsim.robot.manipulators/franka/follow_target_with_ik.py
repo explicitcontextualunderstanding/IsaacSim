@@ -20,7 +20,6 @@ simulation_app = SimulationApp({"headless": False})
 import carb
 from isaacsim.core.api import World
 from isaacsim.robot.manipulators.examples.franka import KinematicsSolver
-from isaacsim.robot.manipulators.examples.franka.controllers.rmpflow_controller import RMPFlowController
 from isaacsim.robot.manipulators.examples.franka.tasks import FollowTarget
 
 my_world = World(stage_units_in_meters=1.0)

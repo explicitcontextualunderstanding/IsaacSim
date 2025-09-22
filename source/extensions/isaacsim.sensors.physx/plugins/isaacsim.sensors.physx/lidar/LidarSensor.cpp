@@ -48,7 +48,7 @@ namespace physx
 {
 
 
-LidarSensor::LidarSensor(omni::physx::IPhysx* physxPtr) : RangeSensorComponent(physxPtr)
+LidarSensor::LidarSensor(omni::physx::IPhysx* physxPtr) : RangeSensorComponent(physxPtr), m_enableSemantics(false)
 {
 }
 

@@ -130,8 +130,8 @@ public:
             }
 
             Ros2QoSProfile qos;
-            const std::string& qosProfile = db.inputs.qosProfile();
-            if (qosProfile.empty())
+            const std::string& currentQosProfile = db.inputs.qosProfile();
+            if (currentQosProfile.empty())
             {
                 qos.depth = state.m_queueSize;
             }
@@ -417,7 +417,7 @@ private:
     std::string m_messageSubfolder;
     std::string m_messageName;
     std::string m_topicName;
-    uint64_t m_queueSize;
+    uint64_t m_queueSize = 10;
     std::string m_qosProfile;
 
     // OGN utils
@@ -609,13 +609,11 @@ private:
         // Check for attribute name and type
         for (auto const& dynamicInput : dynamicInputs)
         {
-            bool status = false;
-            for (auto const& messageField : messageFields)
-                if (db.tokenToString(dynamicInput().name()) == ("inputs:" + messageField.name))
-                {
-                    status = dynamicInput().typeName() == messageField.ognType;
-                    break;
-                }
+            auto it =
+                std::find_if(messageFields.begin(), messageFields.end(),
+                             [&](const auto& messageField)
+                             { return db.tokenToString(dynamicInput().name()) == ("inputs:" + messageField.name); });
+            bool status = (it != messageFields.end() && dynamicInput().typeName() == it->ognType);
             if (!status)
             {
                 return false;

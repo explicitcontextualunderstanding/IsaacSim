@@ -1,5 +1,5 @@
 [package]
-version = "2.2.12"
+version = "2.3.0"
 category = "Simulation"
 title = "Isaac Sim PhysX Sensor UI components"
 description = "Isaac Sim PhysX Sensor UI components extension provides UI components for Isaac Sim PhysX-raycast-based sensor simulation, eg. menu options."

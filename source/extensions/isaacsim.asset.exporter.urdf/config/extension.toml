@@ -1,5 +1,5 @@
 [package]
-version = "1.2.5"
+version = "1.3.2"
 category = "Simulation"
 title = "Isaac Sim USD to URDF exporter"
 description = "Extension that exports USD files to URDF"
@@ -17,6 +17,7 @@ writeTarget.platform = true # pip prebundle makes this extension os specific
 "isaacsim.gui.components" = {}
 "omni.kit.pip_archive" = {}
 
+
 [[python.module]]
 path = "pip_prebundle"
 
@@ -27,5 +28,15 @@ name = "isaacsim.asset.exporter.urdf"
 name = "isaacsim.asset.exporter.urdf.tests"
 
 [[test]]
-
-dependencies = []
+timeout = 400
+dependencies = [ "isaacsim.asset.importer.urdf", "isaacsim.core.experimental.prims"]
+stdoutFailPatterns.exclude = [
+    "*Missing call to destroyResourceBindingSignature()*",
+    '*not added to `TransformGraph` because it is not a link type or joint type prim.*',
+    '*UserWarning: Sum of `faceVertexCounts` (392550) does not equal sum of length of `GeomSubset` `indices` (41287)*',
+    '*Converted USD to URDF.*',
+    '*Invalid Imu sensor prim*',
+    '*not added to `TransformGraph` because it is not a link type or joint type prim.*',
+    '*parent prim is missing contact report API*',
+    '*Error processing node attribute `outputs:pointInstanceDataType`: dataType attribute is empty*'
+]

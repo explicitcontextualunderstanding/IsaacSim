@@ -13,4 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from isaacsim.robot.manipulators.examples.franka.franka import Franka
+from isaacsim.robot.manipulators.examples.franka.franka_experimental import FrankaExperimental
 from isaacsim.robot.manipulators.examples.franka.kinematics_solver import KinematicsSolver
+from isaacsim.robot.manipulators.examples.franka.pick_place.pick_place import FrankaPickPlace

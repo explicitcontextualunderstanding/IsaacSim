@@ -21,7 +21,6 @@ import omni.usd
 from isaacsim.core.utils.stage import open_stage_async
 from isaacsim.ros2.bridge.impl.camera_info_utils import compute_relative_pose, read_camera_info
 from isaacsim.sensors.camera import Camera
-from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Sdf
 
 from .common import ROS2TestCase
@@ -33,11 +32,6 @@ class TestCameraInfoUtils(ROS2TestCase):
     async def setUp(self):
         await super().setUp()
         await omni.usd.get_context().new_stage_async()
-
-        self._assets_root_path = await get_assets_root_path_async()
-        if self._assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
 
         await omni.kit.app.get_app().next_update_async()
 

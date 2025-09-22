@@ -24,8 +24,7 @@ class BaseTask(object):
     getting observations needed for the behavioral layer, calculating metrics needed about the task,
     calling certain things pre-stepping, creating multiple tasks at the same time and much more.
 
-    Checkout the required tutorials at
-    https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+    Checkout the required tutorials at https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
 
     Args:
         name (str): needs to be unique if added to the World.

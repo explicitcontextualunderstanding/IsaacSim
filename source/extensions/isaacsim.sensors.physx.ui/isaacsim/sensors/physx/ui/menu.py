@@ -18,9 +18,12 @@ from pathlib import Path
 
 import carb
 import omni.kit.commands
+from isaacsim.core.utils.prims import create_prim
+from isaacsim.core.utils.stage import get_next_free_path
 from isaacsim.gui.components.menu import make_menu_item_description
+from isaacsim.storage.native import get_assets_root_path
 from omni.kit.menu.utils import MenuItemDescription, add_menu_items, remove_menu_items
-from pxr import Gf, Sdf, UsdGeom
+from pxr import Gf
 
 
 class RangeSensorMenu:
@@ -30,11 +33,27 @@ class RangeSensorMenu:
                 name="PhysX Lidar",
                 sub_menu=[
                     make_menu_item_description(ext_id, "Rotating", lambda a=weakref.proxy(self): a._add_lidar()),
-                    make_menu_item_description(ext_id, "Generic", lambda a=weakref.proxy(self): a._add_generic()),
+                    make_menu_item_description(
+                        ext_id, "Generic", lambda a=weakref.proxy(self): a._add_generic(), "PhysX Generic"
+                    ),
                 ],
             ),
-            make_menu_item_description(
-                ext_id, "LightBeam Sensor", lambda a=weakref.proxy(self): a._add_lightbeam_sensor()
+            MenuItemDescription(
+                name="LightBeam Sensor",
+                sub_menu=[
+                    make_menu_item_description(
+                        ext_id, "Generic", lambda a=weakref.proxy(self): a._add_lightbeam_sensor(), "LightBeam Generic"
+                    ),
+                    make_menu_item_description(
+                        ext_id,
+                        "Tashan TS-F-A",
+                        lambda *_: create_prim(
+                            prim_path=get_next_free_path("/TS_F_A", None),
+                            prim_type="Xform",
+                            usd_path=get_assets_root_path() + "/Isaac/Sensors/Tashan/TS-F-A/TS-F-A.usd",
+                        ),
+                    ),
+                ],
             ),
         ]
         icon_dir = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__)
@@ -65,8 +84,23 @@ class RangeSensorMenu:
                                     },
                                 },
                                 {
-                                    "name": "LightBeam Sensor",
-                                    "onclick_fn": lambda *_: self._add_lightbeam_sensor(),
+                                    "name": {
+                                        "LightBeam Sensor": [
+                                            {
+                                                "name": "Generic",
+                                                "onclick_fn": lambda *_: self._add_lightbeam_sensor(),
+                                            },
+                                            {
+                                                "name": "Tashan TS-F-A",
+                                                "onclick_fn": lambda *_: create_prim(
+                                                    prim_path=get_next_free_path("/TS_F_A", None),
+                                                    prim_type="Xform",
+                                                    usd_path=get_assets_root_path()
+                                                    + "/Isaac/Sensors/Tashan/TS-F-A/TS-F-A.usd",
+                                                ),
+                                            },
+                                        ],
+                                    },
                                 },
                             ],
                         },

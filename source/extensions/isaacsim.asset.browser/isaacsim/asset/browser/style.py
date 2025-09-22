@@ -15,6 +15,7 @@
 
 from pathlib import Path
 
+import omni.ui as ui
 from omni.ui import color as cl
 
 CURRENT_PATH = Path(__file__).parent
@@ -36,4 +37,8 @@ PROPERTY_STYLE = {
     "RadioButton": {"background_color": 0x0, "padding": 0},
     "RadioButton.Image": {"image_url": f"{ICON_PATH}/radio_off.svg"},
     "RadioButton.Image:checked": {"image_url": f"{ICON_PATH}/radio_on.svg"},
+    "GridView.Item:selected": {
+        "background_color": 0x44FFFFFF,
+        "color": 0xFF00B976,
+    },
 }

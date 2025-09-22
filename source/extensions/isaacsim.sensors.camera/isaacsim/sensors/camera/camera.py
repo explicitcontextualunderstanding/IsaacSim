@@ -42,7 +42,7 @@ from isaacsim.core.utils.prims import (
 )
 from isaacsim.core.utils.render_product import get_resolution, set_camera_prim_path, set_resolution
 from omni.isaac.IsaacSensorSchema import IsaacRtxLidarSensorAPI
-from pxr import Sdf, Usd, UsdGeom, Vt
+from pxr import Gf, Sdf, Usd, UsdGeom, Vt
 
 # Attribute maps for lens distortion models
 OPENCV_PINHOLE_ATTRIBUTE_MAP = ["k1", "k2", "p1", "p2", "k3", "k4", "k5", "k6", "s1", "s2", "s3", "s4"]
@@ -276,7 +276,7 @@ class Camera(BaseSensor):
         self._og_controller = og.Controller()
         self._sdg_graph_pipeline = self._og_controller.graph("/Render/PostProcess/SDGPipeline")
 
-        # Make sure the camera aperture is set to use square pixels even if initilize() is not called
+        # Make sure the camera aperture is set to use square pixels even if initialize() is not called
         self._maintain_square_pixel_aperture(mode="horizontal")
 
         return
@@ -2132,6 +2132,7 @@ class Camera(BaseSensor):
             fy (float): Vertical Focal Length (pixels)
             pinhole (List[float]): OpenCV pinhole parameters [k1, k2, p1, p2, k3, k4, k5, k6, s1, s2, s3, s4]
         """
+        image_size = Gf.Vec2i(self.get_resolution())
         return self._set_lens_distortion_properties(
             distortion_model="OpenCvPinhole",
             distortion_model_attr="opencvPinhole",
@@ -2141,6 +2142,7 @@ class Camera(BaseSensor):
             cy=cy,
             fx=fx,
             fy=fy,
+            image_size=image_size,
         )
 
     def get_opencv_pinhole_properties(self) -> Tuple[float, float, float, float, List]:
@@ -2174,6 +2176,7 @@ class Camera(BaseSensor):
             fy (float): Vertical Focal Length (pixels)
             fisheye (List[float]): OpenCV fisheye parameters [k1, k2, k3, k4]
         """
+        image_size = Gf.Vec2i(self.get_resolution())
         return self._set_lens_distortion_properties(
             distortion_model="OpenCvFisheye",
             distortion_model_attr="opencvFisheye",
@@ -2183,6 +2186,7 @@ class Camera(BaseSensor):
             cy=cy,
             fx=fx,
             fy=fy,
+            image_size=image_size,
         )
 
     def get_opencv_fisheye_properties(self) -> Tuple[float, float, float, float, List]:

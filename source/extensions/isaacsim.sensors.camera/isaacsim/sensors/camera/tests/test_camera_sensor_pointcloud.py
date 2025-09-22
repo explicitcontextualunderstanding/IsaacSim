@@ -69,7 +69,7 @@ async def debug_capture_rgb_image_async(camera_position, camera_look_at, resolut
     rgb_annot.attach(render_product)
     await rep.orchestrator.step_async()
     rgb_data = rgb_annot.get_data()
-    rgb_img = Image.fromarray(rgb_data, "RGBA")
+    rgb_img = Image.fromarray(rgb_data).convert("RGBA")
     rgb_img.save(os.path.join(out_dir, file_name))
     print(f"Saved image to {os.path.join(out_dir, file_name)} with shape {rgb_data.shape}")
     rgb_annot.detach()

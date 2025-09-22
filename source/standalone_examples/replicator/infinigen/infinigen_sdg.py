@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate synthetic datasets using infinigen (https://infinigen.org/) generated environments.
-"""
+"""Generate synthetic datasets using infinigen (https://infinigen.org/) generated environments."""
 
 
 import argparse

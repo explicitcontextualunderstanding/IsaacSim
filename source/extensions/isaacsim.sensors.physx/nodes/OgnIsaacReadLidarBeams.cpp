@@ -249,7 +249,7 @@ public:
             m_beamIdx = 0;
         }
 
-        else if (m_numBeamsRemaining <= numBeams)
+        else
         {
 
             // Save data up to maximum FOV
@@ -323,7 +323,7 @@ private:
     uint64_t m_prevSequenceNumber = 0;
 
     bool m_resetLaserScan = true;
-    size_t m_numBeamsRemaining;
+    size_t m_numBeamsRemaining = 0;
 
     size_t m_beamIdx = 0;
 

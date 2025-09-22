@@ -44,7 +44,7 @@ _articulation_views_reset_values = dict()
 
 
 def register_simulation_context(
-    simulation_context: Union[isaacsim.core.api.SimulationContext, isaacsim.core.api.World]
+    simulation_context: Union[isaacsim.core.api.SimulationContext, isaacsim.core.api.World],
 ) -> None:
     """
     Args:

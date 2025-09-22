@@ -29,14 +29,12 @@ config = args.config
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
-import carb
 import omni
 import omni.kit.viewport.utility
 import omni.replicator.core as rep
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils import stage
-from isaacsim.storage.native import get_assets_root_path
-from pxr import Gf, Sdf, UsdGeom, UsdPhysics
+from pxr import Gf, UsdGeom, UsdPhysics
 
 
 def printinc(i):
@@ -115,7 +113,6 @@ i = printinc(i)  # 5
 hydra_texture = rep.create.render_product(sensor.GetPath(), [1, 1], name="Isaac")
 
 # Create the debug draw pipeline in the post process graph
-from omni.syntheticdata import sensors
 
 i = printinc(i)
 simulation_context = SimulationContext(physics_dt=1.0 / 60.0, rendering_dt=1.0 / 60.0, stage_units_in_meters=1.0)

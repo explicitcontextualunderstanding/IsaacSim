@@ -176,7 +176,7 @@ private:
     std::string m_messageSubfolder;
     std::string m_messageName;
 
-    isaacsim::core::nodes::CoreNodes* m_coreNodeFramework;
+    isaacsim::core::nodes::CoreNodes* m_coreNodeFramework = nullptr;
 
     template <bool removeAttributes>
     void updateNodeState(OgnROS2ServiceServerResponseDatabase& db,

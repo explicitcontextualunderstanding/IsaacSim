@@ -23,6 +23,7 @@
 #include <carb/logging/Logger.h>
 
 #include <isaacsim/core/includes/BaseResetNode.h>
+#include <isaacsim/core/includes/Buffer.h>
 #include <isaacsim/core/includes/Conversions.h>
 #include <isaacsim/core/nodes/ICoreNodes.h>
 #include <isaacsim/core/simulation_manager/ISimulationManager.h>
@@ -48,14 +49,14 @@ using isaacsim::core::includes::conversions::asCarbFloat4;
 using isaacsim::core::includes::conversions::asGfRotation;
 using isaacsim::core::includes::conversions::asGfVec3d;
 
-static void createTensorDesc(TensorDesc& tensorDesc, void* dataPtr, int numElements, TensorDataType type)
+static void createTensorDesc(TensorDesc& tensorDesc, void* dataPtr, int numElements, TensorDataType type, int device)
 {
     tensorDesc.dtype = type;
     tensorDesc.numDims = 1;
     tensorDesc.dims[0] = numElements;
     tensorDesc.data = dataPtr;
     tensorDesc.ownData = true;
-    tensorDesc.device = -1;
+    tensorDesc.device = device;
 }
 
 class OgnIsaacComputeOdometry : public isaacsim::core::includes::BaseResetNode
@@ -67,10 +68,11 @@ public:
         state.m_simulationManagerFramework =
             carb::getCachedInterface<isaacsim::core::simulation_manager::ISimulationManager>();
 
-        state.xformData.resize(7);
-        state.velData.resize(6);
-        createTensorDesc(state.m_xformTensor, (void*)state.xformData.data(), 7, TensorDataType::eFloat32);
-        createTensorDesc(state.m_velTensor, (void*)state.velData.data(), 6, TensorDataType::eFloat32);
+        // Resize buffers and arrays
+        state.m_transformBuffer.resize(7);
+        state.m_velocitiesBuffer.resize(6);
+        state.m_transformData.resize(7);
+        state.m_velocitiesData.resize(6);
     }
 
     static bool compute(OgnIsaacComputeOdometryDatabase& db)
@@ -79,24 +81,16 @@ public:
         auto& state = db.perInstanceState<OgnIsaacComputeOdometry>();
         if (state.m_firstFrame && state.m_simulationManagerFramework->isSimulating())
         {
-            // Find our stage
+            // Get the stage
             long stageId = context.iContext->getStageId(context);
             auto stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
-            state.m_tensorInterface = carb::getCachedInterface<TensorApi>();
-            if (!state.m_tensorInterface)
-            {
-                CARB_LOG_ERROR("Failed to acquire Tensor Api interface\n");
-                return false;
-            }
-
-            state.m_simView = state.m_tensorInterface->createSimulationView(stageId);
-
             if (!stage)
             {
-                db.logError("Could not find USD stage %ld", stageId);
+                db.logError("Could not find USD stage with ID %ld", stageId);
                 return false;
             }
 
+            // Get target prim
             const auto& prim = db.inputs.chassisPrim();
             const char* primPath;
             if (!prim.empty())
@@ -111,33 +105,56 @@ public:
             }
             else
             {
-                db.logError("OmniGraph Error: no chassis prim found");
+                db.logError("No chassis (target) prim found at path '%s'", primPath);
                 return false;
             }
-            ObjectType objectType = state.m_simView->getObjectType(primPath);
-            // Checking we have a valid articulation or rigid body
+
+            // Create simulation view
+            state.m_tensorInterface = carb::getCachedInterface<TensorApi>();
+            if (!state.m_tensorInterface)
+            {
+                CARB_LOG_ERROR("Failed to acquire Tensor API interface\n");
+                return false;
+            }
+            state.m_simulationView = state.m_tensorInterface->createSimulationView(stageId);
+
+            // Create tensor descriptors
+            int deviceOrdinal = state.m_simulationView->getDeviceOrdinal();
+            state.m_transformBuffer.setDevice(deviceOrdinal);
+            state.m_velocitiesBuffer.setDevice(deviceOrdinal);
+            createTensorDesc(state.m_transformTensor, static_cast<void*>(state.m_transformBuffer.data()), 7,
+                             TensorDataType::eFloat32, deviceOrdinal);
+            createTensorDesc(state.m_velocitiesTensor, static_cast<void*>(state.m_velocitiesBuffer.data()), 6,
+                             TensorDataType::eFloat32, deviceOrdinal);
+
+            // Create view for the target prim
+            ObjectType objectType = state.m_simulationView->getObjectType(primPath);
             if (objectType == ObjectType::eArticulation || objectType == ObjectType::eArticulationRootLink)
             {
-                IArticulationView* articulation = state.m_simView->createArticulationView(primPath);
+                IArticulationView* articulation = state.m_simulationView->createArticulationView(primPath);
                 state.m_articulation = articulation;
-                state.m_articulation->getRootTransforms(&state.m_xformTensor);
+                state.m_articulation->getRootTransforms(&state.m_transformTensor);
             }
             else if (objectType == ObjectType::eRigidBody || objectType == ObjectType::eArticulationLink)
             {
-                IRigidBodyView* rigidBody = state.m_simView->createRigidBodyView(primPath);
+                IRigidBodyView* rigidBody = state.m_simulationView->createRigidBodyView(primPath);
                 state.m_rigidBody = rigidBody;
-                state.m_rigidBody->getTransforms(&state.m_xformTensor);
+                state.m_rigidBody->getTransforms(&state.m_transformTensor);
             }
             else
             {
-                db.logError("prim is not a valid rigid body or articulation root");
+                db.logError("The prim at path '%s' is not a valid rigid body or articulation root", primPath);
                 return false;
             }
-            state.m_unitScale = UsdGeomGetStageMetersPerUnit(stage);
+
+            // Initialize other variables
+            state.m_transformBuffer.copyTo(state.m_transformData.data(), 7);
+            state.m_velocitiesBuffer.copyTo(state.m_velocitiesData.data(), 6);
             state.m_startingPose = ::physx::PxTransform(
-                ::physx::PxVec3(state.xformData[0], state.xformData[1], state.xformData[2]),
-                ::physx::PxQuat(state.xformData[3], state.xformData[4], state.xformData[5], state.xformData[6]));
-            // get starting pose in the world frame
+                ::physx::PxVec3(state.m_transformData[0], state.m_transformData[1], state.m_transformData[2]),
+                ::physx::PxQuat(state.m_transformData[3], state.m_transformData[4], state.m_transformData[5],
+                                state.m_transformData[6]));
+            state.m_unitScale = UsdGeomGetStageMetersPerUnit(stage);
             state.m_lastTime = state.m_simulationManagerFramework->getSimulationTime();
             state.m_firstFrame = false;
         }
@@ -150,33 +167,35 @@ public:
 
     void computeOdometry(OgnIsaacComputeOdometryDatabase& db)
     {
+        // Get transform and velocities
+        // - Query data from tensor API
         if (m_articulation)
         {
-            m_articulation->getRootTransforms(&m_xformTensor);
+            m_articulation->getRootTransforms(&m_transformTensor);
         }
         else if (m_rigidBody)
         {
-            m_rigidBody->getTransforms(&m_xformTensor);
+            m_rigidBody->getTransforms(&m_transformTensor);
         }
         if (m_articulation)
         {
-            m_articulation->getRootVelocities(&m_velTensor);
+            m_articulation->getRootVelocities(&m_velocitiesTensor);
         }
         else if (m_rigidBody)
         {
-            m_rigidBody->getVelocities(&m_velTensor);
+            m_rigidBody->getVelocities(&m_velocitiesTensor);
         }
+        // - Copy data to host (CPU)
+        m_transformBuffer.copyTo(m_transformData.data(), 7);
+        m_velocitiesBuffer.copyTo(m_velocitiesData.data(), 6);
 
-        // auto bodyPose = mDynamicControlPtr->getRigidBodyPose(mRigidBodyHandle);
-        // auto bodyLocalLinVel = mDynamicControlPtr->getRigidBodyLocalLinearVelocity(mRigidBodyHandle);
-        // auto bodyAngVel = mDynamicControlPtr->getRigidBodyAngularVelocity(mRigidBodyHandle);
-        auto p = ::physx::PxVec3(xformData[0], xformData[1], xformData[2]);
-        auto q = ::physx::PxQuat(xformData[3], xformData[4], xformData[5], xformData[6]);
-        auto linVel = ::physx::PxVec3(velData[0], velData[1], velData[2]);
+        auto p = ::physx::PxVec3(m_transformData[0], m_transformData[1], m_transformData[2]);
+        auto q = ::physx::PxQuat(m_transformData[3], m_transformData[4], m_transformData[5], m_transformData[6]);
+        auto linVel = ::physx::PxVec3(m_velocitiesData[0], m_velocitiesData[1], m_velocitiesData[2]);
         auto bodyLocalLinVel = ::physx::PxVec3(linVel.dot(q.rotate(::physx::PxVec3(1, 0, 0))),
                                                linVel.dot(q.rotate(::physx::PxVec3(0, 1, 0))),
                                                linVel.dot(q.rotate(::physx::PxVec3(0, 0, 1))));
-        auto bodyAngVel = ::physx::PxVec3(velData[3], velData[4], velData[5]);
+        auto bodyAngVel = ::physx::PxVec3(m_velocitiesData[3], m_velocitiesData[4], m_velocitiesData[5]);
 
         if (m_simulationManagerFramework->getSimulationTime() != m_lastTime)
         {
@@ -202,7 +221,7 @@ public:
                 m_angularAcceleration.x, m_angularAcceleration.y, m_angularAcceleration.z);
         }
 
-        // calculate odom reading from starting position
+        // Calculate odometry reading from starting position
         pxr::GfVec3d globalTranslation =
             pxr::GfVec3d(p.x - m_startingPose.p.x, p.y - m_startingPose.p.y, p.z - m_startingPose.p.z);
 
@@ -228,33 +247,33 @@ public:
     }
 
 private:
-    // rigidBody/articulation whose state (velocity, acceleration) is being published.
+    // Tensor API variables
+    // - Views
     IArticulationView* m_articulation = nullptr;
     IRigidBodyView* m_rigidBody = nullptr;
     TensorApi* m_tensorInterface = nullptr;
-    ISimulationView* m_simView = nullptr;
+    ISimulationView* m_simulationView = nullptr;
+    // - Tensor descriptors, buffers (CPU/GPU attending view device) and arrays (CPU, for OmniGraph) containers
+    TensorDesc m_transformTensor;
+    TensorDesc m_velocitiesTensor;
+    isaacsim::core::includes::GenericBufferBase<float> m_transformBuffer;
+    isaacsim::core::includes::GenericBufferBase<float> m_velocitiesBuffer;
+    std::vector<float> m_transformData;
+    std::vector<float> m_velocitiesData;
 
-    // pose of the robot at start
-    TensorDesc m_xformTensor;
-    TensorDesc m_velTensor;
-    std::vector<float> xformData;
-    std::vector<float> velData;
-    ::physx::PxTransform m_startingPose;
-
-    double m_unitScale;
+    // Other variables
+    isaacsim::core::simulation_manager::ISimulationManager* m_simulationManagerFramework = nullptr;
     bool m_firstFrame = true;
-
     double m_lastTime = 0.0;
+    double m_unitScale = 1.0;
+
+    ::physx::PxTransform m_startingPose;
     ::physx::PxVec3 m_linearAcceleration = { 0, 0, 0 };
     ::physx::PxVec3 m_angularAcceleration = { 0, 0, 0 };
-
     ::physx::PxVec3 m_prevLinearVelocity = { 0, 0, 0 };
     ::physx::PxVec3 m_prevAngularVelocity = { 0, 0, 0 };
-
     ::physx::PxVec3 m_globalLinearAcceleration = { 0, 0, 0 };
     ::physx::PxVec3 m_prevGlobalLinearVelocity = { 0, 0, 0 };
-
-    isaacsim::core::simulation_manager::ISimulationManager* m_simulationManagerFramework;
 };
 
 REGISTER_OGN_NODE()

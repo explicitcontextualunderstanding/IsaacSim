@@ -81,7 +81,6 @@ class AssetDetailDelegate(FolderDetailDelegate):
                 elided_text=True,
                 skip_draw_when_clipped=True,
                 alignment=ui.Alignment.TOP,
-                style_type_name_override="GridView.Item",
             )
 
         self._dragging_url = None

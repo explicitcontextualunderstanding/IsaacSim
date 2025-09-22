@@ -1,4 +1,8 @@
 # Changelog
+## [3.3.6] - 2025-09-06
+### Changed
+- Update the Suction Gripper to use Enums for status
+
 ## [3.3.5] - 2025-07-07
 ### Changed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 3.3.4)

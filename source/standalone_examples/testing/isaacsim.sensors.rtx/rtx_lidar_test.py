@@ -29,15 +29,13 @@ lidar_config = args.config
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
-import carb
 import omni
 import omni.kit.viewport.utility
 import omni.replicator.core as rep
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils import stage
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.storage.native import get_assets_root_path
-from pxr import Gf, Sdf, UsdGeom, UsdPhysics
+from pxr import Gf, UsdGeom, UsdPhysics
 
 enable_extension("isaacsim.ros2.bridge")
 
@@ -147,7 +145,6 @@ hydra_texture_1 = rep.create.render_product(sensor1.GetPath(), [1, 1], name="Isa
 hydra_texture_2 = rep.create.render_product(sensor2.GetPath(), [1, 1], name="Isaac").path
 
 # Create the debug draw pipeline in the post process graph
-from omni.syntheticdata import sensors
 
 i = printinc(i)
 simulation_context = SimulationContext(physics_dt=1.0 / 60.0, rendering_dt=1.0 / 60.0, stage_units_in_meters=1.0)

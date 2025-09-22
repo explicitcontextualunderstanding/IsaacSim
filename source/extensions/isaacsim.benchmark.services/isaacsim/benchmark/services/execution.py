@@ -22,13 +22,11 @@ from typing import Dict, List, Optional, Tuple
 
 import carb
 
-from .utils import get_calling_test_id, set_up_logging
-
-logger = set_up_logging(__name__)
+from .utils import get_calling_test_id
 
 
 def print_info_log(str):
-    logger.info(str)
+    carb.log_info(str)
 
 
 class TestExecutionEnvironmentInterface:
@@ -76,7 +74,7 @@ def get_cache_paths() -> List[Tuple[str, str]]:
             if os.path.exists(cache_path):
                 return cache_path
             else:
-                logger.warning(f"get_cache_paths: Cache path {cache_path} doesn't exist - won't track")
+                carb.log_warn(f"get_cache_paths: Cache path {cache_path} doesn't exist - won't track")
         return None
 
     cache_path_list = [

@@ -56,7 +56,7 @@ from isaacsim.core.api import World
 from isaacsim.core.api.objects import VisualCuboid
 from isaacsim.core.utils.prims import create_prim, set_prim_visibility
 from omni.isaac.core.prims import XFormPrim
-from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux
+from pxr import Gf, Sdf, UsdGeom, UsdLux
 
 my_world = World(stage_units_in_meters=1.0)
 

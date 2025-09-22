@@ -90,15 +90,6 @@
       "default_bucket": "default"
     },
     {
-      "name": "gympythontests",
-      "include": ["tests-omni.isaac.gym*.sh"],
-      "exclude": [],
-      "buckets": [
-        {"name": "default", "include": ["tests-omni.isaac.gym*.sh"]}
-      ],
-      "default_bucket": "default"
-    },
-    {
       "name": "alltests",
       "include": ["*"],
       "exclude": [],

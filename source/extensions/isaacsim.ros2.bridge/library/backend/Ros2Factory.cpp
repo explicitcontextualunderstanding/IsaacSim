@@ -39,6 +39,10 @@ std::shared_ptr<Ros2NodeHandle> Ros2FactoryImpl::createNodeHandle(const char* na
                                                                   const char* namespaceName,
                                                                   Ros2ContextHandle* contextHandle)
 {
+    if (!name || !namespaceName || !contextHandle)
+    {
+        return nullptr;
+    }
     return std::make_shared<Ros2NodeHandleImpl>(name, namespaceName, contextHandle);
 }
 
@@ -47,6 +51,10 @@ std::shared_ptr<Ros2Publisher> Ros2FactoryImpl::createPublisher(Ros2NodeHandle* 
                                                                 const void* typeSupport,
                                                                 const Ros2QoSProfile& qos)
 {
+    if (!nodeHandle || !topicName || !typeSupport)
+    {
+        return nullptr;
+    }
     return std::make_shared<Ros2PublisherImpl>(nodeHandle, topicName, typeSupport, qos);
 }
 
@@ -55,6 +63,10 @@ std::shared_ptr<Ros2Subscriber> Ros2FactoryImpl::createSubscriber(Ros2NodeHandle
                                                                   const void* typeSupport,
                                                                   const Ros2QoSProfile& qos)
 {
+    if (!nodeHandle || !topicName || !typeSupport)
+    {
+        return nullptr;
+    }
     return std::make_shared<Ros2SubscriberImpl>(nodeHandle, topicName, typeSupport, qos);
 }
 
@@ -63,6 +75,10 @@ std::shared_ptr<Ros2Service> Ros2FactoryImpl::createService(Ros2NodeHandle* node
                                                             const void* typeSupport,
                                                             const Ros2QoSProfile& qos)
 {
+    if (!nodeHandle || !serviceName || !typeSupport)
+    {
+        return nullptr;
+    }
     return std::make_shared<Ros2ServiceImpl>(nodeHandle, serviceName, typeSupport, qos);
 }
 
@@ -71,6 +87,10 @@ std::shared_ptr<Ros2Client> Ros2FactoryImpl::createClient(Ros2NodeHandle* nodeHa
                                                           const void* typeSupport,
                                                           const Ros2QoSProfile& qos)
 {
+    if (!nodeHandle || !serviceName || !typeSupport)
+    {
+        return nullptr;
+    }
     return std::make_shared<Ros2ClientImpl>(nodeHandle, serviceName, typeSupport, qos);
 }
 

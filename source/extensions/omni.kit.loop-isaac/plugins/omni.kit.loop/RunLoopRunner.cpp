@@ -98,10 +98,10 @@ class PrecisionSleep
 {
 public:
     PrecisionSleep()
-    {
 #if CARB_PLATFORM_WINDOWS
-        m_timer = CreateWaitableTimer(NULL, FALSE, NULL);
+        : m_timer(CreateWaitableTimer(NULL, FALSE, NULL))
 #endif
+    {
     }
 
     ~PrecisionSleep()
@@ -229,7 +229,7 @@ public:
     size_t slidingMaximumOutlierCount = 6;
     float slidingMaximumToleranceFactor = 2.0f;
 
-    RunLoopThread(const std::string& name_) : name(name_), m_runloopIterationCount(0)
+    explicit RunLoopThread(const std::string& name_) : name(name_), m_runloopIterationCount(0)
     {
         // (hacky) Set first update time ~1/60 sec to avoid dealing with 0 elapsed time
         m_lastUpdateTime -= milliseconds(16);
@@ -524,11 +524,11 @@ public:
     {
         m_deltaTime = dt;
     }
-    bool getManualMode()
+    bool getManualMode() const
     {
         return m_manualMode;
     }
-    double getManualStepSize()
+    double getManualStepSize() const
     {
         return m_deltaTime;
     }

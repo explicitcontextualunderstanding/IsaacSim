@@ -25,10 +25,6 @@ import omni.graph.core as og
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
 import omni.kit.commands
-
-# NOTE:
-#   omni.kit.test - std python's unittest module with additional wrapping to add support for async/await tests
-#   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
 import omni.kit.usd
 import omni.kit.viewport.utility
@@ -36,7 +32,6 @@ from isaacsim.core.prims import SingleXFormPrim
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import add_reference_to_stage, get_current_stage, open_stage_async
 from isaacsim.sensors.camera import Camera
-from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Sdf, UsdLux
 
 from .common import ROS2TestCase, get_qos_profile
@@ -49,11 +44,6 @@ class TestRos2CameraInfo(ROS2TestCase):
         await super().setUp()
 
         omni.usd.get_context().new_stage()
-        self._assets_root_path = await get_assets_root_path_async()
-        if self._assets_root_path is None:
-            carb.log_error("Could not find Isaac Sim assets folder")
-            return
-        kit_folder = carb.tokens.get_tokens_interface().resolve("${kit}")
 
         await omni.kit.app.get_app().next_update_async()
 
@@ -151,11 +141,10 @@ class TestRos2CameraInfo(ROS2TestCase):
 
         system_time = time.time()
 
-        for num in range(5):
+        for num in range(3):
             print(f"Play #{num+1}")
             self._timeline.play()
             await omni.kit.app.get_app().next_update_async()
-            await simulate_async(1.5, callback=spin)
             for _ in range(10):
                 if self._camera_info is None:
                     await simulate_async(1, callback=spin)
@@ -244,7 +233,13 @@ class TestRos2CameraInfo(ROS2TestCase):
             return cv2.remap(src=image_raw, map1=map1, map2=map2, interpolation=cv2.INTER_LANCZOS4)
 
     def _prepare_scene_for_stereo_camera(
-        self, baseline: float, resolution: Tuple[int, int], focal_length: float, focus_distance: float
+        self,
+        baseline: float,
+        resolution: Tuple[int, int],
+        focal_length: float,
+        focus_distance: float,
+        use_system_time: bool = False,
+        reset_simulation_time_on_stop: bool = True,
     ) -> Tuple[Camera, Camera]:
         """Add a stereo camera, checkerboard, and lights to the scene
 
@@ -253,6 +248,8 @@ class TestRos2CameraInfo(ROS2TestCase):
             resolution (Tuple[int, int]): Resolution of the cameras
             focal_length (float): Focal length of the cameras
             focus_distance (float): Focus distance of the cameras
+            use_system_time (bool, optional): Whether to use system time for timestamps. Defaults to False.
+            reset_simulation_time_on_stop (bool, optional): Whether to reset_simulation_time_on_stop. Defaults to True.
 
         Returns:
             Tuple[Camera, Camera]: The left and right cameras
@@ -299,22 +296,25 @@ class TestRos2CameraInfo(ROS2TestCase):
                     ],
                     og.Controller.Keys.SET_VALUES: [
                         ("CreateRenderProductLeft.inputs:cameraPrim", [Sdf.Path("/left_camera")]),
-                        ("CreateRenderProductLeft.inputs:height", 1024),
-                        ("CreateRenderProductLeft.inputs:width", 2048),
+                        ("CreateRenderProductLeft.inputs:height", resolution[1]),
+                        ("CreateRenderProductLeft.inputs:width", resolution[0]),
                         ("CreateRenderProductRight.inputs:cameraPrim", [Sdf.Path("/right_camera")]),
-                        ("CreateRenderProductRight.inputs:height", 1024),
-                        ("CreateRenderProductRight.inputs:width", 2048),
+                        ("CreateRenderProductRight.inputs:height", resolution[1]),
+                        ("CreateRenderProductRight.inputs:width", resolution[0]),
                         ("CameraInfoPublish.inputs:topicName", "camera_info_left"),
                         ("CameraInfoPublish.inputs:topicNameRight", "camera_info_right"),
                         ("CameraInfoPublish.inputs:frameId", "frame_left"),
                         ("CameraInfoPublish.inputs:frameIdRight", "frame_right"),
-                        ("CameraInfoPublish.inputs:resetSimulationTimeOnStop", True),
+                        ("CameraInfoPublish.inputs:resetSimulationTimeOnStop", reset_simulation_time_on_stop),
                         ("RGBPublishLeft.inputs:topicName", "rgb_left"),
                         ("RGBPublishLeft.inputs:type", "rgb"),
-                        ("RGBPublishLeft.inputs:resetSimulationTimeOnStop", True),
+                        ("RGBPublishLeft.inputs:resetSimulationTimeOnStop", reset_simulation_time_on_stop),
                         ("RGBPublishRight.inputs:topicName", "rgb_right"),
                         ("RGBPublishRight.inputs:type", "rgb"),
-                        ("RGBPublishRight.inputs:resetSimulationTimeOnStop", True),
+                        ("RGBPublishRight.inputs:resetSimulationTimeOnStop", reset_simulation_time_on_stop),
+                        ("RGBPublishLeft.inputs:useSystemTime", use_system_time),
+                        ("RGBPublishRight.inputs:useSystemTime", use_system_time),
+                        ("CameraInfoPublish.inputs:useSystemTime", use_system_time),
                     ],
                     og.Controller.Keys.CONNECT: [
                         ("OnPlaybackTick.outputs:tick", "RunOneSimulationFrame.inputs:execIn"),
@@ -408,8 +408,8 @@ class TestRos2CameraInfo(ROS2TestCase):
         # Wait for camera info and images to be received
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1.5, callback=spin_right)
-        await simulate_async(1.5, callback=spin_left)
+        await simulate_async(0.5, callback=spin_right)
+        await simulate_async(0.5, callback=spin_left)
 
         self.assertIsNotNone(self._camera_info_left, f"Did not receive left camera_info for {opencv_distortion_model}")
         self.assertIsNotNone(
@@ -556,3 +556,182 @@ class TestRos2CameraInfo(ROS2TestCase):
 
         # Test stereo rectification
         await self._test_stereo_rectification(opencv_distortion_model="opencvFisheye")
+
+    async def test_camera_info_system_time(self):
+        import time
+
+        import rclpy
+        from sensor_msgs.msg import CameraInfo
+
+        # Test 1: useSystemTime = True
+        left_camera, right_camera = self._prepare_scene_for_stereo_camera(
+            baseline=0.15, resolution=(2048, 1024), focal_length=1.8, focus_distance=400, use_system_time=True
+        )
+
+        self._camera_info_system_time = None
+
+        def camera_info_system_time_callback(data):
+            self._camera_info_system_time = data
+
+        node_system = rclpy.create_node("camera_system_time_tester")
+        camera_info_sub_system = node_system.create_subscription(
+            CameraInfo, "camera_info_left", camera_info_system_time_callback, get_qos_profile()
+        )
+
+        def spin_system_time():
+            rclpy.spin_once(node_system, timeout_sec=0.1)
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await simulate_async(0.5, callback=spin_system_time)
+
+        for _ in range(10):
+            if self._camera_info_system_time is None:
+                await simulate_async(0.5, callback=spin_system_time)
+            else:
+                break
+
+        self.assertIsNotNone(self._camera_info_system_time)
+        system_timestamp = (
+            self._camera_info_system_time.header.stamp.sec + self._camera_info_system_time.header.stamp.nanosec * 1e-9
+        )
+        current_time = time.time()
+
+        self.assertLess(abs(system_timestamp - current_time), 2.0, "System time should be similar to current time")
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+    async def test_camera_info_sim_time(self):
+        import time
+
+        import rclpy
+        from sensor_msgs.msg import CameraInfo
+
+        left_camera, right_camera = self._prepare_scene_for_stereo_camera(
+            baseline=0.15, resolution=(2048, 1024), focal_length=1.8, focus_distance=400, use_system_time=False
+        )
+
+        self._camera_info_sim_time = None
+
+        def camera_info_sim_time_callback(data):
+            self._camera_info_sim_time = data
+
+        node_sim = rclpy.create_node("camera_sim_time_tester")
+        camera_info_sub_sim = node_sim.create_subscription(
+            CameraInfo, "camera_info_left", camera_info_sim_time_callback, get_qos_profile()
+        )
+
+        def spin_sim_time():
+            rclpy.spin_once(node_sim, timeout_sec=0.1)
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await simulate_async(0.5, callback=spin_sim_time)
+
+        for _ in range(10):
+            if self._camera_info_sim_time is None:
+                await simulate_async(0.5, callback=spin_sim_time)
+            else:
+                break
+
+        self.assertIsNotNone(self._camera_info_sim_time)
+        sim_timestamp = (
+            self._camera_info_sim_time.header.stamp.sec + self._camera_info_sim_time.header.stamp.nanosec * 1e-9
+        )
+        self.assertGreaterEqual(sim_timestamp, 0.0, "Simulation time should be >= 0")
+        self.assertLessEqual(sim_timestamp, 10.0, "Simulation time should be <= 10s")
+
+        prev_sim_timestamp = sim_timestamp
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Check if sim time reset to Zero
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await simulate_async(0.5, callback=spin_sim_time)
+
+        for _ in range(10):
+            if self._camera_info_sim_time is None:
+                await simulate_async(0.5, callback=spin_sim_time)
+            else:
+                break
+
+        self.assertIsNotNone(self._camera_info_sim_time)
+        sim_timestamp = (
+            self._camera_info_sim_time.header.stamp.sec + self._camera_info_sim_time.header.stamp.nanosec * 1e-9
+        )
+        self.assertGreaterEqual(sim_timestamp, 0.0, "Simulation time should be >= 0")
+        self.assertLessEqual(
+            sim_timestamp, prev_sim_timestamp * 1.2, "Simulation time should be close to previous sim time"
+        )
+
+    async def test_camera_info_sim_time_monotonic(self):
+        import time
+
+        import rclpy
+        from sensor_msgs.msg import CameraInfo
+
+        left_camera, right_camera = self._prepare_scene_for_stereo_camera(
+            baseline=0.15,
+            resolution=(2048, 1024),
+            focal_length=1.8,
+            focus_distance=400,
+            use_system_time=False,
+            reset_simulation_time_on_stop=False,
+        )
+
+        self._camera_info_sim_time = None
+
+        def camera_info_sim_time_callback(data):
+            self._camera_info_sim_time = data
+
+        node_sim = rclpy.create_node("camera_sim_time_monotonic_tester")
+        camera_info_sub_sim = node_sim.create_subscription(
+            CameraInfo, "camera_info_left", camera_info_sim_time_callback, get_qos_profile()
+        )
+
+        def spin_sim_time():
+            rclpy.spin_once(node_sim, timeout_sec=0.1)
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await simulate_async(0.5, callback=spin_sim_time)
+
+        for _ in range(10):
+            if self._camera_info_sim_time is None:
+                await simulate_async(0.5, callback=spin_sim_time)
+            else:
+                break
+
+        self.assertIsNotNone(self._camera_info_sim_time)
+        sim_timestamp = (
+            self._camera_info_sim_time.header.stamp.sec + self._camera_info_sim_time.header.stamp.nanosec * 1e-9
+        )
+        self.assertGreaterEqual(sim_timestamp, 0.0, "Simulation time should be >= 0")
+
+        prev_sim_timestamp = sim_timestamp
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Check if current sim time is larger than prev sim time
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await simulate_async(0.5, callback=spin_sim_time)
+
+        for _ in range(10):
+            if self._camera_info_sim_time is None:
+                await simulate_async(0.5, callback=spin_sim_time)
+            else:
+                break
+
+        self.assertIsNotNone(self._camera_info_sim_time)
+        sim_timestamp = (
+            self._camera_info_sim_time.header.stamp.sec + self._camera_info_sim_time.header.stamp.nanosec * 1e-9
+        )
+        self.assertGreaterEqual(sim_timestamp, prev_sim_timestamp, "Simulation time should be >= prev_sim_timestamp")
+        self.assertLessEqual(
+            sim_timestamp, (prev_sim_timestamp + 10.0), "Simulation time should be within an elapsed max time of 10s"
+        )

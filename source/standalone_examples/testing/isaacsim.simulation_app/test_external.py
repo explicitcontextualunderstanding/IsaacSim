@@ -12,14 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 
-import numpy as np
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp()
 
-import omni
 from isaacsim.core.utils.extensions import disable_extension, enable_extension
 
 simulation_app.update()

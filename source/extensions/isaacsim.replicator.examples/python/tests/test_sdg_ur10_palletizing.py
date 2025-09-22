@@ -18,8 +18,7 @@ import unittest
 
 import omni.kit
 import omni.usd
-
-from .common import validate_folder_contents
+from isaacsim.test.utils.file_validation import validate_folder_contents
 
 
 class TestSDGUR10Palletizing(omni.kit.test.AsyncTestCase):
@@ -215,7 +214,7 @@ class TestSDGUR10Palletizing(omni.kit.test.AsyncTestCase):
 
                 # Util function to save rgb images to file
                 def save_img(rgb_data, filename):
-                    rgb_img = Image.fromarray(rgb_data, "RGBA")
+                    rgb_img = Image.fromarray(rgb_data).convert("RGBA")
                     rgb_img.save(filename + ".png")
 
                 self._switch_to_pathtracing()
@@ -419,9 +418,7 @@ class TestSDGUR10Palletizing(omni.kit.test.AsyncTestCase):
             print("[PalletizingSDGDemo] Done..")
 
             # Check if all the expected files were written
-            all_data_written = validate_folder_contents(
-                sdg_demo._output_dir, {"png": 80, "json": 72}, include_subfolders=True
-            )
+            all_data_written = validate_folder_contents(sdg_demo._output_dir, {"png": 80, "json": 72}, recursive=True)
             self.assertTrue(all_data_written, f"Not all files were written in to: {sdg_demo._output_dir}")
 
         await run_example_async()

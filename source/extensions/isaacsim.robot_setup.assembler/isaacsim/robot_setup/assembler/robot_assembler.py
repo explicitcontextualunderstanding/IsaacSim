@@ -231,47 +231,6 @@ class AssembledBodies:
         """
         return self._collision_mask
 
-    def get_fixed_joint_transform(self) -> Tuple[np.array, np.array]:
-        """Get the transform between mount frames in composed robot.
-
-        Returns:
-            Tuple[np.array, np.array]: translation with shape (3,) and orientation with shape (4,)
-        """
-        if not self.is_assembled():
-            carb.log_warn("Fixed joint no longer exists in composed robot.  Robots have been disassembled.")
-            return None, None
-        fixed_joint = self.fixed_joint
-        translation = np.array(fixed_joint.GetLocalPos0Attr().Get())
-        orientation = np.array(fixed_joint.GetLocalRot0Attr().Get())
-
-        return translation, orientation
-
-    def set_fixed_joint_transform(self, translation: np.array, orientation: np.array):
-        """Set the transform between mount frames in the composed body.
-
-        Args:
-            translation (np.array): Local translation relative to mount frame on base body.
-            orientation (np.array): Local quaternion orientation relative to mount frame on base body.
-        """
-        if not self.is_assembled():
-            carb.log_warn("Fixed joint no longer exists in composed robot.  Rigid Bodies have been disassembled.")
-            return
-        fixed_joint = self.fixed_joint
-        fixed_joint.GetLocalPos0Attr().Set(Gf.Vec3f(*translation.astype(float)))
-        fixed_joint.GetLocalRot0Attr().Set(Gf.Quatf(*orientation.astype(float)))
-
-        # Do the physics solvers work for it so it can't mess up and
-        # explode.
-
-        fixed_joint_prim = fixed_joint.GetPrim()
-        body0 = str(fixed_joint_prim.GetProperty("physics:body0").GetTargets()[0])
-        body1 = str(fixed_joint_prim.GetProperty("physics:body1").GetTargets()[0])
-
-        RobotAssembler._move_obj_b_to_local_pos(body0, self.attach_path, body1, translation, orientation)
-
-        self._refresh_asset(self._attach_path)
-        self._refresh_asset(self._base_path)
-
     def _unmask_collisions(self):
         if self._collision_mask is not None:
             [self._collision_mask.RemoveTarget(target) for target in self._collision_mask.GetTargets()]
@@ -348,23 +307,6 @@ class AssembledRobot:
             Usd.Relationship: A Usd Relationship masking collisions between the two assembled robots
         """
         return self.assembled_robots.collision_mask
-
-    def get_fixed_joint_transform(self):
-        """Get the transform between mount frames in composed robot.
-
-        Returns:
-            Tuple[np.array, np.array]: translation with shape (3,) and orientation with shape (4,)
-        """
-        return self.assembled_robots.get_fixed_joint_transform()
-
-    def set_fixed_joint_transform(self, translation: np.array, orientation: np.array):
-        """Set the transform between mount frames in the composed robot.
-
-        Args:
-            translation (np.array): Local translation relative to mount frame on base robot.
-            orientation (np.array): Local quaternion orientation relative to mount frame on base robot.
-        """
-        self.assembled_robots.set_fixed_joint_transform(translation, orientation)
 
 
 class AssemblyStatus(IntEnum):
@@ -711,53 +653,6 @@ class RobotAssembler:
 
         return AssembledBodies(base_path, attach_path, fixed_joint, root_joints, articulation_root, collision_mask)
 
-    def assemble_articulations(
-        self,
-        base_robot_path: str,
-        attach_robot_path: str,
-        base_robot_mount_frame: str,
-        attach_robot_mount_frame: str,
-        mask_all_collisions=True,
-        single_robot=False,
-        refresh_asset_paths: bool = False,
-    ) -> AssembledRobot:
-        """Compose two robots into one physical structure
-
-        Args:
-            base_robot_path (str): Path to base robot.
-            attach_robot_path (str): Path to attach robot.  The attach robot will be unrooted from the stage and attached only to the base robot
-            base_robot_mount_frame (str): Relative path to frame in base robot where there is the desired attach point.
-            attach_robot_mount_frame (str): Relative path to frame in the attach robot where there is the desired attach point.
-            mask_all_collisions (bool, optional): Mask all collisions between attach robot and base robot.  This is necessary when setting single_robot=False to prevent Physics constraint
-                violations from the new fixed joint.  Advanced users may set this flag to False and use the mask_collisions() function separately for more customizable behavior.  Defaults to True.
-            single_robot (bool, optional): If True: control the resulting composed robots as a single robot Articulation at base_robot_path.
-                Setting this flag to True may resolve unstable physics behavior when teleporting the robot base.  Defaults to False.
-
-        Returns:
-            AssembledRobot: An object representing the assembled robot.  This object can detach the composed robots and edit the fixed joint transform.
-        """
-        assemblage = self.assemble_rigid_bodies(
-            base_robot_path,
-            attach_robot_path,
-            base_robot_mount_frame,
-            attach_robot_mount_frame,
-            mask_all_collisions,
-        )
-
-        # Disable Articulation Root on Articulation B so that A is always the prim path for the composed robot
-        if single_robot:
-            art_b_prim = get_prim_at_path(attach_robot_path)
-            if art_b_prim.HasProperty("physxArticulation:articulationEnabled"):
-                art_b_prim.GetProperty("physxArticulation:articulationEnabled").Set(False)
-
-            assemblage.fixed_joint.GetExcludeFromArticulationAttr().Set(False)
-
-            if refresh_asset_paths:
-                self._refresh_asset(base_robot_path)
-                self._refresh_asset(attach_robot_path)
-
-        return AssembledRobot(assemblage)
-
     def create_fixed_joint(
         self,
         prim_path: str,
@@ -793,29 +688,6 @@ class RobotAssembler:
 
         return fixed_joint
 
-    def convert_prim_to_rigid_body(self, prim_path: str) -> None:
-        """Convert a prim to a rigid body by applying the UsdPhysics.RigidBodyAPI
-        Also sets physics:kinematicEnabled property to true to prevent falling from gravity without needing a fixed joint.
-
-        Args:
-            prim_path (str): Path to prim to convert.
-        """
-        prim_to_convert = get_prim_at_path(prim_path)
-        if get_prim_object_type(prim_path) == "articulation":
-            carb.log_warn("Cannot convert Articulation to Rigid Body")
-            return False
-        if not prim_to_convert.IsValid():
-            carb.log_warn(f"No prim can be found at path {prim_path}")
-            return False
-        else:
-            if not prim_to_convert.HasAPI(UsdPhysics.RigidBodyAPI):
-                UsdPhysics.RigidBodyAPI.Apply(prim_to_convert)
-
-        if prim_to_convert.HasAttribute("physics:kinematicEnabled"):
-            prim_to_convert.GetAttribute("physics:kinematicEnabled").Set(True)
-
-        return True
-
     def _refresh_asset(self, prim_path):
         # Refreshing payloads manually is a way to get the Articulation to update immediately while the timeline is
         # still playing.  Usd Physics should be doing this automatically, but there is currently a bug.  This function
@@ -836,37 +708,3 @@ class RobotAssembler:
                 "RemoveReference", stage=stage, prim_path=Sdf.Path(prim_path), reference=reference
             )
             omni.kit.commands.execute("AddReference", stage=stage, prim_path=Sdf.Path(prim_path), reference=reference)
-
-    @staticmethod
-    def _move_obj_b_to_local_pos(base_mount_path, attach_path, attach_mount_path, rel_offset, rel_orient):
-        # Get the position of base_mount_path as `a`
-        a_trans, a_orient = SingleXFormPrim(base_mount_path).get_world_pose()
-
-        a_rot = quats_to_rot_matrices(a_orient)
-        rel_rot = quats_to_rot_matrices(rel_orient)
-
-        # Get the desired position of attach_mount_path as `c`
-        c_trans = a_rot @ rel_offset + a_trans
-        c_rot = a_rot @ rel_rot
-        c_quat = rot_matrices_to_quats(c_rot)
-
-        # The attach_mount_path local xform is a free variable, and setting its world pose doesn't
-        # change the world pose of every part of the Articulation.
-
-        # We need to set the position of attach_path such that attach_mount_path ends up in the
-        # desired location.  Let the attach path location be `b`.
-
-        # t_bc denotes the translation that brings b to c
-        # r_bc rotates from b to c
-
-        t_bc, q_bc = SingleXFormPrim(attach_mount_path).get_local_pose()
-        r_bc = quats_to_rot_matrices(q_bc)
-
-        b_rot = c_rot @ r_bc.T
-        b_trans = c_trans - b_rot @ t_bc
-        b_orient = rot_matrices_to_quats(b_rot)
-
-        SingleXFormPrim(attach_path).set_world_pose(b_trans, b_orient)
-
-        # These should be roughly equal
-        # print(c_trans,c_quat, SingleXFormPrim(attach_mount_path).get_world_pose())

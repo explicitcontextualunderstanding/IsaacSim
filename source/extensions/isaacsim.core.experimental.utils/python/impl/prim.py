@@ -18,8 +18,9 @@ from __future__ import annotations
 from typing import Callable, Literal
 
 import usdrt
-from pxr import Usd
+from pxr import Sdf, Usd
 
+from . import foundation as foundation_utils
 from . import stage as stage_utils
 
 
@@ -122,7 +123,7 @@ def get_prim_variant_collection(prim: str | Usd.Prim) -> dict[str, list[str]]:
         ... )  # doctest: +NO_CHECK
         >>>
         >>> prim_utils.get_prim_variant_collection("/panda")
-        {'Mesh': ['Performance', 'Quality'], 'Gripper': ['AlternateFinger', 'Default']}
+        {'Mesh': ['Performance', 'Quality'], 'Gripper': ['AlternateFinger', 'Default', 'None', 'Robotiq_2F_85']}
     """
     prim = stage_utils.get_current_stage(backend="usd").GetPrimAtPath(prim) if isinstance(prim, str) else prim
     return {
@@ -392,3 +393,50 @@ def has_api(
         return not any(status)
     else:
         raise ValueError(f"Invalid test operation: '{test}'")
+
+
+def create_prim_attribute(
+    prim: str | Usd.Prim | usdrt.Usd.Prim,
+    *,
+    name: str,
+    type_name: Sdf.ValueTypeName | usdrt.Sdf.ValueTypeName,
+    exist_ok: bool = True,
+) -> Usd.Attribute | usdrt.Usd.Attribute:
+    """Create a new attribute on a USD prim.
+
+    Backends: :guilabel:`usd`.
+
+    Args:
+        prim: Prim path or prim instance.
+        name: Name of the attribute to create.
+        type_name: Type of the attribute to create.
+        exist_ok: Whether to do not raise an error if the attribute already exists.
+
+    Returns:
+        Created attribute, or the existing attribute if it already exists (and ``exist_ok`` is ``True``).
+
+    Raises:
+        RuntimeError: If the attribute already exists and ``exist_ok`` is ``False``.
+        ValueError: If the attribute already exists with a different type name (and ``exist_ok`` is ``True``).
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    type_name = foundation_utils.value_type_name_to_str(type_name)
+    # check if attribute already exists
+    if prim.HasAttribute(name):
+        if not exist_ok:
+            raise RuntimeError(f"Attribute '{name}' already exists")
+        attribute = prim.GetAttribute(name)
+        if foundation_utils.value_type_name_to_str(attribute.GetTypeName()) != type_name:
+            raise ValueError(
+                (
+                    f"Attribute '{name}' already exists with type '{attribute.GetTypeName()}', "
+                    f"but attempting to create it with type '{type_name}'"
+                )
+            )
+    # create attribute
+    else:
+        type_name = foundation_utils.resolve_value_type_name(
+            type_name, backend="usd" if isinstance(prim, Usd.Prim) else "usdrt"
+        )
+        attribute = prim.CreateAttribute(name, type_name, custom=True)
+    return attribute

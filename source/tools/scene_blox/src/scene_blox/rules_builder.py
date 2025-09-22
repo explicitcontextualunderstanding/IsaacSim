@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import copy
 import math
 import re
 from typing import List, Tuple

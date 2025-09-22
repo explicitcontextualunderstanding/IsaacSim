@@ -1106,7 +1106,7 @@ PYBIND11_MODULE(_dynamic_control, m)
     auto math = m.def_submodule("math");
 
     math.def(
-        "mul", [](const DcTransform& a, DcTransform& x) { return a * x; }, py::is_operator(),
+        "mul", [](const DcTransform& a, const DcTransform& x) { return a * x; }, py::is_operator(),
         R"pbdoc( Performs a Forward Transform multiplication between the transforms
         
         Args:

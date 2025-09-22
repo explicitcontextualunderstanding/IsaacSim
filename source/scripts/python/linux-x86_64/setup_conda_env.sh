@@ -18,7 +18,6 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 if [ -n "$ZSH_VERSION" ]; then
     SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
-    export BASH_SOURCE=$SCRIPT_DIR/setup_python_env.sh
 fi
 MY_DIR="$(realpath -s "$SCRIPT_DIR")"
 # path=$SCRIPT_DIR
@@ -37,7 +36,10 @@ MY_DIR="$(realpath -s "$SCRIPT_DIR")"
 export CARB_APP_PATH=$SCRIPT_DIR/kit
 export EXP_PATH=$MY_DIR/apps
 export ISAAC_PATH=$MY_DIR
-. ${MY_DIR}/setup_python_env.sh
+
+cd $SCRIPT_DIR
+. ./setup_python_env.sh
+cd $OLDPWD
 
 # remove Kit Python from PYTHONPATH to avoid conflicts with conda
 export PYTHONPATH=$(echo "$PYTHONPATH" | tr ':' '\n' | grep -v "$SCRIPT_DIR/kit/python/lib/python3.11" | tr '\n' ':' | sed 's/:$//')

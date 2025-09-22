@@ -31,5 +31,14 @@ popd
 
 # Install icon
 echo Installing Icon...
-${SCRIPT_DIR}/python.sh ${SCRIPT_DIR}/data/icon/install_icon.py
+ISAAC_SIM_SCRIPT="${SCRIPT_DIR}/isaac-sim.sh"
+if [ -f "${ISAAC_SIM_SCRIPT}" ]; then
+    # Convert to absolute path
+    ABSOLUTE_ISAAC_SIM_SCRIPT=$(realpath "${ISAAC_SIM_SCRIPT}")
+    echo "Found isaac-sim.sh at: ${ABSOLUTE_ISAAC_SIM_SCRIPT}"
+    ${SCRIPT_DIR}/python.sh ${SCRIPT_DIR}/data/icon/install_icon.py "${ABSOLUTE_ISAAC_SIM_SCRIPT}"
+else
+    echo "Warning: isaac-sim.sh not found at ${ISAAC_SIM_SCRIPT}"
+    ${SCRIPT_DIR}/python.sh ${SCRIPT_DIR}/data/icon/install_icon.py
+fi
 

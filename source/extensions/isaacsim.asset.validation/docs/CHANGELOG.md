@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.4] - 2025-09-16
+### Changed
+- Update tolerances for mis-configured joint poses
+
 ## [1.0.3] - 2025-07-16
 ### Changed
 - Fix asset validator module import

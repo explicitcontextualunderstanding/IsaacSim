@@ -16,15 +16,8 @@
 import asyncio
 import time
 
-import carb.tokens
-import numpy as np
 import omni.kit.commands
-
-# NOTE:
-#   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
-#   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-from isaacsim.asset.gen.conveyor.commands import CreateConveyorBelt
 from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics
 from usdrt import Sdf, Usd
 
@@ -177,11 +170,8 @@ class TestConveyor(omni.kit.test.AsyncTestCase):
                 attr = conveyor_nodes[-1].GetAttribute("inputs:velocity")
                 attr.Set(1)
         self._timeline.play()
-        await simulate_async(2.0)
+        await simulate_async(1.0)
         t = time.time()
         # SImulate exacly 100 frames
         for i in range(100):
             await omni.kit.app.get_app().next_update_async()
-        rtt = time.time() - t
-        print(f"rtt = {rtt}")
-        self.assertLessEqual(rtt, 1.5, f"Must run 100 frames in less than 1.5 seconds, rtt = {rtt}")

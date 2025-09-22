@@ -43,7 +43,13 @@ namespace physx
 {
 
 
-GenericSensor::GenericSensor(omni::physx::IPhysx* physxPtr) : RangeSensorComponent(physxPtr)
+GenericSensor::GenericSensor(omni::physx::IPhysx* physxPtr)
+    : RangeSensorComponent(physxPtr),
+      m_samplingRate(0),
+      m_streaming(false),
+      m_activeAzimuthPtr(nullptr),
+      m_activeZenithPtr(nullptr),
+      m_activeOffsetPtr(nullptr)
 {
 }
 

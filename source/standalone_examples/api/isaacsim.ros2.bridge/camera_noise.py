@@ -26,18 +26,15 @@ CONFIG = {"renderer": "RaytracedLighting", "headless": False}
 
 simulation_app = SimulationApp(CONFIG)
 import carb
-import numpy as np
 import omni
-import omni.graph.core as og
 import omni.replicator.core as rep
-import omni.syntheticdata._syntheticdata as sd
 import warp as wp
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils import extensions, stage
 from isaacsim.core.utils.render_product import set_camera_prim_path
 from isaacsim.storage.native import get_assets_root_path
 from omni.kit.viewport.utility import get_active_viewport
-from pxr import Gf, Usd, UsdGeom
+from pxr import Gf, UsdGeom
 
 # enable ROS bridge extension
 extensions.enable_extension("isaacsim.ros2.bridge")

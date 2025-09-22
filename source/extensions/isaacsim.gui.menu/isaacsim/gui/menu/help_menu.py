@@ -69,21 +69,53 @@ class HelpMenuExtension:
 
         add_menu_items(demo_items, "Help")
 
-        # physics menu item
-        url = resolve_physics_ref_url()
-        physics_menu_item = MenuItemDescription(
-            name="Physics Programming Manual", onclick_fn=lambda: self.open_ref_url(url)
+        ISAAC_DOCS_URL = "https://docs.isaacsim.omniverse.nvidia.com/latest/index.html"
+        REFERENCE_GUIDE_URL = ISAAC_DOCS_URL + "/index.html"
+        MANUAL_URL = ISAAC_DOCS_URL + "/py/index.html"
+        FORUMS_URL = "https://forums.developer.nvidia.com/c/omniverse/simulation/69"
+        KIT_MANUAL_URL = "https://docs.omniverse.nvidia.com/py/kit/index.html"
+
+        reference_guide_menu_item = MenuItemDescription(
+            name="Isaac Sim Online Guide", onclick_fn=lambda: self.open_ref_url(REFERENCE_GUIDE_URL)
+        )
+        scripting_manual_menu_item = MenuItemDescription(
+            name="Isaac Sim Scripting Manual", onclick_fn=lambda: self.open_ref_url(MANUAL_URL)
+        )
+        forums_menu_item = MenuItemDescription(
+            name="Isaac Sim Online Forums", onclick_fn=lambda: self.open_ref_url(FORUMS_URL)
+        )
+        kit_manual_menu_item = MenuItemDescription(
+            name="Kit Programming Manual", onclick_fn=lambda: self.open_ref_url(KIT_MANUAL_URL)
         )
 
-        add_menu_items([physics_menu_item], "Help")
+        physics_menu_item = MenuItemDescription(
+            name="Physics Programming Manual", onclick_fn=lambda: self.open_ref_url(resolve_physics_ref_url())
+        )
+
+        add_menu_items(
+            [
+                physics_menu_item,
+                kit_manual_menu_item,
+                reference_guide_menu_item,
+                scripting_manual_menu_item,
+                forums_menu_item,
+            ],
+            "Help",
+        )
 
     def shutdown(self):
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
 
     def open_ref_url(self, url):
+        import platform
+        import subprocess
         import webbrowser
 
-        webbrowser.open(url)
+        if platform.system().lower() == "windows":
+            webbrowser.open(url)
+        else:
+            # use native system level open, handles snap based browsers better
+            subprocess.Popen(["xdg-open", url])
 
 
 def resolve_physics_ref_url():

@@ -211,8 +211,6 @@ class SyntheticRecorder:
                 print(
                     f"[SDR][Recorder] Start;\tFrame: {self._current_frame};\tTime: {timeline.get_current_time():.4f}."
                 )
-            # WAR ISIM-2602 - UI control needs an orchestrator.preview call if the timeline is playing to write all frames
-            await rep.orchestrator.preview_async()
             self._set_state(RecorderState.RUNNING)
             if self.control_timeline and not timeline.is_playing():
                 if self.verbose:

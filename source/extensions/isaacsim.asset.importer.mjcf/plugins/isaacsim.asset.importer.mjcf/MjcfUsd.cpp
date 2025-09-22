@@ -21,6 +21,8 @@
 #include <isaacsim/core/includes/utils/Usd.h>
 #include <physxSchema/physxMeshMergeCollisionAPI.h>
 
+#include <algorithm>
+
 namespace isaacsim
 {
 namespace asset
@@ -58,7 +60,7 @@ void setStageMetadata(pxr::UsdStageWeakPtr stage, const isaacsim::asset::importe
 
 void createRoot(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
                 Transform trans,
-                const std::string rootPrimPath,
+                const std::string& rootPrimPath,
                 const isaacsim::asset::importer::mjcf::ImportConfig config)
 {
     for (auto& stage : stages)
@@ -72,8 +74,8 @@ void createRoot(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
 }
 
 void createFixedRoot(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
-                     const std::string jointPath,
-                     const std::string bodyPath)
+                     const std::string& jointPath,
+                     const std::string& bodyPath)
 {
     pxr::UsdEditContext context(stages["stage"], stages["physics_stage"]->GetRootLayer());
 
@@ -94,13 +96,7 @@ void applyArticulationAPI(std::unordered_map<std::string, pxr::UsdStageRefPtr> s
 
 std::string ReplaceBackwardSlash(std::string in)
 {
-    for (auto& c : in)
-    {
-        if (c == '\\')
-        {
-            c = '/';
-        }
-    }
+    std::replace(in.begin(), in.end(), '\\', '/');
     return in;
 }
 
@@ -371,7 +367,7 @@ pxr::UsdGeomMesh createMesh(pxr::UsdStageWeakPtr stage,
 }
 
 pxr::UsdGeomXformable createBody(pxr::UsdStageWeakPtr stage,
-                                 const std::string primPath,
+                                 const std::string& primPath,
                                  const Transform& trans,
                                  const ImportConfig& config)
 {
@@ -601,8 +597,7 @@ pxr::UsdGeomMesh createSphereMesh(pxr::UsdStageWeakPtr stage, const pxr::SdfPath
 
     u_patches = u_patches * num_u_verts_scale;
     v_patches = v_patches * num_v_verts_scale;
-    u_patches = (u_patches > 3) ? u_patches : 3;
-    v_patches = (v_patches > 3) ? v_patches : 2;
+    // Note: u_patches (32) and v_patches (16) are always > 3, so no need for conditional checks
 
     float u_delta = 1.0f / (float)u_patches;
     float v_delta = 1.0f / (float)v_patches;
@@ -688,13 +683,13 @@ pxr::UsdGeomMesh createSphereMesh(pxr::UsdStageWeakPtr stage, const pxr::SdfPath
 }
 
 pxr::UsdPrim createPrimitiveGeom(pxr::UsdStageWeakPtr stage,
-                                 const std::string geomPath,
+                                 const std::string& geomPath,
                                  const MJCFGeom* geom,
                                  const std::map<std::string, MeshInfo>& simulationMeshCache,
                                  const ImportConfig& config,
                                  std::map<pxr::TfToken, pxr::SdfPath>& materialPaths,
                                  bool importMaterials,
-                                 const std::string rootPrimPath,
+                                 const std::string& rootPrimPath,
                                  bool collisionGeom)
 {
     pxr::SdfPath path = pxr::SdfPath(geomPath);
@@ -847,7 +842,7 @@ pxr::UsdPrim createPrimitiveGeom(pxr::UsdStageWeakPtr stage,
 }
 
 pxr::UsdPrim createPrimitiveGeom(pxr::UsdStageWeakPtr stage,
-                                 const std::string geomPath,
+                                 const std::string& geomPath,
                                  const MJCFSite* site,
                                  const ImportConfig& config,
                                  bool importMaterials)
@@ -1040,11 +1035,11 @@ void applyCollisionGeom(pxr::UsdStageWeakPtr stage, pxr::UsdPrim prim, bool Conv
 }
 
 pxr::UsdPhysicsJoint createFixedJoint(pxr::UsdStageWeakPtr stage,
-                                      const std::string jointPath,
+                                      const std::string& jointPath,
                                       const Transform& poseJointToParentBody,
                                       const Transform& poseJointToChildBody,
-                                      const std::string parentBodyPath,
-                                      const std::string bodyPath,
+                                      const std::string& parentBodyPath,
+                                      const std::string& bodyPath,
                                       const ImportConfig& config)
 {
     pxr::UsdPhysicsJoint jointPrim = pxr::UsdPhysicsFixedJoint::Define(stage, pxr::SdfPath(jointPath));
@@ -1076,11 +1071,11 @@ pxr::UsdPhysicsJoint createFixedJoint(pxr::UsdStageWeakPtr stage,
 }
 
 pxr::UsdPhysicsJoint createD6Joint(pxr::UsdStageWeakPtr stage,
-                                   const std::string jointPath,
+                                   const std::string& jointPath,
                                    const Transform& poseJointToParentBody,
                                    const Transform& poseJointToChildBody,
-                                   const std::string parentBodyPath,
-                                   const std::string bodyPath,
+                                   const std::string& parentBodyPath,
+                                   const std::string& bodyPath,
                                    const ImportConfig& config)
 {
     pxr::UsdPhysicsJoint jointPrim = pxr::UsdPhysicsJoint::Define(stage, pxr::SdfPath(jointPath));
@@ -1114,8 +1109,8 @@ pxr::UsdPhysicsJoint createD6Joint(pxr::UsdStageWeakPtr stage,
 void initPhysicsJoint(pxr::UsdPhysicsJoint& jointPrim,
                       const Transform& poseJointToParentBody,
                       const Transform& poseJointToChildBody,
-                      const std::string parentBodyPath,
-                      const std::string bodyPath,
+                      const std::string& parentBodyPath,
+                      const std::string& bodyPath,
                       const float& distanceScale)
 {
     pxr::GfVec3f localPos0 =
@@ -1161,7 +1156,6 @@ void applyJointLimits(pxr::UsdPhysicsJoint jointPrim,
     JointAxis axisSlide[3] = { eJointAxisX, eJointAxisY, eJointAxisZ };
     std::string d6Axes[6] = { "transX", "transY", "transZ", "rotX", "rotY", "rotZ" };
     int axis = -1;
-    std::string limitAttr = "";
 
     // assume we can only have one of slide or hinge per d6 joint
     if (joint->type == MJCFJoint::SLIDE)
@@ -1245,12 +1239,10 @@ void applyJointLimits(pxr::UsdPhysicsJoint jointPrim,
 void createJointDrives(pxr::UsdPhysicsJoint jointPrim,
                        const MJCFJoint* joint,
                        const MJCFActuator* actuator,
-                       const std::string axis,
+                       const std::string& axis,
                        const ImportConfig& config)
 {
     pxr::UsdPhysicsDriveAPI driveAPI = pxr::UsdPhysicsDriveAPI::Apply(jointPrim.GetPrim(), pxr::TfToken(axis));
-
-    driveAPI = pxr::UsdPhysicsDriveAPI::Apply(jointPrim.GetPrim(), pxr::TfToken(axis));
     driveAPI.CreateTypeAttr().Set(pxr::TfToken("force")); // TODO: when will this be acceleration?
 
     driveAPI.CreateDampingAttr().Set(joint->damping);

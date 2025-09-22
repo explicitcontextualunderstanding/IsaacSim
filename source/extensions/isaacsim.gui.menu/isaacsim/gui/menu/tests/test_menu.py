@@ -19,10 +19,6 @@ import carb
 import carb.settings
 import carb.tokens
 import omni.kit.commands
-
-# NOTE:
-#   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
-#   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
 import omni.usd
 from isaacsim.core.api.objects import DynamicCuboid
@@ -209,7 +205,7 @@ class TestMenuAssets(OmniUiTest):
             for _ in range(20):
                 await omni.kit.app.get_app().next_update_async()
             print(test_path)
-            delays = [5, 50, 100]
+            delays = [100, 150, 200]
             for delay in delays:
                 try:
                     await menu_click(test_path, human_delay_speed=delay)

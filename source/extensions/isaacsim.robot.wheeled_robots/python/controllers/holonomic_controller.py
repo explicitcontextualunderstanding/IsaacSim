@@ -174,7 +174,7 @@ class HolonomicController(BaseController):
             self.joint_commands = [float(0) for i in range(self.num_wheels)]
         else:
             v = np.array([command[0], command[1], 0]).reshape((3)) * self.linear_gain
-            w = np.array([(command[2])]) * self.angular_gain
+            w = np.array([command[2]]) * self.angular_gain
 
             if np.linalg.norm(v) > 0:
                 v_norm = v / np.linalg.norm(v)

@@ -1,6 +1,3 @@
 <project toolsVersion="5.0">
   <!-- Use this file to include any dependencies for your extension beyond those in `kit-sdk-deps.packman.xml`. -->
-  <dependency name="omniverse_asset_converter" linkPath="../_build/target-deps/omniverse_asset_converter">
-    <package name="omniverse_asset_converter" version="3.2.2+release.1853.b7b41faa.gl.${platform_target}.release" platforms="${platform}" />
-  </dependency>
 </project>

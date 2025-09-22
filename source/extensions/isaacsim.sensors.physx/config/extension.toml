@@ -1,5 +1,5 @@
 [package]
-version = "2.2.27"
+version = "2.3.1"
 category = "Simulation"
 title = "Isaac Sim PhysX Sensors"
 description = "Isaac Sim PhysX Sensors extension provides APIs for PhysX-raycast-based lidars and sensors including Proximity Sensor and Lightbeam Sensor."
@@ -43,6 +43,7 @@ stdoutFailPatterns.exclude = [
  "*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_sensors_physx_IsaacReadLidarBeams: [/TestGraph] no prim path found for the lidar*",
  "*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_sensors_physx_IsaacReadLidarPointCloud: [/TestGraph] no prim path found for the lidar*",
  "*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_sensors_physx_IsaacReadLightBeam: [/TestGraph] Invalid Light Beam Sensor prim*",
+ "*[Error] [isaacsim.sensors.physx.impl.commands] Must specify curtain length if num rays > 1*",
 ]
 
 dependencies = [

@@ -161,7 +161,7 @@ private:
     std::shared_ptr<Ros2Publisher> m_publisher = nullptr;
     std::shared_ptr<Ros2OdometryMessage> m_message = nullptr;
 
-    double m_unitScale;
+    double m_unitScale = 1.0;
     bool m_zUp = true;
 
     // The front of the robot

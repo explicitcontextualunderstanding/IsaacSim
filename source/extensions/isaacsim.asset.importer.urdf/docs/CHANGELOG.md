@@ -1,4 +1,37 @@
 # Changelog
+## [2.4.27] - 2025-09-16
+### Fixed
+- Fix merging fixed joints that stops processing incorrectly.
+
+## [2.4.26] - 2025-09-10
+### Fixed
+- Fix transform error for dae files
+
+## [2.4.25] - 2025-09-06
+### Fixed
+- Check for child link mass and avoid merging if it's defined (only merge reference frames)
+
+
+## [2.4.24] - 2025-08-27
+### Fixed
+- Fix the broken documentation links
+
+## [2.4.23] - 2025-08-21
+### Changed
+- Promoted missing mesh to error message
+- URDF gets imported even if meshes are not found
+
+## [2.4.22] - 2025-08-02
+### Changed
+- Remove direct dependency from Omniverse Asset Converter, and use omni.kit.asset_converter
+
+## [2.4.21] - 2025-07-31
+### Changed
+- Updated compiling dependency for Omniverse Asset Converter
+
+## [2.4.20] - 2025-07-29
+### Fixed
+- Add standard check to tests that makes sure all meshes have >0 vertices and that the stage is in meters
 
 ## [2.4.19] - 2025-07-07
 ### Changed

@@ -13,13 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import json
 import os
+from unittest.mock import patch
 
 import numpy as np
 import omni.kit.app
 import omni.kit.test
 import omni.usd
+from isaacsim.test.utils.image_comparison import compare_arrays_within_tolerances
 from PIL import Image
 
 
@@ -36,26 +39,18 @@ class TestBehaviorsSDGScenario(omni.kit.test.AsyncTestCase):
     OUTPUT_DIR = "_out_behaviors_sdg"
 
     async def setUp(self):
-        pass
+        await omni.kit.app.get_app().next_update_async()
+        omni.usd.get_context().new_stage()
+        await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
-        pass
-
-    # Helper function to print numpy histogram data
-    def print_diff_histogram(self, diff_array, num_bins=10):
-        print(f"\t\tDiff histogram ({num_bins} bins):")
-        hist_counts, bin_edges = np.histogram(diff_array, bins=num_bins)
-        if np.any(hist_counts):
-            for i in range(len(hist_counts)):
-                bin_start = bin_edges[i]
-                bin_end = bin_edges[i + 1]
-                print(f"\t\t  [{bin_start:6.1f} - {bin_end:6.1f}): {hist_counts[i]}")
-        else:
-            print("\t\t  No differences")
+        await omni.kit.app.get_app().next_update_async()
+        omni.usd.get_context().close_stage()
+        await omni.kit.app.get_app().next_update_async()
 
     # Compare PNG files with the specified prefix using mean pixel difference
     def compare_images_with_mean_diff(self, golden_dir, test_dir, prefix, tolerance):
-        print(f"Comparing {prefix} images with tolerance: {tolerance}")
+        print(f"Comparing {prefix} images with mean difference tolerance: {tolerance}")
         # Get the list of .png files matching the prefix
         golden_files = sorted([f for f in os.listdir(golden_dir) if f.startswith(prefix) and f.endswith(".png")])
         test_files = sorted([f for f in os.listdir(test_dir) if f.startswith(prefix) and f.endswith(".png")])
@@ -67,7 +62,7 @@ class TestBehaviorsSDGScenario(omni.kit.test.AsyncTestCase):
             f"File names mismatch for {prefix}*.png: {golden_files} in golden_dir vs {test_files} in test_dir.",
         )
 
-        # Iterate over the matching .png files and compare them pixel-wise using mean difference
+        # Iterate over the matching .png files and compare them using image comparison utilities
         for file_name in golden_files:
             golden_file_path = os.path.join(golden_dir, file_name)
             test_file_path = os.path.join(test_dir, file_name)
@@ -78,24 +73,31 @@ class TestBehaviorsSDGScenario(omni.kit.test.AsyncTestCase):
             golden_array = np.array(golden_image)
             test_array = np.array(test_image)
 
-            # Ensure shapes match
+            # Use comprehensive comparison utilities
+            stdout_capture = io.StringIO()
+            with patch("sys.stdout", stdout_capture):
+                result = compare_arrays_within_tolerances(
+                    golden_array,
+                    test_array,
+                    allclose_rtol=None,  # Disable allclose for this test
+                    allclose_atol=None,
+                    mean_tolerance=tolerance,
+                    print_all_stats=True,
+                )
+
+            # Only print detailed stats on failure to keep logs clean
+            if not result["passed"]:
+                captured_output = stdout_capture.getvalue()
+                print(f"\t'{file_name}': FAILED comparison")
+                print(captured_output)
+            else:
+                print(f"\t'{file_name}': PASSED (mean_diff={result['metrics']['mean_abs']:.3f})")
+
             self.assertTrue(
-                golden_array.shape == test_array.shape,
-                f"Image shapes do not match for {file_name}: expected {golden_array.shape}, got {test_array.shape}.",
-            )
-
-            # Calculate diff stats
-            diff_array = np.abs(golden_array - test_array)
-            mean_diff = np.mean(diff_array)
-            max_diff = np.max(diff_array)
-            print(f"\t'{file_name}': mean_diff={mean_diff}, max_diff={max_diff}")
-
-            # Generate and print histogram of differences
-            self.print_diff_histogram(diff_array, num_bins=10)
-
-            self.assertTrue(
-                mean_diff < tolerance,
-                f"Mean difference for {file_name} is {mean_diff}, which exceeds tolerance {tolerance}.",
+                result["passed"],
+                f"Mean difference comparison failed for {file_name}. "
+                f"Expected mean_diff <= {tolerance}, got {result['metrics']['mean_abs']:.3f}.\n"
+                f"Detailed statistics:\n{stdout_capture.getvalue()}",
             )
 
     # Compare .json files with the specified prefix
@@ -150,7 +152,7 @@ class TestBehaviorsSDGScenario(omni.kit.test.AsyncTestCase):
             f"File names mismatch for {prefix}*.npy: {golden_files} in golden_dir vs {test_files} in test_dir.",
         )
 
-        # Compare the content of each file
+        # Compare the content of each file using comprehensive comparison utilities
         for file_name in golden_files:
             golden_file_path = os.path.join(golden_dir, file_name)
             test_file_path = os.path.join(test_dir, file_name)
@@ -159,34 +161,53 @@ class TestBehaviorsSDGScenario(omni.kit.test.AsyncTestCase):
             golden_data = np.load(golden_file_path)
             test_data = np.load(test_file_path)
 
-            # Ensure shapes match
-            self.assertTrue(
-                golden_data.shape == test_data.shape,
-                f"Data shapes do not match for {file_name}: expected {golden_data.shape}, got {test_data.shape}.",
-            )
+            # Use comprehensive comparison utilities
+            stdout_capture = io.StringIO()
+            with patch("sys.stdout", stdout_capture):
+                if mean_diff_tolerance is not None:
+                    # Use mean difference comparison
+                    result = compare_arrays_within_tolerances(
+                        golden_data,
+                        test_data,
+                        allclose_rtol=None,  # Disable allclose for mean diff comparison
+                        allclose_atol=None,
+                        mean_tolerance=mean_diff_tolerance,
+                        print_all_stats=True,
+                    )
+                else:
+                    # Use allclose comparison
+                    result = compare_arrays_within_tolerances(
+                        golden_data,
+                        test_data,
+                        allclose_rtol=rtol,
+                        allclose_atol=atol,
+                        print_all_stats=True,
+                    )
 
-            # Calculate and print difference statistics
-            diff_array = np.abs(golden_data - test_data)
-            mean_diff = np.mean(diff_array)
-            max_diff = np.max(diff_array)
-            print(f"\t'{file_name}': mean_diff={mean_diff}, max_diff={max_diff}")
+            # Only print detailed stats on failure to keep logs clean
+            if not result["passed"]:
+                captured_output = stdout_capture.getvalue()
+                print(f"\t'{file_name}': FAILED comparison")
+                print(captured_output)
+            else:
+                if mean_diff_tolerance is not None:
+                    print(f"\t'{file_name}': PASSED (mean_diff={result['metrics']['mean_abs']:.6f})")
+                else:
+                    print(f"\t'{file_name}': PASSED (allclose with rtol={rtol}, atol={atol})")
 
-            # Generate and print histogram of differences (condensed)
-            self.print_diff_histogram(diff_array, num_bins=10)
-
-            # Compare using either mean difference or np.allclose based on provided parameters
+            # Assert with detailed error message
             if mean_diff_tolerance is not None:
-                # Use mean difference comparison
                 self.assertTrue(
-                    mean_diff <= mean_diff_tolerance,
-                    f"Mean difference ({mean_diff}) exceeds tolerance ({mean_diff_tolerance}) in file {file_name}: {golden_file_path} vs {test_file_path}.",
+                    result["passed"],
+                    f"Mean difference comparison failed for {file_name}. "
+                    f"Expected mean_diff <= {mean_diff_tolerance}, got {result['metrics']['mean_abs']:.6f}.\n"
+                    f"Detailed statistics:\n{stdout_capture.getvalue()}",
                 )
             else:
-                # Use np.allclose comparison
-                is_array_equal = np.allclose(golden_data, test_data, rtol=rtol, atol=atol)
                 self.assertTrue(
-                    is_array_equal,
-                    f"Content mismatch in file {file_name}: {golden_file_path} vs {test_file_path}.",
+                    result["passed"],
+                    f"Allclose comparison failed for {file_name} with rtol={rtol}, atol={atol}.\n"
+                    f"Detailed statistics:\n{stdout_capture.getvalue()}",
                 )
 
     async def setup_and_run_behaviors_sdg(self):
@@ -333,6 +354,7 @@ class TestBehaviorsSDGScenario(omni.kit.test.AsyncTestCase):
 
             # Stop the timeline (and the behavior scripts triggering)
             timeline.stop()
+            await omni.kit.app.get_app().next_update_async()
 
             # Free the renderer resources
             writer.detach()

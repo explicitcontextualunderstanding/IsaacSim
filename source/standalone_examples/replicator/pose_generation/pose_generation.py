@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Generate a [DOPE, CenterPose, YCBVideo] synthetic datasets
-"""
+"""Generate a [DOPE, CenterPose, YCBVideo] synthetic datasets"""
 
 import argparse
 import datetime

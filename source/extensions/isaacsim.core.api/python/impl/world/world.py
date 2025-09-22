@@ -48,8 +48,7 @@ class World(SimulationContext):
     a Scene. Besides this, the object is bound to a short keyword that facilitates objects retrievals,
     like in a dict.
 
-    Checkout the required tutorials at
-    https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+    Checkout the required tutorials at https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
 
     Args:
         physics_dt (Optional[float], optional): dt between physics steps. Defaults to None.
@@ -509,7 +508,7 @@ class World(SimulationContext):
         await self.reset_async_no_set_up_scene(soft=soft)
         return
 
-    def step(self, render: bool = True, step_sim: bool = True) -> None:
+    def step(self, render: bool = True, step_sim: bool = True, update_fabric: bool = False) -> None:
         """Step the physics simulation while rendering or without.
 
         .. note::
@@ -527,6 +526,10 @@ class World(SimulationContext):
                                      app UI will be frozen (since its not rendering) in this case.
                                      Defaults to True.
             step_sim (bool): True to step simulation (physics and/or rendering)
+            update_fabric (bool): Whether to force the update of the physics data to fabric when performing a physics-only
+                                  step (without rendering). This flag should be enabled when it is desired to read updated
+                                  data using the fabric interface after performing a physics-only step
+                                  (e.g., XFormPrim's world transform).
 
         Example:
 
@@ -541,7 +544,7 @@ class World(SimulationContext):
             self.scene._bbox_cache.SetTime(Usd.TimeCode(self._current_time))
 
         if step_sim:
-            SimulationContext.step(self, render=render)
+            SimulationContext.step(self, render=render, update_fabric=update_fabric)
         if self._data_logger.is_started():
             if self._data_logger._data_frame_logging_func is None:
                 raise Exception("You need to add data logging function before starting the data logger")

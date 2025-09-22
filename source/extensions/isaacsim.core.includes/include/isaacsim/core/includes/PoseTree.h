@@ -14,6 +14,7 @@
 // limitations under the License.
 #pragma once
 
+#include "Buffer.h"
 #include "Conversions.h"
 #include "Pose.h"
 #include "UsdUtilities.h"
@@ -59,14 +60,14 @@ namespace posetree
  * @warning Frame names must be unique within the tree. Duplicate names will be automatically renamed
  *          with their full path.
  */
-static void createTensorDesc(TensorDesc& tensorDesc, void* dataPtr, int numXforms, TensorDataType type)
+static void createTensorDesc(TensorDesc& tensorDesc, void* dataPtr, int numXforms, TensorDataType type, int device)
 {
     tensorDesc.dtype = type;
     tensorDesc.numDims = 1;
     tensorDesc.dims[0] = numXforms * 7;
     tensorDesc.data = dataPtr;
     tensorDesc.ownData = true;
-    tensorDesc.device = -1;
+    tensorDesc.device = device;
 }
 
 class PoseTree
@@ -90,9 +91,12 @@ public:
             carb::getCachedInterface<omni::fabric::IStageReaderWriter>();
         omni::fabric::StageReaderWriterId stageInProgress = iStageReaderWriter->get(stageId);
         m_usdrtStage = usdrt::UsdStage::Attach(stageId, stageInProgress);
-        m_simView = simulationView;
-        m_rigidXformData.resize(7);
-        createTensorDesc(m_rigidTransformTensor, (void*)m_rigidXformData.data(), 1, TensorDataType::eFloat32);
+        m_simulationView = simulationView;
+        m_rigidTransformData.resize(7);
+        m_rigidTransformBuffer.resize(7);
+        m_rigidTransformBuffer.setDevice(m_simulationView->getDeviceOrdinal());
+        createTensorDesc(m_rigidTransformTensor, (void*)m_rigidTransformBuffer.data(), 1, TensorDataType::eFloat32,
+                         m_simulationView->getDeviceOrdinal());
     }
 
     /**
@@ -146,11 +150,11 @@ public:
         // If the parent prim path is not empty, get the type of prim and its pose.
         if (!m_parentPath.IsEmpty())
         {
-            ObjectType objectType = m_simView->getObjectType(m_parentPath.GetString().c_str());
+            ObjectType objectType = m_simulationView->getObjectType(m_parentPath.GetString().c_str());
             if (objectType == ObjectType::eArticulationLink || objectType == ObjectType::eArticulationRootLink ||
                 objectType == ObjectType::eRigidBody)
             {
-                IRigidBodyView* rb = m_simView->createRigidBodyView(m_parentPath.GetString().c_str());
+                IRigidBodyView* rb = m_simulationView->createRigidBodyView(m_parentPath.GetString().c_str());
                 m_parentPose = getRigidBodyPose(rb);
             }
             else
@@ -165,10 +169,10 @@ public:
         // For each target prim determine its type and compute the associated poses
         for (pxr::SdfPath primPath : m_targets)
         {
-            ObjectType objectType = m_simView->getObjectType(primPath.GetString().c_str());
+            ObjectType objectType = m_simulationView->getObjectType(primPath.GetString().c_str());
             if (objectType == ObjectType::eArticulation || objectType == ObjectType::eArticulationRootLink)
             {
-                IArticulationView* articulation = m_simView->createArticulationView(primPath.GetString().c_str());
+                IArticulationView* articulation = m_simulationView->createArticulationView(primPath.GetString().c_str());
                 const IArticulationMetatype* mt = articulation->getSharedMetatype();
                 uint32_t linkCount = articulation->getMaxLinks();
                 std::vector<std::string> linkPaths(linkCount);
@@ -186,13 +190,15 @@ public:
                         childLinks[parentIdx].push_back(j);
                     }
                 }
-                m_linkXformData.resize(7 * linkCount);
-                createTensorDesc(
-                    m_artiTransformTensor, (void*)m_linkXformData.data(), linkCount, TensorDataType::eFloat32);
+                m_linkTransformData.resize(7 * linkCount);
+                m_linkTransformBuffer.resize(7 * linkCount);
+                m_linkTransformBuffer.setDevice(m_simulationView->getDeviceOrdinal());
+                createTensorDesc(m_linkTransformTensor, (void*)m_linkTransformBuffer.data(), linkCount,
+                                 TensorDataType::eFloat32, m_simulationView->getDeviceOrdinal());
 
-                articulation->getLinkTransforms(&m_artiTransformTensor);
-
-                float* data = static_cast<float*>(m_artiTransformTensor.data);
+                articulation->getLinkTransforms(&m_linkTransformTensor);
+                m_linkTransformBuffer.copyTo(m_linkTransformData.data(), 7 * linkCount);
+                float* data = m_linkTransformData.data();
                 ::physx::PxTransform body1Pose = ::physx::PxTransform(
                     ::physx::PxVec3(data[0], data[1], data[2]), ::physx::PxQuat(data[3], data[4], data[5], data[6]));
                 std::string framePath = linkPaths[0];
@@ -233,7 +239,7 @@ public:
             }
             else if (objectType == ObjectType::eArticulationLink || objectType == ObjectType::eRigidBody)
             {
-                IRigidBodyView* rigidBody = m_simView->createRigidBodyView(primPath.GetString().c_str());
+                IRigidBodyView* rigidBody = m_simulationView->createRigidBodyView(primPath.GetString().c_str());
                 ::physx::PxTransform body1Pose = getRigidBodyPose(rigidBody);
                 std::string childFrameId =
                     getUniqueFrameName(getName(m_usdStage->GetPrimAtPath(primPath)), primPath.GetString());
@@ -286,7 +292,8 @@ public:
         if (rb)
         {
             rb->getTransforms(&m_rigidTransformTensor);
-            float* data = static_cast<float*>(m_rigidTransformTensor.data);
+            m_rigidTransformBuffer.copyTo(m_rigidTransformData.data(), 7);
+            float* data = m_rigidTransformData.data();
             ::physx::PxTransform trans(
                 ::physx::PxVec3(data[0], data[1], data[2]), ::physx::PxQuat(data[3], data[4], data[5], data[6]));
             return trans;
@@ -396,19 +403,25 @@ private:
     std::map<std::string, bool> m_publishedFrames;
 
     /** @brief Pointer to the simulation view interface for physics queries */
-    ISimulationView* m_simView = nullptr;
+    ISimulationView* m_simulationView = nullptr;
 
     /** @brief Tensor descriptor for rigid body transform data */
     TensorDesc m_rigidTransformTensor;
 
-    /** @brief Tensor descriptor for articulation transform data */
-    TensorDesc m_artiTransformTensor;
+    /** @brief Tensor descriptor for articulation link transform data */
+    TensorDesc m_linkTransformTensor;
 
-    /** @brief Storage for rigid body transform data (7 floats: position + quaternion) */
-    std::vector<float> m_rigidXformData;
+    /** @brief Buffer for rigid body transform buffer (CPU/GPU attending view device) */
+    GenericBufferBase<float> m_rigidTransformBuffer;
 
-    /** @brief Storage for articulation link transform data */
-    std::vector<float> m_linkXformData;
+    /** @brief Buffer for articulation link transform buffer (CPU/GPU attending view device) */
+    GenericBufferBase<float> m_linkTransformBuffer;
+
+    /** @brief Storage for rigid body transform data (CPU, for PxTransform) */
+    std::vector<float> m_rigidTransformData;
+
+    /** @brief Storage for articulation link transform data (CPU, for PxTransform) */
+    std::vector<float> m_linkTransformData;
 };
 }
 }

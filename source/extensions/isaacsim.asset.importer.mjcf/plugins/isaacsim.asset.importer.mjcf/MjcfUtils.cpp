@@ -174,7 +174,7 @@ void getEulerIfExist(tinyxml2::XMLElement* e, const char* aname, Quat& q, std::s
             c = kPi * c / 180.0f;
         }
 
-        float angles[3] = { a, b, c };
+        const float angles[3] = { a, b, c };
         q = Quat();
 
         for (int i = (int)eulerseq.length() - 1; i >= 0; i--)

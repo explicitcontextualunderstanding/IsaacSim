@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.7.1] - 2025-08-28
+### Changed
+- Fixes and more logging for xform tests
+
+## [4.7.0] - 2025-08-27
+### Added
+- Add boolean flag to force the update of the physics data to fabric when performing a physics-only step
+
+## [4.6.12] - 2025-08-27
+### Fixed
+- Fix the broken documentation links
+
+## [4.6.11] - 2025-08-13
+### Changed
+- Update articulation view test case to check for joint indices and names when querying the measured joint reaction forces/torques
+
 ## [4.6.10] - 2025-07-23
 ### Fixed
 - Exclude test_world_poses_fabric from ETM

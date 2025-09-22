@@ -89,7 +89,6 @@ includedirs {
 
 libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
-    "%{root}/_build/target-deps/nv_usd/release/lib",
     extsbuild_dir .. "/omni.usd.core/bin",
 }
 

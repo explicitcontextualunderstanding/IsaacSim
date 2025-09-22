@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" The decision framework. Decider networks and state machines are implemented here.
+"""The decision framework. Decider networks and state machines are implemented here.
 
 Conceptually, a decider network is a mapping from world and logical state to a choice of high-level
 action. That mapping often has intuitive structure to it; decider networks make it easy to design

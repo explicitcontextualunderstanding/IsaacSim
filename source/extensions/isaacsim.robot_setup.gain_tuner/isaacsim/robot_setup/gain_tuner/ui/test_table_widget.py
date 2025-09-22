@@ -85,7 +85,7 @@ class TestJointItem(TableItem):
             ui.SimpleStringModel(user_provided),
         ]
         self.joint_index = joint_index
-        for i in range(1, 8):
+        for i in range(1, 9):
             self.model_cols[i].add_value_changed_fn(partial(self._on_value_changed, adjusted_col_id=i))
 
         # Add Config update callbacs

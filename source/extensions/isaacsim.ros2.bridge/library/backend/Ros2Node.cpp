@@ -27,10 +27,8 @@ namespace bridge
 {
 
 Ros2NodeHandleImpl::Ros2NodeHandleImpl(const char* name, const char* namespaceName, Ros2ContextHandle* contextHandle)
-    : m_contextHandle(contextHandle), m_node(nullptr)
-{
-    rcl_ret_t rc;
-    m_node = std::shared_ptr<rcl_node_t>(new rcl_node_t,
+    : m_contextHandle(contextHandle),
+      m_node(std::shared_ptr<rcl_node_t>(new rcl_node_t,
                                          [](rcl_node_t* node)
                                          {
                                              rcl_ret_t ret = rcl_node_fini(node);
@@ -39,7 +37,9 @@ Ros2NodeHandleImpl::Ros2NodeHandleImpl(const char* name, const char* namespaceNa
                                                  RCL_ERROR_MSG(Ros2NodeHandleImpl, rcl_node_fini);
                                              }
                                              delete node;
-                                         });
+                                         }))
+{
+    rcl_ret_t rc;
     if (m_node != nullptr)
     {
         (*m_node) = rcl_get_zero_initialized_node();

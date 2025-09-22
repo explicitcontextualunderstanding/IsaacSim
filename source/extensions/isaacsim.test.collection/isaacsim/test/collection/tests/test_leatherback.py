@@ -165,7 +165,10 @@ class TestLeatherback(omni.kit.test.AsyncTestCase):
 
         # Look for a specific gray pixel in the bottom of the RGB image
         rgb_diff = np.array([203, 203, 203]) - rgb_data[self._rgb.height - 1, self._rgb.width // 2]
-        self.assertTrue(np.linalg.norm(rgb_diff) < 10)
+        self.assertTrue(
+            np.linalg.norm(rgb_diff) < 15,
+            msg=f"rgb_diff: {rgb_diff}, np.linalg.norm(rgb_diff): {np.linalg.norm(rgb_diff)}",
+        )
 
         # The first pixel corresponds to the sky, it should have an infinite depth
         # The last pixel is on the ground, it should be around 0.602

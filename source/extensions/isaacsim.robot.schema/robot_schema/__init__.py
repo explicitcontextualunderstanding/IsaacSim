@@ -33,6 +33,11 @@ _attr_prefix = "isaac"
 class Attributes(Enum):
     DESCRIPTION = (f"{_attr_prefix}:description", "Description", pxr.Sdf.ValueTypeNames.String)
     NAMESPACE = (f"{_attr_prefix}:namespace", "Namespace", pxr.Sdf.ValueTypeNames.String)
+    ROBOT_TYPE = (f"{_attr_prefix}:robotType", "Robot Type", pxr.Sdf.ValueTypeNames.Token)
+    LICENSE = (f"{_attr_prefix}:license", "License", pxr.Sdf.ValueTypeNames.Token)
+    VERSION = (f"{_attr_prefix}:version", "Version", pxr.Sdf.ValueTypeNames.String)
+    SOURCE = (f"{_attr_prefix}:source", "Source", pxr.Sdf.ValueTypeNames.String)
+    CHANGELOG = (f"{_attr_prefix}:changelog", "Changelog", pxr.Sdf.ValueTypeNames.StringArray)
     INDEX = (f"{_attr_prefix}:physics:index", "Index", pxr.Sdf.ValueTypeNames.Int)
     NAME_OVERRIDE = (f"{_attr_prefix}:nameOverride", "Name Override", pxr.Sdf.ValueTypeNames.String)
     FORWARD_AXIS = (f"{_attr_prefix}:forwardAxis", "Forward Axis", pxr.Sdf.ValueTypeNames.Token)
@@ -88,7 +93,15 @@ class Relations(Enum):
 
 def ApplyRobotAPI(prim: pxr.Usd.Prim):
     prim.AddAppliedSchema(Classes.ROBOT_API.value)
-    for attr in [Attributes.DESCRIPTION, Attributes.NAMESPACE]:
+    for attr in [
+        Attributes.DESCRIPTION,
+        Attributes.NAMESPACE,
+        Attributes.ROBOT_TYPE,
+        Attributes.LICENSE,
+        Attributes.VERSION,
+        Attributes.SOURCE,
+        Attributes.CHANGELOG,
+    ]:
         prim.CreateAttribute(attr.name, attr.type, True)
 
     for rel in [Relations.ROBOT_LINKS, Relations.ROBOT_JOINTS]:

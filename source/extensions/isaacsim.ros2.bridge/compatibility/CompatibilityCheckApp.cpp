@@ -19,7 +19,7 @@
 #include <rcl/rcl.h>
 
 
-int main(int argc, char* argv[])
+int main(int argc, const char* argv[])
 {
     std::vector<std::string> libList = {
         "rcutils",

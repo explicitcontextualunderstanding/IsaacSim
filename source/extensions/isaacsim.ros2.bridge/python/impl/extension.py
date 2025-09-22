@@ -28,8 +28,13 @@ import omni.syntheticdata
 import omni.syntheticdata._syntheticdata as sd
 from isaacsim.core.nodes.scripts.utils import register_node_writer_with_telemetry
 
-BRIDGE_NAME = "isaacsim.ros2.bridge"
-BRIDGE_PREFIX = "ROS2"
+from .ros2_common import (
+    BRIDGE_NAME,
+    BRIDGE_PREFIX,
+    SUPPORTED_ROS_DISTROS,
+    get_ubuntu_version,
+    print_environment_setup_instructions,
+)
 
 
 class ROS2BridgeExtension(omni.ext.IExt):
@@ -46,13 +51,28 @@ class ROS2BridgeExtension(omni.ext.IExt):
         backup_ros_distro = carb.settings.get_settings().get_as_string("/exts/isaacsim.ros2.bridge/ros_distro")
         ros_distro = os.environ.get("ROS_DISTRO")
         if ros_distro is None:
-            carb.log_warn("ROS_DISTRO env var not found, Please source ROS before enabling this extension")
+
+            if backup_ros_distro == "system_default":
+                if sys.platform == "linux":
+                    detected_distro = get_ubuntu_version()
+                    if detected_distro:
+                        backup_ros_distro = detected_distro
+                        carb.log_info(
+                            f"Ubuntu distro detected. Using system default ROS distribution: {backup_ros_distro}"
+                        )
+                    else:
+                        backup_ros_distro = "humble"
+                        carb.log_error(f"Unsupported Ubuntu distro. Setting ROS distribution to: {backup_ros_distro}")
+                else:
+                    # For Windows system, default to humble
+                    backup_ros_distro = "humble"
+                    carb.log_warn("Using 'humble' as default")
+
             omni.kit.app.get_app().print_and_log(f"Using backup internal ROS2 {backup_ros_distro} distro")
             ros_distro = backup_ros_distro
             os.environ["ROS_DISTRO"] = ros_distro
-            # os.environ["RMW_IMPLEMENTATION"] = "rmw_fastrtps_cpp"
 
-        if ros_distro not in ["humble", "jazzy"]:
+        if ros_distro not in SUPPORTED_ROS_DISTROS.values():
             carb.log_error(f"ROS_DISTRO of {ros_distro} is currently not supported")
             ext_manager.set_extension_enabled("isaacsim.ros2.bridge", False)
             return
@@ -75,31 +95,7 @@ class ROS2BridgeExtension(omni.ext.IExt):
         self._module = _ros2_bridge
 
         if self.check_status(os.environ["ROS_DISTRO"]) is False:
-            if sys.platform == "linux":
-                omni.kit.app.get_app().print_and_log(
-                    f"To use the internal libraries included with the extension please set the following environment variables to use with FastDDS (default) or CycloneDDS before starting Isaac Sim:\n\n"
-                    f"FastDDS (default):\n"
-                    f"export ROS_DISTRO={ros_distro}\n"
-                    f"export RMW_IMPLEMENTATION=rmw_fastrtps_cpp\n"
-                    f"export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self._extension_path}/{ros_distro}/lib\n\n"
-                    f"OR\n\n"
-                    f"CycloneDDS:\n"
-                    f"export ROS_DISTRO={ros_distro}\n"
-                    f"export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp\n"
-                    f"export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self._extension_path}/{ros_distro}/lib\n\n"
-                )
-            else:
-                omni.kit.app.get_app().print_and_log(
-                    f"To use the internal libraries included with the extension, please set the environment variables using one of the following methods before starting Isaac Sim:\n\n"
-                    f"Command Prompt (CMD):\n"
-                    f"set ROS_DISTRO={ros_distro}\n"
-                    f"set RMW_IMPLEMENTATION=rmw_fastrtps_cpp\n"
-                    f"set PATH=%PATH%;{self._extension_path}/{ros_distro}/lib\n\n"
-                    f"PowerShell:\n"
-                    f'$env:ROS_DISTRO = "{ros_distro}"\n'
-                    f'$env:RMW_IMPLEMENTATION = "rmw_fastrtps_cpp"\n'
-                    f'$env:PATH = "$env:PATH;{self._extension_path}/{ros_distro}/lib"\n\n'
-                )
+            print_environment_setup_instructions(self._extension_path, ros_distro)
             carb.log_error(f"ROS2 Bridge startup failed")
             ext_manager.set_extension_enabled("isaacsim.ros2.bridge", False)
         else:

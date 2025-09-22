@@ -30,11 +30,10 @@ simulation_app = SimulationApp({"headless": False})
 
 import numpy as np
 from behaviors.franka.franka_behaviors import ContextStateMonitor, behaviors
-from isaacsim.core.api.objects import DynamicCuboid, VisualCuboid
+from isaacsim.core.api.objects import DynamicCuboid
 from isaacsim.cortex.framework.cortex_utils import load_behavior_module
-from isaacsim.cortex.framework.cortex_world import Behavior, CortexWorld, LogicalStateMonitor
+from isaacsim.cortex.framework.cortex_world import CortexWorld
 from isaacsim.cortex.framework.robot import add_franka_to_stage
-from isaacsim.cortex.framework.tools import SteadyRate
 
 
 class CubeSpec:

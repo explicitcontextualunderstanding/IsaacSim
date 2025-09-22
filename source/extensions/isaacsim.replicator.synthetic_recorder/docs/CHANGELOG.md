@@ -1,4 +1,9 @@
 # Changelog
+## [2.2.16] - 2025-09-15
+### Changed
+- enabled tests blocked by ISIM-2602
+- use isaacsim.test.utils in tests
+
 ## [2.2.15] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 2.2.14)

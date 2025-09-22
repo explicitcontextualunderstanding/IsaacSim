@@ -1,4 +1,8 @@
 # Changelog
+## [3.0.8] - 2025-09-09
+### Changed
+- Add isaacsim.test.utils to test dependencies
+
 ## [3.0.7] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

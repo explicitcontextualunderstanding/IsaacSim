@@ -15,6 +15,7 @@
 
 import gc
 import os
+import weakref
 
 import carb
 import omni.appwindow
@@ -32,6 +33,7 @@ from omni.kit.notification_manager import NotificationStatus, post_notification
 from pxr import Gf, UsdGeom
 
 MENU_NAME = "Add Waypoint Follower"
+MENU_CATEGORY = "ROS2/Navigation"
 
 WAYPOINT_SCRIPT = """
 import rclpy
@@ -405,11 +407,8 @@ class Extension(omni.ext.IExt):
         self._enable_multi_robot = False
 
         get_browser_instance().register_example(
-            name=MENU_NAME, execute_entrypoint=self.build_window, ui_hook=self.build_ui, category="ROS2/Navigation"
+            name=MENU_NAME, ui_hook=lambda a=weakref.proxy(self): a.build_ui(), category=MENU_CATEGORY
         )
-
-    def build_window(self):
-        pass
 
     def build_ui(self):
         # check if ros2 bridge is enabled before proceeding
@@ -654,6 +653,6 @@ class Extension(omni.ext.IExt):
 
     def on_shutdown(self):
         """Cleanup objects on extension shutdown"""
-        get_browser_instance().deregister_example(name=MENU_NAME, category="ROS2")
+        get_browser_instance().deregister_example(name=MENU_NAME, category=MENU_CATEGORY)
         self._timeline.stop()
         gc.collect()

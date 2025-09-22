@@ -16,6 +16,7 @@ from typing import List, Optional, Tuple
 
 import carb
 import omni
+import omni.kit.app
 from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.core.utils.carb import get_carb_setting, set_carb_setting
 from isaacsim.core.utils.constants import AXES_INDICES
@@ -201,7 +202,8 @@ class PhysicsContext(object):
 
         if physics_dt is not None:
             self.set_physics_dt(dt=physics_dt)
-        return
+
+        self._physx_fabric_interface = None
 
     @property
     def prim_path(self):
@@ -558,10 +560,17 @@ class PhysicsContext(object):
             get_carb_setting(self._carb_settings, "/physics/outputVelocitiesLocalSpace"),
         )
 
-    def _step(self, current_time: float) -> None:
+    def _step(self, current_time: float, update_fabric: bool = False) -> None:
         self._physx_sim_interface.simulate(self.get_physics_dt(), current_time)
         self._physx_sim_interface.fetch_results()
-        return
+        if update_fabric:
+            if self._physx_fabric_interface is None:
+                if omni.kit.app.get_app().get_extension_manager().is_extension_enabled("omni.physx.fabric"):
+                    from omni.physxfabric import get_physx_fabric_interface
+
+                    self._physx_fabric_interface = get_physx_fabric_interface()
+            else:
+                self._physx_fabric_interface.update(current_time, self.get_physics_dt())
 
     def set_invert_collision_group_filter(self, invert_collision_group_filter: bool) -> None:
         """[summary]

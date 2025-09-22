@@ -116,16 +116,21 @@ void mergeFixedChildLinks(const KinematicChain::Node& parentNode, UrdfRobot& rob
     {
         // Depth first
         mergeFixedChildLinks(*childNode, robot);
-        auto joint = robot.joints.at(childNode->parentJointName_);
+        auto& joint = robot.joints.at(childNode->parentJointName_);
         auto& urdfChildLink = robot.links.at(childNode->linkName_);
 
         // Only merge if the joint is FIXED, not marked with dontCollapse, AND
         // the child link has no inertia and no colliders
         if ((joint.type == UrdfJointType::FIXED) && !joint.dontCollapse)
         {
+            auto& urdfParentLink = robot.links.at(parentNode.linkName_);
+            if ((urdfChildLink.inertial.hasMass && urdfChildLink.inertial.mass > 0.0f))
+            {
+                joint.dontCollapse = true;
+                continue;
+            }
             CARB_LOG_WARN("link %s has no body properties (mass, inertia, or collisions) and is being merged into %s",
                           childNode->linkName_.c_str(), parentNode.linkName_.c_str());
-            auto& urdfParentLink = robot.links.at(parentNode.linkName_);
             // The pose of the child with respect to the parent is defined at the joint connecting them
             Transform poseChildToParent = joint.origin;
             // Add a reference to the merged link
@@ -188,12 +193,12 @@ void mergeFixedChildLinks(const KinematicChain::Node& parentNode, UrdfRobot& rob
                 urdfParentLink.visuals.push_back(visual);
             }
             urdfChildLink.visuals.clear();
-            for (auto& joint : robot.joints)
+            for (auto& jointPair : robot.joints)
             {
-                if (joint.second.parentLinkName == childNode->linkName_)
+                if (jointPair.second.parentLinkName == childNode->linkName_)
                 {
-                    joint.second.parentLinkName = parentNode.linkName_;
-                    joint.second.origin = poseChildToParent * joint.second.origin;
+                    jointPair.second.parentLinkName = parentNode.linkName_;
+                    jointPair.second.origin = poseChildToParent * jointPair.second.origin;
                 }
             }
 
@@ -212,7 +217,7 @@ bool collapseFixedJoints(UrdfRobot& robot)
         return false;
     }
 
-    auto& parentNode = chain.baseNode;
+    const auto& parentNode = chain.baseNode;
     if (!parentNode->childNodes_.empty())
     {
         mergeFixedChildLinks(*parentNode, robot);

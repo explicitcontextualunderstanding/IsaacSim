@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This module provides the base classes for representing robots and building their command APIs by
+"""This module provides the base classes for representing robots and building their command APIs by
 adding commanders.
 
 The Cortex collaborative systems functional pipeline includes:
@@ -26,7 +26,7 @@ The Cortex collaborative systems functional pipeline includes:
 
 This module implements the command API layer translating higher level commands produced by the
 decision layer to the commanders that process them into lower-level control commands. Commanders
-wrap policies and define the command API used to modulate the underlying policies' behavior. 
+wrap policies and define the command API used to modulate the underlying policies' behavior.
 
 Operationally, the commanders are added to CortexRobot objects and made available to state machines
 and decider networks (decision layer) through the context object. Two examples of commanders are the

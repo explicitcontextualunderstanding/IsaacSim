@@ -12,8 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
+import concurrent.futures
 import os
+from typing import List
 
+import carb
 from pxr import Sdf, UsdUtils
 
 
@@ -49,6 +53,43 @@ def path_join(base, name):
         return os.path.join(base, name)
 
 
+def is_local_path(path: str) -> bool:
+    """Check if a path is local vs online (omniverse://, https://, etc.).
+
+    This function determines whether a given path points to an offline resource
+    that can be accessed without network connectivity.
+
+    Args:
+        path: The file path to check.
+
+    Returns:
+        True if the path is local filesystem, False if online (omniverse://, https://, etc.).
+
+    Example:
+
+    .. code-block:: python
+
+        >>> is_local_path("/home/user/file.usd")
+        True
+        >>> is_local_path("omniverse://server/path/file.usd")
+        False
+    """
+    if not path:
+        return True  # Empty paths are considered local
+
+    path = path.strip()
+
+    # Check for online URL schemes
+    online_schemes = ["omniverse://", "http://", "https://", "ftp://", "sftp://"]
+
+    for scheme in online_schemes:
+        if path.startswith(scheme):
+            return False
+
+    # Local paths (absolute or relative) are considered local
+    return True
+
+
 def find_files_recursive(abs_path, filter_fn=lambda a: True):
     """Recursively list all files under given path(s) that match the filter function.
 
@@ -75,6 +116,111 @@ def find_files_recursive(abs_path, filter_fn=lambda a: True):
             )
             remaining_folders.extend([path_join(path, e.relative_path) for e in entries if (e.flags & 4) > 0])
     return files
+
+
+def find_filtered_files(
+    abs_paths: List[str],
+    max_depth: int = None,
+    filepath_excludes: List[str] = [],
+    filter_patterns: List[str] = [],
+    match_all: bool = False,
+) -> set:
+    """Find and filter USD files recursively with optional depth and pattern constraints.
+
+    Traverses directory trees starting from the provided absolute paths to discover valid USD files.
+    Supports recursive search with configurable depth limits, filepath exclusion patterns,
+    and regex-based filtering. Uses Omniverse client for robust file system operations
+    across local and remote paths.
+
+    Args:
+        abs_paths: List of absolute directory or file paths to search. Supports local paths and omniverse:// URLs.
+        max_depth: Maximum recursion depth for directory traversal. If None, searches
+            without depth limit. Depth 0 means current directory only.
+        filepath_excludes: List of strings that, if found in a filepath, will exclude
+            that file from results. Commonly used to exclude directories like ".thumbs".
+        filter_patterns: List of regex pattern strings to filter discovered filepaths.
+            Patterns are applied to the full absolute filepath.
+        match_all: Controls regex pattern matching behavior. If True, all patterns in
+            filter_patterns must match for a file to be included. If False, any single
+            pattern match includes the file.
+
+    Returns:
+        Set of absolute paths to valid USD files that match all filtering criteria.
+
+    Example:
+
+    .. code-block:: python
+
+        # Find USD files in Isaac environments with depth limit
+        >>> paths = ["/Isaac/Environments", "/Isaac/Samples"]
+        >>> usd_files = find_filtered_files(
+        ...     abs_paths=paths,
+        ...     max_depth=2,
+        ...     filepath_excludes=[".thumbs"],
+        ... )
+
+        # Find files matching specific patterns (any pattern)
+        >>> filtered_files = find_filtered_files(
+        ...     abs_paths=["/Isaac/Samples"],
+        ...     filter_patterns=["carter", "navigation"],
+        ...     match_all=False,
+        ... )
+
+        # Find files matching all patterns
+        >>> strict_filtered = find_filtered_files(
+        ...     abs_paths=["/Isaac/Samples"],
+        ...     filter_patterns=["robot", "demo"],
+        ...     match_all=True,
+        ... )
+    """
+    import re
+
+    import omni.client
+    from omni.client import Result
+
+    usd_files = set()
+    # Track paths with their current depth: [(path, depth)]
+    remaining_folders = [(path, 0) for path in abs_paths]
+
+    # Compile regex patterns once for efficiency
+    compiled_patterns = []
+    if filter_patterns:
+        for pattern_str in filter_patterns:
+            try:
+                compiled_patterns.append(re.compile(pattern_str))
+            except re.error:
+                carb.log_warn(f"Invalid regex pattern: {pattern_str}")
+
+    while remaining_folders:
+        current_path, current_depth = remaining_folders.pop()
+
+        result, entries = omni.client.list(current_path)
+        if result == Result.OK:
+            for entry in entries:
+                entry_path = path_join(current_path, entry.relative_path)
+
+                # Check if it's a file (not a directory)
+                if (entry.flags & 4) == 0:  # 4 is the directory flag
+                    # Apply USD file validation and filtering
+                    if is_valid_usd_file(entry_path, filepath_excludes):
+                        # Apply pattern filters if provided
+                        if filter_patterns:
+                            if match_all:  # ALL patterns must match
+                                if all(pattern.search(entry_path) for pattern in compiled_patterns):
+                                    usd_files.add(entry_path)
+                            else:  # ANY pattern can match (default)
+                                if any(pattern.search(entry_path) for pattern in compiled_patterns):
+                                    usd_files.add(entry_path)
+                        else:
+                            # No pattern filters, just add valid USD file
+                            usd_files.add(entry_path)
+
+                # If it's a directory and we haven't exceeded max depth, add to queue
+                elif (entry.flags & 4) > 0:
+                    if max_depth is None or current_depth < max_depth:
+                        remaining_folders.append((entry_path, current_depth + 1))
+
+    return usd_files
 
 
 def get_stage_references(stage_path, resolve_relatives=True):
@@ -383,3 +529,42 @@ def path_dirname(path):
         return urlunparse((parsed.scheme, parsed.netloc, dir_path, "", "", ""))
     else:
         return os.path.dirname(os.path.normpath(path)) + os.sep
+
+
+async def find_filtered_files_async(
+    root_path: str,
+    filter_patterns: List[str] = [],
+    match_all: bool = False,
+    filepath_excludes: List[str] = [],
+    max_depth: int = None,
+) -> set:
+    """Asynchronously find and filter USD files recursively with optional depth and pattern constraints.
+
+    This is an async wrapper around find_filtered_files that uses a thread pool executor
+    to avoid blocking the main thread. Results are returned as a set for automatic deduplication.
+
+    Args:
+        root_path: Root directory or file path to traverse. Can be local, file://, or omniverse://.
+        filter_patterns: Optional list of regex patterns to filter filepaths.
+        match_all: If True, all patterns must match. If False, any pattern can match.
+        filepath_excludes: List of substrings that should not be present in filepaths.
+        max_depth: Maximum directory depth to traverse. None means unlimited depth.
+
+    Returns:
+        A set of absolute paths to USD files discovered during traversal.
+    """
+
+    # Get filtered USD files with depth limit in one pass
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        usd_files_set = await loop.run_in_executor(
+            executor,
+            find_filtered_files,
+            [root_path],
+            max_depth,
+            filepath_excludes,
+            filter_patterns,
+            match_all,
+        )
+
+    return usd_files_set

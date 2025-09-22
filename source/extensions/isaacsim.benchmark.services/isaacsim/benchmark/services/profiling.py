@@ -16,9 +16,9 @@ import gzip
 import os
 import shutil
 
-from . import utils
+import carb
 
-logger = utils.set_up_logging(__name__)
+from . import utils
 
 
 async def convert_chrome_to_tracy(json_path: str, tracy_path: str) -> str:
@@ -26,12 +26,12 @@ async def convert_chrome_to_tracy(json_path: str, tracy_path: str) -> str:
     from omni.kit.profiler.tracy import tracy
 
     # Convert JSON to Tracy.
-    logger.info(f"Converting {json_path} to {tracy_path}")
+    carb.log_info(f"Converting {json_path} to {tracy_path}")
     tracy.convert_json_to_tracy(json_path, tracy_path)
 
     # If there was a problem with tracy, just return the original file
     if not os.path.exists(tracy_path):
-        logger.warning(f"Unable to create tracy file for {json_path}...")
+        carb.log_warn(f"Unable to create tracy file for {json_path}...")
         return json_path
 
     # Compress file.

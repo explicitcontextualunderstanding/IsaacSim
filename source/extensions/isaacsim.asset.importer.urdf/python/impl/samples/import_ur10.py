@@ -58,7 +58,7 @@ class Extension(omni.ext.IExt):
         with ui.VStack(spacing=5, height=0):
 
             title = "Import a UR10 via URDF"
-            doc_link = "https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/ext_omni_isaac_urdf.html"
+            doc_link = "https://docs.isaacsim.omniverse.nvidia.com/latest/importer_exporter/ext_isaacsim_asset_importer_urdf.html"
 
             overview = "This Example shows you import a UR10 robot arm via URDF.\n\nPress the 'Open in IDE' button to view the source code."
 

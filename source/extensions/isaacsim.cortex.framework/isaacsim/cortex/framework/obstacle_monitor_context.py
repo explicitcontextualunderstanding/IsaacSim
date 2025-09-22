@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" These classes make it easy to monitor obstacles and automatically suppress and unsuppress them
+"""These classes make it easy to monitor obstacles and automatically suppress and unsuppress them
 as needed.
 
 Obstacle monitors use the logical state monitoring framework to handle this functionality in the

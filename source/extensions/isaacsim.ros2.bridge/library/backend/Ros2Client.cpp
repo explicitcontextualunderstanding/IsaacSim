@@ -30,9 +30,9 @@ Ros2ClientImpl::Ros2ClientImpl(Ros2NodeHandle* nodeHandle,
                                const char* serviceName,
                                const void* typeSupport,
                                const Ros2QoSProfile& qos)
-    : m_nodeHandle(nodeHandle), m_waitSetInitialized(false)
-{
-    m_client = std::shared_ptr<rcl_client_t>(new rcl_client_t,
+    : m_nodeHandle(nodeHandle),
+      m_waitSetInitialized(false),
+      m_client(std::shared_ptr<rcl_client_t>(new rcl_client_t,
                                              [nodeHandle](rcl_client_t* client)
                                              {
                                                  // Intentionally capture node by copy so shared_ptr can be
@@ -44,7 +44,8 @@ Ros2ClientImpl::Ros2ClientImpl(Ros2NodeHandle* nodeHandle,
                                                      RCL_ERROR_MSG(Ros2ClientImpl, rcl_client_fini);
                                                  }
                                                  delete client;
-                                             });
+                                             }))
+{
 
     (*m_client) = rcl_get_zero_initialized_client();
     rcl_client_options_t clientOptions = rcl_client_get_default_options();

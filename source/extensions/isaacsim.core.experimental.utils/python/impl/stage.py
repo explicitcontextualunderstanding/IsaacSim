@@ -17,14 +17,14 @@ from __future__ import annotations
 
 import contextlib
 import threading
-from typing import Generator
+from typing import Generator, Literal
 
 import carb
 import omni.kit.stage_templates
 import omni.usd
 import usdrt
 from omni.metrics.assembler.core import get_metrics_assembler_interface
-from pxr import Sdf, Usd, UsdUtils
+from pxr import Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
 
 from . import backend as backend_utils
 from . import prim as prim_utils
@@ -192,6 +192,12 @@ def create_new_stage(*, template: str | None = None) -> Usd.Stage:
         >>> # create a new stage from the 'sunlight' template
         >>> stage_utils.create_new_stage(template="sunlight")
         Usd.Stage.Open(rootLayer=Sdf.Find('anon:...usd'), ...)
+
+        >>> # get the list of available templates
+        >>> import omni.kit.stage_templates
+        >>>
+        >>> [name for item in omni.kit.stage_templates.get_stage_template_list() for name in item]
+        ['empty', 'sunlight', 'default stage']
     """
     # create 'empty' stage
     if template is None:
@@ -300,6 +306,50 @@ async def open_stage_async(usd_path: str) -> tuple[bool, Usd.Stage | None]:
     return result, usd_context.get_stage()
 
 
+def save_stage(usd_path: str) -> bool:
+    """Save the current stage to a USD file.
+
+    Backends: :guilabel:`usd`.
+
+    Args:
+        usd_path: USD file path to save the current stage to.
+
+    Returns:
+        Whether the stage was saved successfully.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import os
+        >>> import tempfile
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> # save the current stage to a USD file
+        >>> usd_path = os.path.join(tempfile.gettempdir(), "test.usd")
+        >>> stage_utils.save_stage(usd_path)
+        True
+    """
+    if not Usd.Stage.IsSupportedFile(usd_path):
+        raise ValueError(f"The file ({usd_path}) is not USD open-able")
+    root_layer = get_current_stage(backend="usd").GetRootLayer()
+    layer = Sdf.Layer.CreateNew(usd_path)
+    layer.TransferContent(root_layer)
+    omni.usd.resolve_paths(root_layer.identifier, layer.identifier)
+    return layer.Save()
+
+
+def close_stage() -> bool:
+    """Close the stage attached to the USD context.
+
+    Backends: :guilabel:`usd`.
+
+    Returns:
+        Whether the stage was closed successfully.
+    """
+    return omni.usd.get_context().close_stage()
+
+
 def add_reference_to_stage(
     usd_path: str, path: str, *, prim_type: str = "Xform", variants: list[tuple[str, str]] = []
 ) -> Usd.Prim:
@@ -378,6 +428,220 @@ def add_reference_to_stage(
     return prim
 
 
+def get_stage_units() -> tuple[float, float]:
+    """Get the stage meters per unit and kilograms per unit currently set.
+
+    Backends: :guilabel:`usd`.
+
+    The most common distance units and their values are listed in the following table:
+
+    +------------------+--------+
+    | Unit             | Value  |
+    +==================+========+
+    | kilometer (km)   | 1000.0 |
+    +------------------+--------+
+    | meters (m)       | 1.0    |
+    +------------------+--------+
+    | inch (in)        | 0.0254 |
+    +------------------+--------+
+    | centimeters (cm) | 0.01   |
+    +------------------+--------+
+    | millimeter (mm)  | 0.001  |
+    +------------------+--------+
+
+    The most common mass units and their values are listed in the following table:
+
+    +------------------+--------+
+    | Unit             | Value  |
+    +==================+========+
+    | metric ton (t)   | 1000.0 |
+    +------------------+--------+
+    | kilogram (kg)    | 1.0    |
+    +------------------+--------+
+    | gram (g)         | 0.001  |
+    +------------------+--------+
+    | pound (lb)       | 0.4536 |
+    +------------------+--------+
+    | ounce (oz)       | 0.0283 |
+    +------------------+--------+
+
+    Returns:
+        Current stage meters per unit and kilograms per unit.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.get_stage_units()
+        (1.0, 1.0)
+    """
+    stage = get_current_stage(backend="usd")
+    return UsdGeom.GetStageMetersPerUnit(stage), UsdPhysics.GetStageKilogramsPerUnit(stage)
+
+
+def set_stage_units(*, meters_per_unit: float | None = None, kilograms_per_unit: float | None = None) -> None:
+    """Set the stage meters per unit and kilograms per unit.
+
+    Backends: :guilabel:`usd`.
+
+    The most common distance units and their values are listed in the following table:
+
+    +------------------+--------+
+    | Unit             | Value  |
+    +==================+========+
+    | kilometer (km)   | 1000.0 |
+    +------------------+--------+
+    | meters (m)       | 1.0    |
+    +------------------+--------+
+    | inch (in)        | 0.0254 |
+    +------------------+--------+
+    | centimeters (cm) | 0.01   |
+    +------------------+--------+
+    | millimeter (mm)  | 0.001  |
+    +------------------+--------+
+
+    The most common mass units and their values are listed in the following table:
+
+    +------------------+--------+
+    | Unit             | Value  |
+    +==================+========+
+    | metric ton (t)   | 1000.0 |
+    +------------------+--------+
+    | kilogram (kg)    | 1.0    |
+    +------------------+--------+
+    | gram (g)         | 0.001  |
+    +------------------+--------+
+    | pound (lb)       | 0.4536 |
+    +------------------+--------+
+    | ounce (oz)       | 0.0283 |
+    +------------------+--------+
+
+    Returns:
+        Current stage meters per unit and kilograms per unit.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> # set stage units to inch and pound respectively
+        >>> stage_utils.set_stage_units(meters_per_unit=0.0254, kilograms_per_unit=0.4536)
+    """
+    stage = get_current_stage(backend="usd")
+    if meters_per_unit is not None:
+        UsdGeom.SetStageMetersPerUnit(stage, meters_per_unit)
+    if kilograms_per_unit is not None:
+        UsdPhysics.SetStageKilogramsPerUnit(stage, kilograms_per_unit)
+
+
+def get_stage_up_axis() -> Literal["Y", "Z"]:
+    """Get the stage up axis.
+
+    Backends: :guilabel:`usd`.
+
+    .. note::
+
+        According to the USD specification, only ``"Y"`` and ``"Z"`` axes are supported.
+
+    Returns:
+        The stage up axis.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.get_stage_up_axis()
+        'Z'
+    """
+    return UsdGeom.GetStageUpAxis(get_current_stage(backend="usd"))
+
+
+def set_stage_up_axis(up_axis: Literal["Y", "Z"]) -> None:
+    """Set the stage up axis.
+
+    Backends: :guilabel:`usd`.
+
+    .. note::
+
+        According to the USD specification, only ``"Y"`` and ``"Z"`` axes are supported.
+
+    Args:
+        up_axis: The stage up axis.
+
+    Raises:
+        ValueError: If the up axis is not a valid token.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.set_stage_up_axis("Y")
+    """
+    if up_axis.upper() not in ["Y", "Z"]:
+        raise ValueError(f"Invalid up axis: '{up_axis}'")
+    UsdGeom.SetStageUpAxis(get_current_stage(backend="usd"), up_axis.upper())
+
+
+def get_stage_time_code() -> tuple[float, float, float]:
+    """Get the stage time code (start, end, and time codes per second).
+
+    Backends: :guilabel:`usd`.
+
+    Returns:
+        The stage time code (start, end, and time codes per second).
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.get_stage_time_code()
+        (0.0, 100.0, 60.0)
+    """
+    stage = get_current_stage(backend="usd")
+    return stage.GetStartTimeCode(), stage.GetEndTimeCode(), stage.GetTimeCodesPerSecond()
+
+
+def set_stage_time_code(
+    *,
+    start_time_code: float | None = None,
+    end_time_code: float | None = None,
+    time_codes_per_second: float | None = None,
+) -> None:
+    """Set the stage time code (start, end, and time codes per second).
+
+    Backends: :guilabel:`usd`.
+
+    Args:
+        start_time_code: The start time code.
+        end_time_code: The end time code.
+        time_codes_per_second: The time codes per second.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.set_stage_time_code(start_time_code=0.0, end_time_code=100.0, time_codes_per_second=10.0)
+    """
+    stage = get_current_stage(backend="usd")
+    if start_time_code is not None:
+        stage.SetStartTimeCode(start_time_code)
+    if end_time_code is not None:
+        stage.SetEndTimeCode(end_time_code)
+    if time_codes_per_second is not None:
+        stage.SetTimeCodesPerSecond(time_codes_per_second)
+
+
 def define_prim(path: str, type_name: str = "Xform") -> Usd.Prim | usdrt.Usd.Prim:
     """Attempt to define a prim of the specified type at the given path.
 
@@ -385,7 +649,7 @@ def define_prim(path: str, type_name: str = "Xform") -> Usd.Prim | usdrt.Usd.Pri
 
     Common token values for ``type_name`` are:
 
-    * ``"Camera"``, ``"Mesh"``, ``"PhysicsScene"``, ``"Xform"``
+    * ``"Camera"``, ``"Mesh"``, ``"PhysicsScene"``, ``"Scope"``, ``"Xform"``
     * Shapes (``"Capsule"``, ``"Cone"``, ``"Cube"``, ``"Cylinder"``, ``"Plane"``, ``"Sphere"``)
     * Lights (``"CylinderLight"``, ``"DiskLight"``, ``"DistantLight"``, ``"DomeLight"``, ``"RectLight"``, ``"SphereLight"``)
 
@@ -418,3 +682,41 @@ def define_prim(path: str, type_name: str = "Xform") -> Usd.Prim | usdrt.Usd.Pri
             raise RuntimeError(f"A prim already exists at path ({path}) with type ({prim.GetTypeName()})")
         return prim
     return stage.DefinePrim(path, type_name)
+
+
+def generate_next_free_path(path: str | None = None, *, prepend_default_prim: bool = True) -> str:
+    """Generate the next free usd path for the current stage.
+
+    Backends: :guilabel:`usd`.
+
+    Args:
+        path: Base path to generate the next free path from.
+            If empty, pseudo-root or not defined, ``"Prim"`` will be used as the default name.
+        prepend_default_prim: Whether to prepend the default prim path to the base path.
+
+    Returns:
+        Next free path.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> # given the stage: /World/Cube, /World/Cube_01
+        >>> stage_utils.define_prim("/World/Cube", type_name="Cube")  # doctest: +NO_CHECK
+        >>> stage_utils.define_prim("/World/Cube_01", type_name="Cube")  # doctest: +NO_CHECK
+        >>>
+        >>> # generate the next available path for /World/Cube
+        >>> stage_utils.generate_next_free_path("/World/Cube")
+        '/World/Cube_02'
+    """
+    stage = get_current_stage(backend="usd")
+    if path in [None, "", "/"]:
+        if prepend_default_prim and stage.HasDefaultPrim():
+            path = f"{stage.GetDefaultPrim().GetPath().pathString}/Prim"
+        else:
+            path = "Prim"
+    if not Sdf.Path.IsValidPathString(path):
+        raise ValueError(f"Prim path ({path}) is not a valid path string")
+    return omni.usd.get_stage_next_free_path(stage, path, prepend_default_prim)

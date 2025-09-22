@@ -20,7 +20,10 @@ function define_test_startup_experience(app_name, kit_file, extra_args)
     local kit_file = kit_file or app_name
     define_test_experience(app_name, {
         config_path = "../apps/" .. kit_file .. ".kit",
-        extra_args = '--ext-folder "' .. script_dir_token .. '/../apps" ' .. extra_args,
+        extra_args = '--ext-folder "' .. script_dir_token .. '/../exts" ' ..
+                     '--ext-folder "' .. script_dir_token .. '/../extscache" ' ..
+                     '--ext-folder "' .. script_dir_token .. '/../extsDeprecated" ' ..
+                     '--ext-folder "' .. script_dir_token .. '/../apps" ' .. extra_args,
     })
 end
 
@@ -38,22 +41,22 @@ function create_tests()
         {
             name = "tests-startup.main",
             kit_file = "isaacsim.exp.full",
-            extra_args = "--/app/quitAfter=500 --/app/file/ignoreUnsavedOnExit=1",
+            extra_args = "--/app/quitAfter=100 --/app/file/ignoreUnsavedOnExit=1",
         },
         {
             name = "tests-startup.streaming",
             kit_file = "isaacsim.exp.full.streaming",
-            extra_args = "--no-window --/app/quitAfter=500 --/app/file/ignoreUnsavedOnExit=1",
+            extra_args = "--no-window --/app/quitAfter=100 --/app/file/ignoreUnsavedOnExit=1",
         },
         {
             name = "tests-startup.extscache",
             kit_file = "isaacsim.exp.full",
-            extra_args = "--no-window --/app/quitAfter=500 --/app/extensions/registryEnabled=0 --/app/file/ignoreUnsavedOnExit=1",
+            extra_args = "--no-window --/app/quitAfter=100 --/app/extensions/registryEnabled=0 --/app/file/ignoreUnsavedOnExit=1",
         },
         {
             name = "tests-startup.xr.vr",
             kit_file = "isaacsim.exp.base.xr.vr",
-            extra_args = "--no-window --/app/quitAfter=500 --/app/file/ignoreUnsavedOnExit=1",
+            extra_args = "--no-window --/app/quitAfter=100 --/app/file/ignoreUnsavedOnExit=1",
         },
     })
 
@@ -226,13 +229,23 @@ function create_tests()
 
     -- isaacsim.sensors.rtx
     python_sample_test(
+        "tests-nativepython-isaacsim.sensors.rtx.inspect_lidar_metadata",
+        "standalone_examples/api/isaacsim.sensors.rtx/inspect_lidar_metadata.py",
+        "--test"
+    )
+    python_sample_test(
+        "tests-nativepython-isaacsim.sensors.rtx.resolve_object_ids_from_gmo",
+        "standalone_examples/api/isaacsim.sensors.rtx/resolve_object_ids_from_gmo.py",
+        "--test"
+    )
+    python_sample_test(
         "tests-nativepython-isaacsim.sensors.rtx.rotating_lidar_rtx",
         "standalone_examples/api/isaacsim.sensors.rtx/rotating_lidar_rtx.py",
         "--test"
     )
     python_sample_test(
-        "tests-nativepython-isaacsim.sensors.rtx.inspect_lidar_metadata",
-        "standalone_examples/api/isaacsim.sensors.rtx/inspect_lidar_metadata.py",
+        "tests-nativepython-isaacsim.sensors.rtx.specify_non_visual_materials",
+        "standalone_examples/api/isaacsim.sensors.rtx/specify_non_visual_materials.py",
         "--test"
     )
 
@@ -484,6 +497,11 @@ function create_tests()
             "standalone_examples/testing/isaacsim.ros2.bridge/test_camera_tf_delay.py",
             "--test-steps=50",
         },
+        {
+            "tests-nativepython-testing-isaacsim.ros2.bridge.test_publish_camera_data",
+            "standalone_examples/testing/isaacsim.ros2.bridge/test_publish_camera_data.py",
+            "--test-steps=5",
+        }
     }
 
     for _, test in ipairs(ros2_bridge_tests) do
@@ -559,6 +577,15 @@ function create_tests()
         {
             "tests-nativepython-isaacsim.replicator.examples.custom_event_and_write",
             "/standalone_examples/api/isaacsim.replicator.examples/custom_event_and_write.py",
+        },
+        {
+            "tests-nativepython-testing-isaacsim.replicator.examples.ar_capture_pipeline",
+            "/standalone_examples/testing/isaacsim.replicator.examples/ar_capture_pipeline.py",
+        },
+        {
+            "tests-nativepython-testing-isaacsim.replicator.examples.ar_capture_pipeline_gpu",
+            "/standalone_examples/testing/isaacsim.replicator.examples/ar_capture_pipeline.py",
+            "--gpu_dynamics",
         },
         {
             "tests-nativepython-testing-isaacsim.replicator.examples.motion_blur_short",

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import sys
 
 from isaacsim import SimulationApp
@@ -34,7 +33,7 @@ from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils import extensions, stage
 from isaacsim.storage.native import get_assets_root_path
 from omni.kit.viewport.utility import get_active_viewport
-from pxr import Gf, Usd, UsdGeom
+from pxr import Gf, UsdGeom
 
 # enable ROS bridge extension
 extensions.enable_extension("isaacsim.ros2.bridge")

@@ -22,6 +22,7 @@ from datetime import datetime as dt
 from pathlib import Path
 from typing import Optional
 
+import carb
 import omni.kit.app
 import toml
 from isaacsim.core.version import get_version
@@ -29,8 +30,6 @@ from isaacsim.core.version import get_version
 from .. import utils
 from ..execution import TestExecutionEnvironmentInterface
 from . import measurements
-
-logger = utils.set_up_logging(__name__)
 
 
 class MetricsBackendInterface:
@@ -60,17 +59,17 @@ class KitGenericTelemetry(MetricsBackendInterface):
         # Remove privacy.toml if it exists.
         try:
             shutil.rmtree(config_dir)
-            logger.info("Config folder with privacy.toml removed.")
+            carb.log_info("Config folder with privacy.toml removed.")
         except Exception:
-            logger.info("Config folder empty.")
+            carb.log_info("Config folder empty.")
 
         # Creates directory for privacy.toml.
         if not os.path.exists(config_dir):
-            logger.info(f"Creating dir for privacy.toml {config_dir}.")
+            carb.log_info(f"Creating dir for privacy.toml {config_dir}.")
             os.makedirs(config_dir)
 
         # Create privacy.toml.
-        logger.info("Creating privacy.toml.")
+        carb.log_info("Creating privacy.toml.")
         data = {
             "privacy": {
                 "performance": True,
@@ -96,11 +95,11 @@ class KitGenericTelemetry(MetricsBackendInterface):
 
 class LocalLogMetrics(MetricsBackendInterface):
     """
-    Just logger.info to console
+    Just carb.log_info to console
     """
 
     def add_metrics(self, test_phase: measurements.TestPhase):
-        logger.info(f"LocalLogMetricsEvent::add_metrics {test_phase}")
+        carb.log_info(f"LocalLogMetricsEvent::add_metrics {test_phase}")
 
 
 class JSONFileMetrics(MetricsBackendInterface):
@@ -141,11 +140,11 @@ class JSONFileMetrics(MetricsBackendInterface):
             # Store the test name
             if test_name != self.test_name:
                 if self.test_name:
-                    logger.warning(
+                    carb.log_warn(
                         f"Nonempty test name {self.test_name} different from name {test_name} provided by test phase."
                     )
                 self.test_name = test_name
-                logger.info(f"Setting test name to {self.test_name}")
+                carb.log_info(f"Setting test name to {self.test_name}")
 
             phase_name = test_phase.get_metadata_field("phase")
             for m in test_phase.measurements:
@@ -165,7 +164,7 @@ class JSONFileMetrics(MetricsBackendInterface):
             metrics_filename_out = Path(metrics_output_folder) / f"metrics_{self.test_name}.json"
 
         with open(metrics_filename_out, "w") as f:
-            logger.info(f"Writing metrics to {metrics_filename_out}")
+            carb.log_info(f"Writing metrics to {metrics_filename_out}")
             f.write(json_data)
 
         self.data.clear()
@@ -216,7 +215,7 @@ class OsmoKPIFile(MetricsBackendInterface):
                     osmo_kpis[measurement.name] = measurement.value
                     log_statements.append(f"{measurement.name}: {measurement.value} {measurement.unit}")
             # Log all KPIs to console
-            logger.info("\n" + "\n".join(log_statements))
+            carb.log_info("\n" + "\n".join(log_statements))
             # Generate the output filename
             if randomize_filename_prefix:
                 _, metrics_filename_out = tempfile.mkstemp(
@@ -227,7 +226,7 @@ class OsmoKPIFile(MetricsBackendInterface):
             # Dump key-value pairs (fields) to the JSON document
             json_data = json.dumps(osmo_kpis, indent=4)
             with open(metrics_filename_out, "w") as f:
-                logger.info(f"Writing KPIs to {metrics_filename_out}")
+                carb.log_info(f"Writing KPIs to {metrics_filename_out}")
                 f.write(json_data)
 
 
@@ -282,7 +281,7 @@ class OmniPerfKPIFile(MetricsBackendInterface):
                     log_statements.append(f"{measurement.name}: {measurement.value} {measurement.unit}")
                     phase_data[measurement.name] = measurement.value
             # Log all metrics to console
-            logger.info("\n" + "\n".join(log_statements))
+            carb.log_info("\n" + "\n".join(log_statements))
 
             workflow_data[phase_name] = phase_data
 
@@ -296,7 +295,7 @@ class OmniPerfKPIFile(MetricsBackendInterface):
         # Dump key-value pairs (fields) to the JSON document
         json_data = json.dumps(workflow_data, indent=4)
         with open(metrics_filename_out, "w") as f:
-            logger.info(f"Writing metrics to {metrics_filename_out}")
+            carb.log_info(f"Writing metrics to {metrics_filename_out}")
             f.write(json_data)
 
 

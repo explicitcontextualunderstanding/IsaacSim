@@ -71,9 +71,50 @@ class ExampleBrowserExtension(omni.ext.IExt):
         _extension_instance = None
 
     def register_example(self, **kwargs):
+        """Register an example to the browser.
+
+        Args:
+            name: The name of the example to register.
+            category: The category of the example to register.
+        """
+        if "name" not in kwargs:
+            raise ValueError("Missing required parameter 'name' for register_example")
+        if "category" not in kwargs:
+            raise ValueError("Missing required parameter 'category' for register_example")
         self._browser_model.register_example(**kwargs)
 
     def deregister_example(self, **kwargs):
+        """Deregister an example from the browser.
+
+        Args:
+            name: The name of the example to deregister.
+            category: The category of the example to deregister.
+
+        Raises:
+            ValueError: If name or category parameters are missing.
+            KeyError: If the category or example doesn't exist.
+        """
+        # Check if required parameters are provided
+        if "name" not in kwargs:
+            raise ValueError("Missing required parameter 'name' for deregister_example")
+        if "category" not in kwargs:
+            raise ValueError("Missing required parameter 'category' for deregister_example")
+
+        name = kwargs["name"]
+        category = kwargs["category"]
+
+        # Check if the category exists
+        if category not in self._browser_model._examples:
+            raise KeyError(f"Category '{category}' does not exist")
+
+        # Check if an example with the given name exists in the category
+        examples_in_category = self._browser_model._examples[category]
+        example_names = [example.example.name for example in examples_in_category]
+
+        if name not in example_names:
+            raise KeyError(f"Example '{name}' does not exist in category '{category}'")
+
+        # If all validations pass, call the inner deregister_example function
         self._browser_model.deregister_example(**kwargs)
 
     def _show_window(self, visible) -> None:

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Tools for exponentially smoothing motion commands as they come in.
+"""Tools for exponentially smoothing motion commands as they come in.
 
 These tools are important for real-world execution. They ensure that discontinuities from discretely
 changing motion commands are never directly sent to the underlying motion policies. They're smoothed

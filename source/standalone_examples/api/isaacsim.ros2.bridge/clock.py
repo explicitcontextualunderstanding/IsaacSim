@@ -13,15 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import time
 
 from isaacsim import SimulationApp
 
 # Example ROS2 bridge sample showing rclpy and rosclock interaction
 simulation_app = SimulationApp({"renderer": "RaytracedLighting", "headless": True})
-import carb
-import omni
 import omni.graph.core as og
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils.extensions import enable_extension

@@ -133,7 +133,7 @@ PYBIND11_MODULE(_mjcf, m)
         .def("set_override_inertia", [](ImportConfig& config, const bool value) { config.overrideInertia = value; })
         .def("set_make_instanceable", [](ImportConfig& config, const bool value) { config.makeInstanceable = value; })
         .def("set_instanceable_usd_path",
-             [](ImportConfig& config, const std::string value) { config.instanceableMeshUsdPath = value; })
+             [](ImportConfig& config, const std::string& value) { config.instanceableMeshUsdPath = value; })
         .def("set_visualize_collision_geoms",
              [](ImportConfig& config, const bool value) { config.visualizeCollisionGeoms = value; })
         .def("set_import_sites", [](ImportConfig& config, const bool value) { config.importSites = value; });

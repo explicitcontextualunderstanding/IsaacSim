@@ -98,6 +98,25 @@ class OgnHolonomicController:
 
         try:
             if not state.initialized:
+                stop = False
+                error_log = ""
+                # TODO: Add a check to see if the wheel radius is valid
+                if len(db.inputs.wheelRadius) == 0:
+                    error_log += "Wheel radius list is empty\n"
+                    stop = True
+                if len(db.inputs.wheelPositions) == 0:
+                    error_log += "Wheel positions list is empty\n"
+                    stop = True
+                if len(db.inputs.wheelOrientations) == 0:
+                    error_log += "Wheel orientations list is empty\n"
+                    stop = True
+                if len(db.inputs.mecanumAngles) == 0:
+                    error_log += "Mecanum angles list is empty\n"
+                    stop = True
+                if stop:
+                    db.log_warning(error_log)
+                    return False
+
                 state.wheel_radius = db.inputs.wheelRadius
                 state.wheel_positions = db.inputs.wheelPositions
                 state.wheel_orientations = db.inputs.wheelOrientations

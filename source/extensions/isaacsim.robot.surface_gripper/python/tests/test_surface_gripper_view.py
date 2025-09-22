@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Import extension python module we are testing with absolute import path, as if we are external user (other extension)
+# from isaacsim.robot.surface_gripper._surface_gripper import Surface_Gripper, Surface_Gripper_Properties
+import time
+
+import numpy as np
 import omni.kit.commands
 
 # NOTE:
@@ -21,10 +26,9 @@ import omni.kit.commands
 import omni.kit.test
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.robot.surface_gripper import GripperView
-
-# Import extension python module we are testing with absolute import path, as if we are external user (other extension)
-# from isaacsim.robot.surface_gripper._surface_gripper import Surface_Gripper, Surface_Gripper_Properties
-from pxr import Gf, Sdf, UsdGeom, UsdPhysics
+from isaacsim.robot.surface_gripper._surface_gripper import GripperStatus
+from omni.physx.scripts.physicsUtils import add_ground_plane
+from pxr import Gf, Sdf, UsdGeom, UsdLux, UsdPhysics
 from usd.schema.isaac import robot_schema
 
 
@@ -44,54 +48,81 @@ class TestSurfaceGripperView(omni.kit.test.AsyncTestCase):
         cubeGeom.AddOrientOp().Set(orientation)
         cubeGeom.AddScaleOp().Set(scale)
         cubeGeom.CreateDisplayColorAttr().Set([color])
-        await omni.kit.app.get_app().next_update_async()
+        # await omni.kit.app.get_app().next_update_async()
         UsdPhysics.CollisionAPI.Apply(cubePrim)
         rigid_api = UsdPhysics.RigidBodyAPI.Apply(cubePrim)
 
+        massAPI = UsdPhysics.MassAPI.Apply(cubePrim)
         if mass > 0:
-            massAPI = UsdPhysics.MassAPI.Apply(cubePrim)
             massAPI.CreateMassAttr(mass)
         else:
             rigid_api.CreateKinematicEnabledAttr(True)
 
-        await omni.kit.app.get_app().next_update_async()
+        # await omni.kit.app.get_app().next_update_async()
         UsdPhysics.CollisionAPI(cubePrim)
 
     # Helper for setting up the physics stage
     async def setup_physics(self):
         # Set Up Physics scene
+        distantLight = UsdLux.DistantLight.Define(self.stage, Sdf.Path("/DistantLight"))
+        distantLight.CreateIntensityAttr(500)
         UsdGeom.SetStageUpAxis(self.stage, UsdGeom.Tokens.z)
         UsdGeom.SetStageMetersPerUnit(self.stage, 1.0)
         self._scene = UsdPhysics.Scene.Define(self.stage, Sdf.Path("/physicsScene"))
-        self._scene.CreateGravityDirectionAttr().Set(Gf.Vec3f(0.0, 0.0, -1.0))
-        self._scene.CreateGravityMagnitudeAttr().Set(9.81)
+        add_ground_plane(self.stage, "/World/groundPlane", "Z", 100, Gf.Vec3f(0, 0, 0), Gf.Vec3f(1.0))
 
     # Helper for setting up the surface gripper
-    async def setup_gripper(self, count):
+    async def setup_gripper(self, count, num_joints=1):
         for i in range(count):
             env_path = "/env" + str(i)
+            env_prim = UsdGeom.Xform.Define(self.stage, env_path)
+            env_prim.AddTranslateOp().Set(Gf.Vec3f(i * 0.2, 0.0, 0))
             box0_path = env_path + "/box0"
             box1_path = env_path + "/box1"
-            box0_props = [box0_path, 0.0, [1, 1, 2.0], [-0.50, 0, 1.00], [0, 0, 0, 1], [80, 80, 255]]
-            box1_props = [box1_path, 1.0, [0.1, 0.1, 0.1], [0.06, 0, 2.04], [0, 0, 0, 1], [255, 80, 80]]
-            d6FixedJoint_path = Sdf.Path(box0_path + "/d6FixedJoint")
-
+            box0_props = [box0_path, 1.0, [0.1, 0.1, 0.1], [0, 0, 0.05], [0, 0, 0, 1], [80, 80, 255]]
+            box1_props = [box1_path, 1.0, [0.1, 0.1, 0.1], [0, 0, 0.15], [0, 0, 0, 1], [255, 80, 80]]
+            spacing = 0.1 / (num_joints + 1)
+            start_y = -0.05 + spacing
             surface_gripper = omni.kit.commands.execute(
                 "CreateSurfaceGripper",
                 prim_path=env_path,
             )
-
             gripper_path = env_path + "/SurfaceGripper"
             gripper_prim = self.stage.GetPrimAtPath(gripper_path)
+            gripper_prim.GetAttribute(robot_schema.Attributes.COAXIAL_FORCE_LIMIT.name).Set(500000)
+            gripper_prim.GetAttribute(robot_schema.Attributes.SHEAR_FORCE_LIMIT.name).Set(500000)
+            gripper_prim.GetAttribute(robot_schema.Attributes.MAX_GRIP_DISTANCE.name).Set(0.01)
             attachment_points_rel = gripper_prim.GetRelationship(robot_schema.Relations.ATTACHMENT_POINTS.name)
-            attachment_points_rel.SetTargets([d6FixedJoint_path])
+
+            djoint_paths = []
 
             await self.createRigidCube(*box0_props)
             await self.createRigidCube(*box1_props)
 
-            joint_prim = UsdPhysics.Joint.Define(self.stage, d6FixedJoint_path)
-            joint_prim.CreateBody0Rel().SetTargets([box0_path])
-            joint_prim.CreateBody1Rel().SetTargets([box1_path])
+            for j in range(num_joints):
+                d6Joint_path = Sdf.Path(box1_path + "/d6Joint" + str(j))
+                djoint_paths.append(d6Joint_path)
+                joint_prim = UsdPhysics.Joint.Define(self.stage, d6Joint_path)
+
+                robot_schema.ApplyAttachmentPointAPI(joint_prim.GetPrim())
+                joint_prim.GetPrim().GetAttribute(robot_schema.Attributes.FORWARD_AXIS.name).Set(UsdPhysics.Tokens.x)
+
+                for limit in ["rotX", "rotY", "rotZ", "transX", "transY", "transZ"]:
+
+                    lim_api = UsdPhysics.LimitAPI.Apply(joint_prim.GetPrim(), limit)
+                    lim_api.CreateHighAttr().Set(-1)
+                    lim_api.CreateLowAttr().Set(1)
+
+                # joint_prim.CreateDriveTypeAttr().Set(UsdPhysics.Tokens.d6)
+                joint_prim.CreateBody0Rel().SetTargets([box1_path])
+                # joint_prim.CreateBody1Rel().SetTargets([box0_path])
+
+                joint_prim.CreateLocalPos0Attr().Set(Gf.Vec3f(0, start_y + j * spacing, -0.499))
+                joint_prim.CreateLocalRot0Attr().Set(Gf.Quatf(0.5, -0.5, 0.5, 0.5))
+                joint_prim.CreateLocalPos1Attr().Set(Gf.Vec3f(i * 0.2, start_y + j * spacing, 0.099))
+                joint_prim.CreateLocalRot1Attr().Set(Gf.Quatf(0.5, -0.5, 0.5, 0.5))
+
+            attachment_points_rel.SetTargets(djoint_paths)
 
         self.gripper_view = GripperView(
             paths="/env*/SurfaceGripper",
@@ -128,7 +159,7 @@ class TestSurfaceGripperView(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
         # set status of the grippers and make sure we can retrieve it after a step
-        status_exp = ["Open", "Open"]
+        status_exp = [GripperStatus.Open, GripperStatus.Open]
         status_values = [-0.5, -0.5]
         self.gripper_view.apply_gripper_action(status_values)
 
@@ -137,26 +168,26 @@ class TestSurfaceGripperView(omni.kit.test.AsyncTestCase):
 
         status = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
-            self.assertEqual(status[i], status_exp[i])
+            self.assertEqual(GripperStatus(status[i]), status_exp[i])
 
         # set status of the grippers and make sure we can retrieve them without a step
-        status_exp = ["Open", "Closing"]
-        status_values = [-0.5, 0.5]
+        status_exp = [GripperStatus.Closed, GripperStatus.Closed]
+        status_values = [0.5, 0.5]
         self.gripper_view.apply_gripper_action(status_values)
 
         status = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
-            self.assertEqual(status[i], status_exp[i])
+            self.assertEqual(GripperStatus(status[i]), status_exp[i])
 
         # set status of only some grippers
-        status_new_exp = ["Open", "Closing"]
-        status_values = [0.5, 0.5]
+        status_new_exp = [GripperStatus.Closed, GripperStatus.Open]
+        status_values = [0.0, -0.5]
         changed_gripper_indices = [1]
         self.gripper_view.apply_gripper_action(status_values, changed_gripper_indices)
 
         status = self.gripper_view.get_surface_gripper_status()
-        self.assertEqual(status[0], status_new_exp[0])
-        self.assertEqual(status[1], status_new_exp[1])
+        self.assertEqual(GripperStatus(status[0]), status_new_exp[0])
+        self.assertEqual(GripperStatus(status[1]), status_new_exp[1])
 
         pass
 
@@ -250,3 +281,26 @@ class TestSurfaceGripperView(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(retry_interval[1], retry_interval_new_exp[1])
 
         pass
+
+    async def test_surface_gripper_apply_action(self, gripper_count=9 * 100, num_joints=1):
+        await self.setup_physics()
+        await self.setup_gripper(gripper_count, num_joints)
+        self._timeline.play()
+        await simulate_async(0.125)
+        start_time = time.time()
+        self.gripper_view.apply_gripper_action([0.5] * gripper_count)
+        elapsed_time = time.time()
+        await omni.kit.app.get_app().next_update_async()
+        new_elapsed_time = time.time()
+        await omni.kit.app.get_app().next_update_async()
+        post_elapsed_time = time.time()
+        status = self.gripper_view.get_surface_gripper_status()
+        print(f"apply_gripper_action elapsed time: {elapsed_time- start_time} seconds")
+        print(f"simulate time: {new_elapsed_time- elapsed_time} seconds")
+        print(f"post simulate time: {post_elapsed_time- new_elapsed_time} seconds")
+        self.assertTrue((np.array(status) == int(GripperStatus.Closed)).all())
+        # self.assertTrue((status == GripperStatus.Closed).all())
+        pass
+
+    async def test_surface_gripper_apply_action_multi_joints(self):
+        await self.test_surface_gripper_apply_action(100, 9)

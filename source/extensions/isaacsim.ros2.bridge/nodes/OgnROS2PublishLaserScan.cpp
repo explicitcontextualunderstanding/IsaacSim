@@ -57,7 +57,7 @@ public:
         // Publisher was not valid, create a new one
         if (!state.m_publisher)
         {
-            CARB_PROFILE_ZONE(0, "setup publisher");
+            CARB_PROFILE_ZONE(0, "[IsaacSim] setup publisher");
             // Setup ROS publisher
             const std::string& topicName = db.inputs.topicName();
             std::string fullTopicName = addTopicPrefix(state.m_namespaceName, topicName);
@@ -99,12 +99,12 @@ public:
 
     bool publishLidar(OgnROS2PublishLaserScanDatabase& db)
     {
-        CARB_PROFILE_ZONE(1, "publish laserscan function");
+        CARB_PROFILE_ZONE(1, "[IsaacSim] publish laserscan function");
         auto& state = db.perInstanceState<OgnROS2PublishLaserScan>();
         auto tasking = carb::getCachedInterface<carb::tasking::ITasking>();
 
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message to publish before starting next
             state.m_tasks.wait();
         }
@@ -160,7 +160,7 @@ public:
 
         if (state.m_multithreadingDisabled)
         {
-            CARB_PROFILE_ZONE(1, "LaserScan publisher publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] LaserScan publisher publish");
             state.m_publisher.get()->publish(state.m_message->getPtr());
         }
         else
@@ -168,7 +168,7 @@ public:
             tasking->addTask(carb::tasking::Priority::eHigh, state.m_tasks,
                              [&state]
                              {
-                                 CARB_PROFILE_ZONE(1, "LaserScan publisher publish");
+                                 CARB_PROFILE_ZONE(1, "[IsaacSim] LaserScan publisher publish");
                                  state.m_publisher.get()->publish(state.m_message->getPtr());
                              });
         }
@@ -184,7 +184,7 @@ public:
     virtual void reset()
     {
         {
-            CARB_PROFILE_ZONE(1, "wait for previous publish");
+            CARB_PROFILE_ZONE(1, "[IsaacSim] wait for previous publish");
             // Wait for last message to publish before starting next
             m_tasks.wait();
         }

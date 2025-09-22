@@ -18,6 +18,7 @@ from typing import List
 
 import omni.kit.app
 import omni.ui as ui
+from omni.usd import Sdf
 
 from ..builders.robot_templates import *
 from ..progress import ProgressColorState, ProgressRegistry
@@ -120,6 +121,12 @@ class AddRobot:
                                 ui.Spacer(height=6)
                                 self._robot_name_widget = ui.StringField()
                                 self._robot_name_widget.model.set_value(self._robot_name)
+                                self._robot_name_widget.model.add_value_changed_fn(
+                                    lambda m: self._on_robot_name_changed(m)
+                                )
+                                self._invalid_robot_name_label = ui.Label(
+                                    "Invalid Robot Name", visible=False, style={"color": "red"}
+                                )
 
                 ## windows for add robot selections
                 self._configure_robot_on_stage()
@@ -147,6 +154,14 @@ class AddRobot:
 
                 ## robot type selection
                 self._robot_type_model.add_item_changed_fn(_update_robot_type)
+
+    def _on_robot_name_changed(self, m):
+        robot_name_value = m.get_value_as_string()
+        if Sdf.Path.IsValidIdentifier(robot_name_value):
+            self._robot_name = robot_name_value
+            self._invalid_robot_name_label.visible = False
+        else:
+            self._invalid_robot_name_label.visible = True
 
     def set_visible(self, visible):
         """

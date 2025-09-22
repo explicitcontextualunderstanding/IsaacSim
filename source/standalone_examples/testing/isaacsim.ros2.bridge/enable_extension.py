@@ -13,13 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 
 from isaacsim import SimulationApp
 
 # Example ROS bridge sample showing rospy and rosclock interaction
 kit = SimulationApp()
-import omni
 from isaacsim.core.utils.extensions import enable_extension
 
 # enable ROS bridge extension

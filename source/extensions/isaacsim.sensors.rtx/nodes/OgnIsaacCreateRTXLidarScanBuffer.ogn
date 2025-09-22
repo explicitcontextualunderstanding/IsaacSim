@@ -127,6 +127,12 @@
                 "description": "Create an output array for the MaterialId.",
                 "default": false,
                 "uiName": "Output The MaterialId"
+            },
+            "enablePerFrameOutput": {
+                "type": "bool",
+                "description": "Enable per frame output",
+                "default": false,
+                "uiName": "Enable Per Frame Output"
             }
         },
         "outputs": {

@@ -150,10 +150,17 @@ function get_git_info(params, env_var)
     return str
 end
 
+
 function generate_version_header()
     shortSha = get_git_info("rev-parse --short HEAD", "ISAACSIM_BUILD_SHA")
     commitDate = get_git_info('show -s --format="%ad"', "ISAACSIM_BUILD_DATE")
-    branch = get_git_info("rev-parse --abbrev-ref HEAD", "ISAACSIM_BUILD_BRANCH")
+    
+    local branch
+    branch = branch or get_git_info("rev-parse --abbrev-ref HEAD", "ISAACSIM_BUILD_BRANCH")
+    
+    -- Always print the final branch value
+    print("ISAACSIM_BUILD_BRANCH " .. (branch or "UNKNOWN"))
+    
     version = get_git_info("show HEAD:VERSION", "ISAACSIM_BUILD_VERSION")
     repo = get_git_info("config --get remote.origin.url", "ISAACSIM_BUILD_REPO")
     print(
@@ -217,8 +224,11 @@ function group_apps(kit)
     define_local_experience("isaac-sim", "isaacsim.exp.full")
     define_local_experience("isaac-sim.fabric", "isaacsim.exp.full.fabric")
     define_local_experience("isaac-sim.selector", "isaacsim.exp.selector")
-    define_local_experience("isaac-sim.streaming", "isaacsim.exp.full.streaming", "--no-window ")
-    define_local_experience("isaac-sim.xr.vr", "isaacsim.exp.base.xr.vr")
+    define_local_experience("isaac-sim.compatibility_check", "isaacsim.exp.compatibility_check")
+    if os.hostarch() == "x86_64" then
+        define_local_experience("isaac-sim.streaming", "isaacsim.exp.full.streaming", "--no-window ")
+        define_local_experience("isaac-sim.xr.vr", "isaacsim.exp.base.xr.vr")
+    end
     define_local_experience(
         "isaac-sim.action_and_event_data_generation",
         "isaacsim.exp.action_and_event_data_generation.full"

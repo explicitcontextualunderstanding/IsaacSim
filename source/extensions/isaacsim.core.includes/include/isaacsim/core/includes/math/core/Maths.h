@@ -406,7 +406,7 @@ inline Mat44 TransformFromVector(const Vec3& w, const Point3& t = Point3(0.0f, 0
     m.SetCol(2, Vec4(w.x, w.y, w.z, 0.0));
     m.SetCol(3, Vec4(t.x, t.y, t.z, 1.0f));
 
-    BasisFromVector(w, (Vec3*)m.columns[0], (Vec3*)m.columns[1]);
+    BasisFromVector(w, reinterpret_cast<Vec3*>(m.columns[0]), reinterpret_cast<Vec3*>(m.columns[1]));
 
     return m;
 }
@@ -1889,7 +1889,7 @@ CUDA_CALLABLE inline bool IntersectRayAABBFast(
 
     // return ((lmax > 0.f) & (lmax >= lmin));
     // return ((lmax > 0.f) & (lmax > lmin));
-    bool hit = ((lmax >= 0.f) & (lmax >= lmin));
+    bool hit = ((lmax >= 0.f) && (lmax >= lmin));
     if (hit)
         t = lmin;
     return hit;

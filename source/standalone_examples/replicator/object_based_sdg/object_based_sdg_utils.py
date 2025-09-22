@@ -100,7 +100,6 @@ def add_rigid_body_dynamics(prim, disable_gravity=False, angular_damping=None):
 
 
 # Add dynamics properties to the prim (if mesh or primitive) (rigid body to root + colliders to the meshes)
-# https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/rigid-bodies.html#rigid-body-simulation
 def add_colliders_and_rigid_body_dynamics(prim, disable_gravity=False):
     # Add colliders to mesh or primitive types of the descendants of the prim (including root)
     add_colliders(prim)
@@ -147,7 +146,7 @@ def get_random_transform_values(
 
 
 # Generate a random pose on a sphere looking at the origin
-# https://docs.omniverse.nvidia.com/isaacsim/latest/reference_conventions.html
+# https://docs.isaacsim.omniverse.nvidia.com/latest/reference_material/reference_conventions.html
 def get_random_pose_on_sphere(origin, radius, camera_forward_axis=(0, 0, -1)):
     origin = Gf.Vec3f(origin)
     camera_forward_axis = Gf.Vec3f(camera_forward_axis)

@@ -117,7 +117,6 @@ def transform_inertia_tensor(
     # Step 2: Parallel axis theorem
     d = displacement
     d_dot_d = d[0] ** 2 + d[1] ** 2 + d[2] ** 2
-
     # Identity and outer product
     I3 = Gf.Matrix3f(1.0)
     outer_dd = Gf.Matrix3f(
@@ -140,7 +139,6 @@ def transform_inertia_tensor(
     # Final transformed inertia tensor
     I_final = Gf.Matrix3f(I_world)
     I_final += D
-
     return I_final
 
 
@@ -224,6 +222,16 @@ class GainTuner:
         self._articulation = Articulation(self._articulation_root)
         joints = [stage.GetPrimAtPath(self._articulation.dof_paths[0][i]) for i in range(self._articulation.num_dofs)]
         robot_joints = rs_utils.GetAllRobotJoints(stage, self._robot, True)
+        fixed_joints = [j for j in robot_joints if pxr.UsdPhysics.FixedJoint(j)]
+        fixed_joints = [
+            j
+            for j in fixed_joints
+            if rs_utils.GetJointBodyRelationship(j, 0) is None or rs_utils.GetJointBodyRelationship(j, 1) is None
+        ]
+        fixed_links = [rs_utils.GetJointBodyRelationship(j, 0) for j in fixed_joints]
+        fixed_links += [rs_utils.GetJointBodyRelationship(j, 1) for j in fixed_joints]
+        fixed_links = set([l for l in fixed_links if l is not None])
+        self._fixed_links = fixed_links
         self._joints = {i: j for i, j in enumerate(joints) if j in robot_joints}
         # print(self._joint_acumulated_inertia)
         self._joint_names = {i: self._articulation.dof_names[i] for i in self._joints.keys()}
@@ -346,12 +354,14 @@ class GainTuner:
         robot_transform = omni.usd.get_world_transform_matrix(self._robot)
         joint_inertia = {}
         for joint in self._joints.values():
-            backward_acumulated_inertia = pxr.Gf.Matrix3f()
-            forward_acumulated_inertia = pxr.Gf.Matrix3f()
+            backward_acumulated_inertia = pxr.Gf.Matrix3f().SetZero()
+            forward_acumulated_inertia = pxr.Gf.Matrix3f().SetZero()
             backward_links, forward_links = rs_utils.GetLinksFromJoint(self._robot_tree, joint)
             joint_pose = rs_utils.GetJointPose(self._robot, joint)
             for link in backward_links:
                 link_path = link.GetPath()
+                if link_path in self._fixed_links:
+                    continue
                 if not (self._link_mass[link_path].valid and self._link_mass[link_path].done):
                     return
                 link_pose = omni.usd.get_world_transform_matrix(link)
@@ -371,6 +381,8 @@ class GainTuner:
                 backward_acumulated_inertia += transformed_inertia
             for link in forward_links:
                 link_path = link.GetPath()
+                if link_path in self._fixed_links:
+                    continue
                 link_pose = omni.usd.get_world_transform_matrix(link)
                 if not (self._link_mass[link_path].valid and self._link_mass[link_path].done):
                     return
@@ -388,12 +400,16 @@ class GainTuner:
                 distance = world_com - joint_pose.ExtractTranslation()
                 transformed_inertia = transform_inertia_tensor(diag_inertia, principal_axes, mass, distance)
                 forward_acumulated_inertia += transformed_inertia
-
             m1 = matrix_norm(forward_acumulated_inertia.GetTranspose() * forward_acumulated_inertia)
             m2 = matrix_norm(backward_acumulated_inertia.GetTranspose() * backward_acumulated_inertia)
             eq_inertia = 1
-            if (m1 + m2) > 0:
+            if (m1 * m2) > 0:
                 eq_inertia = m1 * m2 / (m1 + m2)
+            else:
+                if m1 > 0:
+                    eq_inertia = m1
+                elif m2 > 0:
+                    eq_inertia = m2
 
             joint_inertia[joint] = eq_inertia
 

@@ -26,7 +26,6 @@ CONFIG = {"renderer": "RaytracedLighting", "headless": False}
 simulation_app = SimulationApp(CONFIG)
 import carb
 import omni
-import omni.graph.core as og
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.storage.native import get_assets_root_path
@@ -68,13 +67,9 @@ simulation_context.play()
 
 simulation_app.update()
 
-while simulation_app.is_running():
+while simulation_app.is_running() and frame < 10:
 
-    # runs with a realtime clock
     simulation_app.update()
-
-    if frame > 120:
-        break
     frame = frame + 1
 
 simulation_context.stop()

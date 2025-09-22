@@ -23,14 +23,10 @@ import psutil
 
 from .. import stats
 from ..metrics import measurements
-from ..utils import set_up_logging
 from .interface import InputContext, MeasurementData, MeasurementDataRecorder
 
 if TYPE_CHECKING:
     from ..settings import BenchmarkSettings
-
-
-logger = set_up_logging(__name__)
 
 
 class GPUStats(stats.OmniStats):

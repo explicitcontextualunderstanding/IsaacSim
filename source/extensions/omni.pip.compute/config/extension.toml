@@ -4,7 +4,7 @@ order = -1000
 reloadable = false
 
 [package]
-version = "1.6.2"
+version = "1.6.3"
 category = "Internal"
 title = "Compute package Pip Archive"
 description = "General packages for compute"

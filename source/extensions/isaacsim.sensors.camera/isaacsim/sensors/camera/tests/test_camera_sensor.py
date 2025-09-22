@@ -643,6 +643,9 @@ class TestCameraSensor(omni.kit.test.AsyncTestCase):
             np.isclose(coeffs, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2], atol=0.001).all()
         )
 
+        image_size = self.camera.prim.GetAttribute("omni:lensdistortion:opencvPinhole:imageSize").Get()
+        self.assertEqual(image_size, (256, 256))
+
     async def test_opencv_pinhole_properties_partial(self):
         """Test OpenCV pinhole lens distortion model with partial parameters."""
         # Only set cx and fx
@@ -656,6 +659,9 @@ class TestCameraSensor(omni.kit.test.AsyncTestCase):
         # All distortion coefficients should be 0 by default
         self.assertTrue(np.isclose(coeffs, [0] * 12, atol=0.001).all())
 
+        image_size = self.camera.prim.GetAttribute("omni:lensdistortion:opencvPinhole:imageSize").Get()
+        self.assertEqual(image_size, (256, 256))
+
     async def test_opencv_fisheye_properties_full(self):
         """Test OpenCV fisheye lens distortion model with full coefficients."""
         self.camera.set_opencv_fisheye_properties(
@@ -667,6 +673,9 @@ class TestCameraSensor(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(fx, 450.0, delta=0.1)
         self.assertAlmostEqual(fy, 450.0, delta=0.1)
         self.assertTrue(np.isclose(coeffs, [0.1, 0.2, 0.3, 0.4], atol=0.001).all())
+
+        image_size = self.camera.prim.GetAttribute("omni:lensdistortion:opencvFisheye:imageSize").Get()
+        self.assertEqual(image_size, (256, 256))
 
     async def test_opencv_fisheye_properties_partial(self):
         """Test OpenCV fisheye lens distortion model with partial parameters."""
@@ -680,6 +689,9 @@ class TestCameraSensor(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(fy, 485.0, delta=0.1)
         # k1 is 0.00245 by default, and others are 0
         self.assertTrue(np.isclose(coeffs, [0.00245, 0, 0, 0], atol=0.001).all())
+
+        image_size = self.camera.prim.GetAttribute("omni:lensdistortion:opencvFisheye:imageSize").Get()
+        self.assertEqual(image_size, (256, 256))
 
     async def test_lens_distortion_model_handling(self):
         """Test how set_lens_distortion_model handles different model names."""
@@ -729,6 +741,64 @@ class TestCameraSensor(omni.kit.test.AsyncTestCase):
         self.assertEqual(self.camera.get_lens_distortion_model(), "opencvPinhole")
         # Verify correct API is applied
         self.assertIn("OmniLensDistortionOpenCvPinholeAPI", self.camera.prim.GetAppliedSchemas())
+
+    async def test_opencv_non_square_resolution(self):
+        """Test OpenCV distortion models with non-square resolution."""
+        # Define initial resolution (16:9 aspect ratio)
+        resolution = (1280, 720)
+
+        # Create a new camera with non-square resolution
+        non_square_camera = Camera(
+            prim_path="/World/non_square_camera",
+            position=np.array([0.0, 0.0, 10.0]),
+            resolution=resolution,
+        )
+
+        # Wait for camera initialization
+        non_square_camera.initialize()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Test OpenCV pinhole with non-square resolution
+        non_square_camera.set_opencv_pinhole_properties(
+            cx=resolution[0] / 2.0,  # Half of width
+            cy=resolution[1] / 2.0,  # Half of height
+            fx=1000.0,
+            fy=1000.0,
+            pinhole=[0.1, 0.2, 0.01, 0.02],
+        )
+
+        # Verify imageSize is correctly set for non-square resolution
+        image_size = non_square_camera.prim.GetAttribute("omni:lensdistortion:opencvPinhole:imageSize").Get()
+        self.assertEqual(image_size, resolution)
+
+        # Test OpenCV fisheye with non-square resolution
+        non_square_camera.set_opencv_fisheye_properties(
+            cx=resolution[0] / 2.0,
+            cy=resolution[1] / 2.0,
+            fx=800.0,
+            fy=800.0,
+            fisheye=[0.05, 0.01, -0.003, -0.0005],
+        )
+
+        # Verify imageSize is correctly set for non-square resolution
+        image_size = non_square_camera.prim.GetAttribute("omni:lensdistortion:opencvFisheye:imageSize").Get()
+        self.assertEqual(image_size, resolution)
+
+        # Test with portrait orientation
+        resolution = (1080, 1920)
+        non_square_camera.set_resolution(resolution)
+
+        # Set pinhole properties again with new resolution
+        non_square_camera.set_opencv_pinhole_properties(
+            cx=resolution[0] / 2.0,  # Half of width
+            cy=resolution[1] / 2.0,  # Half of height
+            fx=1000.0,
+            fy=1000.0,
+        )
+
+        # Verify imageSize is correctly updated
+        image_size = non_square_camera.prim.GetAttribute("omni:lensdistortion:opencvPinhole:imageSize").Get()
+        self.assertEqual(image_size, resolution)
 
     async def test_fisheye_polynomial_properties(self):
         """Test setting and getting fisheye polynomial properties."""

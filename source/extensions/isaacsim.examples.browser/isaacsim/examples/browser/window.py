@@ -24,6 +24,7 @@ from omni.kit.browser.folder.core import TreeFolderBrowserWidgetEx
 from .delegate import AssetDetailDelegate
 from .model import ExampleBrowserModel
 from .property_delegate import EmptyPropertyDelegate, MultiPropertyDelegate, PropAssetPropertyDelegate
+from .style import THUMBNAIL_STYLE
 
 
 class BrowserWidget(TreeFolderBrowserWidgetEx):
@@ -65,5 +66,6 @@ class ExampleBrowserWindow(ui.Window):
                     min_thumbnail_size=32,
                     max_thumbnail_size=128,
                     detail_thumbnail_size=64,
+                    style=THUMBNAIL_STYLE,
                     property_delegates=[EmptyPropertyDelegate(), PropAssetPropertyDelegate(), MultiPropertyDelegate()],
                 )

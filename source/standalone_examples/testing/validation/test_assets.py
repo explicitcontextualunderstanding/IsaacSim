@@ -18,9 +18,6 @@
 import argparse
 import csv
 
-# Standard library imports
-import os
-
 # Initialize simulation app first
 from isaacsim import SimulationApp
 
@@ -50,7 +47,7 @@ from isaacsim.storage.native import (
 )
 
 # Omniverse Validation Engine
-from omni.asset_validator.core import IssueSeverity, OmniDefaultPrimChecker, ValidationEngine
+from omni.asset_validator.core import IssueSeverity, ValidationEngine
 from omni.physx import get_physx_interface
 from pxr import PhysxSchema, Sdf, UsdGeom
 

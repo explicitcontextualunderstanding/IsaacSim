@@ -95,7 +95,7 @@ class Extension(omni.ext.IExt):
         "Stereolabs": {
             "ZED_X": {
                 "prim_prefix": "/ZED_X",
-                "usd_path": "/Isaac/Sensors/Stereolabs/ZED_X/ZED_X.usd",
+                "usd_path": "/Isaac/Sensors/Stereolabs/ZED_X/ZED_X.usdc",
                 "is_depth_sensor": True,
             }
         },

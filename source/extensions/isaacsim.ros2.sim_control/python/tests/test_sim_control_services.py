@@ -15,6 +15,7 @@
 
 import asyncio
 import gc
+import time
 
 import numpy as np
 import omni.kit.test
@@ -97,12 +98,13 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         from rclpy.executors import SingleThreadedExecutor
 
         def call_service():
-            node = rclpy.create_node("test_client_node")
+            unique_id = f"{int(time.time() * 1000)}"
+            node = rclpy.create_node(f"test_client_node_{unique_id}")
             try:
                 client = node.create_client(service_type, service_name)
 
                 # Wait for service
-                if not client.wait_for_service(timeout_sec=30.0):
+                if not client.wait_for_service(timeout_sec=60.0):
                     return None, "Service not available"
 
                 # Make the call
@@ -113,7 +115,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
                 executor.add_node(node)
 
                 try:
-                    executor.spin_until_future_complete(future, timeout_sec=30.0)
+                    executor.spin_until_future_complete(future, timeout_sec=60.0)
                     if future.done():
                         return future.result(), None
                     else:
@@ -155,7 +157,8 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         from rclpy.executors import SingleThreadedExecutor
 
         def call_action():
-            node = rclpy.create_node("test_action_client_node")
+            unique_id = f"{int(time.time() * 1000)}"
+            node = rclpy.create_node(f"test_action_client_node_{unique_id}")
             try:
                 client = ActionClient(node, action_type, action_name)
 
@@ -226,12 +229,12 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
         request = GetSimulatorFeatures.Request()
-        result = await self._call_service_async(GetSimulatorFeatures, "/isaacsim/GetSimulatorFeatures", request)
+        result = await self._call_service_async(GetSimulatorFeatures, "/get_simulator_features", request)
 
         self.assertIsNotNone(result)
 
         # Assert specific expected values
-        expected_features = [0, 1, 10, 11, 12, 20, 23, 24, 25, 26, 32, 33]
+        expected_features = [0, 1, 10, 11, 12, 20, 23, 24, 25, 26, 31, 32, 33, 40, 42, 43, 44, 45]
         expected_spawn_formats = ["usd"]
         expected_custom_info = "Control Isaac Sim via ROS2 Simulation Interfaces."
 
@@ -262,7 +265,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request = GetSimulationState.Request()
 
         # Test initial state (should be stopped by default)
-        result = await self._call_service_async(GetSimulationState, "/isaacsim/GetSimulationState", request)
+        result = await self._call_service_async(GetSimulationState, "/get_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertIsNotNone(result.state)
@@ -273,7 +276,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         await asyncio.sleep(0.5)
 
-        result = await self._call_service_async(GetSimulationState, "/isaacsim/GetSimulationState", request)
+        result = await self._call_service_async(GetSimulationState, "/get_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertEqual(result.state.state, SimulationState.STATE_PLAYING)
@@ -283,7 +286,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         await asyncio.sleep(0.5)
 
-        result = await self._call_service_async(GetSimulationState, "/isaacsim/GetSimulationState", request)
+        result = await self._call_service_async(GetSimulationState, "/get_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertEqual(result.state.state, SimulationState.STATE_PAUSED)
@@ -293,7 +296,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         await asyncio.sleep(0.5)
 
-        result = await self._call_service_async(GetSimulationState, "/isaacsim/GetSimulationState", request)
+        result = await self._call_service_async(GetSimulationState, "/get_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertEqual(result.state.state, SimulationState.STATE_STOPPED)
@@ -323,7 +326,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request = SetSimulationState.Request()
         request.state.state = SimulationState.STATE_PLAYING
 
-        result = await self._call_service_async(SetSimulationState, "/isaacsim/SetSimulationState", request)
+        result = await self._call_service_async(SetSimulationState, "/set_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -338,7 +341,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         # Test setting to PAUSED state
         request.state.state = SimulationState.STATE_PAUSED
 
-        result = await self._call_service_async(SetSimulationState, "/isaacsim/SetSimulationState", request)
+        result = await self._call_service_async(SetSimulationState, "/set_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -353,7 +356,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         # Test setting to STOPPED state
         request.state.state = SimulationState.STATE_STOPPED
 
-        result = await self._call_service_async(SetSimulationState, "/isaacsim/SetSimulationState", request)
+        result = await self._call_service_async(SetSimulationState, "/set_simulation_state", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -389,14 +392,14 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
 
         for prim in stage.Traverse():
             if prim.IsValid() and not prim.GetPath().isEmpty:
-                expected_prim_paths.append(str(prim.GetPath()))
+                if not prim.GetPath().pathString.startswith("/Render"):
+                    expected_prim_paths.append(str(prim.GetPath()))
 
         # Sort for consistent comparison
         expected_prim_paths.sort()
-
         # Call the GetEntities service
         request = GetEntities.Request()
-        result = await self._call_service_async(GetEntities, "/isaacsim/GetEntities", request)
+        result = await self._call_service_async(GetEntities, "/get_entities", request)
 
         self.assertIsNotNone(result)
         self.assertIsNotNone(result.entities)
@@ -451,7 +454,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request = GetEntityInfo.Request()
         request.entity = "/World/Objects/DynamicCube"
 
-        result = await self._call_service_async(GetEntityInfo, "/isaacsim/GetEntityInfo", request)
+        result = await self._call_service_async(GetEntityInfo, "/get_entity_info", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -463,7 +466,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         # Test entity info for StaticCone (no RigidBody API)
         request.entity = "/World/Objects/StaticCone"
 
-        result = await self._call_service_async(GetEntityInfo, "/isaacsim/GetEntityInfo", request)
+        result = await self._call_service_async(GetEntityInfo, "/get_entity_info", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -513,7 +516,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request = GetEntityState.Request()
         request.entity = "/World/Objects/DynamicCube"
 
-        result = await self._call_service_async(GetEntityState, "/isaacsim/GetEntityState", request)
+        result = await self._call_service_async(GetEntityState, "/get_entity_state", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -547,7 +550,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         # Query the static cone entity state via service
         request.entity = "/World/Objects/StaticCone"
 
-        result = await self._call_service_async(GetEntityState, "/isaacsim/GetEntityState", request)
+        result = await self._call_service_async(GetEntityState, "/get_entity_state", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -622,7 +625,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request.filters = EntityFilters()
         request.filters.filter = "Objects"  # Filter for entities containing "Objects"
 
-        result = await self._call_service_async(GetEntitiesStates, "/isaacsim/GetEntitiesStates", request)
+        result = await self._call_service_async(GetEntitiesStates, "/get_entities_states", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -642,7 +645,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         # Now filter more specifically for entities starting with "/World/Objects/"
         request.filters.filter = "^/World/Objects/"  # Regex to match paths starting with "/World/Objects/"
 
-        result = await self._call_service_async(GetEntitiesStates, "/isaacsim/GetEntitiesStates", request)
+        result = await self._call_service_async(GetEntitiesStates, "/get_entities_states", request)
 
         self._timeline.pause()
         await omni.kit.app.get_app().next_update_async()
@@ -741,7 +744,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         cube_request.state.twist.angular.y = 0.2
         cube_request.state.twist.angular.z = 0.3
 
-        cube_result = await self._call_service_async(SetEntityState, "/isaacsim/SetEntityState", cube_request)
+        cube_result = await self._call_service_async(SetEntityState, "/set_entity_state", cube_request)
 
         self.assertIsNotNone(cube_result)
         self.assertTrue(cube_result.result.result == Result.RESULT_OK)
@@ -770,7 +773,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         cone_request.state.twist.angular.y = 0.6  # Should be ignored
         cone_request.state.twist.angular.z = 0.7  # Should be ignored
 
-        cone_result = await self._call_service_async(SetEntityState, "/isaacsim/SetEntityState", cone_request)
+        cone_result = await self._call_service_async(SetEntityState, "/set_entity_state", cone_request)
 
         self.assertIsNotNone(cone_result)
         self.assertTrue(cone_result.result.result == Result.RESULT_OK)
@@ -814,7 +817,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         cube_request.state.twist.linear.y = 1.5
         cube_request.state.twist.linear.z = 2.5
 
-        cube_result = await self._call_service_async(SetEntityState, "/isaacsim/SetEntityState", cube_request)
+        cube_result = await self._call_service_async(SetEntityState, "/set_entity_state", cube_request)
 
         self.assertIsNotNone(cube_result)
         self.assertTrue(cube_result.result.result == Result.RESULT_OK)
@@ -823,7 +826,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         cone_request.state.pose.position.y = 5.5
         cone_request.state.pose.position.z = 1.5
 
-        cone_result = await self._call_service_async(SetEntityState, "/isaacsim/SetEntityState", cone_request)
+        cone_result = await self._call_service_async(SetEntityState, "/set_entity_state", cone_request)
 
         self.assertIsNotNone(cone_result)
         self.assertTrue(cone_result.result.result == Result.RESULT_OK)
@@ -879,7 +882,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         delete_request = DeleteEntity.Request()
         delete_request.entity = "/World/Objects/DynamicCube"
 
-        delete_result = await self._call_service_async(DeleteEntity, "/isaacsim/DeleteEntity", delete_request)
+        delete_result = await self._call_service_async(DeleteEntity, "/delete_entity", delete_request)
 
         self.assertIsNotNone(delete_result)
         self.assertTrue(delete_result.result.result == Result.RESULT_OK)
@@ -894,7 +897,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request.allow_renaming = False
         request.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        result = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request)
+        result = await self._call_service_async(SpawnEntity, "/spawn_entity", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -1006,7 +1009,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request.initial_pose.pose.orientation.y = float(expected_orientation[2])
         request.initial_pose.pose.orientation.z = float(expected_orientation[3])
 
-        result = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request)
+        result = await self._call_service_async(SpawnEntity, "/spawn_entity", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -1092,7 +1095,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request.allow_renaming = False
         request.uri = ""  # Empty URI should create just an Xform
 
-        result = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request)
+        result = await self._call_service_async(SpawnEntity, "/spawn_entity", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -1132,7 +1135,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request1.allow_renaming = False
         request1.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        result1 = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request1)
+        result1 = await self._call_service_async(SpawnEntity, "/spawn_entity", request1)
 
         self.assertIsNotNone(result1)
         self.assertTrue(result1.result.result == Result.RESULT_OK)
@@ -1147,7 +1150,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request2.allow_renaming = True  # Should auto-rename
         request2.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        result2 = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request2)
+        result2 = await self._call_service_async(SpawnEntity, "/spawn_entity", request2)
 
         self.assertIsNotNone(result2)
         self.assertTrue(result2.result.result == Result.RESULT_OK)
@@ -1188,7 +1191,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
         request.entity_namespace = "robot1"
 
-        result = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request)
+        result = await self._call_service_async(SpawnEntity, "/spawn_entity", request)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.result.result == Result.RESULT_OK)
@@ -1211,7 +1214,8 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         await asyncio.sleep(0.5)  # Wait for topics to be published
 
         # Check ROS topics for namespace directly
-        node = rclpy.create_node("namespace_test_node")
+        unique_id = f"{int(time.time() * 1000)}"
+        node = rclpy.create_node(f"namespace_test_node_{unique_id}")
 
         topic_names_and_types = node.get_topic_names_and_types()
         topic_names = [name for name, _ in topic_names_and_types]
@@ -1257,7 +1261,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request_setup.allow_renaming = False
         request_setup.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        result_setup = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request_setup)
+        result_setup = await self._call_service_async(SpawnEntity, "/spawn_entity", request_setup)
 
         self.assertTrue(result_setup.result.result == Result.RESULT_OK)
 
@@ -1271,7 +1275,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request_error1.allow_renaming = False  # Should fail
         request_error1.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        result_error1 = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request_error1)
+        result_error1 = await self._call_service_async(SpawnEntity, "/spawn_entity", request_error1)
 
         self.assertIsNotNone(result_error1)
         self.assertEqual(result_error1.result.result, SpawnEntity.Response.NAME_NOT_UNIQUE)
@@ -1282,7 +1286,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request_error2.allow_renaming = False  # Should fail
         request_error2.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        result_error2 = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request_error2)
+        result_error2 = await self._call_service_async(SpawnEntity, "/spawn_entity", request_error2)
 
         self.assertIsNotNone(result_error2)
         self.assertEqual(result_error2.result.result, Result.RESULT_OK)
@@ -1296,7 +1300,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         request_error3.allow_renaming = False
         request_error3.uri = "/invalid/path/to/nonexistent.usd"  # Invalid URI
 
-        result_error3 = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", request_error3)
+        result_error3 = await self._call_service_async(SpawnEntity, "/spawn_entity", request_error3)
 
         self.assertIsNotNone(result_error3)
         self.assertEqual(result_error3.result.result, SpawnEntity.Response.RESOURCE_PARSE_ERROR)
@@ -1330,7 +1334,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         spawn_request.allow_renaming = False
         spawn_request.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        spawn_result = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", spawn_request)
+        spawn_result = await self._call_service_async(SpawnEntity, "/spawn_entity", spawn_request)
 
         self.assertIsNotNone(spawn_result)
         self.assertTrue(spawn_result.result.result == Result.RESULT_OK)
@@ -1343,7 +1347,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         delete_request = DeleteEntity.Request()
         delete_request.entity = "/EntityToDelete"
 
-        delete_result = await self._call_service_async(DeleteEntity, "/isaacsim/DeleteEntity", delete_request)
+        delete_result = await self._call_service_async(DeleteEntity, "/delete_entity", delete_request)
 
         self.assertIsNotNone(delete_result)
         self.assertTrue(delete_result.result.result == Result.RESULT_OK)
@@ -1357,7 +1361,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         delete_nonexistent_request.entity = "/NonExistentEntity"
 
         delete_nonexistent_result = await self._call_service_async(
-            DeleteEntity, "/isaacsim/DeleteEntity", delete_nonexistent_request
+            DeleteEntity, "/delete_entity", delete_nonexistent_request
         )
         self.assertIsNotNone(delete_nonexistent_result)
         self.assertTrue(delete_nonexistent_result.result.result == Result.RESULT_NOT_FOUND)
@@ -1400,7 +1404,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         spawn_request.allow_renaming = False
         spawn_request.uri = assets_root_path + "/Isaac/Samples/ROS2/Robots/limo_ROS.usd"
 
-        spawn_result = await self._call_service_async(SpawnEntity, "/isaacsim/SpawnEntity", spawn_request)
+        spawn_result = await self._call_service_async(SpawnEntity, "/spawn_entity", spawn_request)
 
         self.assertTrue(spawn_result.result.result == Result.RESULT_OK)
 
@@ -1424,7 +1428,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         reset_request = ResetSimulation.Request()
         reset_request.scope = ResetSimulation.Request.SCOPE_DEFAULT  # or SCOPE_ALL - both treated the same
 
-        reset_result = await self._call_service_async(ResetSimulation, "/isaacsim/ResetSimulation", reset_request)
+        reset_result = await self._call_service_async(ResetSimulation, "/reset_simulation", reset_request)
 
         self.assertIsNotNone(reset_result)
         self.assertTrue(reset_result.result.result == Result.RESULT_OK)
@@ -1494,11 +1498,31 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         initial_positions, _ = cube_prim.get_world_poses()
         initial_z = initial_positions.numpy()[0][2]
 
+        # Test single step (1 frame)
+        step_request = StepSimulation.Request()
+        step_request.steps = 1
+
+        single_step_result = await self._call_service_async(StepSimulation, "/step_simulation", step_request)
+
+        self.assertIsNotNone(single_step_result)
+        self.assertTrue(single_step_result.result.result == Result.RESULT_OK)
+        self.assertIn("1 frames", single_step_result.result.error_message)  # Should mention 1 frame
+
+        # Verify simulation is still paused after single step
+        self.assertFalse(self._timeline.is_playing())
+        self.assertFalse(self._timeline.is_stopped())
+
+        # Verify cube moved after single step
+        after_single_step_positions, _ = cube_prim.get_world_poses()
+        after_single_step_z = after_single_step_positions.numpy()[0][2]
+
+        self.assertLess(after_single_step_z, initial_z, "Cube should have moved after single step")
+
         # Test double step
         step_request = StepSimulation.Request()
         step_request.steps = 2
 
-        step_result = await self._call_service_async(StepSimulation, "/isaacsim/StepSimulation", step_request)
+        step_result = await self._call_service_async(StepSimulation, "/step_simulation", step_request)
 
         self.assertIsNotNone(step_result)
         self.assertTrue(step_result.result.result == Result.RESULT_OK)
@@ -1507,16 +1531,16 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         self.assertFalse(self._timeline.is_playing())
         self.assertFalse(self._timeline.is_stopped())
 
-        # Verify cube moved (should have fallen slightly due to gravity and velocity)
+        # Verify cube moved further (should have fallen more after 2 additional steps)
         after_step_positions, _ = cube_prim.get_world_poses()
         after_step_z = after_step_positions.numpy()[0][2]
 
-        self.assertLess(after_step_z, initial_z, "Cube should have fallen after stepping simulation")
+        self.assertLess(after_step_z, after_single_step_z, "Cube should have fallen further after double step")
 
         # Test multiple steps
         step_request.steps = 5
 
-        step_result = await self._call_service_async(StepSimulation, "/isaacsim/StepSimulation", step_request)
+        step_result = await self._call_service_async(StepSimulation, "/step_simulation", step_request)
 
         self.assertIsNotNone(step_result)
         self.assertTrue(step_result.result.result == Result.RESULT_OK)
@@ -1533,7 +1557,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
 
         step_request.steps = 1
 
-        step_result_playing = await self._call_service_async(StepSimulation, "/isaacsim/StepSimulation", step_request)
+        step_result_playing = await self._call_service_async(StepSimulation, "/step_simulation", step_request)
 
         self.assertIsNotNone(step_result_playing)
         self.assertTrue(step_result_playing.result.result == Result.RESULT_INCORRECT_STATE)
@@ -1586,7 +1610,7 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         goal = SimulateSteps.Goal()
         goal.steps = 5
 
-        action_result = await self._call_action_async(SimulateSteps, "/isaacsim/SimulateSteps", goal)
+        action_result = await self._call_action_async(SimulateSteps, "/simulate_steps", goal)
 
         self.assertIsNotNone(action_result)
         self.assertTrue(action_result.result.result.result == Result.RESULT_OK)
@@ -1607,10 +1631,313 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
 
         goal.steps = 3
 
-        action_result_playing = await self._call_action_async(SimulateSteps, "/isaacsim/SimulateSteps", goal)
+        action_result_playing = await self._call_action_async(SimulateSteps, "/simulate_steps", goal)
 
         self.assertIsNotNone(action_result_playing)
         self.assertTrue(action_result_playing.result.result.result == Result.RESULT_INCORRECT_STATE)
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+    async def test_load_world_service(self):
+        """Test that LoadWorld service correctly loads USD world files.
+
+        This test verifies the service can load valid USD files, handles invalid paths,
+        and validates unsupported formats.
+        """
+        # fmt: off
+        from simulation_interfaces.msg import Result
+        from simulation_interfaces.srv import LoadWorld
+
+        # fmt: on
+
+        self.create_test_stage()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Get the assets root path
+        assets_root_path = await get_assets_root_path_async()
+        self.assertIsNotNone(assets_root_path, "Could not find Isaac Sim assets folder")
+
+        # Test loading a valid USD world file
+        request = LoadWorld.Request()
+        request.uri = assets_root_path + "/Isaac/Environments/Grid/default_environment.usd"
+
+        result = await self._call_service_async(LoadWorld, "/load_world", request)
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.result.result == Result.RESULT_OK)
+        self.assertIsNotNone(result.world)
+        self.assertEqual(result.world.world_resource.uri, request.uri)
+        self.assertEqual(result.world.name, "default_environment")
+
+        # Verify the world was actually loaded
+        stage = omni.usd.get_context().get_stage()
+        self.assertIsNotNone(stage, "Stage should be loaded after LoadWorld")
+
+        root_layer = stage.GetRootLayer()
+
+        stage_uri = root_layer.identifier
+        self.assertEqual(result.world.world_resource.uri, stage_uri)
+
+        # Test loading invalid file path (should fail)
+        request_invalid = LoadWorld.Request()
+        request_invalid.uri = "/invalid/path/to/nonexistent.usd"
+
+        result_invalid = await self._call_service_async(LoadWorld, "/load_world", request_invalid)
+
+        self.assertIsNotNone(result_invalid)
+        self.assertEqual(result_invalid.result.result, LoadWorld.Response.RESOURCE_PARSE_ERROR)
+
+        # Test unsupported format (should fail)
+        request_unsupported = LoadWorld.Request()
+        request_unsupported.uri = "/some/path/file.obj"  # Not a USD format
+
+        result_unsupported = await self._call_service_async(LoadWorld, "/load_world", request_unsupported)
+
+        self.assertIsNotNone(result_unsupported)
+        self.assertEqual(result_unsupported.result.result, LoadWorld.Response.UNSUPPORTED_FORMAT)
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+    async def test_get_current_world_service(self):
+        """Test that GetCurrentWorld service returns correct world information.
+
+        This test verifies the service returns appropriate responses for loaded worlds,
+        in-memory stages, and when no world is loaded.
+        """
+        # fmt: off
+        from simulation_interfaces.msg import Result
+        from simulation_interfaces.srv import GetCurrentWorld, LoadWorld
+
+        # fmt: on
+        # Test with in-memory world (created test stage)
+        self.create_test_stage()
+        await omni.kit.app.get_app().next_update_async()
+
+        request = GetCurrentWorld.Request()
+        result = await self._call_service_async(GetCurrentWorld, "/get_current_world", request)
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.result.result == Result.RESULT_OK)
+        self.assertIsNotNone(result.world)
+        # In-memory world should have empty URI and specific name
+        self.assertEqual(result.world.world_resource.uri, "")
+        self.assertEqual(result.world.name, "untitled_world")
+
+        # Test with loaded world file
+        assets_root_path = await get_assets_root_path_async()
+        self.assertIsNotNone(assets_root_path, "Could not find Isaac Sim assets folder")
+
+        # Load a world first
+        load_request = LoadWorld.Request()
+        load_request.uri = assets_root_path + "/Isaac/Environments/Grid/default_environment.usd"
+
+        load_result = await self._call_service_async(LoadWorld, "/load_world", load_request)
+        self.assertIsNotNone(load_result)
+        self.assertTrue(load_result.result.result == Result.RESULT_OK)
+
+        # Now test GetCurrentWorld with loaded world
+        result_loaded = await self._call_service_async(GetCurrentWorld, "/get_current_world", request)
+
+        self.assertIsNotNone(result_loaded)
+        self.assertTrue(result_loaded.result.result == Result.RESULT_OK)
+        self.assertIsNotNone(result_loaded.world)
+        # Should have the loaded URI and extracted name
+        self.assertEqual(result_loaded.world.world_resource.uri, load_request.uri)
+        self.assertEqual(result_loaded.world.name, "default_environment")
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+    async def test_unload_world_service(self):
+        """Test that UnloadWorld service correctly unloads worlds and creates empty stage.
+
+        This test verifies the service can unload a loaded world, creating an anonymous
+        in-memory stage, and handles the case when no world is loaded.
+        """
+        from simulation_interfaces.msg import Result
+        from simulation_interfaces.srv import LoadWorld, UnloadWorld
+
+        self.create_test_stage()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Get the assets root path
+        assets_root_path = await get_assets_root_path_async()
+        self.assertIsNotNone(assets_root_path, "Could not find Isaac Sim assets folder")
+
+        # First load a world so we have something to unload
+        load_request = LoadWorld.Request()
+        load_request.uri = assets_root_path + "/Isaac/Environments/Grid/default_environment.usd"
+
+        load_result = await self._call_service_async(LoadWorld, "/load_world", load_request)
+
+        self.assertIsNotNone(load_result)
+        self.assertTrue(load_result.result.result == Result.RESULT_OK)
+
+        # Verify the world was loaded with a real file URI
+        stage = omni.usd.get_context().get_stage()
+        self.assertIsNotNone(stage, "Stage should be loaded after LoadWorld")
+
+        root_layer = stage.GetRootLayer()
+        stage_uri_before = root_layer.identifier
+        self.assertFalse(stage_uri_before.startswith("anon:"), "Loaded stage should not be anonymous")
+        self.assertEqual(stage_uri_before, load_request.uri, "Stage URI should match loaded file")
+
+        # Now test UnloadWorld service
+        unload_request = UnloadWorld.Request()
+        unload_result = await self._call_service_async(UnloadWorld, "/unload_world", unload_request)
+
+        self.assertIsNotNone(unload_result)
+        self.assertTrue(unload_result.result.result == Result.RESULT_OK)
+
+        # Verify the stage is now anonymous (in-memory)
+        stage_after = omni.usd.get_context().get_stage()
+        self.assertIsNotNone(stage_after, "Stage should still exist after unload")
+
+        root_layer_after = stage_after.GetRootLayer()
+        stage_uri_after = root_layer_after.identifier
+        self.assertTrue(
+            stage_uri_after.startswith("anon:"), f"Unloaded stage should be anonymous. Got: {stage_uri_after}"
+        )
+
+        # Test unloading when no specific world is loaded (should still work)
+        unload_result2 = await self._call_service_async(UnloadWorld, "/unload_world", unload_request)
+
+        self.assertIsNotNone(unload_result2)
+        self.assertTrue(unload_result2.result.result == Result.RESULT_OK)
+
+        # Verify stage is still anonymous
+        stage_final = omni.usd.get_context().get_stage()
+        root_layer_final = stage_final.GetRootLayer()
+        stage_uri_final = root_layer_final.identifier
+        self.assertTrue(
+            stage_uri_final.startswith("anon:"),
+            f"Stage should remain anonymous after second unload. Got: {stage_uri_final}",
+        )
+
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+    async def test_get_available_worlds_service(self):
+        """Test that GetAvailableWorlds service discovers and filters world files correctly.
+
+        This test verifies basic world discovery, tag filtering with ANY/ALL modes,
+        additional sources, and error handling.
+        """
+        # fmt: off
+        from simulation_interfaces.msg import Result, TagsFilter
+        from simulation_interfaces.srv import GetAvailableWorlds
+
+        # fmt: on
+
+        self.create_test_stage()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Test basic world discovery without filters
+        request = GetAvailableWorlds.Request()
+
+        result = await self._call_service_async(GetAvailableWorlds, "/get_available_worlds", request)
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.result.result == Result.RESULT_OK)
+        self.assertIsNotNone(result.worlds)
+        self.assertGreater(len(result.worlds), 0, "Should find at least some world files")
+
+        # Verify each world has required fields
+        for world in result.worlds:
+            self.assertIsNotNone(world.world_resource.uri)
+            self.assertIsNotNone(world.name)
+            self.assertTrue(world.name != "", "World name should not be empty")
+
+        # Test tag filtering with ANY mode (default)
+        request_any = GetAvailableWorlds.Request()
+        request_any.filter = TagsFilter()
+        request_any.filter.tags = ["warehouse", "simple"]  # Should find files containing either term
+        request_any.filter.filter_mode = TagsFilter.FILTER_MODE_ANY
+
+        result_any = await self._call_service_async(GetAvailableWorlds, "/get_available_worlds", request_any)
+
+        self.assertIsNotNone(result_any)
+        self.assertTrue(result_any.result.result == Result.RESULT_OK)
+
+        # Should find at least some files (warehouse.usd should match)
+        if len(result_any.worlds) > 0:
+            # Verify EVERY result contains at least one of our filter terms (ANY mode)
+            for world in result_any.worlds:
+                uri_lower = world.world_resource.uri.lower()
+                has_warehouse = "warehouse" in uri_lower
+                has_simple = "simple" in uri_lower
+                self.assertTrue(
+                    has_warehouse or has_simple,
+                    f"File '{world.world_resource.uri}' should match at least one filter pattern ['warehouse', 'simple'] in ANY mode",
+                )
+
+        # Test tag filtering with ALL mode
+        request_all = GetAvailableWorlds.Request()
+        request_all.filter = TagsFilter()
+        request_all.filter.tags = ["warehouse", "simple"]  # Should find files containing both terms
+        request_all.filter.filter_mode = TagsFilter.FILTER_MODE_ALL
+
+        result_all = await self._call_service_async(GetAvailableWorlds, "/get_available_worlds", request_all)
+
+        self.assertIsNotNone(result_all)
+        self.assertTrue(result_all.result.result == Result.RESULT_OK)
+        # ALL mode should generally return fewer or equal results than ANY mode
+        self.assertLessEqual(len(result_all.worlds), len(result_any.worlds))
+
+        # Verify EVERY result contains ALL of our filter terms (ALL mode)
+        if len(result_all.worlds) > 0:
+            for world in result_all.worlds:
+                uri_lower = world.world_resource.uri.lower()
+                has_warehouse = "warehouse" in uri_lower
+                has_simple = "simple" in uri_lower
+                self.assertTrue(
+                    has_warehouse and has_simple,
+                    f"File '{world.world_resource.uri}' should match ALL filter patterns ['warehouse', 'simple'] in ALL mode",
+                )
+
+        # Test with additional sources
+        assets_root_path = await get_assets_root_path_async()
+        if assets_root_path:
+            request_additional = GetAvailableWorlds.Request()
+            request_additional.additional_sources = [assets_root_path + "/Isaac/Sensors/SICK/picoScan150"]
+
+            result_additional = await self._call_service_async(
+                GetAvailableWorlds, "/get_available_worlds", request_additional
+            )
+
+            self.assertIsNotNone(result_additional)
+            self.assertTrue(result_additional.result.result == Result.RESULT_OK)
+            self.assertGreater(len(result_additional.worlds), 0, "Should find worlds in additional sources")
+
+        # Test continue_on_error flag with invalid additional source
+        request_error = GetAvailableWorlds.Request()
+        request_error.additional_sources = ["/invalid/nonexistent/path"]
+        request_error.continue_on_error = True
+
+        result_error = await self._call_service_async(GetAvailableWorlds, "/get_available_worlds", request_error)
+
+        self.assertIsNotNone(result_error)
+        # Should succeed despite invalid path due to continue_on_error=True
+        self.assertTrue(result_error.result.result == Result.RESULT_OK)
+
+        # Test offline_only flag (should not affect local files)
+        request_offline = GetAvailableWorlds.Request()
+        request_offline.offline_only = True
+
+        result_offline = await self._call_service_async(GetAvailableWorlds, "/get_available_worlds", request_offline)
+
+        self.assertIsNotNone(result_offline)
+        self.assertTrue(result_offline.result.result == Result.RESULT_OK)
+
+        # Verify no remote URLs in offline-only results
+        remote_protocols = ["omniverse://", "https://", "http://", "ftp://", "sftp://"]
+        for world in result_offline.worlds:
+            is_remote = any(world.world_resource.uri.startswith(protocol) for protocol in remote_protocols)
+            self.assertFalse(
+                is_remote, f"Offline-only should not return remote URLs. Found: {world.world_resource.uri}"
+            )
 
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()

@@ -63,7 +63,7 @@ from `plugins/isaacsim.asset.importer.mjcf/MjcfUsd.cpp` as follows:
 - Calls `setStageMetadata`, which sets up the UsdPhysicsScene
 - Calls `createRoot` which defines the robot's root USD prim. Will also make this prim the default prim if
 makeDefaultPrim is set to true in the import config.
-- Handles making the imported USD instanceable if desired in the import config. For more information regarding instanceable assets, please visit https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/tutorial_gym_instanceable_assets.html
+- Handles making the imported USD instanceable if desired in the import config. For more information regarding instanceable assets, please visit https://docs.isaacsim.omniverse.nvidia.com/latest/isaac_lab_tutorials/tutorial_instanceable_assets.html
 - For each body, calls `CreatePhysicsBodyAndJoint` recursively, which imports the kinematic tree onto the USD stage.
 - Calls `addWorldGeomsAndSites`, which creates dummy links to place the sites/geoms defined in the world body
 - Calls `AddContactFilters`, which adds collisions between the prims in accordance with the contact graph.

@@ -43,9 +43,17 @@ function include_physx()
     libdirs {
         "%{root}/_build/target-deps/physx/bin/linux.x86_64/debug",
     }
+    filter { "system:linux", "platforms:aarch64", "configurations:debug" }
+    libdirs {
+        "%{root}/_build/target-deps/physx/bin/linux.aarch64/debug",
+    }
     filter { "system:linux", "platforms:x86_64", "configurations:release" }
     libdirs {
         "%{root}/_build/target-deps/physx/bin/linux.x86_64/checked",
+    }
+    filter { "system:linux", "platforms:aarch64", "configurations:release" }
+    libdirs {
+        "%{root}/_build/target-deps/physx/bin/linux.aarch64/checked",
     }
     filter {}
 
@@ -251,6 +259,7 @@ function define_test_experience(name, args)
 end
 ROS2_EXTRA = {
     ["windows"] = [[
+set ROS_DISTRO=humble
 set RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 set ROS_DOMAIN_ID=93
 pushd %~dp0\..\exts
@@ -259,6 +268,7 @@ popd
 set PATH=%PATH%;%basedir%
 ]],
     ["linux"] = [[
+export ROS_DISTRO=humble
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=$((($RANDOM % 18) + 80))
 INTERNAL_LIBS=$(readlink -f $SCRIPT_DIR/../exts/isaacsim.ros2.bridge/humble/lib)
@@ -434,8 +444,9 @@ setlocal
 set SCRIPT_DIR=%%~dp0
 set NO_ROS_ENV=false
 
-REM if this is the selector script, don't set up ros env
+REM don't set up ros env for the following apps
 if /i "%%~n0"=="isaac-sim.selector" set NO_ROS_ENV=true
+if /i "%%~n0"=="isaac-sim.compatibility_check" set NO_ROS_ENV=true
 
 REM Check args for a flag to disable ROS environment setup
 for %%%%a in (%%*) do (

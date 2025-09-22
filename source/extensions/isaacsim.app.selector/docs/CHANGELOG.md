@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.10.0] - 2025-08-21
+### Changed
+- Deprecate app selector
+
 ## [2.9.6] - 2025-06-09
 ### Changed
 - Use default icon if app specific icon is not found

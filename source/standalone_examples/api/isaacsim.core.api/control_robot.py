@@ -28,6 +28,7 @@ asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka
 robot = add_reference_to_stage(usd_path=asset_path, prim_path="/Franka")
 robot.GetVariantSet("Gripper").SetVariantSelection("AlternateFinger")
 robot.GetVariantSet("Mesh").SetVariantSelection("Quality")
+simulation_app.update()
 
 simulation_context = SimulationContext()
 
@@ -36,6 +37,8 @@ simulation_context.initialize_physics()
 art = Articulation("/Franka")
 art.initialize()
 dof_ptr = art.get_dof_index("panda_joint2")
+
+simulation_app.update()
 
 simulation_context.play()
 # NOTE: before interacting with physics directly you need to step physics for one step at least

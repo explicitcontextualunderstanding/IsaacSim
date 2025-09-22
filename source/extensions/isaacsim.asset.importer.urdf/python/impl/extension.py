@@ -258,7 +258,9 @@ class UrdfImporter(object):
 
     def _build_info_ui(self):
         title = EXTENSION_NAME
-        doc_link = "https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/ext_omni_isaac_urdf.html"
+        doc_link = (
+            "https://docs.isaacsim.omniverse.nvidia.com/latest/importer_exporter/ext_isaacsim_asset_importer_urdf.html"
+        )
 
         overview = "This utility is used to import URDF representations of robots into Isaac Sim. "
         overview += "URDF is an XML format for representing a robot model in ROS."

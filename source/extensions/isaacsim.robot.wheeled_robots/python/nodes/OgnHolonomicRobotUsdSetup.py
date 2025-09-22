@@ -80,6 +80,28 @@ class OgnHolonomicRobotUsdSetup:
                 state.initialize()
 
             if state.initialized:
+                stop = False
+                error_log = ""
+                # TODO: Add a check to see if the wheel radius is valid
+                if len(state.robot_params.wheel_radius) == 0:
+                    error_log += "Wheel radius list is empty\n"
+                    stop = True
+                if len(state.robot_params.wheel_positions) == 0:
+                    error_log += "Wheel positions list is empty\n"
+                    stop = True
+                if len(state.robot_params.wheel_orientations) == 0:
+                    error_log += "Wheel orientations list is empty\n"
+                    stop = True
+                if len(state.robot_params.mecanum_angles) == 0:
+                    error_log += "Mecanum angles list is empty\n"
+                    stop = True
+                if len(state.robot_params.wheel_dof_names) == 0:
+                    error_log += "Wheel dof names list is empty\n"
+                    stop = True
+                if stop:
+                    db.log_error(error_log)
+                    return False
+
                 db.outputs.wheelRadius = state.robot_params.wheel_radius
                 db.outputs.wheelPositions = state.robot_params.wheel_positions
                 db.outputs.wheelOrientations = state.robot_params.wheel_orientations

@@ -1,4 +1,4 @@
-﻿# all folders starting with _ are local
+# all folders starting with _ are local
 _*/
 !_impl/
 # exclude local website repo, used for publishing
@@ -162,3 +162,11 @@ results_by_file.json
 
 # EULA check marker file
 .eula_accepted
+
+# Ignore external tests
+source/standalone_examples/testing/external_workflow_tests/**
+
+# Docker build temp files
+exclude_list.txt
+generated_rsync_package.sh
+.container_venv/

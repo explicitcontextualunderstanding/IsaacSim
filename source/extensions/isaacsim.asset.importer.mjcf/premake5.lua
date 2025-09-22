@@ -37,8 +37,8 @@ includedirs {
     target_deps .. "/python/include/python3.11",
     target_deps .. "/tinyxml2/include",
     target_deps .. "/omni_client_library/include",
-    target_deps .. "/omniverse_asset_converter/include",
     extsbuild_dir .. "%{root}/source/extensions/isaacsim.robot.schema/include",
+    isaac_sim_extsbuild_dir .. "/omni.kit.asset_converter/include",
     "%{root}/source/extensions/isaacsim.asset.importer.mjcf/include",
     "%{root}/source/extensions/isaacsim.core.includes/include",
 }
@@ -49,7 +49,7 @@ libdirs {
     target_deps .. "/tinyxml2/lib",
     target_deps .. "/omni_client_library/%{cfg.buildcfg}",
     extsbuild_dir .. "/omni.usd.core/bin",
-    target_deps .. "/omniverse_asset_converter/lib",
+    isaac_sim_extsbuild_dir .. "/omni.kit.asset_converter/asset_converter_native_bindings/libs",    
 }
 
 links {

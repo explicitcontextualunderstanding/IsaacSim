@@ -4,7 +4,7 @@ order = -1000
 reloadable = false
 
 [package]
-version = "3.0.2"
+version = "3.0.4"
 category = "Internal"
 title = "Isaac Sim ML Pip Archive"
 description = "Pip packages needed by isaac sim extensions"

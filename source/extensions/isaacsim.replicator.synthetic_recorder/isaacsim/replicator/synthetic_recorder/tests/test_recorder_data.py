@@ -16,7 +16,6 @@
 
 import os
 import shutil
-from collections import Counter
 
 import omni.kit.app
 import omni.kit.test
@@ -24,15 +23,7 @@ import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
 from isaacsim.replicator.synthetic_recorder.synthetic_recorder import SyntheticRecorder
-
-
-# Check the contents of a folder against expected extension counts e.g expected_counts={png: 3, json: 3, npy: 3}
-def validate_folder_contents(path: str, expected_counts: dict[str, int]) -> bool:
-    if not os.path.exists(path) or not os.path.isdir(path):
-        return False
-    # Count the number of files with each extension and check that the counts match the expected counts
-    file_counts = Counter(f.split(".")[-1] for f in os.listdir(path) if "." in f)
-    return all(file_counts.get(ext, 0) == count for ext, count in expected_counts.items())
+from isaacsim.test.utils.file_validation import validate_folder_contents
 
 
 class TestRecorderData(omni.kit.test.AsyncTestCase):
@@ -147,8 +138,8 @@ class TestRecorderData(omni.kit.test.AsyncTestCase):
         await self.run_recorder_capture(num_frames=10, play_timeline=False, control_timeline=True)
 
     # ISIM-2602 - orchestrator.preview call causes an extra frame to be written if not called from UI
-    # async def test_recorder_data_play_timeline_true_control_timeline_false(self):
-    #     await self.run_recorder_capture(num_frames=10, play_timeline=True, control_timeline=False)
+    async def test_recorder_data_play_timeline_true_control_timeline_false(self):
+        await self.run_recorder_capture(num_frames=10, play_timeline=True, control_timeline=False)
 
-    # async def test_recorder_data_play_timeline_true_control_timeline_true(self):
-    #     await self.run_recorder_capture(num_frames=10, play_timeline=True, control_timeline=True)
+    async def test_recorder_data_play_timeline_true_control_timeline_true(self):
+        await self.run_recorder_capture(num_frames=10, play_timeline=True, control_timeline=True)

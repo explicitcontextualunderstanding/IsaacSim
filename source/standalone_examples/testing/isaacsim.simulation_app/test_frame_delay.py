@@ -56,7 +56,6 @@ import omni.replicator.core as rep
 import omni.usd
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.core.utils.prims import add_labels
 from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.sensors.camera import Camera
@@ -68,6 +67,7 @@ from pxr import UsdGeom
 
 class CustomWriter(Writer):
     def __init__(self):
+        self.annotators = []
         self.annotators.append(AnnotatorRegistry.get_annotator("rgb"))
         self.annotators.append(AnnotatorRegistry.get_annotator("semantic_segmentation"))
         self.annotators.append(AnnotatorRegistry.get_annotator("bounding_box_2d_tight"))

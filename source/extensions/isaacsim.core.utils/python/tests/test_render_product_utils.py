@@ -18,7 +18,7 @@ import omni.replicator.core as rep
 from isaacsim.core.utils.render_product import *
 
 
-class TestStage(omni.kit.test.AsyncTestCase):
+class TestRenderProduct(omni.kit.test.AsyncTestCase):
     # Before running each test
     async def setUp(self):
         await omni.usd.get_context().new_stage_async()

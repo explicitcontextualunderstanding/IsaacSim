@@ -1,4 +1,8 @@
 # Changelog
+## [1.4.10] - 2025-08-29
+### Changed
+- Renamed CARB profiling zones to include [IsaacSim] prefix
+
 ## [1.4.9] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.4.8)

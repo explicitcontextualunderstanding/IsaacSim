@@ -1374,7 +1374,8 @@ class Articulation(XFormPrim):
                 prims._metadata.joint_names  # list of names
                 prims._metadata.joint_indices  # dict of name: index
 
-            To retrieve a specific row for the link incoming joint force/torque use ``joint_index + 1``
+            To retrieve a specific row for the link incoming joint force/torque use ``joint_index + 1`` when specifying
+            the ``joint_indices`` parameter. For the ``joint_names`` parameter, the conversion is done internally.
 
         Args:
             indices (Optional[Union[np.ndarray, List, torch.Tensor]], optional): indices to specify which prims
@@ -1450,7 +1451,7 @@ class Articulation(XFormPrim):
         if joint_names is not None and joint_indices is not None:
             raise Exception("joint indices and joint names can't be both specified")
         if joint_names is not None:
-            joint_indices = self._convert_joint_names_to_indices(joint_names)
+            joint_indices = [index + 1 for index in self._convert_joint_names_to_indices(joint_names)]
         if self.is_physics_handle_valid():
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_bodies, self._device)

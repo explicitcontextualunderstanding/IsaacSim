@@ -63,11 +63,11 @@ pxr::SdfPath getNextFreePath(pxr::UsdStageWeakPtr stage, const pxr::SdfPath& pri
 void setStageMetadata(pxr::UsdStageWeakPtr stage, const isaacsim::asset::importer::mjcf::ImportConfig config);
 void createRoot(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
                 Transform trans,
-                const std::string rootPrimPath,
+                const std::string& rootPrimPath,
                 const isaacsim::asset::importer::mjcf::ImportConfig config);
 void createFixedRoot(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
-                     const std::string jointPath,
-                     const std::string bodyPath);
+                     const std::string& jointPath,
+                     const std::string& bodyPath);
 void applyArticulationAPI(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
                           pxr::UsdGeomXformable prim,
                           const isaacsim::asset::importer::mjcf::ImportConfig config);
@@ -87,7 +87,7 @@ void createAndBindMaterial(pxr::UsdStageWeakPtr stage,
                            bool colorOnly,
                            std::map<pxr::TfToken, pxr::SdfPath>& materialPaths);
 pxr::UsdGeomXformable createBody(pxr::UsdStageWeakPtr stage,
-                                 const std::string primPath,
+                                 const std::string& primPath,
                                  const Transform& trans,
                                  const ImportConfig& config);
 void applyRigidBody(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
@@ -95,39 +95,39 @@ void applyRigidBody(std::unordered_map<std::string, pxr::UsdStageRefPtr> stages,
                     const MJCFBody* body,
                     const ImportConfig& config);
 pxr::UsdPrim createPrimitiveGeom(pxr::UsdStageWeakPtr stage,
-                                 const std::string geomPath,
+                                 const std::string& geomPath,
                                  const MJCFGeom* geom,
                                  const std::map<std::string, MeshInfo>& simulationMeshCache,
                                  const ImportConfig& config,
                                  std::map<pxr::TfToken, pxr::SdfPath>& materialPaths,
                                  bool importMaterials,
-                                 const std::string rootPrimPath,
+                                 const std::string& rootPrimPath,
                                  bool collisionGeom);
 pxr::UsdPrim createPrimitiveGeom(pxr::UsdStageWeakPtr stage,
-                                 const std::string geomPath,
+                                 const std::string& geomPath,
                                  const MJCFSite* site,
                                  const ImportConfig& config,
                                  bool importMaterials);
 void applyCollisionGeom(pxr::UsdStageWeakPtr stage, pxr::UsdPrim prim, bool ConvexDecomposition);
 pxr::UsdPhysicsJoint createFixedJoint(pxr::UsdStageWeakPtr stage,
-                                      const std::string jointPath,
+                                      const std::string& jointPath,
                                       const Transform& poseJointToParentBody,
                                       const Transform& poseJointToChildBody,
-                                      const std::string parentBodyPath,
-                                      const std::string bodyPath,
+                                      const std::string& parentBodyPath,
+                                      const std::string& bodyPath,
                                       const ImportConfig& config);
 pxr::UsdPhysicsJoint createD6Joint(pxr::UsdStageWeakPtr stage,
-                                   const std::string jointPath,
+                                   const std::string& jointPath,
                                    const Transform& poseJointToParentBody,
                                    const Transform& poseJointToChildBody,
-                                   const std::string parentBodyPath,
-                                   const std::string bodyPath,
+                                   const std::string& parentBodyPath,
+                                   const std::string& bodyPath,
                                    const ImportConfig& config);
 void initPhysicsJoint(pxr::UsdPhysicsJoint& jointPrim,
                       const Transform& poseJointToParentBody,
                       const Transform& poseJointToChildBody,
-                      const std::string parentBodyPath,
-                      const std::string bodyPath,
+                      const std::string& parentBodyPath,
+                      const std::string& bodyPath,
                       const float& distanceScale);
 void applyPhysxJoint(pxr::UsdPhysicsJoint& jointPrim, const MJCFJoint* joint);
 void applyJointLimits(pxr::UsdPhysicsJoint jointPrim,
@@ -140,7 +140,7 @@ void applyJointLimits(pxr::UsdPhysicsJoint jointPrim,
 void createJointDrives(pxr::UsdPhysicsJoint jointPrim,
                        const MJCFJoint* joint,
                        const MJCFActuator* actuator,
-                       const std::string axis,
+                       const std::string& axis,
                        const ImportConfig& config);
 
 } // namespace mjcf

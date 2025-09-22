@@ -85,9 +85,9 @@ public:
      * @param[in] messageType Type of message (default: standard message)
      * @param[in] showLoadingError Whether to show library loading errors
      */
-    Ros2MessageInterfaceImpl(std::string pkgName,
-                             std::string msgSubfolder,
-                             std::string msgName,
+    Ros2MessageInterfaceImpl(const std::string& pkgName,
+                             const std::string& msgSubfolder,
+                             const std::string& msgName,
                              BackendMessageType messageType = BackendMessageType::eMessage,
                              bool showLoadingError = false);
     /**
@@ -668,7 +668,7 @@ class Ros2ContextHandleImpl : public Ros2ContextHandle
 public:
     virtual ~Ros2ContextHandleImpl()
     {
-        shutdown();
+        Ros2ContextHandleImpl::shutdown();
     }
     virtual void* getContext();
     virtual void init(int argc, char const* const* argv, bool setDomainId = false, size_t domainId = 0);
@@ -778,9 +778,9 @@ public:
 
 private:
     Ros2NodeHandle* m_nodeHandle;
+    bool m_waitSetInitialized = false;
     std::shared_ptr<rcl_subscription_t> m_subscription = nullptr;
     rcl_wait_set_t m_waitSet;
-    bool m_waitSetInitialized = false;
 };
 
 /**
@@ -828,10 +828,10 @@ public:
 
 private:
     Ros2NodeHandle* m_nodeHandle;
+    bool m_waitSetInitialized = false;
     std::shared_ptr<rcl_service_t> m_service = nullptr;
     rcl_wait_set_t m_waitSet;
     rmw_request_id_t m_requestId;
-    bool m_waitSetInitialized = false;
 };
 
 /**
@@ -879,10 +879,10 @@ public:
 
 private:
     Ros2NodeHandle* m_nodeHandle;
+    bool m_waitSetInitialized = false;
     std::shared_ptr<rcl_client_t> m_client = nullptr;
     rcl_wait_set_t m_waitSet;
     rmw_request_id_t m_requestId;
-    bool m_waitSetInitialized = false;
 };
 
 /**
@@ -903,9 +903,9 @@ public:
      * @param[in] msgName Name of the message type.
      * @param[in] messageType Type of the message (default: eMessage).
      */
-    Ros2DynamicMessageImpl(std::string pkgName,
-                           std::string msgSubfolder,
-                           std::string msgName,
+    Ros2DynamicMessageImpl(const std::string& pkgName,
+                           const std::string& msgSubfolder,
+                           const std::string& msgName,
                            BackendMessageType messageType = BackendMessageType::eMessage);
     virtual ~Ros2DynamicMessageImpl();
     virtual const void* getTypeSupportHandle();

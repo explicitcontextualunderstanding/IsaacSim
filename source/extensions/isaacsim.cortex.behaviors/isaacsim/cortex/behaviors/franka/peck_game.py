@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This script gives an example of a behavior programmed entirely as a decider network (no state
+"""This script gives an example of a behavior programmed entirely as a decider network (no state
 machines). The behavior will monitor the blocks for movement, and whenever a block moves it will
 reach down and peck it. It will always switch to the most recently moved block, aborting its
 previous peck behavior if a new block is moved.

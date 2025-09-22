@@ -669,7 +669,7 @@ class SimulationContext:
             if SimulationManager.get_physics_sim_view() is None:
                 SimulationManager.initialize_physics()
 
-    def step(self, render: bool = True) -> None:
+    def step(self, render: bool = True, update_fabric: bool = False) -> None:
         """Steps the physics simulation while rendering or without.
 
         .. warning::
@@ -681,6 +681,10 @@ class SimulationContext:
             render (bool, optional): Set to False to only do a physics simulation without rendering. Note:
                                      app UI will be frozen (since its not rendering) in this case.
                                      Defaults to True.
+            update_fabric (bool): Whether to force the update of the physics data to fabric when performing a physics-only
+                                  step (without rendering). This flag should be enabled when it is desired to read updated
+                                  data using the fabric interface after performing a physics-only step
+                                  (e.g., XFormPrim's world transform).
 
         Raises:
             Exception: if there is no stage currently opened
@@ -700,13 +704,13 @@ class SimulationContext:
             # rendering dt is zero, but physics is not, call step and then render
             elif self.get_rendering_dt() == 0 and self.get_physics_dt() != 0:
                 if self.is_playing():
-                    self._physics_context._step(current_time=self.current_time)
+                    self._physics_context._step(current_time=self.current_time, update_fabric=update_fabric)
                 SimulationContext.render(self)
             else:
                 self._app.update()
         else:
             if self.is_playing():
-                self._physics_context._step(current_time=self.current_time)
+                self._physics_context._step(current_time=self.current_time, update_fabric=update_fabric)
         return
 
     def render(self) -> None:

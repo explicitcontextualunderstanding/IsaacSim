@@ -17,7 +17,8 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True})
 
-import carb
+import sys
+
 import numpy as np
 import omni
 import omni.kit.commands
@@ -50,11 +51,9 @@ result, sensor = omni.kit.commands.execute(
     translation=Gf.Vec3d(0, 0, 0),
 )
 
-# start simulation
-# We must do one full step with rendering before the sensor will work correctly.
-world.step(render=True)
+# start simulation and initialize physics
+world.initialize_physics()
 timeline.play()
-world.step(render=False)
 
 for frame in range(100):
     world.step(render=False)
@@ -65,7 +64,8 @@ print("cube pose", cube_1.get_world_pose())
 reading = cs.get_sensor_reading(cube_path + "/Contact_Sensor")
 
 if not reading.is_valid:
-    raise ValueError("No contact sensor readings")
+    print("[FAIL] No contact sensor readings")
+    sys.exit(1)
 
 if reading.is_valid:
     print(str(reading))

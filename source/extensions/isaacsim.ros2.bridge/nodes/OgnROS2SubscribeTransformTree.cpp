@@ -467,11 +467,11 @@ private:
     std::set<std::string> m_primPaths;
     std::vector<std::string> m_articulationRoots;
 
-    long m_stageId;
+    long m_stageId = 0;
     pxr::UsdStageRefPtr m_usdStage;
     pxr::SdfLayerRefPtr m_anonLayer;
 
-    uint64_t m_nodeId;
+    uint64_t m_nodeId = 0;
     int m_startupState = 0;
 };
 

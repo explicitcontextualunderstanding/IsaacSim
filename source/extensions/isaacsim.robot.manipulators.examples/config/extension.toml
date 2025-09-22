@@ -1,5 +1,5 @@
 [package]
-version = "1.0.17"
+version = "1.1.1"
 category = "example"
 title = "Manipulators Examples"
 description = "examples of manipulators and grippers"
@@ -12,6 +12,10 @@ writeTarget.kit = true
 
 [dependencies]
 "isaacsim.core.api" = {}
+"isaacsim.core.experimental.materials" = {}
+"isaacsim.core.experimental.objects" = {}
+"isaacsim.core.experimental.prims" = {}
+"isaacsim.core.experimental.utils" = {}
 "isaacsim.robot.manipulators" = {}
 "isaacsim.robot_motion.motion_generation" = {}
 "isaacsim.storage.native" = {}

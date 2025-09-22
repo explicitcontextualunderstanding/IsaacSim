@@ -1,4 +1,8 @@
 # Changelog
+## [3.0.9] - 2025-09-17
+### Removed
+- Deleted dead code
+
 ## [3.0.8] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 3.0.7)

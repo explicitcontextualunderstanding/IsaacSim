@@ -1,7 +1,7 @@
 [package]
 title = "Isaac Sim"
 description = "Main Omniverse Isaac Sim Application"
-version = "5.0.0"
+version = "5.1.0"
 execFile = "isaac-sim.fabric"
 keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in UI with "experience" filter
 
@@ -15,8 +15,8 @@ keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in
 
 [settings]
 app.name = "Isaac-Sim Fabric"
-app.version = "5.0.0"
-app.vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default on Windows)
+app.version = "5.1.0"
+app.vulkan = true                   # Explicitly enable Vulkan
 app.enableDeveloperWarnings = false # disable developer warnings to reduce log noise
 
 [settings.persistent]
@@ -33,11 +33,4 @@ physics.visualizationDisplayJoints = false
     "${app}/../extscache",
     "${app}/../extsUser",
     "${app}/../extsDeprecated",
-]
-
-[settings.exts."omni.kit.registry.nucleus"]
-registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
-	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
-	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
 ]

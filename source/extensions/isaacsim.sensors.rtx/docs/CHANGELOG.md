@@ -1,15 +1,78 @@
 # Changelog
 
+## [15.8.2] - 2025-09-17
+### Changed
+- Specify rtx.materialDb.nonVisualMaterialSemantics.prefix as "omni:simready:nonvisual" to align with SimReady spec
+
+## [15.8.1] - 2025-09-15
+### Added
+- GenericModelOutput explicitly added to valid arguments in LidarRtx.attach_annotator
+### Fixed
+- LidarRtx no longer resets prim orientation and position if called with existing prim path
+
+## [15.8.0] - 2025-09-09
+### Added
+- New APIs to apply non-visual material attributes to Material prims, resolve non-visual material ID as base/coating/attribute.
+### Removed
+- No longer using CSV mapping from visual to non-visual materials as default behavior, favoring USD attribute specification instead
+
+## [15.7.0] - 2025-09-05
+### Added
+- Per-frame output option to IsaacCreateRTXLidarScanBuffer
+### Changed
+- Use CUDA graphs, improved kernels, and cached device properties in IsaacCreateRTXLidarScanBuffer to improve perf
+- IsaacExtractRTXSensorPointCloudNoAccumulator annotator now uses IsaacCreateRTXLidarScanBuffer node with per-frame
+  output enabled
+### Removed
+- IsaacExtractRTXSensorPointCloud node no longer used
+- Unused CUDA kernels removed
+### Fixed
+- IsaacCreateRTXLidarScanBuffer outputs correct timestamps
+
+## [15.6.4] - 2025-08-29
+### Changed
+- Renamed CARB profiling zones to include [IsaacSim] prefix
+
+## [15.6.3] - 2025-08-22
+### Changed
+- Use SimulationManager instead of deprecated CoreNodes APIs for time related APIs
+- Add dependency on isaacsim.core.simulation_manager
+
+## [15.6.2] - 2025-08-22
+### Removed
+- Motion BVH no longer enabled by default.
+
+## [15.6.1] - 2025-08-22
+### Fixed
+- Corrected field name in test_generic_model_output
+
+## [15.6.0] - 2025-08-08
+### Added
+- StableIdMap annotator available in LidarRtx class
+- New static methods in LidarRTX class to decode StableIdMap output into map of stable IDs to prim paths, and resolve GenericModelOutput object IDs as 128-bit stable IDs.
+
+## [15.5.2] - 2025-08-07
+### Fixed
+- Annotator test tolerance increased to 2% to account for FlatScan not interpolating distance based on azimuths
+- Annotator tests combined where appropriate to reduce test time
+
+## [15.5.1] - 2025-07-29
+### Fixed
+- Remove version locks for omni.sensors.nv.*
+
 ## [15.5.0] - 2025-07-25
 ### Added
 - Restored IsaacCreateRTXLidarScanBuffer, switched to device-side processing with double buffers
 - Support for additional SICK Lidars
+
 ### Removed
 - LidarPointAccumulator usage removed from extension
+
 ### Changed
 - Improvements to stream processing in IsaacExtractRTXSensorPointCloud
 - IsaacComputeRTXLidarFlatScan gets inputs from IsaacCreateRTXLidarScanBuffer
 - OmniLidar prims created with IsaacSensorCreateRtxLidar command have omni:sensor:Core:skipDroppingInvalidPoints set to True
+
 ### Fixed
 - No longer run IsaacExtractRTXSensorPointCloud tests twice.
 

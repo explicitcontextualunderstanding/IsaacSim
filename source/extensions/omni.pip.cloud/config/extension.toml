@@ -4,7 +4,7 @@ order = -100
 reloadable = false
 
 [package]
-version = "1.3.6"
+version = "1.4.2"
 category = "Internal"
 title = "Cloud package Pip Archive"
 description = "General packages for cloud"

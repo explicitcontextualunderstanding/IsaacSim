@@ -16,6 +16,7 @@ import asyncio
 import os
 import weakref
 
+import carb
 import omni.kit.commands
 import omni.ui as ui
 import omni.usd
@@ -271,8 +272,15 @@ class RobotHierarchy:
         def _on_add_link_ok(d):
             # get the link name from the popup window
             link_name = d.get_value("link_name")
-            UsdGeom.Xform.Define(self._links_temp_stage, Sdf.Path(link_name))
-            self._link_popup_window.hide()
+            # if not Sdf.Path.IsValidIdentifier(link_name):
+            #     print(f"Invalid link name: {link_name}")
+            #     return
+            try:
+                UsdGeom.Xform.Define(self._links_temp_stage, Sdf.Path(link_name))
+                self._link_popup_window.hide()
+            except Exception as e:
+                carb.log_error(f"Error adding link, Check if the link name is valid: {e}")
+                return
 
         def _on_add_link_cancel(d):
             self._link_popup_window.hide()

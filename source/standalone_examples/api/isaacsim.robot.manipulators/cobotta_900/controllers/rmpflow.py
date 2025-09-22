@@ -17,7 +17,6 @@ import os
 
 import isaacsim.robot_motion.motion_generation as mg
 from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.extensions import get_extension_path_from_name
 
 
 class RMPFlowController(mg.MotionPolicyController):

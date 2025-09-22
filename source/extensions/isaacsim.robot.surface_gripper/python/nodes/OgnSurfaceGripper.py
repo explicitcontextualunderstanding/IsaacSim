@@ -24,7 +24,7 @@ class OgnSurfaceGripper:
         if db.inputs.enabled and len(db.inputs.SurfaceGripper) > 0:
             input_prim = db.inputs.SurfaceGripper[0].pathString
             status = gripper_interface.get_gripper_status(input_prim)
-            if status == "Open":
+            if status == surface_gripper.GripperStatus.Open:
                 gripper_interface.close_gripper(input_prim)
             else:
                 gripper_interface.open_gripper(input_prim)

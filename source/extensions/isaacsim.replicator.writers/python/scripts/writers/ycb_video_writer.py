@@ -378,7 +378,7 @@ class YCBVideoWriter(Writer):
         segmentation_data_remapped = np.take(semantic_id_to_class_index_map, semantic_seg_data)
 
         # Save ground truth data as png
-        img = Image.fromarray(np.uint8(segmentation_data_remapped), "L")
+        img = Image.fromarray(np.uint8(segmentation_data_remapped)).convert("L")
 
         image_id = "{:06d}".format(self._frame_id)
         file_path = f"{self.vid_dir}/{render_product_path}{image_id}-label.{self._image_output_format}"

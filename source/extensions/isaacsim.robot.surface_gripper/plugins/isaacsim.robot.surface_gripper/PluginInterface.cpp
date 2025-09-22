@@ -25,12 +25,14 @@
 
 #include "isaacsim/robot/surface_gripper/SurfaceGripperComponent.h"
 #include "isaacsim/robot/surface_gripper/SurfaceGripperManager.h"
+// Threading utilities
+#include "isaacsim/robot/surface_gripper/ThreadUtils.h"
 // clang-format on
 
 #include <carb/Framework.h>
 #include <carb/PluginUtils.h>
 #include <carb/logging/Log.h>
-#include <carb/settings/ISettings.h>
+// <carb/settings/ISettings.h> include removed: settings interface not used
 
 #include <isaacsim/robot/surface_gripper/ISurfaceGripper.h>
 #include <omni/fabric/usd/PathConversion.h>
@@ -44,6 +46,9 @@
 #include <omni/physx/IPhysx.h>
 #include <omni/physx/IPhysxSceneQuery.h>
 #include <omni/usd/UsdContext.h>
+
+#include <algorithm>
+#include <vector>
 
 const struct carb::PluginImplDesc g_kPluginDesc = { "isaacsim.robot.surface_gripper.plugin", "Surface Gripper",
                                                     "NVIDIA", carb::PluginHotReload::eDisabled, "dev" };
@@ -68,13 +73,13 @@ omni::physx::IPhysx* g_physx = nullptr;
 pxr::UsdStageWeakPtr g_stage = nullptr;
 omni::physics::tensors::TensorApi* g_tensorApi = nullptr;
 omni::physics::tensors::ISimulationView* g_simulationView = nullptr;
-omni::physics::tensors::TensorDesc rigidBodyData;
-carb::settings::ISettings* g_settings = nullptr;
 std::unique_ptr<isaacsim::robot::surface_gripper::SurfaceGripperManager> g_surfaceGripperManager;
 omni::physx::SubscriptionId g_stepSubscription;
 bool g_firstFrame = true;
 long int g_stageID;
 } // end of anonymous namespace
+
+// Parallel utilities are provided by ThreadUtils.h
 
 namespace surface_gripper
 {
@@ -107,20 +112,13 @@ bool CARB_ABI isSurfaceGripper(const char* primPath)
  * @param[in] primPath USD path of the gripper
  * @return Status string ("Open" or "Closed"), or empty string if not found
  */
-const char* CARB_ABI getGripperStatus(const char* primPath)
+int CARB_ABI getGripperStatus(const char* primPath)
 {
     if (g_stage && g_surfaceGripperManager)
     {
-        std::string status = g_surfaceGripperManager->getGripperStatus(primPath);
-        if (!status.empty())
-        {
-            // Return a static string to ensure it lives beyond this function call
-            static std::string statusStr;
-            statusStr = status;
-            return statusStr.c_str();
-        }
+        return static_cast<int>(g_surfaceGripperManager->getGripperStatus(primPath));
     }
-    return "";
+    return -1;
 }
 
 /**
@@ -132,7 +130,7 @@ bool CARB_ABI openGripper(const char* primPath)
 {
     if (g_stage && g_surfaceGripperManager)
     {
-        return g_surfaceGripperManager->setGripperStatus(primPath, "Open");
+        return g_surfaceGripperManager->setGripperStatus(primPath, isaacsim::robot::surface_gripper::GripperStatus::Open);
     }
     return false;
 }
@@ -146,7 +144,8 @@ bool CARB_ABI closeGripper(const char* primPath)
 {
     if (g_stage && g_surfaceGripperManager)
     {
-        return g_surfaceGripperManager->setGripperStatus(primPath, "Closed");
+        return g_surfaceGripperManager->setGripperStatus(
+            primPath, isaacsim::robot::surface_gripper::GripperStatus::Closed);
     }
     return false;
 }
@@ -196,6 +195,79 @@ std::vector<std::string> CARB_ABI getGrippedObjects(const char* primPath)
 }
 
 /**
+ * @brief Batched: get status strings for multiple surface grippers in parallel.
+ */
+std::vector<int> CARB_ABI getGripperStatusBatch(const char* const* primPaths, size_t count)
+{
+    std::vector<int> results(count);
+    if (primPaths == nullptr || count == 0)
+    {
+        return results;
+    }
+    isaacsim::robot::surface_gripper::parallelForIndex(
+        count, [&](size_t i) { results[i] = static_cast<int>(getGripperStatus(primPaths[i])); });
+    return results;
+}
+
+/**
+ * @brief Batched: open multiple surface grippers in parallel.
+ */
+std::vector<bool> CARB_ABI openGripperBatch(const char* const* primPaths, size_t count)
+{
+    std::vector<bool> results(count, false);
+    if (primPaths == nullptr || count == 0)
+    {
+        return results;
+    }
+    isaacsim::robot::surface_gripper::parallelForIndex(count, [&](size_t i) { results[i] = openGripper(primPaths[i]); });
+    return results;
+}
+
+/**
+ * @brief Batched: close multiple surface grippers in parallel.
+ */
+std::vector<bool> CARB_ABI closeGripperBatch(const char* const* primPaths, size_t count)
+{
+    std::vector<bool> results(count, false);
+    if (primPaths == nullptr || count == 0)
+    {
+        return results;
+    }
+    isaacsim::robot::surface_gripper::parallelForIndex(count, [&](size_t i) { results[i] = closeGripper(primPaths[i]); });
+    return results;
+}
+
+/**
+ * @brief Batched: set actions for multiple surface grippers in parallel.
+ */
+std::vector<bool> CARB_ABI setGripperActionBatch(const char* const* primPaths, const float* actions, size_t count)
+{
+    std::vector<bool> results(count, false);
+    if (primPaths == nullptr || actions == nullptr || count == 0)
+    {
+        return results;
+    }
+    isaacsim::robot::surface_gripper::parallelForIndex(
+        count, [&](size_t i) { results[i] = setGripperAction(primPaths[i], actions[i]); });
+    return results;
+}
+
+/**
+ * @brief Batched: get gripped objects arrays for multiple surface grippers in parallel.
+ */
+std::vector<std::vector<std::string>> CARB_ABI getGrippedObjectsBatch(const char* const* primPaths, size_t count)
+{
+    std::vector<std::vector<std::string>> results(count);
+    if (primPaths == nullptr || count == 0)
+    {
+        return results;
+    }
+    isaacsim::robot::surface_gripper::parallelForIndex(
+        count, [&](size_t i) { results[i] = getGrippedObjects(primPaths[i]); });
+    return results;
+}
+
+/**
  * @brief Gets a list of all surface grippers in the scene
  * @return Vector of prim paths for all surface grippers
  */
@@ -206,6 +278,16 @@ std::vector<std::string> CARB_ABI getAllGrippers()
         return g_surfaceGripperManager->getAllGrippers();
     }
     return std::vector<std::string>();
+}
+
+bool setWriteToUsd(const bool writeToUsd)
+{
+    if (g_surfaceGripperManager)
+    {
+        g_surfaceGripperManager->setWriteToUsd(writeToUsd);
+        return true;
+    }
+    return false;
 }
 
 } // namespace surface_gripper
@@ -344,7 +426,7 @@ void onPhysicsStep(float dt, void* userData)
     {
         if (g_firstFrame)
         {
-            CARB_PROFILE_ZONE(0, "SurfaceGripper::firstFramePlay");
+            CARB_PROFILE_ZONE(0, "[IsaacSim] SurfaceGripper::firstFramePlay");
             onPlay();
             g_firstFrame = false;
         }
@@ -402,12 +484,7 @@ CARB_EXPORT void carbOnPluginStartup()
     }
 
 
-    g_settings = carb::getCachedInterface<carb::settings::ISettings>();
-    if (!g_settings)
-    {
-        CARB_LOG_ERROR("*** Failed to acquire Carb Setting interface\n");
-        return;
-    }
+    // Carb settings interface removed (unused)
 
     g_surfaceGripperManager = std::make_unique<isaacsim::robot::surface_gripper::SurfaceGripperManager>(g_physx);
     // CARB_LOG_WARN("Surface Gripper Manager created");
@@ -452,11 +529,19 @@ void fillInterface(isaacsim::robot::surface_gripper::SurfaceGripperInterface& if
     using namespace isaacsim::robot::surface_gripper;
     memset(&iface, 0, sizeof(iface));
 
-    iface.GetGripperStatus = surface_gripper::getGripperStatus;
-    iface.OpenGripper = surface_gripper::openGripper;
-    iface.CloseGripper = surface_gripper::closeGripper;
-    iface.SetGripperAction = surface_gripper::setGripperAction;
-    iface.GetGrippedObjects = surface_gripper::getGrippedObjects;
+    iface.getGripperStatus = surface_gripper::getGripperStatus;
+    iface.openGripper = surface_gripper::openGripper;
+    iface.closeGripper = surface_gripper::closeGripper;
+    iface.setGripperAction = surface_gripper::setGripperAction;
+    iface.getGrippedObjects = surface_gripper::getGrippedObjects;
+    iface.setWriteToUsd = surface_gripper::setWriteToUsd;
+
+    // Batched functions
+    iface.getGripperStatusBatch = surface_gripper::getGripperStatusBatch;
+    iface.openGripperBatch = surface_gripper::openGripperBatch;
+    iface.closeGripperBatch = surface_gripper::closeGripperBatch;
+    iface.setGripperActionBatch = surface_gripper::setGripperActionBatch;
+    iface.getGrippedObjectsBatch = surface_gripper::getGrippedObjectsBatch;
 }
 
 #ifdef _WIN32

@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.6.0] - 2025-07-10
+### Added
+- Added `robot_type`, `license`, `version`, `source`, and `changelog` to the Isaac Robot API.
+
 ## [3.5.1] - 2025-06-12
 ### Changed
 - Get extension path using `os` module since carb tokens can not be resolved by Sphinx

@@ -1,4 +1,18 @@
 # Changelog
+## [2.3.1] - 2025-08-29
+### Changed
+- Renamed CARB profiling zones to include [IsaacSim] prefix
+
+## [2.3.0] - 2025-08-12
+### Added
+- Unit tests for sensor creation commands.
+
+### Changed
+- Standardized sensor creation command arguments.
+
+### Fixed
+- Setting LightBeam sensor orientation and translation works correctly.
+
 ## [2.2.27] - 2025-07-07
 ### Changed
 - Add unit test for pybind11 module docstrings

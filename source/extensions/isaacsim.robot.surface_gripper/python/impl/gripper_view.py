@@ -94,12 +94,25 @@ class GripperView(XformPrim):
         Returns:
             list[str]: Status of the surface grippers ("Open", "Closing", or "Closed"). Shape (M,).
         """
-        gripper_status = []
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
-        for i in indices:
-            gripper_status.append(self.surface_gripper_interface.get_gripper_status(self.prims[i].GetPath().pathString))
+        prim_paths = [self.prims[i].GetPath().pathString for i in indices]
+        return self.surface_gripper_interface.get_gripper_status_batch(prim_paths)
 
-        return gripper_status
+    def get_gripped_objects(self, indices: list | np.ndarray | wp.array | None = None) -> list[str]:
+        """Get the gripped objects for the surface grippers.
+
+        Args:
+            indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
+                     Defaults to None (i.e: all prims in the view).
+
+        Returns:
+            list[str]: List of gripped object paths for each gripper. Shape (M,).
+
+        """
+
+        indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
+        prim_paths = [self.prims[i].GetPath().pathString for i in indices]
+        return self.surface_gripper_interface.get_gripped_objects_batch(prim_paths)
 
     def get_surface_gripper_properties(
         self, indices: list | np.ndarray | wp.array | None = None
@@ -153,12 +166,17 @@ class GripperView(XformPrim):
             raise ValueError("Length of values must match number of grippers")
 
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
+        prim_paths: list[str] = []
+        actions: list[float] = []
         for i in indices:
             # Ensure indice has a matching values
             if i >= len(values):
                 raise ValueError("Indices should be compatible with length of values")
+            prim_paths.append(self.prims[i].GetPath().pathString)
+            actions.append(values[i])
 
-            self.surface_gripper_interface.set_gripper_action(self.prims[i].GetPath().pathString, values[i])
+        if len(prim_paths) > 0:
+            self.surface_gripper_interface.set_gripper_action_batch(prim_paths, actions)
 
         return
 

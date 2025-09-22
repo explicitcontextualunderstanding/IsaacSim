@@ -28,84 +28,86 @@ from isaacsim.storage.native import get_assets_root_path
 
 
 class Extension(omni.ext.IExt):
+    # Example names and categories as class constants for easier maintenance
+    NOVA_CARTER_NAME = "Nova Carter"
+    NOVA_CARTER_JOINT_STATES_NAME = "Nova Carter Joint States"
+    IW_HUB_NAME = "iw_hub"
+    SAMPLE_SCENE_NAME = "Sample Scene"
+    PERCEPTOR_SCENE_NAME = "Perceptor Scene"
+    HOSPITAL_SCENE_NAME = "Hospital Scene"
+    OFFICE_SCENE_NAME = "Office Scene"
+
+    # Categories
+    ROS2_NAVIGATION_CATEGORY = "ROS2/Navigation"
+    ROS2_ISAAC_ROS_CATEGORY = "ROS2/Isaac ROS"
+    ROS2_MULTIPLE_ROBOTS_CATEGORY = "ROS2/Navigation/Multiple Robots"
+
     def on_startup(self, ext_id: str):
+        """Initialize the extension and register all examples."""
         self._ext_id = ext_id
+        self._registered_examples = []  # Track registered examples for cleanup
 
-        nova_carter_name = "Nova Carter"
-        get_browser_instance().register_example(
-            name=nova_carter_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                nova_carter_name, "/Isaac/Samples/ROS2/Scenario/carter_warehouse_navigation.usd"
-            ),
-            category="ROS2/Navigation",
+        # Register Nova Carter example
+        self._register_example(
+            name=self.NOVA_CARTER_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/carter_warehouse_navigation.usd",
+            category=self.ROS2_NAVIGATION_CATEGORY,
         )
 
-        nova_carter_joint_states_name = "Nova Carter Joint States"
-        get_browser_instance().register_example(
-            name=nova_carter_joint_states_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                nova_carter_joint_states_name,
-                "/Isaac/Samples/ROS2/Scenario/carter_warehouse_navigation_joint_states.usd",
-            ),
-            category="ROS2/Navigation",
+        # Register Nova Carter Joint States example
+        self._register_example(
+            name=self.NOVA_CARTER_JOINT_STATES_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/carter_warehouse_navigation_joint_states.usd",
+            category=self.ROS2_NAVIGATION_CATEGORY,
         )
 
-        iw_hub_name = "iw_hub"
-        get_browser_instance().register_example(
-            name=iw_hub_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                iw_hub_name, "/Isaac/Samples/ROS2/Scenario/iw_hub_warehouse_navigation.usd"
-            ),
-            category="ROS2/Navigation",
+        # Register iw_hub example
+        self._register_example(
+            name=self.IW_HUB_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/iw_hub_warehouse_navigation.usd",
+            category=self.ROS2_NAVIGATION_CATEGORY,
         )
 
-        sample_scene_name = "Sample Scene"
-        get_browser_instance().register_example(
-            name=sample_scene_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                sample_scene_name, "/Isaac/Samples/ROS2/Scenario/carter_warehouse_apriltags_worker.usd"
-            ),
-            category="ROS2/Isaac ROS",
+        # Register Sample Scene example
+        self._register_example(
+            name=self.SAMPLE_SCENE_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/carter_warehouse_apriltags_worker.usd",
+            category=self.ROS2_ISAAC_ROS_CATEGORY,
         )
 
-        perceptor_scene_name = "Perceptor Scene"
-        get_browser_instance().register_example(
-            name=perceptor_scene_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                perceptor_scene_name, "/Isaac/Samples/ROS2/Scenario/perceptor_navigation.usd"
-            ),
-            category="ROS2/Isaac ROS",
+        # Register Perceptor Scene example
+        self._register_example(
+            name=self.PERCEPTOR_SCENE_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/perceptor_navigation.usd",
+            category=self.ROS2_ISAAC_ROS_CATEGORY,
         )
 
-        hospital_scene_name = "Hospital Scene"
-        get_browser_instance().register_example(
-            name=hospital_scene_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                hospital_scene_name, "/Isaac/Samples/ROS2/Scenario/multiple_robot_carter_hospital_navigation.usd"
-            ),
-            category="ROS2/Navigation/Multiple Robots",
+        # Register Hospital Scene example
+        self._register_example(
+            name=self.HOSPITAL_SCENE_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/multiple_robot_carter_hospital_navigation.usd",
+            category=self.ROS2_MULTIPLE_ROBOTS_CATEGORY,
         )
 
-        office_scene_name = "Office Scene"
-        get_browser_instance().register_example(
-            name=office_scene_name,
-            execute_entrypoint=self.build_window,
-            ui_hook=lambda a=weakref.proxy(self): a.build_ui(
-                office_scene_name, "/Isaac/Samples/ROS2/Scenario/multiple_robot_carter_office_navigation.usd"
-            ),
-            category="ROS2/Navigation/Multiple Robots",
+        # Register Office Scene example
+        self._register_example(
+            name=self.OFFICE_SCENE_NAME,
+            file_path="/Isaac/Samples/ROS2/Scenario/multiple_robot_carter_office_navigation.usd",
+            category=self.ROS2_MULTIPLE_ROBOTS_CATEGORY,
         )
 
-    def build_window(self):
-        pass
+    def _register_example(self, name: str, file_path: str, category: str):
+        """Register a single example and track it for cleanup."""
+        get_browser_instance().register_example(
+            name=name,
+            ui_hook=lambda a=weakref.proxy(self), n=name, f=file_path: a.build_ui(n, f),
+            category=category,
+        )
+        # Track the registered example for proper cleanup
+        self._registered_examples.append((name, category))
 
     def build_ui(self, name, file_path):
+        """Build the UI for the example."""
 
         # check if ros2 bridge is enabled before proceeding
         extension_enabled = omni.kit.app.get_app().get_extension_manager().is_extension_enabled("isaacsim.ros2.bridge")
@@ -128,6 +130,8 @@ class Extension(omni.ext.IExt):
                 )
 
     def _on_environment_setup(self, stage_path):
+        """Load the specified USD stage asynchronously."""
+
         async def load_stage(path):
             await omni.usd.get_context().open_stage_async(path)
 
@@ -140,9 +144,6 @@ class Extension(omni.ext.IExt):
         asyncio.ensure_future(load_stage(scenario_path))
 
     def on_shutdown(self):
-        get_browser_instance().deregister_example(name="Carter", category="ROS2")
-        get_browser_instance().deregister_example(name="iw_hub", category="ROS2")
-        get_browser_instance().deregister_example(name="Sample Scene", category="Isaac ROS")
-        get_browser_instance().deregister_example(name="Perceptor Scene", category="Isaac ROS")
-        get_browser_instance().deregister_example(name="Hospital Scene", category="ROS2")
-        get_browser_instance().deregister_example(name="Office Scene", category="ROS2")
+        """Clean up by deregistering all registered examples."""
+        for name, category in self._registered_examples:
+            get_browser_instance().deregister_example(name=name, category=category)

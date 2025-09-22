@@ -18,10 +18,11 @@ import unittest
 
 import numpy as np
 import omni.kit.test
-from isaacsim.core.api import World
+from isaacsim.core.api import SimulationContext
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
 from isaacsim.core.prims import XFormPrim
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.core.utils.numpy.rotations import euler_angles_to_quats
 
 # NOTE:
@@ -38,10 +39,11 @@ from .common import CoreTestCase
 class TestXFormPrimView(CoreTestCase):
     async def setUp(self):
         await super().setUp()
-        World.clear_instance()
+        SimulationContext.clear_instance()
         await create_new_stage_async()
-        self._my_world = World()
-        await self._my_world.initialize_simulation_context_async()
+        self._my_context = SimulationContext()
+        SimulationManager.enable_fabric(enable=False)
+        await self._my_context.initialize_simulation_context_async()
         assets_root_path = await get_assets_root_path_async()
         asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         add_reference_to_stage(usd_path=asset_path, prim_path="/World/Franka_1")
@@ -86,7 +88,9 @@ class TestXFormPrimView(CoreTestCase):
 
     @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
     async def test_world_poses_fabric(self):
+        print("test_world_poses_fabric get_world_poses started")
         current_positions, current_orientations = self._frankas_view.get_world_poses(usd=False)
+        print("test_world_poses_fabric get_world_poses done")
         self.assertTrue(np.isclose(current_positions, np.zeros([2, 3], dtype=np.float32)).all())
         expected_orientations = np.zeros([2, 4], dtype=np.float32)
         expected_orientations[:, 0] = 1
@@ -94,8 +98,11 @@ class TestXFormPrimView(CoreTestCase):
 
         new_positions = np.array([[10.0, 10.0, 0], [-40, -40, 0]])
         new_orientations = euler_angles_to_quats(np.array([[0, 0, np.pi / 2.0], [0, 0, -np.pi / 2.0]]))
+        print("test_world_poses_fabric set_world_poses start")
         self._frankas_view.set_world_poses(positions=new_positions, orientations=new_orientations, usd=False)
+        print("test_world_poses_fabric set_world_poses done, get_world_poses started")
         current_positions, current_orientations = self._frankas_view.get_world_poses(usd=False)
+        print("test_world_poses_fabric get_world_poses done")
         self.assertTrue(np.isclose(current_positions, new_positions).all())
         self.assertTrue(
             np.logical_or(
@@ -103,6 +110,7 @@ class TestXFormPrimView(CoreTestCase):
                 np.isclose(current_orientations, -new_orientations, atol=1e-05).all(axis=1),
             ).all()
         )
+        print("test_world_poses_fabric done")
         return
 
     async def test_local_pose(self):
@@ -147,10 +155,6 @@ class TestXFormPrimView(CoreTestCase):
                 self.assertEqual(visibility_attr, "invisible")
 
     async def test_scale_units_resolve(self):
-        World.clear_instance()
-        await create_new_stage_async()
-        self._my_world = World()
-        await self._my_world.initialize_simulation_context_async()
         os.path.dirname(os.path.abspath(__file__))
         add_reference_to_stage(
             usd_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/cm_asset.usd"), prim_path="/World"

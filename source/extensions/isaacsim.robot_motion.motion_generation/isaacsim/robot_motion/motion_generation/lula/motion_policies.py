@@ -150,7 +150,6 @@ class RmpFlow(LulaInterfaceHelper, MotionPolicy):
 
             active_joint_velocity_targets : Velocity targets for the robot in the next frame
         """
-
         self._update_robot_joint_states(active_joint_positions, active_joint_velocities, frame_duration)
         return self._robot_joint_positions, self._robot_joint_velocities
 
@@ -163,7 +162,6 @@ class RmpFlow(LulaInterfaceHelper, MotionPolicy):
 
         Visualizing collision spheres as prims on the stage is likely to significantly slow down the framerate of the simulation.  This function should only be used for debugging purposes
         """
-
         if len(self._collision_spheres) == 0:
             self._create_collision_sphere_prims(True)
         else:
@@ -460,7 +458,8 @@ class RmpFlow(LulaInterfaceHelper, MotionPolicy):
             )
         with Sdf.ChangeBlock():
             for sphere, sphere_pose in zip(self._collision_spheres, sphere_poses):
-                sphere.set_world_pose(sphere_pose / self._meters_per_unit)
+                sphere_translation = self._robot_rot @ sphere_pose + self._robot_pos
+                sphere.set_world_pose(position=sphere_translation / self._meters_per_unit)
                 sphere.set_visibility(is_visible)
 
     def _update_collision_sphere_prims(self):
@@ -471,8 +470,10 @@ class RmpFlow(LulaInterfaceHelper, MotionPolicy):
 
         sphere_poses = self._policy.collision_sphere_positions(joint_positions)
 
-        for col_sphere, new_pose in zip(self._collision_spheres, sphere_poses):
-            col_sphere.set_world_pose(position=new_pose / self._meters_per_unit)
+        for col_sphere, sphere_pose in zip(self._collision_spheres, sphere_poses):
+            # Transform the sphere pose to the world frame
+            sphere_translation = self._robot_rot @ sphere_pose + self._robot_pos
+            col_sphere.set_world_pose(position=sphere_translation / self._meters_per_unit)
 
     def _update_end_effector_prim(self):
         if self._ee_visual is None:

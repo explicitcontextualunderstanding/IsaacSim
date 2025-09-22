@@ -1,4 +1,13 @@
 # Changelog
+
+## [1.1.6] - 2025-08-21
+### Changed
+- RTX Lidar menu options now use IsaacSensorCreateRtxLidar command to align with other APIs
+
+## [1.1.5] - 2025-08-06
+### Changed
+- Remove test_helpers_gfx from test dependencies
+
 ## [1.1.4] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.1.3)

@@ -30,6 +30,9 @@ import omni.kit.commands
 from isaacsim.core.version import get_version
 from omni.client import CopyBehavior, Result
 
+DEFAULT_ASSET_ROOT_PATH_SETTING = "/persistent/isaac/asset_root/default"
+DEFAULT_ASSET_ROOT_TIMEOUT_SETTING = "/persistent/isaac/asset_root/timeout"
+
 
 class Version(namedtuple("Version", "major minor patch")):
     def __new__(cls, s):
@@ -283,8 +286,8 @@ def get_server_path(suffix: str = "") -> typing.Union[str, None]:
         url (str): URL of Nucleus server with path to folder.
         Returns None if Nucleus server not found.
     """
-    carb.log_info("Check /persistent/isaac/asset_root/default setting")
-    default_asset_root = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
+    carb.log_info(f"Check {DEFAULT_ASSET_ROOT_PATH_SETTING} setting")
+    default_asset_root = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_PATH_SETTING)
     server_root = get_url_root(default_asset_root)
     if server_root:
         result = check_server(server_root, suffix)
@@ -306,8 +309,8 @@ async def get_server_path_async(suffix: str = "") -> typing.Union[str, None]:
         url (str): URL of Nucleus server with path to folder.
         Returns None if Nucleus server not found.
     """
-    carb.log_info("Check /persistent/isaac/asset_root/default setting")
-    default_asset_root = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
+    carb.log_info(f"Check {DEFAULT_ASSET_ROOT_PATH_SETTING} setting")
+    default_asset_root = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_PATH_SETTING)
     server_root = get_url_root(default_asset_root)
     if server_root:
         result = await check_server_async(server_root, suffix)
@@ -388,7 +391,7 @@ def get_full_asset_path(path: str) -> typing.Union[str, None]:
     """
 
     # 1 - Check /persistent/isaac/asset_root/default setting
-    default_asset_root = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
+    default_asset_root = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_PATH_SETTING)
     if default_asset_root:
         result = check_server(default_asset_root, path)
         if result:
@@ -422,7 +425,7 @@ async def get_full_asset_path_async(path: str) -> typing.Union[str, None]:
     """
 
     # 1 - Check /persistent/isaac/asset_root/default setting
-    default_asset_root = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
+    default_asset_root = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_PATH_SETTING)
     if default_asset_root:
         result = await check_server_async(default_asset_root, path)
         if result:
@@ -455,65 +458,79 @@ def get_isaac_asset_root_path() -> typing.Union[str, None]:
     return None
 
 
-def get_assets_root_path() -> typing.Union[str, None]:
+def get_assets_root_path(*, skip_check: bool = False) -> str:
     """Tries to find the root path to the Isaac Sim assets on a Nucleus server
 
-    Raises:
-        RuntimeError: if the root path is not found.
-
-    Returns:
-        typing.Union[str, None]:
-            url (str): URL of Nucleus server with root path to assets folder.
-            Returns None if Nucleus server not found.
-    """
-
-    # get timeout
-    timeout = carb.settings.get_settings().get("/persistent/isaac/asset_root/timeout")
-    if not isinstance(timeout, (int, float)):
-        timeout = 10.0
-
-    # Check /persistent/isaac/asset_root/default setting
-    carb.log_info("Check /persistent/isaac/asset_root/default setting")
-    default_asset_root = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
-    if default_asset_root:
-        result = check_server(default_asset_root, "/Isaac", timeout)
-        if result:
-            result = check_server(default_asset_root, "/NVIDIA", timeout)
-            if result:
-                carb.log_info("Assets root found at {}".format(default_asset_root))
-                return default_asset_root
-
-    raise RuntimeError("Could not find assets root folder")
-
-
-async def get_assets_root_path_async() -> typing.Union[str, None]:
-    """Tries to find the root path to the Isaac Sim assets on a Nucleus server (asynchronous version).
+    Args:
+        skip_check (bool): If True, skip the checking step to verify that the resolved path exists.
 
     Raises:
+        RuntimeError: if the root path setting is not set.
         RuntimeError: if the root path is not found.
 
     Returns:
         url (str): URL of Nucleus server with root path to assets folder.
-        Returns None if Nucleus server not found.
     """
 
     # get timeout
-    timeout = carb.settings.get_settings().get("/persistent/isaac/asset_root/timeout")
+    timeout = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_TIMEOUT_SETTING)
     if not isinstance(timeout, (int, float)):
         timeout = 10.0
 
-    # Check /persistent/isaac/asset_root/default setting
-    carb.log_info("Check /persistent/isaac/asset_root/default setting")
-    default_asset_root = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
-    if default_asset_root:
-        result = await check_server_async(default_asset_root, "/Isaac", timeout)
-        if result:
-            result = await check_server_async(default_asset_root, "/NVIDIA", timeout)
-            if result:
-                carb.log_info("Assets root found at {}".format(default_asset_root))
-                return default_asset_root
+    # resolve path
+    carb.log_info(f"Check {DEFAULT_ASSET_ROOT_PATH_SETTING} setting")
+    default_asset_root = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_PATH_SETTING)
+    if not default_asset_root:
+        raise RuntimeError(f"The '{DEFAULT_ASSET_ROOT_PATH_SETTING}' setting is not set")
+    if skip_check:
+        return default_asset_root
 
-    raise RuntimeError("Could not find assets root folder")
+    # check path
+    result = check_server(default_asset_root, "/Isaac", timeout)
+    if result:
+        result = check_server(default_asset_root, "/NVIDIA", timeout)
+        if result:
+            carb.log_info(f"Assets root found at {default_asset_root}")
+            return default_asset_root
+
+    raise RuntimeError(f"Could not find assets root folder: {default_asset_root}")
+
+
+async def get_assets_root_path_async(*, skip_check: bool = False) -> str:
+    """Tries to find the root path to the Isaac Sim assets on a Nucleus server (asynchronous version).
+
+    Args:
+        skip_check (bool): If True, skip the checking step to verify that the resolved path exists.
+
+    Raises:
+        RuntimeError: if the root path setting is not set.
+        RuntimeError: if the root path is not found.
+
+    Returns:
+        url (str): URL of Nucleus server with root path to assets folder.
+    """
+
+    # get timeout
+    timeout = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_TIMEOUT_SETTING)
+    if not isinstance(timeout, (int, float)):
+        timeout = 10.0
+
+    # resolve path
+    carb.log_info(f"Check {DEFAULT_ASSET_ROOT_PATH_SETTING} setting")
+    default_asset_root = carb.settings.get_settings().get(DEFAULT_ASSET_ROOT_PATH_SETTING)
+    if not default_asset_root:
+        raise RuntimeError(f"The '{DEFAULT_ASSET_ROOT_PATH_SETTING}' setting is not set")
+    if skip_check:
+        return default_asset_root
+
+    # check path
+    result = await check_server_async(default_asset_root, "/Isaac", timeout)
+    if result:
+        result = await check_server_async(default_asset_root, "/NVIDIA", timeout)
+        if result:
+            carb.log_info(f"Assets root found at {default_asset_root}")
+            return default_asset_root
+    raise RuntimeError(f"Could not find assets root folder: {default_asset_root}")
 
 
 def get_assets_server() -> typing.Union[str, None]:

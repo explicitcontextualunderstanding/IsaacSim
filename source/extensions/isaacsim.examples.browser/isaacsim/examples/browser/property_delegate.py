@@ -36,7 +36,7 @@ class PropAssetPropertyDelegate(BrowserPropertyDelegate):
                 self._build_thumbnail(item)
             with ui.HStack():
                 ui.Spacer()
-                self._name_label = ui.Label(item.name, height=0, style_type_name_override="Asset.Title")
+                self._name_label = ui.Label(item.name, height=0)
                 ui.Spacer()
             item.ui_hook()
 
