@@ -1054,4 +1054,5 @@ python_analysis_extra_mapping = [
 ########################################################################################################################
 
 [repo_edit_sysconfig]
-sysconfig_path = "${root}/_build/${platform}/${config}/kit/python/lib/python3.11/_sysconfigdata__linux_x86_64-linux-gnu.py"
+"platform:linux-x86_64".sysconfig_path = "${root}/_build/${platform}/${config}/kit/python/lib/python3.11/_sysconfigdata__linux_x86_64-linux-gnu.py"
+"platform:linux-aarch64".sysconfig_path = "${root}/_build/${platform}/${config}/kit/python/lib/python3.11/_sysconfigdata__linux_aarch64-linux-gnu.py"

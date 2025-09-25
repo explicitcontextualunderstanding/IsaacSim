@@ -61,7 +61,6 @@ for _, ros_distro in ipairs(ros_distributions) do
     add_files("iface", "include")
     includedirs {
         "%{root}/source/extensions/isaacsim.core.includes/include",
-        "%{root}/_build/target-deps/cuda/include",
         "%{root}/_build/target-deps/omni_physics/%{config}/include",
         "%{root}/_build/target-deps/nv_ros2_" .. ros_distro .. "/include",
         "%{root}/_build/target-deps/nlohmann_json/include",
@@ -276,7 +275,6 @@ cppdialect("C++17")
         "%{target_deps}/doctest/include",
         "%{root}/source/extensions/isaacsim.ros2.bridge/include",
         "%{root}/_build/target-deps/nlohmann_json/include",
-        "%{root}/_build/target-deps/cuda/include",
         "%{root}/source/deprecated/omni.isaac.dynamic_control/include",
         "%{root}/source/extensions/isaacsim.core.includes/include",
         "%{root}/_build/target-deps/python/include/python3.11",

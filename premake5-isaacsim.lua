@@ -182,9 +182,9 @@ function add_cuda_dependencies()
     -- Add in the library directories
     filter { "system:linux" }
     -- lib dir stubs in case you link against 'cuda'.
-    libdirs { target_deps .. "/cuda/lib64/stubs" }
+    libdirs { cudaLibPathLinux .. "/stubs" }
     -- lib dir in case you link against 'cudart_static'.
-    libdirs { target_deps .. "/cuda/lib64/" }
+    libdirs { cudaLibPathLinux }
     links { "cuda" }
 
     -- linking to cudart_static requires libpthread, libdl, and librt
@@ -197,7 +197,7 @@ function add_cuda_dependencies()
     filter {}
 
     -- CUDA-specific include directory
-    includedirs { target_deps .. "/cuda/include" }
+    includedirs { cudaIncludePath }
 end
 
 -- Define experience to test one particular extension.

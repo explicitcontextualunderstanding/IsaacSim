@@ -235,7 +235,31 @@ function group_apps(kit)
     )
 end
 
-nvccPath = path.getabsolute("_build/target-deps/cuda/bin/nvcc")
+-- Check for system NVCC first, but only on ARM64 (aarch64) where glibc compatibility issues exist
+local systemNvccPath = "/usr/local/cuda/bin/nvcc"
+local hostArch = os.hostarch()
+local isAarch64 = hostArch == "aarch64" or hostArch == "arm64" or hostArch == "ARM64"
+
+if isAarch64 and os.isfile(systemNvccPath) then
+    nvccPath = systemNvccPath
+    cudaIncludePath = "/usr/local/cuda/include"
+    cudaLibPathLinux = "/usr/local/cuda/lib64"
+    print("Using system NVCC (ARM64): " .. nvccPath)
+    print("Using system CUDA includes (ARM64): " .. cudaIncludePath)
+    print("Using system CUDA libs (ARM64): " .. cudaLibPathLinux)
+else
+    nvccPath = path.getabsolute("_build/target-deps/cuda/bin/nvcc")
+    cudaIncludePath = path.getabsolute("_build/target-deps/cuda/include")
+    cudaLibPathLinux = path.getabsolute("_build/target-deps/cuda/lib64")
+    if isAarch64 then
+        print("Using target-deps NVCC (ARM64, system NVCC not found): " .. nvccPath)
+    else
+        print("Using target-deps NVCC (x86_64): " .. nvccPath)
+    end
+    print("Using target-deps CUDA includes: " .. cudaIncludePath)
+    print("Using target-deps CUDA libs: " .. cudaLibPathLinux)
+end
+
 filter { "system:windows" }
 nvccHostCompilerVS = path.getabsolute("_build/host-deps/msvc/VC")
 filter {}
