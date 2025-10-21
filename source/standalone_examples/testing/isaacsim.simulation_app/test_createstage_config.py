@@ -31,4 +31,5 @@ stage_utils.create_new_stage()
 for i in range(100):
     kit.update()
 
+stage_utils.close_stage()
 kit.close()  # Cleanup application

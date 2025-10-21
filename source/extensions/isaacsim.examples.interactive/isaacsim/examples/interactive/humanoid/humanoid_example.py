@@ -60,7 +60,7 @@ class HumanoidExample(BaseSample):
         )
         timeline = omni.timeline.get_timeline_interface()
         self._event_timer_callback = timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-            int(omni.timeline.TimelineEventType.STOP), self._timeline_timer_callback_fn
+            int(omni.timeline.TimelineEventType.PLAY), self._timeline_timer_callback_fn
         )
 
     async def setup_post_load(self) -> None:
@@ -69,11 +69,14 @@ class HumanoidExample(BaseSample):
         self._keyboard = self._appwindow.get_keyboard()
         self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
         self._physics_ready = False
-        self.get_world().add_physics_callback("physics_step", callback_fn=self.on_physics_step)
+        if not self.get_world().physics_callback_exists("physics_step"):
+            self.get_world().add_physics_callback("physics_step", callback_fn=self.on_physics_step)
         await self.get_world().play_async()
 
     async def setup_post_reset(self) -> None:
         self._physics_ready = False
+        if not self.get_world().physics_callback_exists("physics_step"):
+            self.get_world().add_physics_callback("physics_step", callback_fn=self.on_physics_step)
         await self.get_world().play_async()
 
     def on_physics_step(self, step_size) -> None:
@@ -102,6 +105,8 @@ class HumanoidExample(BaseSample):
     def _timeline_timer_callback_fn(self, event) -> None:
         if self.h1:
             self._physics_ready = False
+        if not self.get_world().physics_callback_exists("physics_step"):
+            self.get_world().add_physics_callback("physics_step", callback_fn=self.on_physics_step)
 
     def world_cleanup(self):
         world = self.get_world()

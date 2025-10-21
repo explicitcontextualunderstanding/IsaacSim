@@ -297,7 +297,7 @@ class Mesh(XformPrim):
     """
 
     def set_points(
-        self, points: list[list | np.ndarray | wp.array], *, indices: list | np.ndarray | wp.array | None = None
+        self, points: list[list | np.ndarray | wp.array], *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the mesh points (in local space) of the prims.
 
@@ -325,7 +325,7 @@ class Mesh(XformPrim):
             data = ops_utils.place(points[0 if len(points) == 1 else i], device="cpu").numpy().reshape((-1, 3))
             self.geoms[index].GetPointsAttr().Set(Vt.Vec3fArray(data.tolist()))
 
-    def get_points(self, *, indices: list | np.ndarray | wp.array | None = None) -> list[wp.array]:
+    def get_points(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> list[wp.array]:
         """Get the mesh points (in local space) of the prims.
 
         Backends: :guilabel:`usd`.
@@ -360,7 +360,7 @@ class Mesh(XformPrim):
         return data
 
     def set_normals(
-        self, normals: list[list | np.ndarray | wp.array], *, indices: list | np.ndarray | wp.array | None = None
+        self, normals: list[list | np.ndarray | wp.array], *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the mesh normals (object-space orientation for individual points) of the prims.
 
@@ -393,7 +393,7 @@ class Mesh(XformPrim):
             data = ops_utils.place(normals[0 if len(normals) == 1 else i], device="cpu").numpy().reshape((-1, 3))
             self.geoms[index].GetNormalsAttr().Set(Vt.Vec3fArray(data.tolist()))
 
-    def get_normals(self, *, indices: list | np.ndarray | wp.array | None = None) -> list[wp.array]:
+    def get_normals(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> list[wp.array]:
         """Get the mesh normals (object-space orientation for individual points) of the prims.
 
         Backends: :guilabel:`usd`.
@@ -433,7 +433,7 @@ class Mesh(XformPrim):
         ) = None,
         hole_indices: list[list | np.ndarray | wp.array] | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the face (3D model flat surface) specifications of the prims.
 
@@ -501,7 +501,7 @@ class Mesh(XformPrim):
                 data = hole_indices[0 if len(hole_indices) == 1 else i]
                 geom.GetHoleIndicesAttr().Set(Vt.IntArray(data.tolist()))
 
-    def get_face_specs(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[
+    def get_face_specs(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> tuple[
         list[wp.array],
         list[wp.array],
         list[Literal["none", "cornersOnly", "cornersPlus1", "cornersPlus2", "boundaries", "all"]],
@@ -558,7 +558,7 @@ class Mesh(XformPrim):
         crease_lengths: list[list | np.ndarray | wp.array],
         crease_sharpnesses: list[list | np.ndarray | wp.array],
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the crease (set of adjacent sharpened edges) specifications of the prims.
 
@@ -623,7 +623,7 @@ class Mesh(XformPrim):
             geom.GetCreaseSharpnessesAttr().Set(Vt.FloatArray(crease_sharpness.tolist()))
 
     def get_crease_specs(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[list[wp.array], list[wp.array], list[wp.array]]:
         """Get the crease (set of adjacent sharpened edges) specifications of the prims.
 
@@ -667,7 +667,7 @@ class Mesh(XformPrim):
         corner_indices: list[list | np.ndarray | wp.array],
         corner_sharpnesses: list[list | np.ndarray | wp.array],
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the corner specifications of the prims.
 
@@ -711,7 +711,7 @@ class Mesh(XformPrim):
             geom.GetCornerSharpnessesAttr().Set(Vt.FloatArray(corner_sharpness.tolist()))
 
     def get_corner_specs(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[list[wp.array], list[wp.array]]:
         """Get the corner specifications of the prims.
 
@@ -752,7 +752,7 @@ class Mesh(XformPrim):
         interpolate_boundaries: list[Literal["none", "edgeOnly", "edgeAndCorner"]] | None = None,
         triangle_subdivision_rules: list[Literal["catmullClark", "smooth"]] | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the subdivision specifications of the prims.
 
@@ -802,7 +802,7 @@ class Mesh(XformPrim):
                 data = np.broadcast_to(np.array(triangle_subdivision_rules, dtype=object), (indices.shape[0],))
                 geom.GetTriangleSubdivisionRuleAttr().Set(data[i])
 
-    def get_subdivision_specs(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[
+    def get_subdivision_specs(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> tuple[
         list[Literal["catmullClark", "loop", "bilinear", "none"]],
         list[Literal["none", "edgeOnly", "edgeAndCorner"]],
         list[Literal["catmullClark", "smooth"]],

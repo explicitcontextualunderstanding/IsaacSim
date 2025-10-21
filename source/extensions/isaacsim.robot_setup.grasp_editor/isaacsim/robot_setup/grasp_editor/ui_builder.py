@@ -782,7 +782,7 @@ class UIBuilder:
             self._articulation = SingleArticulation(self._gripper_selection_dropdown.get_selection())
             self._articulation.initialize()
 
-            self._rigid_body = RigidPrim(rb_prim_path)
+            self._rigid_body = RigidPrim(rb_prim_path, reset_xform_properties=False)
             self._rigid_body.initialize()
             self._rigid_body.disable_gravities()
 

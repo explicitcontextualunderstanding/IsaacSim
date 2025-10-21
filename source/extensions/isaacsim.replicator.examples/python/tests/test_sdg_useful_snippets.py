@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import carb.settings
 import omni.kit
 import omni.usd
 from isaacsim.test.utils.file_validation import validate_folder_contents
@@ -23,6 +24,7 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
+        self.original_dlss_exec_mode = carb.settings.get_settings().get("rtx/post/dlss/execMode")
 
     async def tearDown(self):
         omni.usd.get_context().close_stage()
@@ -30,6 +32,7 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", self.original_dlss_exec_mode)
 
     async def test_sdg_snippet_multi_camera(self):
         import os
@@ -182,6 +185,9 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
 
         # Setting capture on play to False will prevent the replicator from capturing data each frame
         carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
+
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)))))))))
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
         # Create a camera and render product to collect the data from
         cam = rep.create.camera(position=(5, 5, 5), look_at=(0, 0, 0))
@@ -385,6 +391,9 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             # Create a new stage with the assets
             setup_stage()
             stage = omni.usd.get_context().get_stage()
+
+            # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto))))))))))))))))
+            carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
             # Set replicator settings (capture only on request and enable motion blur)
             carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)

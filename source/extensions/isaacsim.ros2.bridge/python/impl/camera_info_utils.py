@@ -111,6 +111,9 @@ def read_camera_info(render_product_path: str) -> Tuple:
     camera_info.width = width
     camera_info.height = height
     # Set default intrinsic matrix (k)
+    if fy != fx:
+        carb.log_warn(f"Forcing fy to fx ({fy} != {fx}) when computing CameraInfo, as renderer assumes square pixels.")
+        fy = fx
     camera_info.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
     # Set default rectification matrix (r)
     camera_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]

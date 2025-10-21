@@ -163,7 +163,11 @@ class TestMenuAssets(OmniUiTest):
         await omni.kit.app.get_app().next_update_async()
 
     async def test_loading_environments(self):
-        from omni.kit.viewport.utility.tests.capture import capture_viewport_and_wait, finalize_capture_and_compare
+        from isaacsim.test.utils import (
+            capture_viewport_annotator_data_async,
+            compare_arrays_within_tolerances,
+            read_image_as_array,
+        )
 
         self.environment_menu_dict = self.menu_dict["Create"]["Environments"]
         ## check everything under "Environment"
@@ -190,21 +194,16 @@ class TestMenuAssets(OmniUiTest):
 
         empty_path = ""
         environment_menu_list = get_menu_path(self.environment_menu_dict, empty_path, empty_list, environment_root_path)
-        try:
-            carb.windowing.acquire_windowing_interface()
-        except:
-            carb.log_error("unable to acquire windowing interface")
-            return
 
         for test_path in environment_menu_list:
             if test_path in skip_list:
                 print("skipping ", test_path)
                 continue
 
-            clear_stage()
+            await create_new_stage_async()
             for _ in range(20):
                 await omni.kit.app.get_app().next_update_async()
-            print(test_path)
+            print("testing ", test_path)
             delays = [100, 150, 200]
             for delay in delays:
                 try:
@@ -234,19 +233,21 @@ class TestMenuAssets(OmniUiTest):
             else:
                 set_camera_view(eye=[3, -3, 3], target=[0, 0, 0])
 
-            for _ in range(200):
+            for _ in range(10):
                 await omni.kit.app.get_app().next_update_async()
             # capture and compare with golden image
             output_dir = Path(omni.kit.test.get_test_output_path())
-            await capture_viewport_and_wait(image_name=golden_img_name, output_img_dir=output_dir, viewport=None)
-            diff = finalize_capture_and_compare(
-                image_name=golden_img_name,
-                output_img_dir=output_dir,
-                golden_img_dir=self._golden_img_dir,
-                threshold=1000,
+            rgb_data = await capture_viewport_annotator_data_async(viewport_api)
+            golden_img_data = read_image_as_array(self._golden_img_dir / golden_img_name)
+            results = compare_arrays_within_tolerances(
+                golden_img_data,
+                rgb_data,
+                allclose_rtol=None,  # Disable allclose for mean diff comparison
+                allclose_atol=None,
+                mean_tolerance=10,
+                print_all_stats=True,
             )
-            self.assertIsNotNone(diff)
-            self.assertLess(diff, 1000, f"DIFF: {test_path} - {diff}")
+            self.assertTrue(results["passed"], f"Results: {test_path} - {results}")
 
             # count the number of prims in the stage
             num_prims = 0

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.1] - 2025-09-24
+### Fixed
+- Fix deformable prim's docstrings test
+
+## [0.8.0] - 2025-09-19
+### Added
+- Add rotation, stress and gradient computation for volume deformable bodies
+
+## [0.7.0] - 2025-09-18
+### Added
+- Add support for input data expressed as basic Python types (bool, int, float)
+
 ## [0.6.2] - 2025-07-28
 ### Changed
 - Trigger the synchronous generation of deformable simulation meshes to ensure data is always available

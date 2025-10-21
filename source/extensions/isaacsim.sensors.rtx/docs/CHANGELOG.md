@@ -1,5 +1,16 @@
 # Changelog
 
+## [15.8.4] - 2025-10-07
+### Fixed
+- LidarRtx warns if rational time is 0/0 and will not collect simulation time or Annotator data in that case
+
+## [15.8.3] - 2025-09-26
+### Added
+- kwargs to LidarRtx.attach_annotator and LidarRtx.attach_writer to specify keywords upon Annotator or Writer initialization
+
+### Fixed
+- Fixed docstring references to nonexistent annotators
+
 ## [15.8.2] - 2025-09-17
 ### Changed
 - Specify rtx.materialDb.nonVisualMaterialSemantics.prefix as "omni:simready:nonvisual" to align with SimReady spec
@@ -7,25 +18,29 @@
 ## [15.8.1] - 2025-09-15
 ### Added
 - GenericModelOutput explicitly added to valid arguments in LidarRtx.attach_annotator
+
 ### Fixed
 - LidarRtx no longer resets prim orientation and position if called with existing prim path
 
 ## [15.8.0] - 2025-09-09
 ### Added
 - New APIs to apply non-visual material attributes to Material prims, resolve non-visual material ID as base/coating/attribute.
+
 ### Removed
 - No longer using CSV mapping from visual to non-visual materials as default behavior, favoring USD attribute specification instead
 
 ## [15.7.0] - 2025-09-05
 ### Added
 - Per-frame output option to IsaacCreateRTXLidarScanBuffer
+
 ### Changed
 - Use CUDA graphs, improved kernels, and cached device properties in IsaacCreateRTXLidarScanBuffer to improve perf
-- IsaacExtractRTXSensorPointCloudNoAccumulator annotator now uses IsaacCreateRTXLidarScanBuffer node with per-frame
-  output enabled
+- IsaacExtractRTXSensorPointCloudNoAccumulator annotator now uses IsaacCreateRTXLidarScanBuffer node with per-frame output enabled
+
 ### Removed
 - IsaacExtractRTXSensorPointCloud node no longer used
 - Unused CUDA kernels removed
+
 ### Fixed
 - IsaacCreateRTXLidarScanBuffer outputs correct timestamps
 
@@ -213,7 +228,7 @@
 - exts."isaacsim.sensors.rtx".supportedLidarConfigs specifies OmniLidar USDs (some including meshes) that can be added via sensor create commands.
 - Sensor creation commands now have "force_camera_prim" bool argument to forcibly create Camera prims as RTX Sensors (see below).
 
-## Changed
+### Changed
 - Deprecated Camera prims as RTX Sensors
 - LidarRTX no longer implicitly attaches annotators or writers; user must now explicitly attach annotators or writers using helper methods.
 - LidarRTX get_current_frame() data dictionary exposes data from each attached annotator
@@ -223,13 +238,13 @@
 - IsaacSensorCreateRtxLidar and IsaacSensorCreateRtxRadar will now create OmniSensor prims on the stage by default
 - OgnIsaacComputeRTXLidarFlatScan now only works with lidar configurations or OmniLidar prims specifying 2D lidars, with all emitters at 0 degrees elevation.
 
-## Removed
+### Removed
 - OgnIsaacComputeRTXLidarPointCloud node removed in favor of OgnIsaacExtractRTXSensorPointCloud
 - OgnIsaacComputeRTXRadarPointCloud node removed in favor of OgnIsaacExtractRTXSensorPointCloud
 - OgnIsaacCreateRTXLidarScanBuffer node removed in favor of OgnIsaacExtractRTXSensorPointCloud
 - OgnIsaacReadRTXLidarData node removed in favor of standalone examples
 
-## Fixed
+### Fixed
 - OgnIsaacComputeRTXLidarFlatScan properly outputs all returns from full scan of 2D lidar.
 
 ## [14.4.2] - 2025-05-10

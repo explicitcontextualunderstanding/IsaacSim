@@ -21,10 +21,11 @@ import argparse
 from pprint import pprint
 
 import numpy as np
+import omni.kit.commands
+import omni.usd
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import cuboid
 from isaacsim.core.api.robots import Robot
-from isaacsim.core.utils.prims import create_prim
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.robot_motion.motion_generation.articulation_motion_policy import ArticulationMotionPolicy
 from isaacsim.robot_motion.motion_generation.interface_config_loader import (
@@ -33,6 +34,8 @@ from isaacsim.robot_motion.motion_generation.interface_config_loader import (
 )
 from isaacsim.robot_motion.motion_generation.lula import RmpFlow
 from isaacsim.storage.native import get_assets_root_path
+from omni.kit.viewport.utility import get_active_viewport
+from pxr import Usd, UsdGeom
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -63,10 +66,10 @@ prim_path = "/my_robot"
 
 add_reference_to_stage(usd_path=usd_path, prim_path=prim_path)
 
-light_prim = create_prim("/DistantLight", "DistantLight")
-light_prim.GetAttribute("inputs:intensity").Set(5000)
+# Use default grid environment like other manipulator examples
 
 my_world = World(stage_units_in_meters=1.0)
+my_world.scene.add_default_ground_plane()
 
 robot = my_world.scene.add(Robot(prim_path=prim_path, name=robot_name))
 
@@ -105,6 +108,25 @@ obstacle = cuboid.VisualCuboid(
     "/World/obstacle", position=np.array([0.8, 0, 0.5]), color=np.array([0, 1.0, 0]), size=0.1
 )
 rmpflow.add_obstacle(obstacle)
+
+# Frame the existing viewport camera on the robot (like pressing F)
+stage = omni.usd.get_context().get_stage()
+active_viewport = get_active_viewport()
+if active_viewport and active_viewport.camera_path:
+    usd_camera = UsdGeom.Camera.Get(stage, active_viewport.camera_path)
+    if usd_camera:
+        usd_camera.GetProjectionAttr().Set(UsdGeom.Tokens.perspective)
+    resolution = active_viewport.resolution
+    aspect_ratio = resolution[0] / resolution[1]
+    omni.kit.commands.execute(
+        "FramePrimsCommand",
+        prim_to_move=active_viewport.camera_path,
+        prims_to_frame=[prim_path],
+        time_code=Usd.TimeCode.Default(),
+        aspect_ratio=aspect_ratio,
+        zoom=0.6,
+    )
+
 
 my_world.reset()
 reset_needed = False

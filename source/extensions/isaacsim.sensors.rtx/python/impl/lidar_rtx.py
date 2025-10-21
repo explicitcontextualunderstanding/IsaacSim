@@ -192,6 +192,7 @@ class LidarRtx(BaseSensor):
             "StableIdMap",
             "GenericModelOutput",
         ],
+        **kwargs,
     ) -> None:
         """Attach an annotator to the Lidar sensor.
 
@@ -201,12 +202,15 @@ class LidarRtx(BaseSensor):
                 - "IsaacExtractRTXSensorPointCloudNoAccumulator"
                 - "IsaacCreateRTXLidarScanBuffer"
                 - "StableIdMap"
+                - "GenericModelOutput"
+            **kwargs: Additional arguments to pass to the annotator on initialization.
         """
         if annotator_name in self._annotators:
             carb.log_warn(f"Annotator {annotator_name} already attached to {self._render_product_path}")
             return
 
         annotator = rep.AnnotatorRegistry.get_annotator(annotator_name)
+        annotator.initialize(**kwargs)
         annotator.attach([self._render_product_path])
         self._annotators[annotator_name] = annotator
         return
@@ -239,16 +243,18 @@ class LidarRtx(BaseSensor):
         """
         return self._writers
 
-    def attach_writer(self, writer_name: str) -> None:
+    def attach_writer(self, writer_name: str, **kwargs) -> None:
         """Attach a writer to the Lidar sensor.
 
         Args:
             param writer_name (str): Name of the writer to attach.
+            **kwargs: Additional arguments to pass to the writer on initialization.
         """
         if writer_name in self._writers:
             carb.log_warn(f"Writer {writer_name} already attached to {self._render_product_path}")
             return
         writer = rep.WriterRegistry.get(writer_name)
+        writer.initialize(**kwargs)
         writer.attach([self._render_product_path])
         self._writers[writer_name] = writer
 
@@ -275,18 +281,18 @@ class LidarRtx(BaseSensor):
     def _create_point_cloud_graph_node(self):
         """Create a point cloud graph node for the Lidar sensor.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacExtractRTXSensorPointCloud') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacExtractRTXSensorPointCloudNoAccumulator') instead.
         """
         carb.log_warn(
             "LidarRtx._create_point_cloud_graph_node is deprecated as of Isaac Sim 5.0 and will be removed in a future release. Use attach_annotator instead."
         )
-        self.attach_annotator("IsaacExtractRTXSensorPointCloud")
+        self.attach_annotator("IsaacExtractRTXSensorPointCloudNoAccumulator")
         return
 
     def _create_flat_scan_graph_node(self):
         """Create a flat scan graph node for the Lidar sensor.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "LidarRtx._create_flat_scan_graph_node is deprecated as of Isaac Sim 5.0 and will be removed in a future release. Use attach_annotator instead."
@@ -390,9 +396,15 @@ class LidarRtx(BaseSensor):
             .get(),
         )
 
-        self._current_frame["rendering_time"] = self._simulation_manager_interface.get_simulation_time_at_time(
-            self._current_frame["rendering_frame"]
-        )
+        if self._current_frame["rendering_frame"][1] == 0:
+            carb.log_warn(
+                f"Reference time is {self._current_frame['rendering_frame'][0]}/{self._current_frame['rendering_frame'][1]}, cannot get simulation time on this frame."
+            )
+        else:
+            self._current_frame["rendering_time"] = self._simulation_manager_interface.get_simulation_time_at_time(
+                self._current_frame["rendering_frame"]
+            )
+
         for annotator_name, annotator in self._annotators.items():
             self._current_frame[annotator_name] = annotator.get_data()
 
@@ -522,56 +534,56 @@ class LidarRtx(BaseSensor):
     def add_point_cloud_data_to_frame(self):
         """Add point cloud data to the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "add_point_cloud_data_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically added to the current frame if the corresponding annotator is attached."
         )
-        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def add_linear_depth_data_to_frame(self):
         """Add linear depth data to the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "add_linear_depth_data_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically added to the current frame if the corresponding annotator is attached."
         )
-        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def add_intensities_data_to_frame(self):
         """Add intensities data to the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "add_intensities_data_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically added to the current frame if the corresponding annotator is attached."
         )
-        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def add_azimuth_range_to_frame(self):
         """Add azimuth range data to the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "add_azimuth_range_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically added to the current frame if the corresponding annotator is attached."
         )
-        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def add_horizontal_resolution_to_frame(self):
         """Add horizontal resolution data to the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "add_horizontal_resolution_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically added to the current frame if the corresponding annotator is attached."
         )
-        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use attach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def add_range_data_to_frame(self):
@@ -607,56 +619,56 @@ class LidarRtx(BaseSensor):
     def remove_point_cloud_data_to_frame(self):
         """Remove point cloud data from the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "remove_point_cloud_data_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically removed from the current frame if the corresponding annotator is detached."
         )
-        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def remove_linear_depth_data_to_frame(self):
         """Remove linear depth data from the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "remove_linear_depth_data_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically removed from the current frame if the corresponding annotator is detached."
         )
-        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def remove_intensities_data_to_frame(self):
         """Remove intensities data from the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "remove_intensities_data_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically removed from the current frame if the corresponding annotator is detached."
         )
-        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def remove_azimuth_range_to_frame(self):
         """Remove azimuth range data from the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "remove_azimuth_range_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically removed from the current frame if the corresponding annotator is detached."
         )
-        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def remove_horizontal_resolution_to_frame(self):
         """Remove horizontal resolution data from the current frame.
 
-        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.
+        This method is deprecated as of Isaac Sim 5.0. Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.
         """
         carb.log_warn(
             "remove_horizontal_resolution_to_frame is deprecated as of Isaac Sim 5.0 and will be removed in a future release. This attribute is now automatically removed from the current frame if the corresponding annotator is detached."
         )
-        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScanSimulationTime') instead.")
+        carb.log_warn("Use detach_annotator('IsaacComputeRTXLidarFlatScan') instead.")
         return
 
     def remove_range_data_to_frame(self):

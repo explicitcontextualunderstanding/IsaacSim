@@ -20,6 +20,7 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp(launch_config={"headless": False})
 
+import carb.settings
 import omni.replicator.core as rep
 import omni.usd
 from isaacsim.core.utils.semantics import add_labels
@@ -40,6 +41,9 @@ def run_example():
     rep.orchestrator.set_capture_on_play(False)
     random.seed(42)
     rep.set_global_seed(42)
+
+    # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+    carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
     # Setup stage
     stage = omni.usd.get_context().get_stage()

@@ -203,7 +203,7 @@ class TestRos2ServicePrim(ROS2TestCase):
         )
 
         # node and client
-        ros2_node = rclpy.create_node("isaac_sim_test_service")
+        ros2_node = self.create_node("isaac_sim_test_service")
         client = ros2_node.create_client(isaac_ros2_messages.srv.GetPrims, "/get_prims")
 
         self._timeline.play()
@@ -252,7 +252,7 @@ class TestRos2ServicePrim(ROS2TestCase):
         )
 
         # node and client
-        ros2_node = rclpy.create_node("isaac_sim_test_service")
+        ros2_node = self.create_node("isaac_sim_test_service")
         client = ros2_node.create_client(isaac_ros2_messages.srv.GetPrimAttributes, "/get_prim_attributes")
 
         self._timeline.play()
@@ -304,7 +304,7 @@ class TestRos2ServicePrim(ROS2TestCase):
         specs = self.createAttributes(prim_path)
 
         # node and client
-        ros2_node = rclpy.create_node("isaac_sim_test_service")
+        ros2_node = self.create_node("isaac_sim_test_service")
         client_get = ros2_node.create_client(isaac_ros2_messages.srv.GetPrimAttribute, "/get_prim_attribute")
         client_set = ros2_node.create_client(isaac_ros2_messages.srv.SetPrimAttribute, "/set_prim_attribute")
 

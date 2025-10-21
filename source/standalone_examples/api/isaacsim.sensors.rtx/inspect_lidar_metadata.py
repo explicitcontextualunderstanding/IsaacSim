@@ -20,10 +20,8 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True, "enable_motion_bvh": True})
 
-import carb
 import omni
-from isaacsim.core.api import World
-from isaacsim.core.utils.stage import add_reference_to_stage
+from isaacsim.core.utils.stage import is_stage_loading, open_stage
 from isaacsim.sensors.rtx import LidarRtx, get_gmo_data
 from isaacsim.storage.native import get_assets_root_path
 
@@ -41,18 +39,15 @@ args, unknown = parser.parse_known_args()
 
 aux_data_level = args.aux_data_level
 
-# Create a world
-my_world = World(stage_units_in_meters=1.0)
-
 # Load the small warehouse scene
 assets_root_path = get_assets_root_path()
-add_reference_to_stage(
-    usd_path=assets_root_path + "/Isaac/Environments/Simple_Warehouse/warehouse.usd", prim_path="/World/warehouse"
-)
+open_stage(usd_path=assets_root_path + "/Isaac/Environments/Simple_Warehouse/warehouse.usd")
+while is_stage_loading():
+    simulation_app.update()
 
 # Place a basic lidar in the scene, overriding attributes as necessary
 custom_attributes = {"omni:sensor:Core:auxOutputType": args.aux_data_level}
-lidar = my_world.scene.add(LidarRtx(prim_path="/World/lidar", name="lidar", **custom_attributes))
+lidar = LidarRtx(prim_path="/World/lidar", name="lidar", **custom_attributes)
 
 # Initialize the lidar and attach an annotator
 ANNOTATOR_NAME = "GenericModelOutput"
@@ -65,22 +60,22 @@ def inspect_lidar_metadata(frame: int, gmo_buffer: dict) -> None:
     # Read GenericModelOutput struct from buffer
     gmo = get_gmo_data(gmo_buffer)
     # Print some useful information
-    carb.log_warn(f"Frame {frame} -- Lidar auxiliary level: {args.aux_data_level}")
-    carb.log_warn(f"numElements: {gmo.numElements}")
+    print(f"Frame {frame} -- Lidar auxiliary level: {args.aux_data_level}")
+    print(f"numElements: {gmo.numElements}")
     if LIDAR_AUX_DATA_LEVELS[aux_data_level] >= LIDAR_AUX_DATA_LEVELS["BASIC"]:
-        carb.log_warn(f"Scan complete: {gmo.scanComplete}")
-        carb.log_warn(f"azimuthOffset: {gmo.azimuthOffset}")
-        carb.log_warn(f"emitterId is a {type(gmo.emitterId)} of size {gmo.numElements}")
-        carb.log_warn(f"channelId is a {type(gmo.channelId)} of size {gmo.numElements}")
-        carb.log_warn(f"tickId is a {type(gmo.tickId)} of size {gmo.numElements}")
-        carb.log_warn(f"echoId is a {type(gmo.echoId)} of size {gmo.numElements}")
-        carb.log_warn(f"tickStates is a {type(gmo.tickStates)} of size {gmo.numElements}")
+        print(f"Scan complete: {gmo.scanComplete}")
+        print(f"azimuthOffset: {gmo.azimuthOffset}")
+        print(f"emitterId is a {type(gmo.emitterId)} of size {gmo.numElements}")
+        print(f"channelId is a {type(gmo.channelId)} of size {gmo.numElements}")
+        print(f"tickId is a {type(gmo.tickId)} of size {gmo.numElements}")
+        print(f"echoId is a {type(gmo.echoId)} of size {gmo.numElements}")
+        print(f"tickStates is a {type(gmo.tickStates)} of size {gmo.numElements}")
     if LIDAR_AUX_DATA_LEVELS[aux_data_level] >= LIDAR_AUX_DATA_LEVELS["EXTRA"]:
-        carb.log_warn(f"objId is a {type(gmo.objId)} of size {gmo.numElements}")
-        carb.log_warn(f"matId is a {type(gmo.matId)} of size {gmo.numElements}")
+        print(f"objId is a {type(gmo.objId)} of size {gmo.numElements}")
+        print(f"matId is a {type(gmo.matId)} of size {gmo.numElements}")
     if LIDAR_AUX_DATA_LEVELS[aux_data_level] >= LIDAR_AUX_DATA_LEVELS["FULL"]:
-        carb.log_warn(f"hitNormals is a {type(gmo.hitNormals)} of size {gmo.numElements}")
-        carb.log_warn(f"velocities is a {type(gmo.velocities)} of size {gmo.numElements}")
+        print(f"hitNormals is a {type(gmo.hitNormals)} of size {gmo.numElements}")
+        print(f"velocities is a {type(gmo.velocities)} of size {gmo.numElements}")
     return
 
 
@@ -88,7 +83,7 @@ timeline = omni.timeline.get_timeline_interface()
 timeline.play()
 i = 0
 # Run for 10 frames in test mode
-while simulation_app.is_running() and (not args.test or i < 10):
+while simulation_app.is_running() and (not args.test or i < 5):
     simulation_app.update()
     data = lidar.get_current_frame()[ANNOTATOR_NAME]
     if len(data) > 0:

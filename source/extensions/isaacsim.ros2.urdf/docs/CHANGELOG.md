@@ -1,4 +1,8 @@
 # Changelog
+## [1.1.20] - 2025-10-06
+### Fixed
+- Fix cleanup of the ObserverGuard object when using omni.kit.command in script
+
 ## [1.1.19] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.1.18)

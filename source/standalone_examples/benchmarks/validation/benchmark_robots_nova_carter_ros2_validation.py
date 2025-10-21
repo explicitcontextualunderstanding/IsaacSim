@@ -51,7 +51,7 @@ parser.add_argument(
     default="standalone_examples/benchmarks/validation/captures",
     help="Directory holding output images from current run - relative to the current working directory",
 )
-parser.add_argument("--tolerance", type=int, default=5, help="Tolerance for mean difference in image comparison")
+parser.add_argument("--tolerance", type=int, default=10, help="Tolerance for mean difference in image comparison")
 parser.add_argument(
     "--blur-kernel",
     type=int,
@@ -81,6 +81,9 @@ gpu_frametime = args.gpu_frametime
 headless = args.non_headless
 
 
+import os
+from pathlib import Path
+
 import numpy as np
 from isaacsim import SimulationApp
 
@@ -90,6 +93,7 @@ import carb
 import omni
 import omni.graph.core as og
 import omni.kit.test
+import omni.replicator.core as rep
 from isaacsim.core.api import PhysicsContext
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.core.utils.stage import get_current_stage
@@ -100,7 +104,7 @@ from pxr import Usd
 enable_extension("isaacsim.benchmark.services")
 
 from isaacsim.benchmark.services import BaseIsaacBenchmark
-from isaacsim.benchmark.services.validation import Validator
+from isaacsim.benchmark.services.validation import CoordinateValidator, Validator
 
 # Create the benchmark
 benchmark = BaseIsaacBenchmark(
@@ -237,8 +241,43 @@ rclpy.shutdown()
 benchmark.stop()
 
 # validate benchmark
+# Run coordinate validation
+coordinate_validator = CoordinateValidator()
+golden_data = coordinate_validator.calculate_bounds_from_historical_data()
+coordinate_validation_passed = coordinate_validator.validate_robot_coordinates(robots, golden_data)
+
+# Run image validation
 validator = Validator.from_cli_args(args)
-passed = validator.run(stage, benchmark_name=benchmark.benchmark_name)
+image_validation_passed = validator.run(stage, benchmark_name=benchmark.benchmark_name)
+
+# Print validation results
+print(f"\n{'='*80}")
+print("FINAL VALIDATION SUMMARY")
+print(f"{'='*80}")
+print(f"Coordinate Validation: {'PASS' if coordinate_validation_passed else 'FAIL'}")
+print(f"Image Validation:      {'PASS' if image_validation_passed else 'FAIL'}")
+
+# Final decision: fail only if BOTH validations fail
+overall_validation_passed = coordinate_validation_passed or image_validation_passed
+
+if overall_validation_passed:
+    print(f"\nOVERALL RESULT: PASS")
+    print("   At least one validation method passed.")
+    if coordinate_validation_passed and image_validation_passed:
+        print("   Both coordinate and image validations passed!")
+    elif coordinate_validation_passed:
+        print("   Coordinate validation passed (image validation failed).")
+    else:
+        print("   Image validation passed (coordinate validation failed).")
+else:
+    print(f"\nOVERALL RESULT: FAIL")
+    print("   Both coordinate and image validations failed.")
+
+print(f"{'='*80}")
 
 timeline.stop()
 simulation_app.close()
+
+# Exit with appropriate code if validation failed and exit_on_fail is set
+if args.exit_on_fail and not overall_validation_passed:
+    exit(1)

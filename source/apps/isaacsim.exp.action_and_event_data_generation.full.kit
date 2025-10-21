@@ -111,7 +111,7 @@ template_name = "action_and_event_data_generation_full"
 "omni.graph.visualization.nodes" = {}
 "omni.hydra.engine.stats" = {}
 "omni.physx.graph" = {}
-"omni.scene.optimizer.bundle" = { version = "107.3.10", exact = true }
+"omni.scene.optimizer.bundle" = { version = "107.3.12", exact = true }
 "isaacsim.asset.gen.conveyor" = {}
 
 
@@ -120,6 +120,8 @@ name = "Action and Event Data Generation"
 version = "0.1.5"
 file.ignoreUnsavedOnExit = false
 window.title = "Action and Event Data Generation"
+runLoops.main.rateLimitEnabled = true  # Enable rate limiting, simulation runs at specified rendering rate (default 60 hz)
+runLoops.main.manualModeEnabled = true # Enable manual mode, dt is fixed at requested rate
 gatherRenderResults = true # True to prevent artifacts in multiple viewport configurations, can be set to false for better performance in some cases
 
 # Register extension folder from this repo in kit

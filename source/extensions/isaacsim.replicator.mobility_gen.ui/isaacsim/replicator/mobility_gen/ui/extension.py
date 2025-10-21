@@ -27,6 +27,7 @@ import isaacsim.core.api.objects as objects
 import isaacsim.replicator.mobility_gen.examples
 import numpy as np
 import omni.ext
+import omni.kit
 import omni.ui as ui
 from isaacsim.core.utils.stage import open_stage, save_stage
 from isaacsim.core.utils.viewports import set_active_viewport_camera
@@ -125,6 +126,24 @@ class MobilityGenExtension(omni.ext.IExt):
         self.update_recording_count()
         self.clear_recording()
 
+        self._occupancy_map_is_not_yaml_msg = (
+            "Occupancy map must be a YAML file.  Please enter a file path with a valid YAML extension."
+        )
+        self._occupancy_map_invalid_path_no_yaml_ext_dialog = omni.kit.window.popup_dialog.MessageDialog(
+            message=self._occupancy_map_is_not_yaml_msg,
+            title="Invalid occupancy map.",
+            disable_cancel_button=True,
+            ok_handler=lambda dialog: dialog.hide(),
+        )
+
+        self._occupancy_map_doesnt_exist_msg = "Occupancy map does not exist.  Please enter a file path that exists."
+        self._occupancy_map_invalid_path_does_not_exist = omni.kit.window.popup_dialog.MessageDialog(
+            message=self._occupancy_map_doesnt_exist_msg,
+            disable_cancel_button=True,
+            title="Invalid occupancy map.",
+            ok_handler=lambda dialog: dialog.hide(),
+        )
+
     def build_occ_map_frame(self):
         if self.scenario is not None:
             with ui.VStack():
@@ -219,6 +238,24 @@ class MobilityGenExtension(omni.ext.IExt):
                 if self.step % 15 == 0:
                     self.recording_step_label.text = f"Current recording duration: {self.recording_time:.2f}s"
 
+    def _check_occupancy_map_yaml_path(self):
+        occupancy_map_yaml_path = os.path.expanduser(self.omap_field_string_model.as_string)
+
+        if not os.path.exists(occupancy_map_yaml_path):
+            carb.log_warn(self._occupancy_map_doesnt_exist_msg)
+            self._occupancy_map_invalid_path_does_not_exist.show()
+
+            return False
+
+        _, file_ext = os.path.splitext(os.path.basename(occupancy_map_yaml_path))
+
+        if file_ext.lower() not in [".yaml", ".yml"]:
+            carb.log_warn(self._occupancy_map_is_not_yaml_msg)
+            self._occupancy_map_invalid_path_no_yaml_ext_dialog.show()
+            return False
+
+        return True
+
     def build_scenario(self):
 
         async def _build_scenario_async():
@@ -240,7 +277,10 @@ class MobilityGenExtension(omni.ext.IExt):
             # Set config
             self.config = Config(scenario_type=scenario_type_str, robot_type=robot_type_str, scene_usd=scene_usd_str)
 
-            occupancy_map = OccupancyMap.from_ros_yaml(os.path.expanduser(self.omap_field_string_model.as_string))
+            if self._check_occupancy_map_yaml_path():
+                occupancy_map = OccupancyMap.from_ros_yaml(os.path.expanduser(self.omap_field_string_model.as_string))
+            else:
+                return
 
             # Open stage and save local copy
             open_stage(scene_usd_str)

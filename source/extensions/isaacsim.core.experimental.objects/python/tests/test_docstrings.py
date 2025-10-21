@@ -24,8 +24,10 @@ from isaacsim.core.experimental.objects import (
     DiskLight,
     DistantLight,
     DomeLight,
+    GroundPlane,
     Light,
     Mesh,
+    Plane,
     RectLight,
     Shape,
     Sphere,
@@ -50,6 +52,11 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
 
     # --------------------------------------------------------------------
 
+    async def test_ground_plane_docstrings(self):
+        await self.assertDocTests(GroundPlane)
+
+    # --------------------------------------------------------------------
+
     async def test_mesh_docstrings(self):
         await self.assertDocTests(Mesh)
 
@@ -69,6 +76,10 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
 
     async def test_cylinder_docstrings(self):
         await self.assertDocTests(Cylinder)
+        await self.assertDocTests(Shape)
+
+    async def test_plane_docstrings(self):
+        await self.assertDocTests(Plane)
         await self.assertDocTests(Shape)
 
     async def test_sphere_docstrings(self):

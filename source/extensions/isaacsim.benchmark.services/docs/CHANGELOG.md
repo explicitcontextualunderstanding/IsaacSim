@@ -1,4 +1,13 @@
 # Changelog
+
+## [3.1.1] - 2025-09-26
+### Changed
+- Update license headers
+
+## [3.1.0] - 2025-09-25
+### Added
+- Added coordinate validation tooling for position/orientation validation
+
 ## [3.0.6] - 2025-09-10
 ### Changed
 - Moved all logging functionality to carb.log() module

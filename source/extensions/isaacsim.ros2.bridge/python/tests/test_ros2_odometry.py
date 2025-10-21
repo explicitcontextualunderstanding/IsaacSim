@@ -156,10 +156,12 @@ class TestRos2Odometry(ROS2TestCase):
             self._cube_odometry_global_data = data
             print(data.twist.twist.linear)
 
-        ros2_node = rclpy.create_node("odometry_publisher_tester")
-        odom_sub = ros2_node.create_subscription(Odometry, "cube_odometry", cube_odometry_callback, get_qos_profile())
-        odom_sub_global = ros2_node.create_subscription(
-            Odometry, "cube_odometry_global", cube_odometry_global_callback, get_qos_profile()
+        ros2_node = self.create_node("odometry_publisher_tester")
+        odom_sub = self.create_subscription(
+            ros2_node, Odometry, "cube_odometry", cube_odometry_callback, get_qos_profile()
+        )
+        odom_sub_global = self.create_subscription(
+            ros2_node, Odometry, "cube_odometry_global", cube_odometry_global_callback, get_qos_profile()
         )
 
         self.retrived_lin_vel = None
@@ -419,7 +421,7 @@ class TestRos2Odometry(ROS2TestCase):
         await omni.kit.app.get_app().next_update_async()
 
         # Create ROS node for this test
-        ros2_node = rclpy.create_node("leatherback_odometry_tester")
+        ros2_node = self.create_node("leatherback_odometry_tester")
 
         # Publishers
         ackermann_pub = ros2_node.create_publisher(AckermannDriveStamped, "/ackermann_cmd", 10)
@@ -432,7 +434,7 @@ class TestRos2Odometry(ROS2TestCase):
             self._leatherback_odom = data
 
         # Subscribe to the odometry topic
-        odom_sub = ros2_node.create_subscription(Odometry, "/odom", odometry_callback, get_qos_profile())
+        odom_sub = self.create_subscription(ros2_node, Odometry, "/odom", odometry_callback, get_qos_profile())
 
         # Function to process ROS messages
         def spin():
@@ -644,7 +646,7 @@ class TestRos2Odometry(ROS2TestCase):
         await omni.kit.app.get_app().next_update_async()
 
         # Create ROS node for this test
-        ros2_node = rclpy.create_node("leatherback_odometry_tester")
+        ros2_node = self.create_node("leatherback_odometry_tester")
 
         # Publishers
         ackermann_pub = ros2_node.create_publisher(AckermannDriveStamped, "/ackermann_cmd", 10)
@@ -657,7 +659,7 @@ class TestRos2Odometry(ROS2TestCase):
             self._leatherback_odom = data
 
         # Subscribe to the odometry topic
-        odom_sub = ros2_node.create_subscription(Odometry, "/odom", odometry_callback, get_qos_profile())
+        odom_sub = self.create_subscription(ros2_node, Odometry, "/odom", odometry_callback, get_qos_profile())
 
         # Function to process ROS messages
         def spin():

@@ -73,7 +73,7 @@ class SphereLight(Light):
         paths: str | list[str],
         *,
         # SphereLight
-        radii: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -115,7 +115,7 @@ class SphereLight(Light):
     """
 
     def set_radii(
-        self, radii: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, radii: float | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the radii of the prims.
 
@@ -146,7 +146,7 @@ class SphereLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetRadiusAttr().Set(radii[0 if radii.shape[0] == 1 else i].item())
 
-    def get_radii(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_radii(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the radii of the prims.
 
         Backends: :guilabel:`usd`.
@@ -183,7 +183,7 @@ class SphereLight(Light):
         return ops_utils.place(data, device=self._device)
 
     def set_enabled_treat_as_points(
-        self, enabled: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, enabled: bool | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Enable or disable the treat as points (effectively, a zero-radius sphere) of the prims.
 
@@ -218,7 +218,7 @@ class SphereLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetTreatAsPointAttr().Set(bool(enabled[0 if enabled.shape[0] == 1 else i].item()))
 
-    def get_enabled_treat_as_points(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_enabled_treat_as_points(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the enabled state of the treat as points (effectively, a zero-radius sphere) of the prims.
 
         Backends: :guilabel:`usd`.

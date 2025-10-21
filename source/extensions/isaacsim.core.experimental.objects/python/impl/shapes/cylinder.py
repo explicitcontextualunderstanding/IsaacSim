@@ -80,8 +80,8 @@ class Cylinder(Shape):
         paths: str | list[str],
         *,
         # Cylinder
-        radii: list | np.ndarray | wp.array | None = None,
-        heights: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
+        heights: float | list | np.ndarray | wp.array | None = None,
         axes: Literal["X", "Y", "Z"] | list[Literal["X", "Y", "Z"]] | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
@@ -190,9 +190,9 @@ class Cylinder(Shape):
 
     def set_radii(
         self,
-        radii: list | np.ndarray | wp.array,
+        radii: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the radii (cylinder's radius) of the prims.
 
@@ -228,7 +228,7 @@ class Cylinder(Shape):
     def get_radii(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the radii (cylinder's radius) of the prims.
 
@@ -267,9 +267,9 @@ class Cylinder(Shape):
 
     def set_heights(
         self,
-        heights: list | np.ndarray | wp.array,
+        heights: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the heights (cylinder's spine length along the axis) of the prims.
 
@@ -305,7 +305,7 @@ class Cylinder(Shape):
     def get_heights(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the heights (cylinder's spine length along the axis) of the prims.
 
@@ -346,7 +346,7 @@ class Cylinder(Shape):
         self,
         axes: Literal["X", "Y", "Z"] | list[Literal["X", "Y", "Z"]],
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the axes (cylinder's axis along which the spine is aligned) of the prims.
 
@@ -386,7 +386,7 @@ class Cylinder(Shape):
     def get_axes(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> list[Literal["X", "Y", "Z"]]:
         """Get the axes (cylinder's axis along which the spine is aligned) of the prims.
 

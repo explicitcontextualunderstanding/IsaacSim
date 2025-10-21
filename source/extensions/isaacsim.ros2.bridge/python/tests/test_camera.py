@@ -181,23 +181,23 @@ class TestRos2Camera(ROS2TestCase):
         def bbox_3d_callback(data):
             self._bbox_3d = data
 
-        node = rclpy.create_node("camera_tester")
-        rgb_sub = node.create_subscription(Image, "rgb", rgb_callback, get_qos_profile())
-        depth_sub = node.create_subscription(Image, "depth", depth_callback, get_qos_profile())
-        depth_pcl_sub = node.create_subscription(PointCloud2, "depth_pcl", depth_pcl_callback, get_qos_profile())
-        instance_segmentation_sub = node.create_subscription(
-            Image, "instance_segmentation", instance_segmentation_callback, get_qos_profile()
+        node = self.create_node("camera_tester")
+        rgb_sub = self.create_subscription(node, Image, "rgb", rgb_callback, get_qos_profile())
+        depth_sub = self.create_subscription(node, Image, "depth", depth_callback, get_qos_profile())
+        depth_pcl_sub = self.create_subscription(node, PointCloud2, "depth_pcl", depth_pcl_callback, get_qos_profile())
+        instance_segmentation_sub = self.create_subscription(
+            node, Image, "instance_segmentation", instance_segmentation_callback, get_qos_profile()
         )
-        semantic_segmentation_sub = node.create_subscription(
-            Image, "semantic_segmentation", semantic_segmentation_callback, get_qos_profile()
+        semantic_segmentation_sub = self.create_subscription(
+            node, Image, "semantic_segmentation", semantic_segmentation_callback, get_qos_profile()
         )
-        bbox_2d_tight_sub = node.create_subscription(
-            Detection2DArray, "bbox_2d_tight", bbox_2d_tight_callback, get_qos_profile()
+        bbox_2d_tight_sub = self.create_subscription(
+            node, Detection2DArray, "bbox_2d_tight", bbox_2d_tight_callback, get_qos_profile()
         )
-        bbox_2d_loose_sub = node.create_subscription(
-            Detection2DArray, "bbox_2d_loose", bbox_2d_loose_callback, get_qos_profile()
+        bbox_2d_loose_sub = self.create_subscription(
+            node, Detection2DArray, "bbox_2d_loose", bbox_2d_loose_callback, get_qos_profile()
         )
-        bbox_3d_sub = node.create_subscription(Detection3DArray, "bbox_3d", bbox_3d_callback, get_qos_profile())
+        bbox_3d_sub = self.create_subscription(node, Detection3DArray, "bbox_3d", bbox_3d_callback, get_qos_profile())
 
         await omni.kit.app.get_app().next_update_async()
         omni.kit.commands.execute(
@@ -249,8 +249,6 @@ class TestRos2Camera(ROS2TestCase):
         self.assertGreaterEqual(self._bbox_2d_tight.header.stamp.sec, system_time)
         self.assertGreaterEqual(self._bbox_2d_loose.header.stamp.sec, system_time)
         self.assertGreaterEqual(self._bbox_3d.header.stamp.sec, system_time)
-
-        node.destroy_node()
 
     async def test_bbox(self):
         cube_1 = VisualCuboid("/cube_1", position=[2, 0, 0], scale=[1.5, 1, 1])
@@ -368,30 +366,30 @@ class TestRos2Camera(ROS2TestCase):
         def semantic_callback_loose(data):
             self._semantic_data_loose = data
 
-        node = rclpy.create_node("bbox_tester")
+        node = self.create_node("bbox_tester")
 
-        bbox_2d_tight_sub = node.create_subscription(
-            Detection2DArray, "bbox_2d_tight", bbox_2d_tight_callback, get_qos_profile()
+        bbox_2d_tight_sub = self.create_subscription(
+            node, Detection2DArray, "bbox_2d_tight", bbox_2d_tight_callback, get_qos_profile()
         )
-        bbox_2d_loose_sub = node.create_subscription(
-            Detection2DArray, "bbox_2d_loose", bbox_2d_loose_callback, get_qos_profile()
+        bbox_2d_loose_sub = self.create_subscription(
+            node, Detection2DArray, "bbox_2d_loose", bbox_2d_loose_callback, get_qos_profile()
         )
 
-        bbox_3d_sub = node.create_subscription(Detection3DArray, "bbox_3d", bbox_3d_callback, get_qos_profile())
-        semantic_labels_instance_sub = node.create_subscription(
-            String, "semantic_labels_instance", semantic_callback_instance, get_qos_profile()
+        bbox_3d_sub = self.create_subscription(node, Detection3DArray, "bbox_3d", bbox_3d_callback, get_qos_profile())
+        semantic_labels_instance_sub = self.create_subscription(
+            node, String, "semantic_labels_instance", semantic_callback_instance, get_qos_profile()
         )
-        semantic_labels_semantic_sub = node.create_subscription(
-            String, "semantic_labels_semantic", semantic_callback_semantic, get_qos_profile()
+        semantic_labels_semantic_sub = self.create_subscription(
+            node, String, "semantic_labels_semantic", semantic_callback_semantic, get_qos_profile()
         )
-        semantic_labels_3d_sub = node.create_subscription(
-            String, "semantic_labels_3d", semantic_callback_3d, get_qos_profile()
+        semantic_labels_3d_sub = self.create_subscription(
+            node, String, "semantic_labels_3d", semantic_callback_3d, get_qos_profile()
         )
-        semantic_labels_tight_sub = node.create_subscription(
-            String, "semantic_labels_tight", semantic_callback_tight, get_qos_profile()
+        semantic_labels_tight_sub = self.create_subscription(
+            node, String, "semantic_labels_tight", semantic_callback_tight, get_qos_profile()
         )
-        semantic_labels_loose_sub = node.create_subscription(
-            String, "semantic_labels_loose", semantic_callback_loose, get_qos_profile()
+        semantic_labels_loose_sub = self.create_subscription(
+            node, String, "semantic_labels_loose", semantic_callback_loose, get_qos_profile()
         )
 
         def spin():
@@ -538,8 +536,6 @@ class TestRos2Camera(ROS2TestCase):
         self.assertEqual(detections[2].bbox.center.position.y, 444.5)
         self.assertEqual(detections[2].bbox.center.theta, 0)
 
-        node.destroy_node()
-
     async def test_empty_semantics(self):
         cube_3 = VisualCuboid("/cube_3", position=[100, 0, 0], scale=[1, 1, 3])
         add_labels(cube_3.prim, labels=["Cube2"], instance_name="class")
@@ -592,10 +588,12 @@ class TestRos2Camera(ROS2TestCase):
         def semantic_callback(data):
             self._semantic_data = data
 
-        node = rclpy.create_node("bbox_tester")
+        node = self.create_node("bbox_tester")
 
-        bbox_3d_sub = node.create_subscription(Detection3DArray, "bbox_3d", bbox_3d_callback, get_qos_profile())
-        semantic_labels_sub = node.create_subscription(String, "semantic_labels", semantic_callback, get_qos_profile())
+        bbox_3d_sub = self.create_subscription(node, Detection3DArray, "bbox_3d", bbox_3d_callback, get_qos_profile())
+        semantic_labels_sub = self.create_subscription(
+            node, String, "semantic_labels", semantic_callback, get_qos_profile()
+        )
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -614,5 +612,3 @@ class TestRos2Camera(ROS2TestCase):
         semantic_dict = json.loads(self._semantic_data.data)
         self.assertTrue("time_stamp" in semantic_dict)
         self.assertFalse("0" in semantic_dict)
-
-        node.destroy_node()

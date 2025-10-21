@@ -223,7 +223,7 @@ void ImuSensor::onPhysicsStep()
         m_rawBuffer.pop_back();
     }
 
-    const double* imaginary = qWb.GetImaginary().GetArray();
+    const omni::math::linalg::vec3d imaginary = qWb.GetImaginary();
 
     // read in new data
     m_rawBuffer.insert(m_rawBuffer.begin(), IsRawData());
@@ -380,9 +380,8 @@ void ImuSensor::onComponentChange()
 
 
     omni::math::linalg::quatd rotate(
-        sensorQuat.GetReal(),
-        omni::math::linalg::vec3d(sensorQuat.GetImaginary().GetArray()[0], sensorQuat.GetImaginary().GetArray()[1],
-                                  sensorQuat.GetImaginary().GetArray()[2]));
+        sensorQuat.GetReal(), omni::math::linalg::vec3d(sensorQuat.GetImaginary()[0], sensorQuat.GetImaginary()[1],
+                                                        sensorQuat.GetImaginary()[2]));
 
     m_props.orientation.SetRotate(rotate);
 
@@ -417,9 +416,8 @@ void ImuSensor::onComponentChange()
                 isaacsim::core::includes::safeGetAttribute(scene.GetGravityMagnitudeAttr(), mag);
                 pxr::GfVec3f dirAttr;
                 isaacsim::core::includes::safeGetAttribute(scene.GetGravityDirectionAttr(), dirAttr); // (0, 0, -1.0f)
-
-                dir.Set(static_cast<double>(dirAttr.GetArray()[0]), static_cast<double>(dirAttr.GetArray()[1]),
-                        static_cast<double>(dirAttr.GetArray()[2]));
+                dir.Set(
+                    static_cast<double>(dirAttr[0]), static_cast<double>(dirAttr[1]), static_cast<double>(dirAttr[2]));
                 m_gravity = static_cast<double>(mag) / m_unitScale * -dir;
             }
         }

@@ -237,7 +237,13 @@ class SimulationApp:
                 if os.path.isfile(exp):
                     experience = exp
                     break
-        self.config.update({"experience": experience})
+        # Set or remove experience based on final value
+        if experience and experience != "":
+            self.config.update({"experience": experience})
+        else:
+            # Remove experience key if None or empty string (and no default found)
+            self.config.pop("experience", None)
+
         if launch_config is not None:
             self.config.update(launch_config)
         if builtins.ISAAC_LAUNCHED_FROM_JUPYTER:
@@ -375,27 +381,30 @@ class SimulationApp:
         exe_path = os.path.abspath(f'{os.environ["CARB_APP_PATH"]}')
         carb.log_info(f"SimulationApp._start_app: Using executable path: {exe_path}")
         # input arguments to the application
-        args = [
-            os.path.abspath(__file__),
-            f'{self.config["experience"]}',
-            f"--/app/tokens/exe-path={exe_path}",  # this is needed so dlss lib is found
-            f'--/persistent/app/viewport/displayOptions={self.config["display_options"]}',  # hide extra stuff in viewport
-            # Forces kit to not render until all USD files are loaded
-            f'--/rtx/materialDb/syncLoads={self.config["sync_loads"]}',
-            f'--/rtx/hydra/materialSyncLoads={self.config["sync_loads"]}',
-            f'--/omni.kit.plugin/syncUsdLoads={self.config["sync_loads"]}',
-            f'--/app/renderer/resolution/width={self.config["width"]}',
-            f'--/app/renderer/resolution/height={self.config["height"]}',
-            f'--/app/window/width={self.config["window_width"]}',
-            f'--/app/window/height={self.config["window_height"]}',
-            f'--/renderer/multiGpu/enabled={self.config["multi_gpu"]}',
-            f'--/app/fastShutdown={self.config["fast_shutdown"]}',
-            "--/app/installSignalHandlers=0",
-            "--ext-folder",
-            f'{os.path.abspath(os.environ["ISAAC_PATH"])}/exts',  # adding to json doesn't work
-            "--ext-folder",
-            f'{os.path.abspath(os.environ["ISAAC_PATH"])}/apps',  # so we can reference other kit files
-        ]
+        args = [os.path.abspath(__file__)]
+        if "experience" in self.config:
+            args.append(f'{self.config["experience"]}')
+        args.extend(
+            [
+                f"--/app/tokens/exe-path={exe_path}",  # this is needed so dlss lib is found
+                f'--/persistent/app/viewport/displayOptions={self.config["display_options"]}',  # hide extra stuff in viewport
+                # Forces kit to not render until all USD files are loaded
+                f'--/rtx/materialDb/syncLoads={self.config["sync_loads"]}',
+                f'--/rtx/hydra/materialSyncLoads={self.config["sync_loads"]}',
+                f'--/omni.kit.plugin/syncUsdLoads={self.config["sync_loads"]}',
+                f'--/app/renderer/resolution/width={self.config["width"]}',
+                f'--/app/renderer/resolution/height={self.config["height"]}',
+                f'--/app/window/width={self.config["window_width"]}',
+                f'--/app/window/height={self.config["window_height"]}',
+                f'--/renderer/multiGpu/enabled={self.config["multi_gpu"]}',
+                f'--/app/fastShutdown={self.config["fast_shutdown"]}',
+                "--/app/installSignalHandlers=0",
+                "--ext-folder",
+                f'{os.path.abspath(os.environ["ISAAC_PATH"])}/exts',  # adding to json doesn't work
+                "--ext-folder",
+                f'{os.path.abspath(os.environ["ISAAC_PATH"])}/apps',  # so we can reference other kit files
+            ]
+        )
         # Add additional command line arguments
         extra_args = self.config.get("extra_args", [])
         if isinstance(extra_args, list):
@@ -609,7 +618,7 @@ class SimulationApp:
         carb.log_info("SimulationApp._prepare_ui: UI setup completed")
 
     def _wait_for_viewport(self) -> None:
-        MAX_FRAMES = 25
+        MAX_FRAMES = 60
         DOCKING_FRAMES = 10
         frame_count = 0
         carb.log_info("SimulationApp._wait_for_viewport: Starting viewport wait")
@@ -626,6 +635,8 @@ class SimulationApp:
             while viewport_api.frame_info.get("viewport_handle", None) is None and frame_count < MAX_FRAMES:
                 carb.log_info(f"SimulationApp._wait_for_viewport: Waiting for viewport... frame {frame_count}")
                 self._app.update()
+                # Sleep to reduce the overall number of frames it takes for the renderer to render its first frame
+                time.sleep(0.02)
                 frame_count += 1
             if frame_count == MAX_FRAMES:
                 raise Exception("Timeout waiting for viewport")
@@ -798,6 +809,12 @@ class SimulationApp:
         except Exception:
             pass
         carb.log_info("SimulationApp.close: Replicator shutdown finished")
+        # close the stage to make sure all the objects are destroyed
+        if self.context.can_close_stage():
+            self.context.close_stage()
+            carb.log_info("SimulationApp.close: Stage closed")
+        else:
+            carb.log_info("SimulationApp.close: Stage could not be closed")
         # check if exited already
         if not self._exiting:
             self._exiting = True

@@ -17,10 +17,12 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp(launch_config={"headless": False})
 
+import argparse
 import asyncio
 import os
 import random
 
+import carb.settings
 import omni.kit.app
 import omni.replicator.core as rep
 import omni.timeline
@@ -28,6 +30,11 @@ import omni.usd
 from isaacsim.core.utils.semantics import upgrade_prim_semantics_to_labels
 from isaacsim.core.utils.stage import add_reference_to_stage
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--num_scenarios", type=int, default=5, help="Number of randomization scenarios to create")
+args, _ = parser.parse_known_args()
+num_scenarios = args.num_scenarios
 
 # Make sure the simready explorer extension is enabled
 ext_manager = omni.kit.app.get_app().get_extension_manager()
@@ -176,6 +183,9 @@ def run_simready_randomizations(num_scenarios):
     rep.orchestrator.set_capture_on_play(False)
     random.seed(15)
 
+    # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+    carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
     # Add lights to the scene
     dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
     dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(500.0)
@@ -222,7 +232,6 @@ def run_simready_randomizations(num_scenarios):
     rp.destroy()
 
 
-num_scenarios = 5
 print(f"Running {num_scenarios} simready randomization scenarios...")
 run_simready_randomizations(num_scenarios)
 

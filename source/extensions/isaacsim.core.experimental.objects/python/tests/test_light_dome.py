@@ -25,15 +25,15 @@ from isaacsim.core.experimental.prims.tests.common import (
     check_allclose,
     check_array,
     check_lists,
+    cprint,
     draw_choice,
     draw_indices,
     draw_sample,
+    parametrize,
 )
 
-from .common import parametrize
 
-
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"]) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
     # create new stage
     await stage_utils.create_new_stage_async()
     # define prims
@@ -59,11 +59,11 @@ class TestDomeLight(omni.kit.test.AsyncTestCase):
 
     # --------------------------------------------------------------------
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_len(self, prim, num_prims, device, backend):
         self.assertEqual(len(prim), num_prims, f"Invalid len ({num_prims} prims)")
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_are_of_type(self, prim, num_prims, device, backend):
         self.assertFalse(TargetLight.are_of_type("/World").numpy().item())
         self.assertTrue(TargetLight.are_of_type("/World/A_0").numpy().item())
@@ -71,30 +71,30 @@ class TestDomeLight(omni.kit.test.AsyncTestCase):
         self.assertTrue(TargetLight.are_of_type(prim_utils.get_prim_at_path("/World/A_0")).numpy().item())
         self.assertTrue(TargetLight.are_of_type([prim_utils.get_prim_at_path("/World/A_0")]).numpy().item())
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_guide_radii(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
                 prim.set_guide_radii(v0, indices=indices)
                 output = prim.get_guide_radii(indices=indices)
                 check_array(output, shape=(expected_count, 1), dtype=wp.float32, device=device)
                 check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_texture_files(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_choice(shape=(expected_count,), choices=["a", "bc", "def"]):
                 prim.set_texture_files(v0, indices=indices)
                 output = prim.get_texture_files(indices=indices)
                 check_lists(expected_v0, output)
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_texture_formats(self, prim, num_prims, device, backend):
         choices = ["automatic", "latlong", "mirroredBall", "angular", "cubeMapVerticalCross"]
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_choice(shape=(expected_count,), choices=choices):
                 prim.set_texture_formats(v0, indices=indices)
                 output = prim.get_texture_formats(indices=indices)

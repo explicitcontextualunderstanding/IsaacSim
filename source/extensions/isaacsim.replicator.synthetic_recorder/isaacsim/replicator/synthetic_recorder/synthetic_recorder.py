@@ -94,6 +94,7 @@ class SyntheticRecorder:
         self._writer = None
         self._current_frame = 0
         self._render_products = []
+        self._original_capture_on_play = None
 
     def get_state(self):
         """Get the current state of the recorder."""
@@ -122,9 +123,11 @@ class SyntheticRecorder:
                 print(f"[SDR][Warn] Could not create writer {self.writer_name}: {e}")
                 return False
 
-        if carb.settings.get_settings().get("/omni/replicator/captureOnPlay"):
+        # Store the original capture on play setting and disable it if necessary
+        self._original_capture_on_play = carb.settings.get_settings().get("/omni/replicator/captureOnPlay")
+        if self._original_capture_on_play:
             rep.orchestrator.set_capture_on_play(False)
-            print("[SDR][Warn] Disabling replicator capture on play flag for synthetic data recorder.")
+            print("[SDR][Warn] Disabling replicator capture on play flag during recording.")
 
         writer_params = {}
         if self.writer_name == "BasicWriter":
@@ -201,6 +204,13 @@ class SyntheticRecorder:
         for rp in self._render_products:
             rp.destroy()
         self._render_products.clear()
+
+        # Reset the capture on play flag to its original value
+        if self._original_capture_on_play is not None:
+            rep.orchestrator.set_capture_on_play(self._original_capture_on_play)
+            if self._original_capture_on_play:
+                print(f"[SDR][Warn] Re-enabled replicator capture on play flag after recording.")
+            self._original_capture_on_play = None
 
     async def start_stop_async(self):
         """Start or stop the recording loop."""
@@ -302,7 +312,6 @@ class SyntheticRecorder:
         for prim in stage.Traverse():
             # Check the new semantics API
             if prim.HasAPI(UsdSemantics.LabelsAPI):
-                print(f"Prim {prim.GetPath()} has the new semantics API")
                 return True
             # Check the old semantics API
             if prim.HasAPI(Semantics.SemanticsAPI):

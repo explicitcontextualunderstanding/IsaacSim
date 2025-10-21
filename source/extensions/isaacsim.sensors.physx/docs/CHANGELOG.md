@@ -1,4 +1,8 @@
 # Changelog
+## [2.3.2] - 2025-09-26
+### Changed
+- Update license headers
+
 ## [2.3.1] - 2025-08-29
 ### Changed
 - Renamed CARB profiling zones to include [IsaacSim] prefix

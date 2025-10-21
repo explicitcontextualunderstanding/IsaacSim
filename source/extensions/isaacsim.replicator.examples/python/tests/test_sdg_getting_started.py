@@ -16,6 +16,7 @@
 import os
 import random
 
+import carb.settings
 import omni.kit
 import omni.replicator.core as rep
 import omni.timeline
@@ -31,6 +32,7 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
+        self.original_dlss_exec_mode = carb.settings.get_settings().get("rtx/post/dlss/execMode")
 
     async def tearDown(self):
         omni.usd.get_context().close_stage()
@@ -38,11 +40,15 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", self.original_dlss_exec_mode)
 
     async def test_sdg_getting_started_01(self):
         # Create a new stage and disable capture on play
         omni.usd.get_context().new_stage()
         rep.orchestrator.set_capture_on_play(False)
+
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
         # Setup the stage with a dome light and a cube
         stage = omni.usd.get_context().get_stage()
@@ -101,6 +107,9 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         # Create a new stage and disable capture on play
         omni.usd.get_context().new_stage()
         rep.orchestrator.set_capture_on_play(False)
+
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
         # Setup stage
         stage = omni.usd.get_context().get_stage()
@@ -175,6 +184,9 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         random.seed(42)
         rep.set_global_seed(42)
 
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
         # Setup stage
         stage = omni.usd.get_context().get_stage()
         cube = stage.DefinePrim("/World/Cube", "Cube")
@@ -236,6 +248,9 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         # Create a new stage and disable capture on play
         omni.usd.get_context().new_stage()
         rep.orchestrator.set_capture_on_play(False)
+
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
         # Add a light
         stage = omni.usd.get_context().get_stage()

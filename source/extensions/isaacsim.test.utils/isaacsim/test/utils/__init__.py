@@ -16,4 +16,5 @@
 from .file_validation import *
 from .image_capture import *
 from .image_comparison import *
+from .image_io import *
 from .timed_async_test import *

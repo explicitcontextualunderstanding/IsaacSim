@@ -1,8 +1,7 @@
 # Changelog
 ## [8.0.26] - 2025-09-17
 ### Fixed
-- Fixed bug in RMPflow collision sphere visualization where updating the robot position did not
-  update the positions of visualized spheres.
+- Fixed bug in RMPflow collision sphere visualization where updating the robot position did not update the positions of visualized spheres.
 
 ## [8.0.25] - 2025-07-15
 ### Fixed

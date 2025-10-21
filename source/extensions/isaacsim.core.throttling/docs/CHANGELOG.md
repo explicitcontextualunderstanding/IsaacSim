@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.2.2] - 2025-09-25
+### Changed
+- Enabling async rendering happens after a 10 frame delay
+
 ## [2.2.1] - 2025-09-08
 ### Changed
 - Use opt-in carb setting for async rendering and manual mode toggles

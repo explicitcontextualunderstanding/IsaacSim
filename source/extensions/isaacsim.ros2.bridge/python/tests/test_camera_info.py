@@ -14,27 +14,41 @@
 # limitations under the License.
 
 
+import os
 import random
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import carb
 import cv2
-import numpy as np
-import omni.graph.core as og
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
+import isaacsim.core.utils.numpy.rotations as rot_utils
+import numpy as np
+import omni.graph.core as og
 import omni.kit.commands
 import omni.kit.test
 import omni.kit.usd
 import omni.kit.viewport.utility
+import omni.replicator.core as rep
+import usdrt
+from isaacsim.core.api.objects import VisualCuboid
 from isaacsim.core.prims import SingleXFormPrim
 from isaacsim.core.utils.physics import simulate_async
+from isaacsim.core.utils.prims import define_prim
 from isaacsim.core.utils.stage import add_reference_to_stage, get_current_stage, open_stage_async
+from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.sensors.camera import Camera
-from pxr import Sdf, UsdLux
+from isaacsim.test.utils import compute_difference_metrics, save_depth_image
+from pxr import Gf, Sdf, UsdGeom, UsdLux
+from sensor_msgs.msg import CameraInfo, Image, PointCloud2
+from sensor_msgs_py import point_cloud2
 
 from .common import ROS2TestCase, get_qos_profile
+
+# Debug flags for saving depth images during testing
+SAVE_DEPTH_IMAGES_AS_TEST = False
+SAVE_DEPTH_IMAGES_AS_GOLDEN = False
 
 
 # Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
@@ -58,14 +72,36 @@ class TestRos2CameraInfo(ROS2TestCase):
     # After running each test
     async def tearDown(self):
 
+        self._timeline.stop()
         await super().tearDown()
 
     def imgmsg_to_cv2(self, img_msg):
-        # encoding for RGB images is Type_RGB8 (token = rgb8) by default
-        # dtype, n_channels = self.encoding_to_dtype_with_channels(img_msg.encoding)
-        dtype = "uint8"
-        n_channels = 3
-        dtype = np.dtype(dtype)
+        """Convert ROS image message to numpy array.
+
+        Converts a ROS sensor_msgs/Image message to a numpy array, handling different
+        encodings including RGB and depth images.
+
+        Args:
+            param img_msg: ROS Image message.
+
+        Returns:
+            Image as numpy array with proper data type and dimensions.
+        """
+        # Determine dtype and n_channels based on encoding
+        if img_msg.encoding == "rgb8":
+            dtype = np.dtype(np.uint8)
+            n_channels = 3
+        elif img_msg.encoding == "32FC1":
+            dtype = np.dtype(np.float32)
+            n_channels = 1
+        elif img_msg.encoding == "16UC1":
+            dtype = np.dtype(np.uint16)
+            n_channels = 1
+        else:
+            # Default fallback for RGB
+            dtype = np.dtype(np.uint8)
+            n_channels = 3
+
         dtype = dtype.newbyteorder(">" if img_msg.is_bigendian else "<")
 
         img_buf = np.asarray(img_msg.data, dtype=dtype) if isinstance(img_msg.data, list) else img_msg.data
@@ -129,8 +165,10 @@ class TestRos2CameraInfo(ROS2TestCase):
         def camera_info_callback(data):
             self._camera_info = data
 
-        node = rclpy.create_node("camera_tester")
-        camera_info_sub = node.create_subscription(CameraInfo, "camera_info", camera_info_callback, get_qos_profile())
+        node = self.create_node("camera_tester")
+        camera_info_sub = self.create_subscription(
+            node, CameraInfo, "camera_info", camera_info_callback, get_qos_profile()
+        )
 
         await omni.kit.app.get_app().next_update_async()
 
@@ -367,8 +405,8 @@ class TestRos2CameraInfo(ROS2TestCase):
             rclpy.init()
 
         # Create ROS nodes to receive camera data
-        node_left = rclpy.create_node("camera_left_node")
-        node_right = rclpy.create_node("camera_right_node")
+        node_left = self.create_node("camera_left_node")
+        node_right = self.create_node("camera_right_node")
 
         # Set up QoS profile matching the publisher
         cam_info_qos = QoSProfile(
@@ -389,14 +427,14 @@ class TestRos2CameraInfo(ROS2TestCase):
             self._image_right = msg
 
         # Create subscriptions
-        camera_info_left_sub = node_left.create_subscription(
-            CameraInfo, "camera_info_left", camera_info_left_callback, cam_info_qos
+        camera_info_left_sub = self.create_subscription(
+            node_left, CameraInfo, "camera_info_left", camera_info_left_callback, cam_info_qos
         )
-        camera_info_right_sub = node_right.create_subscription(
-            CameraInfo, "camera_info_right", camera_info_right_callback, cam_info_qos
+        camera_info_right_sub = self.create_subscription(
+            node_right, CameraInfo, "camera_info_right", camera_info_right_callback, cam_info_qos
         )
-        image_left_sub = node_left.create_subscription(Image, "rgb_left", image_left_callback, cam_info_qos)
-        image_right_sub = node_right.create_subscription(Image, "rgb_right", image_right_callback, cam_info_qos)
+        image_left_sub = self.create_subscription(node_left, Image, "rgb_left", image_left_callback, cam_info_qos)
+        image_right_sub = self.create_subscription(node_right, Image, "rgb_right", image_right_callback, cam_info_qos)
 
         # Start spinning the nodes
         def spin_left():
@@ -573,9 +611,9 @@ class TestRos2CameraInfo(ROS2TestCase):
         def camera_info_system_time_callback(data):
             self._camera_info_system_time = data
 
-        node_system = rclpy.create_node("camera_system_time_tester")
-        camera_info_sub_system = node_system.create_subscription(
-            CameraInfo, "camera_info_left", camera_info_system_time_callback, get_qos_profile()
+        node_system = self.create_node("camera_system_time_tester")
+        camera_info_sub_system = self.create_subscription(
+            node_system, CameraInfo, "camera_info_left", camera_info_system_time_callback, get_qos_profile()
         )
 
         def spin_system_time():
@@ -617,9 +655,9 @@ class TestRos2CameraInfo(ROS2TestCase):
         def camera_info_sim_time_callback(data):
             self._camera_info_sim_time = data
 
-        node_sim = rclpy.create_node("camera_sim_time_tester")
-        camera_info_sub_sim = node_sim.create_subscription(
-            CameraInfo, "camera_info_left", camera_info_sim_time_callback, get_qos_profile()
+        node_sim = self.create_node("camera_sim_time_tester")
+        camera_info_sub_sim = self.create_subscription(
+            node_sim, CameraInfo, "camera_info_left", camera_info_sim_time_callback, get_qos_profile()
         )
 
         def spin_sim_time():
@@ -687,9 +725,9 @@ class TestRos2CameraInfo(ROS2TestCase):
         def camera_info_sim_time_callback(data):
             self._camera_info_sim_time = data
 
-        node_sim = rclpy.create_node("camera_sim_time_monotonic_tester")
-        camera_info_sub_sim = node_sim.create_subscription(
-            CameraInfo, "camera_info_left", camera_info_sim_time_callback, get_qos_profile()
+        node_sim = self.create_node("camera_sim_time_monotonic_tester")
+        camera_info_sub_sim = self.create_subscription(
+            node_sim, CameraInfo, "camera_info_left", camera_info_sim_time_callback, get_qos_profile()
         )
 
         def spin_sim_time():
@@ -735,3 +773,540 @@ class TestRos2CameraInfo(ROS2TestCase):
         self.assertLessEqual(
             sim_timestamp, (prev_sim_timestamp + 10.0), "Simulation time should be within an elapsed max time of 10s"
         )
+
+    async def test_depth_pointcloud_projection(self):
+        """Test that depth pointcloud can be projected back to depth image using camera intrinsics.
+
+        This test verifies that a depth pointcloud published by ROS2CameraHelper can be projected
+        back to a depth image using OpenCV and camera intrinsic parameters from CameraInfo,
+        and that the projected image matches the original depth image within acceptable tolerances.
+
+        Example:
+
+        .. code-block:: python
+
+            # This test is run automatically as part of the test suite
+            >>> # The test creates a camera, publishes depth data and pointcloud
+            >>> # then projects the pointcloud back to verify consistency
+        """
+        # Set up test scene with objects
+        await self._setup_test_scene_with_objects()
+
+        # Create camera using high-level API
+        resolution = (1280, 720)
+        camera = Camera(
+            prim_path="/World/Camera",
+            position=np.array([4.0, 0, 0.0]),
+            resolution=resolution,
+            orientation=rot_utils.euler_angles_to_quats(np.array([0, 0, 180]), degrees=True),
+        )
+        camera.set_focal_length(1.814756)
+
+        # Set up directories for debug image saving
+        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden")
+        test_dir = carb.tokens.get_tokens_interface().resolve("${temp}/test_depth_pointcloud_projection")
+
+        # Set up ROS2 message capture
+        node, depth_image_msg, pointcloud_msg, camera_info_msg = self._setup_ros2_message_capture(
+            "depth_pointcloud_projection_tester"
+        )
+
+        # Create OmniGraph to publish camera data
+        graph_path = "/ActionGraph"
+
+        try:
+            keys = og.Controller.Keys
+            (graph, nodes, _, _) = og.Controller.edit(
+                {"graph_path": graph_path, "evaluator_name": "execution"},
+                {
+                    keys.CREATE_NODES: [
+                        ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                        ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+                        ("CreateRenderProduct", "isaacsim.core.nodes.IsaacCreateRenderProduct"),
+                        ("DepthImagePublisher", "isaacsim.ros2.bridge.ROS2CameraHelper"),
+                        ("PointcloudPublisher", "isaacsim.ros2.bridge.ROS2CameraHelper"),
+                        ("CameraInfoPublisher", "isaacsim.ros2.bridge.ROS2CameraInfoHelper"),
+                    ],
+                    keys.SET_VALUES: [
+                        ("CreateRenderProduct.inputs:cameraPrim", [usdrt.Sdf.Path(camera.prim_path)]),
+                        ("CreateRenderProduct.inputs:height", resolution[1]),
+                        ("CreateRenderProduct.inputs:width", resolution[0]),
+                        ("DepthImagePublisher.inputs:topicName", "depth_image"),
+                        ("DepthImagePublisher.inputs:type", "depth"),
+                        ("DepthImagePublisher.inputs:frameId", "camera_frame"),
+                        ("PointcloudPublisher.inputs:topicName", "depth_pointcloud"),
+                        ("PointcloudPublisher.inputs:type", "depth_pcl"),
+                        ("PointcloudPublisher.inputs:frameId", "camera_frame"),
+                        ("CameraInfoPublisher.inputs:topicName", "camera_info"),
+                        ("CameraInfoPublisher.inputs:frameId", "camera_frame"),
+                    ],
+                    keys.CONNECT: [
+                        ("OnPlaybackTick.outputs:tick", "CreateRenderProduct.inputs:execIn"),
+                        ("CreateRenderProduct.outputs:execOut", "DepthImagePublisher.inputs:execIn"),
+                        ("CreateRenderProduct.outputs:execOut", "PointcloudPublisher.inputs:execIn"),
+                        ("CreateRenderProduct.outputs:execOut", "CameraInfoPublisher.inputs:execIn"),
+                        (
+                            "CreateRenderProduct.outputs:renderProductPath",
+                            "DepthImagePublisher.inputs:renderProductPath",
+                        ),
+                        (
+                            "CreateRenderProduct.outputs:renderProductPath",
+                            "PointcloudPublisher.inputs:renderProductPath",
+                        ),
+                        (
+                            "CreateRenderProduct.outputs:renderProductPath",
+                            "CameraInfoPublisher.inputs:renderProductPath",
+                        ),
+                    ],
+                },
+            )
+        except Exception as e:
+            carb.log_info(f"Graph creation error: {e}")
+            raise
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Wait for ROS2 messages to be received
+        await self._wait_for_ros2_messages(node, depth_image_msg, pointcloud_msg, camera_info_msg)
+
+        # Convert depth image message to numpy array using existing method
+        original_depth_image = self.imgmsg_to_cv2(depth_image_msg[0])
+
+        # Extract pointcloud data as numpy array
+        pointcloud_data = point_cloud2.read_points_numpy(pointcloud_msg[0], field_names=("x", "y", "z"), skip_nans=True)
+
+        # Project pointcloud back to depth image using OpenCV and full camera calibration
+        projected_depth_image = self._project_pointcloud_to_depth_image(
+            pointcloud_data, camera_info_msg[0], original_depth_image.shape
+        )
+
+        # Save debug images if flags are enabled
+        self._save_debug_depth_images(original_depth_image, projected_depth_image, golden_dir, test_dir, "_high_level")
+
+        # Compare images and assert similarity
+        self._compare_depth_images_and_assert(
+            original_depth_image, projected_depth_image, "high-level API", tolerance_mean=0.1, tolerance_rmse=0.2
+        )
+
+        # Clean up
+        node.destroy_node()
+        self._timeline.stop()
+
+    def _project_pointcloud_to_depth_image(
+        self, pointcloud_data: list, camera_info_msg: CameraInfo, image_shape: tuple
+    ) -> np.ndarray:
+        """Project 3D pointcloud back to depth image using camera calibration.
+
+        Uses OpenCV's cv2.projectPoints to project 3D points back to 2D image coordinates
+        and create a depth image. This provides accurate projection using the full camera
+        calibration including intrinsics and distortion coefficients.
+
+        Args:
+            param pointcloud_data: List of (x, y, z) tuples from pointcloud.
+            param camera_info_msg: ROS CameraInfo message containing full camera calibration.
+            param image_shape: (height, width) of the target depth image.
+
+        Returns:
+            Projected depth image as numpy array with same dimensions as input shape.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import numpy as np
+            >>> # Example pointcloud data
+            >>> points = [(1.0, 0.5, 2.0), (-0.5, 1.0, 1.5)]
+            >>> # Project to depth image using camera info
+            >>> depth_img = self._project_pointcloud_to_depth_image(points, camera_info_msg, (480, 640))
+            >>> depth_img.shape
+            (480, 640)
+        """
+        height, width = image_shape
+        projected_depth = np.zeros((height, width), dtype=np.float32)
+
+        if pointcloud_data.size == 0:
+            return projected_depth
+
+            # Extract x, y, z coordinates from numpy array
+        # read_points_numpy returns an array where columns are [x, y, z]
+        points_3d = pointcloud_data.astype(np.float32)
+
+        # Filter out invalid points (NaN, inf, or zero depth)
+        valid_mask = np.isfinite(points_3d).all(axis=1) & (points_3d[:, 2] > 0)  # Positive Z (depth)
+        points_3d = points_3d[valid_mask]
+
+        if len(points_3d) == 0:
+            return projected_depth
+
+        # Extract camera parameters from CameraInfo message
+        # Camera intrinsic matrix K from CameraInfo
+        camera_matrix = np.array(camera_info_msg.k).reshape(3, 3).astype(np.float32)
+
+        # Distortion coefficients from CameraInfo
+        # CameraInfo.d contains [k1, k2, t1, t2, k3] for plumb_bob model
+        dist_coeffs = None
+        if len(camera_info_msg.d) > 0:
+            dist_coeffs = np.array(camera_info_msg.d, dtype=np.float32)
+
+        # Use cv2.projectPoints for robust projection with full camera calibration
+        # cv2.projectPoints expects points as (N, 1, 3) and no rotation/translation
+        points_3d_reshaped = points_3d.reshape(-1, 1, 3)
+        rvec = np.zeros((3, 1), dtype=np.float32)  # No rotation
+        tvec = np.zeros((3, 1), dtype=np.float32)  # No translation
+
+        # Project points using OpenCV with distortion correction
+        projected_points, _ = cv2.projectPoints(points_3d_reshaped, rvec, tvec, camera_matrix, dist_coeffs)
+
+        # Convert projected points back to (N, 2) format
+        projected_points = projected_points.reshape(-1, 2)
+
+        # Convert to integer pixel coordinates
+        u = projected_points[:, 0].astype(int)
+        v = projected_points[:, 1].astype(int)
+        depths = points_3d[:, 2]
+
+        # Filter points within image bounds
+        valid_pixels = (u >= 0) & (u < width) & (v >= 0) & (v < height)
+        u_valid = u[valid_pixels]
+        v_valid = v[valid_pixels]
+        depths_valid = depths[valid_pixels]
+
+        # Handle multiple points projecting to same pixel by taking the closest depth
+        for i in range(len(u_valid)):
+            pixel_u, pixel_v, depth = u_valid[i], v_valid[i], depths_valid[i]
+            if projected_depth[pixel_v, pixel_u] == 0 or depth < projected_depth[pixel_v, pixel_u]:
+                projected_depth[pixel_v, pixel_u] = depth
+
+        return projected_depth
+
+    def _setup_ros2_message_capture(self, node_name: str, topic_prefix: str = ""):
+        """Set up ROS2 node and message callbacks for depth pointcloud projection tests.
+
+        Creates a ROS2 node with subscribers for depth image, pointcloud, and camera info messages.
+        Sets up callbacks to capture the messages for later processing.
+
+        Args:
+            param node_name: Name for the ROS2 node.
+            param topic_prefix: Prefix to add to topic names (e.g., "_low_level").
+
+        Returns:
+            Tuple containing (node, depth_image_msg, pointcloud_msg, camera_info_msg) where
+            the message variables are lists that will be populated by the callbacks.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> node, msgs = self._setup_ros2_message_capture("test_node", "_low_level")
+            >>> # msgs will contain [depth_image_msg, pointcloud_msg, camera_info_msg] as lists
+        """
+        import rclpy
+
+        node = rclpy.create_node(node_name)
+
+        # Use lists to store messages (mutable for callback closure)
+        depth_image_msg = [None]
+        pointcloud_msg = [None]
+        camera_info_msg = [None]
+
+        # Set up message callbacks
+        def depth_image_callback(msg: Image):
+            depth_image_msg[0] = msg
+
+        def pointcloud_callback(msg: PointCloud2):
+            pointcloud_msg[0] = msg
+
+        def camera_info_callback(msg: CameraInfo):
+            camera_info_msg[0] = msg
+
+        # Create subscribers
+        depth_image_sub = node.create_subscription(
+            Image, f"depth_image{topic_prefix}", depth_image_callback, get_qos_profile()
+        )
+        pointcloud_sub = node.create_subscription(
+            PointCloud2, f"depth_pointcloud{topic_prefix}", pointcloud_callback, get_qos_profile()
+        )
+        camera_info_sub = node.create_subscription(
+            CameraInfo, f"camera_info{topic_prefix}", camera_info_callback, get_qos_profile()
+        )
+
+        return node, depth_image_msg, pointcloud_msg, camera_info_msg
+
+    async def _wait_for_ros2_messages(
+        self, node, depth_image_msg, pointcloud_msg, camera_info_msg, timeout_iterations: int = 50
+    ):
+        """Wait for ROS2 messages to be received.
+
+        Spins the ROS2 node until all three message types are received or timeout is reached.
+
+        Args:
+            param node: ROS2 node to spin.
+            param depth_image_msg: List containing depth image message (modified in place).
+            param pointcloud_msg: List containing pointcloud message (modified in place).
+            param camera_info_msg: List containing camera info message (modified in place).
+            param timeout_iterations: Maximum number of spin iterations before timeout.
+
+        Raises:
+            AssertionError: If any required messages are not received within timeout.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> await self._wait_for_ros2_messages(node, depth_msg, pc_msg, info_msg)
+            >>> # All messages should now be populated
+        """
+        import rclpy
+
+        # Spin ROS2 node to receive messages
+        for _ in range(timeout_iterations):
+            rclpy.spin_once(node, timeout_sec=0.1)
+            if all([depth_image_msg[0], pointcloud_msg[0], camera_info_msg[0]]):
+                break
+            await omni.kit.app.get_app().next_update_async()
+
+        # Verify we received all messages
+        self.assertIsNotNone(depth_image_msg[0], "Failed to receive depth image message")
+        self.assertIsNotNone(pointcloud_msg[0], "Failed to receive pointcloud message")
+        self.assertIsNotNone(camera_info_msg[0], "Failed to receive camera info message")
+
+    def _save_debug_depth_images(
+        self,
+        original_depth_image: np.ndarray,
+        projected_depth_image: np.ndarray,
+        golden_dir: str,
+        test_dir: str,
+        suffix: str = "",
+    ):
+        """Save debug depth images for visual inspection.
+
+        Uses the save_depth_image utility from isaacsim.test.utils.image_capture for proper
+        depth image handling with automatic normalization and format selection.
+
+        Args:
+            param original_depth_image: Original depth image from camera.
+            param projected_depth_image: Depth image projected from pointcloud.
+            param golden_dir: Directory for golden reference images.
+            param test_dir: Directory for test output images.
+            param suffix: Suffix to add to filenames (e.g., "_low_level").
+
+        Example:
+
+        .. code-block:: python
+
+            >>> self._save_debug_depth_images(orig_img, proj_img, "/golden", "/test", "_low_level")
+            >>> # Images saved with proper depth handling if debug flags are enabled
+        """
+        if not (SAVE_DEPTH_IMAGES_AS_TEST or SAVE_DEPTH_IMAGES_AS_GOLDEN):
+            return
+
+        # Save original depth image with proper normalization
+        if SAVE_DEPTH_IMAGES_AS_TEST:
+            save_depth_image(original_depth_image, test_dir, f"original_depth{suffix}.png", normalize=True)
+            save_depth_image(projected_depth_image, test_dir, f"projected_depth{suffix}.png", normalize=True)
+
+        if SAVE_DEPTH_IMAGES_AS_GOLDEN:
+            save_depth_image(original_depth_image, golden_dir, f"original_depth{suffix}.png", normalize=True)
+            save_depth_image(projected_depth_image, golden_dir, f"projected_depth{suffix}.png", normalize=True)
+
+    def _compare_depth_images_and_assert(
+        self,
+        original_depth_image: np.ndarray,
+        projected_depth_image: np.ndarray,
+        test_name: str = "",
+        tolerance_mean: float = 0.1,
+        tolerance_rmse: float = 0.5,
+    ):
+        """Compare depth images and assert they are within tolerance.
+
+        Uses compute_difference_metrics to compare images and logs detailed metrics.
+        Asserts that mean absolute difference and RMSE are within specified tolerances.
+
+        Args:
+            param original_depth_image: Original depth image from camera.
+            param projected_depth_image: Depth image projected from pointcloud.
+            param test_name: Name of the test for logging purposes.
+            param tolerance_mean: Maximum allowed mean absolute difference.
+            param tolerance_rmse: Maximum allowed RMSE.
+
+        Raises:
+            AssertionError: If images differ more than specified tolerances.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> self._compare_depth_images_and_assert(orig_img, proj_img, "high_level_api")
+            >>> # Logs metrics and asserts similarity within default tolerances
+        """
+        from isaacsim.test.utils.image_comparison import compute_difference_metrics, print_difference_statistics
+
+        metrics = compute_difference_metrics(original_depth_image, projected_depth_image, ignore_blank_pixels=True)
+
+        if SAVE_DEPTH_IMAGES_AS_GOLDEN or SAVE_DEPTH_IMAGES_AS_TEST:
+            print_difference_statistics(metrics)
+
+        # Assert that the images are reasonably similar
+        self.assertLess(
+            metrics["mean_abs"],
+            tolerance_mean,
+            f"Mean absolute difference {metrics['mean_abs']} exceeds tolerance of {tolerance_mean}",
+        )
+        self.assertLess(
+            metrics["rmse"], tolerance_rmse, f"RMSE {metrics['rmse']} exceeds tolerance of {tolerance_rmse}"
+        )
+
+    async def _setup_test_scene_with_objects(self):
+        """Set up test scene with simple room environment.
+
+        Loads the Simple Room environment which provides sufficient depth variation
+        for meaningful pointcloud and depth image data from the existing scene geometry.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> await self._setup_test_scene_with_objects()
+            >>> # Simple room scene loaded
+        """
+        # Load a simple scene
+        scene_path = "/Isaac/Environments/Simple_Room/simple_room.usd"
+        await open_stage_async(self._assets_root_path + scene_path)
+
+        await omni.kit.app.get_app().next_update_async()
+
+    async def test_depth_pointcloud_projection_low_level_api(self):
+        """Test depth pointcloud projection using low-level USD API.
+
+        This test verifies that a depth pointcloud published by ROS2CameraHelper can be projected
+        back to a depth image using OpenCV and camera intrinsic parameters from CameraInfo,
+        and that the projected image matches the original depth image within acceptable tolerances.
+
+        Uses the low-level UsdGeom.Camera API for camera creation and manual render product setup.
+
+        Example:
+
+        .. code-block:: python
+
+            # This test is run automatically as part of the test suite
+            >>> # The test creates a camera using UsdGeom.Camera API, manually creates render product
+            >>> # publishes depth data and pointcloud, then projects the pointcloud back to verify consistency
+        """
+        # Set up test scene with objects
+        await self._setup_test_scene_with_objects()
+
+        # Create camera using low-level USD API
+        from isaacsim.core.utils.prims import define_prim
+        from pxr import Gf, UsdGeom
+
+        camera_prim_path = "/World/CameraLowLevel"
+        camera_prim = UsdGeom.Camera(define_prim(prim_path=camera_prim_path, prim_type="Camera"))
+
+        # Set camera transform and properties
+        from isaacsim.core.utils.xforms import reset_and_set_xform_ops
+
+        # Set up camera transform using XFormPrim for convenience
+        orientation = rot_utils.euler_angles_to_quats(np.array([90, 0, 90]), degrees=True)
+        reset_and_set_xform_ops(
+            camera_prim.GetPrim(),
+            Gf.Vec3d([4, 0, 0.0]),
+            Gf.Quatd(orientation[0], orientation[1], orientation[2], orientation[3]),
+        )
+
+        # Set camera properties
+        resolution = (1280, 720)
+        focal_length = 1.814756
+        # USD Camera focal length is in tenths of world units (decimeters) while the high-level Camera API
+        # expects focal length in world units (meters). Multiply by 10 to convert from meters to decimeters.
+        camera_prim.GetFocalLengthAttr().Set(focal_length * 10)
+
+        # Set up directories for debug image saving
+        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden")
+        test_dir = carb.tokens.get_tokens_interface().resolve("${temp}/test_depth_pointcloud_projection_low_level")
+
+        # Set up ROS2 message capture
+        node, depth_image_msg, pointcloud_msg, camera_info_msg = self._setup_ros2_message_capture(
+            "depth_pointcloud_projection_tester_low_level", "_low_level"
+        )
+
+        # Create OmniGraph to publish camera data
+        graph_path = "/ActionGraphLowLevel"
+
+        try:
+            keys = og.Controller.Keys
+            (graph, nodes, _, _) = og.Controller.edit(
+                {"graph_path": graph_path, "evaluator_name": "execution"},
+                {
+                    keys.CREATE_NODES: [
+                        ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                        ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+                        ("CreateRenderProduct", "isaacsim.core.nodes.IsaacCreateRenderProduct"),
+                        ("DepthImagePublisher", "isaacsim.ros2.bridge.ROS2CameraHelper"),
+                        ("PointcloudPublisher", "isaacsim.ros2.bridge.ROS2CameraHelper"),
+                        ("CameraInfoPublisher", "isaacsim.ros2.bridge.ROS2CameraInfoHelper"),
+                    ],
+                    keys.SET_VALUES: [
+                        ("CreateRenderProduct.inputs:cameraPrim", [usdrt.Sdf.Path(camera_prim_path)]),
+                        ("CreateRenderProduct.inputs:height", resolution[1]),
+                        ("CreateRenderProduct.inputs:width", resolution[0]),
+                        ("DepthImagePublisher.inputs:topicName", "depth_image_low_level"),
+                        ("DepthImagePublisher.inputs:type", "depth"),
+                        ("DepthImagePublisher.inputs:frameId", "camera_frame"),
+                        ("PointcloudPublisher.inputs:topicName", "depth_pointcloud_low_level"),
+                        ("PointcloudPublisher.inputs:type", "depth_pcl"),
+                        ("PointcloudPublisher.inputs:frameId", "camera_frame"),
+                        ("CameraInfoPublisher.inputs:topicName", "camera_info_low_level"),
+                        ("CameraInfoPublisher.inputs:frameId", "camera_frame"),
+                    ],
+                    keys.CONNECT: [
+                        ("OnPlaybackTick.outputs:tick", "CreateRenderProduct.inputs:execIn"),
+                        ("CreateRenderProduct.outputs:execOut", "DepthImagePublisher.inputs:execIn"),
+                        ("CreateRenderProduct.outputs:execOut", "PointcloudPublisher.inputs:execIn"),
+                        ("CreateRenderProduct.outputs:execOut", "CameraInfoPublisher.inputs:execIn"),
+                        (
+                            "CreateRenderProduct.outputs:renderProductPath",
+                            "DepthImagePublisher.inputs:renderProductPath",
+                        ),
+                        (
+                            "CreateRenderProduct.outputs:renderProductPath",
+                            "PointcloudPublisher.inputs:renderProductPath",
+                        ),
+                        (
+                            "CreateRenderProduct.outputs:renderProductPath",
+                            "CameraInfoPublisher.inputs:renderProductPath",
+                        ),
+                    ],
+                },
+            )
+        except Exception as e:
+            carb.log_info(f"Graph creation error: {e}")
+            raise
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Wait for ROS2 messages to be received
+        await self._wait_for_ros2_messages(node, depth_image_msg, pointcloud_msg, camera_info_msg)
+
+        # Convert depth image message to numpy array using existing method
+        original_depth_image = self.imgmsg_to_cv2(depth_image_msg[0])
+
+        # Extract pointcloud data as numpy array
+        pointcloud_data = point_cloud2.read_points_numpy(pointcloud_msg[0], field_names=("x", "y", "z"), skip_nans=True)
+
+        # Project pointcloud back to depth image using OpenCV and full camera calibration
+        projected_depth_image = self._project_pointcloud_to_depth_image(
+            pointcloud_data, camera_info_msg[0], original_depth_image.shape
+        )
+
+        # Save debug images if flags are enabled
+        self._save_debug_depth_images(original_depth_image, projected_depth_image, golden_dir, test_dir, "_low_level")
+
+        # Compare images and assert similarity
+        self._compare_depth_images_and_assert(
+            original_depth_image, projected_depth_image, "low-level API", tolerance_mean=0.1, tolerance_rmse=0.5
+        )
+
+        # Cleanup
+        node.destroy_node()

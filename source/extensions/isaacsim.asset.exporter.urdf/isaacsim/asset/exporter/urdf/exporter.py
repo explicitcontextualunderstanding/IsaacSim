@@ -17,6 +17,7 @@
 # Standard Library
 import os
 import pathlib
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -27,7 +28,7 @@ import numpy as np
 import omni
 import omni.ui as ui
 from isaacsim.core.utils.stage import open_stage
-from isaacsim.gui.components.element_wrappers import Button, CheckBox, CollapsableFrame, StringField
+from isaacsim.gui.components.element_wrappers import Button, CheckBox, CollapsableFrame, DropDown, StringField
 from isaacsim.gui.components.ui_utils import get_style
 from omni.physx import get_physx_property_query_interface
 from omni.physx.bindings._physx import PhysxPropertyQueryMode, PhysxPropertyQueryResult
@@ -51,8 +52,8 @@ class UrdfExporter:
     def __init__(self):
         self.log_level = logger.level_from_name("ERROR")
         # Initialize parameters as direct attributes
-        self._mesh_dir = None
-        self._mesh_path_prefix = ""
+        self._mesh_dir = "meshes"
+        self._mesh_path_prefix = "file://"
         self._root = None
         self._visualize_collision_meshes = False
 
@@ -74,21 +75,48 @@ class UrdfExporter:
     def build_exporter_options(self):
         with ui.VStack(style=get_option_style(), spacing=5, height=0):
             mesh_field = StringField(
-                "Mesh Directory Path",
-                default_value="",
-                tooltip="Path to where directory mesh files will be saved. Defaults to 'meshes'.",
-                use_folder_picker=True,
+                "Mesh Folder Name",
+                default_value="meshes",
+                tooltip="Folder name for mesh files. Defaults to 'meshes'.",
+                use_folder_picker=False,
                 on_value_changed_fn=lambda v: self._on_value_changed("mesh_dir", v),
             )
 
-            mesh_path_prefix_field = StringField(
-                "Mesh Path Prefix",
-                default_value="",
-                tooltip="Prefix to add to URDF mesh filename values (e.g. 'file://')",
-                on_value_changed_fn=lambda v: self._on_value_changed("mesh_path_prefix", v),
+            mesh_path_prefix_options = ["file://", "package://", "./"]
+            self._mesh_path_prefix = "file://"
+            self._package_name = ""
+
+            def on_mesh_path_prefix_changed(new_value):
+                self._on_value_changed("mesh_path_prefix", new_value)
+                self._mesh_path_prefix = new_value
+                self._package_name_frame.visible = new_value == "package://"
+                # ui.refresh()
+
+            # Replaced ComboBoxField with DropDown
+            def populate_mesh_prefix_options():
+                return mesh_path_prefix_options
+
+            dropdown = DropDown(
+                label="Mesh Path Prefix",
+                tooltip="Prefix to add to URDF mesh filename values.",
+                populate_fn=populate_mesh_prefix_options,
+                on_selection_fn=on_mesh_path_prefix_changed,
+                keep_old_selections=False,
+                add_flourish=True,
             )
-            # set default value to match standard ROS Mesh Path Prefix file://<path to output directory>
-            mesh_path_prefix_field.set_value("file://<path to output directory>")
+
+            self._package_name_frame = ui.Frame()
+            with self._package_name_frame:
+                with ui.HStack():
+                    ui.Spacer(width=20)
+                    package_name_field = StringField(
+                        "Package Name",
+                        default_value="",
+                        tooltip="Name of the ROS package for 'package://' mesh paths.",
+                        on_value_changed_fn=lambda v: setattr(self, "_package_name", v),
+                    )
+            # Initialize items and trigger default selection callback
+            dropdown.repopulate()
 
             root_path_field = StringField(
                 "Root Prim Path",
@@ -106,10 +134,8 @@ class UrdfExporter:
             )
 
     def _on_export_button_clicked_fn(self, export_dir: str, export_filename: str):
-        print("self._mesh_dir: ", self._mesh_dir)
-        print("self._mesh_path_prefix: ", self._mesh_path_prefix)
-        print("self._root: ", self._root)
-        print("self._visualize_collision_meshes: ", self._visualize_collision_meshes)
+        sanitized_export_dir = os.path.normpath(export_dir)
+        self._mesh_dir = os.path.join(sanitized_export_dir, os.path.basename(self._mesh_dir))
 
         # check if all the necessary fields have been filled out
         if not self._root:
@@ -170,18 +196,39 @@ class UrdfExporter:
         # Create the UsdToUrdf object with the inertia data in the stage
         usd_to_urdf = UsdToUrdf(stage, **usd_to_urdf_kwargs)
 
-        if self._mesh_path_prefix == "file://<path to output directory>":
-            use_uri_file_prefix = True
-        else:
-            use_uri_file_prefix = False
+        mesh_prefix = self._mesh_path_prefix
 
+        if self._mesh_path_prefix == "package://":
+            if self._package_name == "":
+                self._package_name = os.path.splitext(os.path.basename(export_path))[0]
+            # Sanitize package name: lowercase, alphanumeric and underscores, no consecutive underscores, at least 2 chars
+
+            sanitized_name = re.sub(r"[^a-z0-9_]", "_", self._package_name.lower())
+            sanitized_name = re.sub(r"_+", "_", sanitized_name)
+            sanitized_name = sanitized_name.strip("_")
+            if len(sanitized_name) < 2:
+                sanitized_name = sanitized_name + "_pkg"
+            mesh_prefix = self._mesh_path_prefix + sanitized_name + "/"
+
+        # Check if the mesh directory is a subdirectory of the export directory
+        use_uri_file_prefix = mesh_prefix == "file://"
+        if use_uri_file_prefix and self._mesh_dir and not self._mesh_dir.endswith("/"):
+            self._mesh_dir = self._mesh_dir + "/"
         output_path = usd_to_urdf.save_to_file(
             urdf_output_path=export_path,
             visualize_collision_meshes=self._visualize_collision_meshes,
             mesh_dir=self._mesh_dir,
-            mesh_path_prefix=self._mesh_path_prefix,
+            mesh_path_prefix=mesh_prefix,
             use_uri_file_prefix=use_uri_file_prefix,
         )
+
+        # Override the URI file prefix to be relative path if the mesh path prefix is "./"
+        if mesh_prefix == "./":
+            with open(export_path, "r") as f:
+                urdf_content = f.read()
+            urdf_content = urdf_content.replace(self._mesh_dir, "./")
+            with open(export_path, "w") as f:
+                f.write(urdf_content)
 
         # Revert the stage back to its original state by removing the new layer if it was added
         root_layer.subLayerPaths.remove(inertia_temp_layer.identifier)

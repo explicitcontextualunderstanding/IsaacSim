@@ -13,6 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import platform
+import sys
+
+# Exit early if running on ARM64 (aarch64) architecture
+if platform.machine().lower() in ["aarch64", "arm64"]:
+    print("Livestream is not supported on ARM64 architecture. Exiting.")
+    sys.exit(0)
+
 from isaacsim import SimulationApp
 
 # This sample enables a livestream server to connect to when running headless

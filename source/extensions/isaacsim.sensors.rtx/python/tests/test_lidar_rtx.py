@@ -272,6 +272,36 @@ class TestLidarRtx(omni.kit.test.AsyncTestCase):
         annotators = lidar.get_annotators()
         self.assertEqual(len(annotators), 0)
 
+    async def test_annotator_kwarg_initialization(self):
+        """Test that annotators can be initialized with kwargs."""
+        lidar = LidarRtx(prim_path=self.lidar_prim_path, name="kwarg_test")
+
+        # Test IsaacCreateRTXLidarScanBuffer with specific kwargs
+        scan_buffer_kwargs = {
+            "outputIntensity": True,
+            "outputDistance": True,
+            "outputObjectId": False,
+            "outputVelocity": True,
+            "outputAzimuth": True,
+            "outputElevation": False,
+            "outputNormal": True,
+            "outputTimestamp": True,
+            "outputEmitterId": False,
+            "outputBeamId": True,
+            "outputMaterialId": True,
+        }
+
+        # Attach annotator with kwargs - this tests that kwargs are properly passed to initialize()
+        lidar.attach_annotator("IsaacCreateRTXLidarScanBuffer", **scan_buffer_kwargs)
+
+        # Test individual kwargs as well
+        lidar.detach_annotator("IsaacCreateRTXLidarScanBuffer")
+        lidar.attach_annotator("IsaacCreateRTXLidarScanBuffer", outputIntensity=True, outputDistance=True)
+
+        # Verify all annotators are attached
+        annotators = lidar.get_annotators()
+        self.assertIn("IsaacCreateRTXLidarScanBuffer", annotators)
+
     async def test_writer_methods(self):
         """Test get_writers, attach_writer, detach_writer, and detach_all_writers"""
         lidar = LidarRtx(prim_path=self.lidar_prim_path, name="writer_test")

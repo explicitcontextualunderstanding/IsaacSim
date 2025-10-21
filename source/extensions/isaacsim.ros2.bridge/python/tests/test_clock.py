@@ -75,8 +75,8 @@ class TestRos2BridgeCommands(ROS2TestCase):
         def clock_callback(data):
             self._time_sec = data.clock.sec + data.clock.nanosec / 1.0e9
 
-        node = rclpy.create_node("test_sim_clock")
-        clock_sub = node.create_subscription(Clock, "clock", clock_callback, get_qos_profile())
+        node = self.create_node("test_sim_clock")
+        clock_sub = self.create_subscription(node, Clock, "clock", clock_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -115,8 +115,8 @@ class TestRos2BridgeCommands(ROS2TestCase):
         def clock_callback(data):
             self._time_sec = data.clock.sec + data.clock.nanosec / 1.0e9
 
-        node = rclpy.create_node("test_sim_clock")
-        clock_sub = node.create_subscription(Clock, "clock", clock_callback, get_qos_profile())
+        node = self.create_node("test_sim_clock")
+        clock_sub = self.create_subscription(node, Clock, "clock", clock_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -165,8 +165,8 @@ class TestRos2BridgeCommands(ROS2TestCase):
         def clock_callback(data):
             self._time_sec = data.clock.sec + data.clock.nanosec / 1.0e9
 
-        node = rclpy.create_node("test_sim_clock")
-        clock_sub = node.create_subscription(Clock, "clock", clock_callback, get_qos_profile())
+        node = self.create_node("test_sim_clock")
+        clock_sub = self.create_subscription(node, Clock, "clock", clock_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)

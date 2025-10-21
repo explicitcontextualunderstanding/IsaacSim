@@ -20,6 +20,8 @@ from typing import List
 import carb
 from pxr import Sdf, UsdUtils
 
+from ..nucleus import get_assets_root_path_async
+
 
 def path_join(base, name):
     """Join two path components intelligently handling Omniverse URLs.
@@ -261,6 +263,10 @@ def is_absolute_path(path):
     if path.lower().startswith("omniverse://"):
         return True
     if path.lower().startswith("file://"):
+        return True
+    if path.lower().startswith("http://"):
+        return True
+    if path.lower().startswith("https://"):
         return True
     return os.path.isabs(path)
 
@@ -529,6 +535,58 @@ def path_dirname(path):
         return urlunparse((parsed.scheme, parsed.netloc, dir_path, "", "", ""))
     else:
         return os.path.dirname(os.path.normpath(path)) + os.sep
+
+
+async def resolve_asset_path_async(original_path: str) -> str | None:
+    """Resolve asset path by checking original location and fallback to assets root.
+
+    This function attempts to resolve a given asset path by first checking if it exists
+    in its original location. If not found, it constructs an alternate path using the
+    Isaac Sim assets root path and checks if that exists instead.
+
+    Args:
+        original_path: The original asset path to resolve.
+
+    Returns:
+        The resolved path if found, None otherwise.
+        Returns the path that exists (either original or assets root based), or None if neither exists.
+
+    Raises:
+        Exception: May raise exceptions from path_exists or get_assets_root_path_async calls.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> path = await resolve_asset_path_async("/Isaac/Environments/Grid/default_environment.usd")
+        >>> print(path)
+        /path/to/assets/Isaac/Environments/Grid/default_environment.usd
+        >>>
+        >>> invalid_path = await resolve_asset_path_async("/nonexistent/file.usd")
+        >>> print(invalid_path)
+        None
+    """
+    # Check if the original path exists
+    original_exists = await path_exists(original_path)
+    if original_exists:
+        return original_path
+
+    try:
+        # Construct alternate path with asset root
+        assets_root_path = await get_assets_root_path_async()
+        if assets_root_path:
+            alternate_path = (
+                assets_root_path + original_path
+                if original_path.startswith("/")
+                else assets_root_path + "/" + original_path
+            )
+
+            if await path_exists(alternate_path):
+                return alternate_path
+    except Exception as e:
+        carb.log_warn(f"Could not get assets root path: {e}")
+
+    return None
 
 
 async def find_filtered_files_async(

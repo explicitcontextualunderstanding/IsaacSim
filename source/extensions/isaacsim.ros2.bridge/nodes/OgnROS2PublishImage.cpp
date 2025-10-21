@@ -524,7 +524,7 @@ public:
             else
             {
                 // In order to get the benefits of using a separate stream, do all of the work in a new thread
-                tasking->addTask(carb::tasking::Priority::eHigh, state.m_tasks,
+                tasking->addTask(carb::tasking::Priority::eHigh, state.m_nitrosBridgeTasks,
                                  [data = publishNitrosBridgeImageThreadData]() mutable
                                  { publishNitrosBridgeHelper(data); });
             }

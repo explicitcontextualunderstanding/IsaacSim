@@ -1,15 +1,15 @@
-The Isaac Sim software in this repository is covered under the Apache 2.0 
+The Isaac Sim software in this repository is covered under the Apache 2.0
 License terms below.
 
 Building or using the software requires additional components licenced
 under other terms. These additional components include dependencies such
-as the Omniverse Kit SDK, as well as 3D models and textures. 
+as the Omniverse Kit SDK, as well as 3D models and textures.
 
-License terms for these additional NVIDIA owned and licensed components 
+License terms for these additional NVIDIA owned and licensed components
 can be found here:
-   https://docs.nvidia.com/NVIDIA-IsaacSim-Additional-Software-and-Materials-License.pdf
+   https://www.nvidia.com/en-us/agreements/enterprise-software/isaac-sim-additional-software-and-materials-license/
 
-Any open source dependencies downloaded during the build process are owned 
+Any open source dependencies downloaded during the build process are owned
 by their respective owners and licensed under their respective terms.
 
                                  Apache License

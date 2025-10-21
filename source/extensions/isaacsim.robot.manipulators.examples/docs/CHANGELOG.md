@@ -1,4 +1,7 @@
 # Changelog
+## [1.1.2] - 2025-09-26
+### Changed
+- Update license headers
 
 ## [1.1.1] - 2025-08-20
 ### Added

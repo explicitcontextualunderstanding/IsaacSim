@@ -182,12 +182,29 @@ class ArticulationPositionWindow(MenuHelperWindow):
                     (art_controller_node_name, "isaacsim.core.nodes.IsaacArticulationController"),
                     (joint_names_array_name, "omni.graph.nodes.ConstructArray"),
                 ],
+                keys.CREATE_ATTRIBUTES: [
+                    # Create additional input attributes for joint command array
+                    *[
+                        (joint_command_array_name + ".inputs:input" + str(i), "double")
+                        for i in range(1, self._num_dofs)
+                    ],
+                    # Create additional input attributes for joint names array
+                    *[(joint_names_array_name + ".inputs:input" + str(i), "token") for i in range(1, self._num_dofs)],
+                ],
                 keys.SET_VALUES: [
                     (joint_command_array_name + ".inputs:arrayType", "double[]"),
                     (joint_command_array_name + ".inputs:arraySize", self._num_dofs),
                     (art_controller_node_name + ".inputs:robotPath", self._art_root_path),
                     (joint_names_array_name + ".inputs:arrayType", "token[]"),
                     (joint_names_array_name + ".inputs:arraySize", self._num_dofs),
+                    *[
+                        (joint_command_array_name + ".inputs:input" + str(i), self._default_pos[i])
+                        for i in range(self._num_dofs)
+                    ],
+                    *[
+                        (joint_names_array_name + ".inputs:input" + str(i), self._joint_names[i])
+                        for i in range(self._num_dofs)
+                    ],
                 ],
                 keys.CONNECT: [
                     (tick_node + ".outputs:tick", art_controller_node_name + ".inputs:execIn"),
@@ -196,26 +213,6 @@ class ArticulationPositionWindow(MenuHelperWindow):
                 ],
             },
         )
-
-        # need to add extra inputs for the construct array nodes depending on the number of joints
-        for i in range(1, self._num_dofs):
-            og.Controller.create_attribute(
-                joint_command_array_node,
-                "inputs:input" + str(i),
-                og.Type(og.BaseDataType.DOUBLE, 1, 0, og.AttributeRole.NONE),
-                og.AttributePortType.ATTRIBUTE_PORT_TYPE_INPUT,
-            )
-            og.Controller.create_attribute(
-                joint_names_array_node,
-                "inputs:input" + str(i),
-                og.Type(og.BaseDataType.TOKEN, 1, 0, og.AttributeRole.NONE),
-                og.AttributePortType.ATTRIBUTE_PORT_TYPE_INPUT,
-            )
-
-        # set the default values for the joint command array and joint names array
-        for i in range(self._num_dofs):
-            og.Controller.attribute(joint_command_array_node + ".inputs:input" + str(i)).set(self._default_pos[i])
-            og.Controller.attribute(joint_names_array_node + ".inputs:input" + str(i)).set(self._joint_names[i])
 
     def _on_ok(self):
         self._og_path = self.og_path_input.get_value()
@@ -446,12 +443,30 @@ class ArticulationVelocityWindow(MenuHelperWindow):
                     (art_controller_node_name, "isaacsim.core.nodes.IsaacArticulationController"),
                     (joint_names_array_name, "omni.graph.nodes.ConstructArray"),
                 ],
+                keys.CREATE_ATTRIBUTES: [
+                    # Create additional input attributes for joint command array
+                    *[
+                        (joint_command_array_name + ".inputs:input" + str(i), "double")
+                        for i in range(1, self._num_dofs)
+                    ],
+                    # Create additional input attributes for joint names array
+                    *[(joint_names_array_name + ".inputs:input" + str(i), "token") for i in range(1, self._num_dofs)],
+                ],
                 keys.SET_VALUES: [
                     (joint_command_array_name + ".inputs:arrayType", "double[]"),
                     (joint_command_array_name + ".inputs:arraySize", self._num_dofs),
                     (art_controller_node_name + ".inputs:targetPrim", self._art_root_path),
                     (joint_names_array_name + ".inputs:arrayType", "token[]"),
                     (joint_names_array_name + ".inputs:arraySize", self._num_dofs),
+                    # Set the default values for all inputs
+                    *[
+                        (joint_command_array_name + ".inputs:input" + str(i), self._default_vel[i])
+                        for i in range(self._num_dofs)
+                    ],
+                    *[
+                        (joint_names_array_name + ".inputs:input" + str(i), self._joint_names[i])
+                        for i in range(self._num_dofs)
+                    ],
                 ],
                 keys.CONNECT: [
                     (tick_node + ".outputs:tick", art_controller_node_name + ".inputs:execIn"),
@@ -460,27 +475,6 @@ class ArticulationVelocityWindow(MenuHelperWindow):
                 ],
             },
         )
-
-        # need to add extra inputs for the construct array nodes depending on the number of joints
-        for i in range(1, self._num_dofs):
-            og.Controller.create_attribute(
-                joint_command_array_node,
-                "inputs:input" + str(i),
-                og.Type(og.BaseDataType.DOUBLE, 1, 0, og.AttributeRole.NONE),
-                og.AttributePortType.ATTRIBUTE_PORT_TYPE_INPUT,
-            )
-
-            og.Controller.create_attribute(
-                joint_names_array_node,
-                "inputs:input" + str(i),
-                og.Type(og.BaseDataType.TOKEN, 1, 0, og.AttributeRole.NONE),
-                og.AttributePortType.ATTRIBUTE_PORT_TYPE_INPUT,
-            )
-
-        # set the default values for the joint command array and joint names array
-        for j in range(self._num_dofs):
-            og.Controller.attribute(joint_command_array_node + ".inputs:input" + str(j)).set(self._default_vel[j])
-            og.Controller.attribute(joint_names_array_node + ".inputs:input" + str(j)).set(self._joint_names[j])
 
     def _on_ok(self):
         self._og_path = self.og_path_input.get_value()
@@ -759,39 +753,48 @@ class GripperWindow(MenuHelperWindow):
         if self._joint_names:
             n_joints = len(self._joint_names)
 
-            # create an array node to collect joint names
-            (_, [joint_names_node], _, _) = og.Controller.edit(
+            # Prepare all operations for a single edit call
+            create_nodes = [("ArrayJointNames", "omni.graph.nodes.ConstructArray")]
+            create_attributes = [
+                # Create additional input attributes for array node (for i > 0)
+                *[(f"ArrayJointNames.inputs:input{i}", "token") for i in range(1, n_joints)]
+            ]
+            set_values = [
+                ("ArrayJointNames.inputs:arrayType", "token[]"),
+                ("ArrayJointNames.inputs:arraySize", n_joints),
+            ]
+            create_connections = []
+
+            # Create joint name nodes and their connections
+            for i in range(n_joints):
+                node_name = f"JointName{i}"
+                joint_name = self._joint_names[i]
+                create_nodes.append((node_name, "omni.graph.nodes.ConstantToken"))
+                set_values.append((f"{node_name}.inputs:value", joint_name))
+
+                # Connection from joint name node to array
+                create_connections.append(
+                    (f"{self._og_path}/{node_name}.inputs:value", f"{self._og_path}/ArrayJointNames.inputs:input{i}")
+                )
+
+            # Connection from array to gripper controller
+            create_connections.append(
+                (
+                    f"{self._og_path}/ArrayJointNames.outputs:array",
+                    f"{self._og_path}/GripperController.inputs:jointNames",
+                )
+            )
+
+            # Execute all operations in a single edit call
+            og.Controller.edit(
                 graph_handle,
                 {
-                    keys.CREATE_NODES: [("ArrayJointNames", "omni.graph.nodes.ConstructArray")],
-                    keys.SET_VALUES: [
-                        ("ArrayJointNames.inputs:arrayType", "token[]"),
-                        ("ArrayJointNames.inputs:arraySize", n_joints),
-                    ],
+                    keys.CREATE_NODES: create_nodes,
+                    keys.CREATE_ATTRIBUTES: create_attributes,
+                    keys.SET_VALUES: set_values,
+                    keys.CONNECT: create_connections,
                 },
             )
-            og.Controller.connect(
-                og.Controller.attribute(self._og_path + "/ArrayJointNames.outputs:array"),
-                og.Controller.attribute(self._og_path + "/GripperController.inputs:jointNames"),
-            )
-            # create the matching number of inputs in array node and input token nodes
-            for i in range(n_joints):
-                node_name = "JointName" + str(i)
-                joint_name = self._joint_names[i]
-                og.Controller.create_node((node_name, graph_handle), "omni.graph.nodes.ConstantToken")
-                og.Controller.attribute(self._og_path + "/" + node_name + ".inputs:value").set(joint_name)
-                if i > 0:
-                    joint_names_node.create_attribute(
-                        "input" + str(i),
-                        og.Type(og.BaseDataType.TOKEN),
-                        og.AttributePortType.ATTRIBUTE_PORT_TYPE_INPUT,
-                    )
-
-                # make connections to arrayNames node
-                og.Controller.connect(
-                    og.Controller.attribute(self._og_path + "/JointName" + str(i) + ".inputs:value"),
-                    og.Controller.attribute(self._og_path + "/ArrayJointNames.inputs:input" + str(i)),
-                )
         else:
             print("defaulting to move all joints in the robot")
 

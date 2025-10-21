@@ -1,4 +1,8 @@
 # Changelog
+## [0.2.2] - 2025-09-27
+### Added
+- Restored SICK Inspector83x
+
 ## [0.2.1] - 2025-08-04
 ### Fixed
 - Asset path for ZED X sensor

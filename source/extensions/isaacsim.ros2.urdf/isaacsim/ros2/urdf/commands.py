@@ -19,8 +19,6 @@ import omni.client
 import omni.kit.commands
 from isaacsim.asset.importer.urdf import _urdf
 from isaacsim.ros2.urdf.RobotDescription import RobotDefinitionReader
-
-# import omni.kit.utils
 from omni.client import Result
 from pxr import Usd, UsdUtils
 
@@ -48,7 +46,7 @@ class URDFImportFromROS2Node(omni.kit.commands.Command):
 
     def on_app_update(self, event):
         if self.finished:
-            self.__subscription.unsubscribe()
+            self.__subscription = None
             if self.robot_model:
                 self.import_robot(self.robot_model)
             return

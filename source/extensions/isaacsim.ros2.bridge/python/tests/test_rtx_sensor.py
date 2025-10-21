@@ -134,12 +134,12 @@ class TestROS2RTXSensor(ROS2TestCase):
         from sensor_msgs.msg import LaserScan, PointCloud2
 
         self._pcl_data = None
-        node = rclpy.create_node("rtx_lidar_tester")
+        node = self.create_node("rtx_lidar_tester")
 
         def pcl_callback(data):
             self._pcl_data = data
 
-        pcl_sub = node.create_subscription(PointCloud2, "point_cloud", pcl_callback, get_qos_profile())
+        pcl_sub = self.create_subscription(node, PointCloud2, "point_cloud", pcl_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -198,12 +198,12 @@ class TestROS2RTXSensor(ROS2TestCase):
         from sensor_msgs.msg import LaserScan, PointCloud2
 
         self._scan_data = None
-        node = rclpy.create_node("rtx_lidar_tester")
+        node = self.create_node("rtx_lidar_tester")
 
         def scan_callback(data):
             self._scan_data = data
 
-        scan_sub = node.create_subscription(LaserScan, "laser_scan", scan_callback, get_qos_profile())
+        scan_sub = self.create_subscription(node, LaserScan, "laser_scan", scan_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)

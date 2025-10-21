@@ -32,7 +32,7 @@
 ### Changed
 - Updated dependencies and imports after renaming
 
-## [2.0.0] - 2024.09.23
+## [2.0.0] - 2024-09-23
 ### Deprecated
 - Extension deprecated since Isaac Sim 4.5.0. Replaced by isaacsim.replicator.
 

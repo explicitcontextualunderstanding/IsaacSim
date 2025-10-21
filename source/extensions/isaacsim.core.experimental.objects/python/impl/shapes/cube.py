@@ -73,7 +73,7 @@ class Cube(Shape):
         paths: str | list[str],
         *,
         # Cube
-        sizes: list | np.ndarray | wp.array | None = None,
+        sizes: float | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -169,9 +169,9 @@ class Cube(Shape):
 
     def set_sizes(
         self,
-        sizes: list | np.ndarray | wp.array,
+        sizes: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the sizes (cube's edge length) of the prims.
 
@@ -207,7 +207,7 @@ class Cube(Shape):
     def get_sizes(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the sizes (cube's edge length) of the prims.
 

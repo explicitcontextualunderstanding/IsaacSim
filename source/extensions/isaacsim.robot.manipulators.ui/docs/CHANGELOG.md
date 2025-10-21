@@ -1,4 +1,8 @@
 # Changelog
+## [2.1.23] - 2025-09-16
+### Fixed
+- Fix graph creation for Articulation Position, Velocity, and Gripper windows so that reopening usd after save works correctly. Add unit tests for these cases.
+
 ## [2.1.22] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 2.1.21)

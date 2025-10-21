@@ -1,4 +1,12 @@
 # Changelog
+## [1.3.6] - 2025-09-23
+### Fixed
+- SingleViewDepthSensorAsset correctly sets position, orientation, translation on __init__.
+
+## [1.3.5] - 2025-09-22
+### Fixed
+- SingleViewDepthSensorAsset.initialize validates depth sensor attributes before setting on render product prims.
+
 ## [1.3.4] - 2025-09-04
 ### Fixed
 - Camera.set_opencv_pinhole_properties and Camera.set_opencv_fisheye_properties now correctly set imageSize attribute as Camera._resolution.

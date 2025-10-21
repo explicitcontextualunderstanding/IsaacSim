@@ -15,6 +15,7 @@
 
 import omni.kit.test
 from isaacsim.core.api import SimulationContext, World
+from isaacsim.core.utils.prims import get_prim_attribute_value
 from isaacsim.core.utils.stage import create_new_stage_async, get_current_stage, get_stage_units, set_stage_units
 
 from .common import CoreTestCase
@@ -82,3 +83,14 @@ class TestSimulationContext(CoreTestCase):
         await simulation_context.initialize_simulation_context_async()
         assert 1.0 / simulation_context.get_rendering_dt() == stage.GetTimeCodesPerSecond()
         return
+
+    async def test_physics_context_solve_articulation_contact_last(self):
+        simulation_context = SimulationContext(set_defaults=False)
+        await simulation_context.initialize_simulation_context_async()
+        physics_context = simulation_context.get_physics_context()
+        for value in [True, False]:
+            physics_context.set_solve_articulation_contact_last(value)
+            self.assertEqual(physics_context.get_solve_articulation_contact_last(), value)
+            self.assertEqual(
+                get_prim_attribute_value(physics_context.prim_path, "physxScene:solveArticulationContactLast"), value
+            )

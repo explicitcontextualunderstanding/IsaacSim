@@ -1,4 +1,14 @@
 # Changelog
+
+## [0.4.0] - 2025-10-08
+### Added
+- Add `GroundPlane` object
+
+## [0.3.0] - 2025-09-18
+### Added
+- Add USD `Plane` shape
+- Add support for input data expressed as basic Python types (bool, int, float)
+
 ## [0.2.4] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 0.2.3)

@@ -68,10 +68,10 @@ class RigidBodyMaterial(PhysicsMaterial):
         self,
         paths: str | list[str],
         *,
-        static_frictions: list | np.ndarray | wp.array | None = None,
-        dynamic_frictions: list | np.ndarray | wp.array | None = None,
-        restitutions: list | np.ndarray | wp.array | None = None,
-        densities: list | np.ndarray | wp.array | None = None,
+        static_frictions: float | list | np.ndarray | wp.array | None = None,
+        dynamic_frictions: float | list | np.ndarray | wp.array | None = None,
+        restitutions: float | list | np.ndarray | wp.array | None = None,
+        densities: float | list | np.ndarray | wp.array | None = None,
     ) -> None:
         # get or create prims
         self._materials = []
@@ -107,10 +107,10 @@ class RigidBodyMaterial(PhysicsMaterial):
 
     def set_friction_coefficients(
         self,
-        static_frictions: list | np.ndarray | wp.array = None,
-        dynamic_frictions: list | np.ndarray | wp.array = None,
+        static_frictions: float | list | np.ndarray | wp.array = None,
+        dynamic_frictions: float | list | np.ndarray | wp.array = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the friction coefficients of the prims.
 
@@ -161,7 +161,7 @@ class RigidBodyMaterial(PhysicsMaterial):
     def get_friction_coefficients(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the friction coefficients of the prims.
 
@@ -207,9 +207,9 @@ class RigidBodyMaterial(PhysicsMaterial):
 
     def set_restitution_coefficients(
         self,
-        restitutions: list | np.ndarray | wp.array,
+        restitutions: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the restitution coefficients of the prims.
 
@@ -244,7 +244,7 @@ class RigidBodyMaterial(PhysicsMaterial):
     def get_restitution_coefficients(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the restitution coefficients of the prims.
 
@@ -284,9 +284,9 @@ class RigidBodyMaterial(PhysicsMaterial):
 
     def set_densities(
         self,
-        densities: list | np.ndarray | wp.array,
+        densities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the densities of the prims.
 
@@ -321,7 +321,7 @@ class RigidBodyMaterial(PhysicsMaterial):
     def get_densities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the densities of the prims.
 
@@ -371,7 +371,7 @@ class RigidBodyMaterial(PhysicsMaterial):
             Literal["average", "max", "min", "multiply"] | list[Literal["average", "max", "min", "multiply"]] | None
         ) = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the way two material properties will be combined to yield a coefficient for a collision.
 
@@ -425,7 +425,7 @@ class RigidBodyMaterial(PhysicsMaterial):
     def get_combine_modes(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[
         list[Literal["average", "max", "min", "multiply"]],
         list[Literal["average", "max", "min", "multiply"]],
@@ -474,9 +474,9 @@ class RigidBodyMaterial(PhysicsMaterial):
 
     def set_enabled_compliant_contacts(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the compliant spring-damper contact effects of the prims.
 
@@ -518,7 +518,7 @@ class RigidBodyMaterial(PhysicsMaterial):
     def get_enabled_compliant_contacts(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the compliant spring-damper contact effects of the prims.
 
@@ -555,10 +555,10 @@ class RigidBodyMaterial(PhysicsMaterial):
 
     def set_compliant_contact_gains(
         self,
-        stiffnesses: list | np.ndarray | wp.array | None = None,
-        dampings: list | np.ndarray | wp.array | None = None,
+        stiffnesses: float | list | np.ndarray | wp.array | None = None,
+        dampings: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the compliant contact gains (stiffnesses and dampings) of the prims.
 
@@ -613,7 +613,7 @@ class RigidBodyMaterial(PhysicsMaterial):
     def get_compliant_contact_gains(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the compliant contact gains (stiffnesses and dampings) of the prims.
 

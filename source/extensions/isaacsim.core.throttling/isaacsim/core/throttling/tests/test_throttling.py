@@ -82,20 +82,47 @@ class TestIsaacThrottling(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), False)
         self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), False)
-        self.assertEqual(self._settings.get("/app/asyncRendering"), False)
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), True)
         self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), True)
-        self.assertEqual(self._settings.get("/app/asyncRendering"), True)
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), False)
         self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), False)
-        self.assertEqual(self._settings.get("/app/asyncRendering"), False)
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._settings.get("/rtx/ecoMode/enabled"), True)
         self.assertEqual(self._settings.get("/exts/omni.kit.hydra_texture/gizmos/enabled"), True)
-        self.assertEqual(self._settings.get("/app/asyncRendering"), True)
+        pass
+
+    async def test_async_rendering_10_frame_delay(self):
+        """Test that async rendering is re-enabled after 10 frames when timeline stops."""
+        self._settings = carb.settings.get_settings()
+
+        # Enable async toggle
+        self._settings.set("/exts/isaacsim.core.throttling/enable_async", True)
+
+        # Start with timeline playing (async should be disabled)
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        self.assertFalse(self._settings.get("/app/asyncRendering"))
+
+        # Stop timeline - start the 10-frame delay
+        self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # For frames 1-9, async rendering should be disabled
+        for frame in range(1, 10):
+            await omni.kit.app.get_app().next_update_async()
+            self.assertFalse(
+                self._settings.get("/app/asyncRendering"), f"Async rendering should be False at frame {frame}"
+            )
+
+        # On frame 10, async rendering should be enabled
+        await omni.kit.app.get_app().next_update_async()
+        self.assertTrue(self._settings.get("/app/asyncRendering"), "Async rendering should be True after 10 frames")
+
+        await omni.kit.app.get_app().next_update_async()
+        self.assertTrue(self._settings.get("/app/asyncRendering"))
         pass

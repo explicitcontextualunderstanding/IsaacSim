@@ -73,7 +73,7 @@ class Sphere(Shape):
         paths: str | list[str],
         *,
         # Sphere
-        radii: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -169,9 +169,9 @@ class Sphere(Shape):
 
     def set_radii(
         self,
-        radii: list | np.ndarray | wp.array,
+        radii: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the radii (sphere's radius) of the prims.
 
@@ -207,7 +207,7 @@ class Sphere(Shape):
     def get_radii(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the radii (sphere's radius) of the prims.
 

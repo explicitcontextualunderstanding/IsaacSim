@@ -15,18 +15,71 @@
 
 import builtins
 import glob
+import multiprocessing
 import os
+import platform
 import sys
+
+
+def _aarch_preload_checking(queue):
+    try:
+        import torch
+    except Exception as e:
+        queue.put(f"Unable to check for LD_PRELOAD state ({', '.join(platform.uname())}): {e}")
+        return
+
+    message = None
+    shared_libraries = [
+        *glob.glob("/lib/*/libgomp.so.1"),
+        *glob.glob(os.path.join(f"{torch.__path__[0]}.libs", "libgomp*")),
+    ]
+    preload_libraries = [item for item in os.environ.get("LD_PRELOAD", "").split(":") if item.strip()]
+    paths = ":".join([item for item in shared_libraries if item not in preload_libraries])
+    if paths:
+        message = f"""
+========================================================================
+WARNING: For the application to run, some shared libraries must be
+loaded before others, using one of the following options.
+========================================================================
+
+* Set the environment variable for the current terminal:
+
+    export LD_PRELOAD="$LD_PRELOAD:{paths}"
+
+* Execute a scoped operation (affecting the current process only):
+
+    LD_PRELOAD="{paths}" <COMMAND>
+
+========================================================================
+"""
+    queue.put(message)
+
+
+def aarch_preload_checking():
+    machine = platform.machine().lower()
+    if sys.platform == "linux" and ("arm" in machine or "aarch" in machine):
+        queue = multiprocessing.Queue()
+        process = multiprocessing.Process(target=_aarch_preload_checking, args=(queue,))
+        process.start()
+        process.join()
+        msg = queue.get()
+        if msg:
+            sys.exit(msg)
 
 
 def bootstrap_kernel():
     # isaac-sim path
     isaacsim_path = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
 
-    # check if it is a non-Python package manager installation
-    split_path = isaacsim_path.split(os.sep)
-    if len(split_path) >= 2 and split_path[-1] == "isaacsim" and split_path[-2] == "python_packages":
+    # check for non-Python package manager installation
+    if isaacsim_path.split(os.sep)[-2:] == ["python_packages", "isaacsim"]:
+        # DGX/ARM LD_PRELOAD checking when a (virtual) Python environment is used
+        if os.path.join("kit", "python") not in sys.executable:
+            aarch_preload_checking()
         return
+
+    # DGX/ARM LD_PRELOAD checking
+    aarch_preload_checking()
 
     # kit path (internal kernel)
     if os.path.isdir(os.path.join(isaacsim_path, "kit", "extscore")):

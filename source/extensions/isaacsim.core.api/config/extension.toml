@@ -1,5 +1,5 @@
 [package]
-version = "4.7.1"
+version = "4.8.0"
 category = "Simulation"
 title = "Isaac Sim Core"
 description = "The Core extension provides a set of APIs to control the Simulation State as well as the physics scene. It also provides wrappers for USD objects, physics and visual materials."

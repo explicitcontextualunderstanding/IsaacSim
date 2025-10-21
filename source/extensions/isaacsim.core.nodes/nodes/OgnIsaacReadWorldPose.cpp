@@ -75,10 +75,10 @@ public:
         }
         usdrt::GfMatrix4d usdTransform =
             isaacsim::core::includes::pose::computeWorldXformNoCache(state.m_stage, state.m_usdrtStage, primPath);
-        const double* sourceOrientationI =
-            usdTransform.ExtractRotationMatrix().ExtractRotation().GetImaginary().GetArray();
+        const omni::math::linalg::vec3d sourceOrientationI =
+            usdTransform.ExtractRotationMatrix().ExtractRotation().GetImaginary();
         const double sourceOrientationR = usdTransform.ExtractRotationMatrix().ExtractRotation().GetReal();
-        const double* sourceTranslation = usdTransform.ExtractTranslation().GetArray();
+        const usdrt::GfVec3d sourceTranslation = usdTransform.ExtractTranslation();
         auto transform = usdrt::GfTransform(usdTransform);
         const double* sourceScale = transform.GetScale().data();
 

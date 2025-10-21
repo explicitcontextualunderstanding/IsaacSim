@@ -57,6 +57,9 @@ world.reset()
 # Setting capture on play to False will prevent the replicator from capturing data each frame
 carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
 
+# Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
 # Create a camera and render product to collect the data from
 cam = rep.create.camera(position=(5, 5, 5), look_at=(0, 0, 0))
 rp = rep.create.render_product(cam, (512, 512))

@@ -62,7 +62,7 @@ class TestRos2Subscriber(ROS2TestCase):
         subscriber_node = new_nodes[-1]
 
         ros2_publisher = None
-        ros2_node = rclpy.create_node("isaac_sim_test_subscriber")
+        ros2_node = self.create_node("isaac_sim_test_subscriber")
 
         # define messages
         messages = []
@@ -141,9 +141,9 @@ class TestRos2Subscriber(ROS2TestCase):
             print(message_type)
             # create publisher
             if ros2_publisher:
-                ros2_node.destroy_publisher(ros2_publisher)
+                self.destroy_publisher(ros2_node, ros2_publisher)
                 ros2_publisher = None
-            ros2_publisher = ros2_node.create_publisher(eval(message_type), "custom_topic", 10)
+            ros2_publisher = self.create_publisher(ros2_node, eval(message_type), "custom_topic", 10)
 
             # change message type
             await omni.kit.app.get_app().next_update_async()

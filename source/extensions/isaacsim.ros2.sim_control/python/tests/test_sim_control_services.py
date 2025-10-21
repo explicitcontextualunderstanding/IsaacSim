@@ -1679,6 +1679,27 @@ class TestSimControlServices(omni.kit.test.AsyncTestCase):
         stage_uri = root_layer.identifier
         self.assertEqual(result.world.world_resource.uri, stage_uri)
 
+        # Test loading with direct URI (without asset root path prefix)
+        request_no_prefix = LoadWorld.Request()
+        request_no_prefix.uri = "/Isaac/Environments/Grid/default_environment.usd"
+
+        result_no_prefix = await self._call_service_async(LoadWorld, "/load_world", request_no_prefix)
+
+        self.assertIsNotNone(result_no_prefix)
+        self.assertTrue(result_no_prefix.result.result == Result.RESULT_OK)
+        self.assertIsNotNone(result_no_prefix.world)
+        self.assertEqual(result_no_prefix.world.name, "default_environment")
+        self.assertEqual(result_no_prefix.world.world_resource.uri, assets_root_path + request_no_prefix.uri)
+
+        # Verify the world was actually loaded
+        stage = omni.usd.get_context().get_stage()
+        self.assertIsNotNone(stage, "Stage should be loaded after LoadWorld")
+
+        root_layer = stage.GetRootLayer()
+
+        stage_uri = root_layer.identifier
+        self.assertEqual(result_no_prefix.world.world_resource.uri, stage_uri)
+
         # Test loading invalid file path (should fail)
         request_invalid = LoadWorld.Request()
         request_invalid.uri = "/invalid/path/to/nonexistent.usd"

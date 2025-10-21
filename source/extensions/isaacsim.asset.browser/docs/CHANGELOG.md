@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.3.23] - 2025-10-10
+### Changed
+- Update assets path to production
+
 ## [1.3.22] - 2025-09-05
 ### Changed
 - Update assets path to staging

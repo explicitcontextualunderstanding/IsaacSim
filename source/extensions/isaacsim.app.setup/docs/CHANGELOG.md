@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.6.0] - 2025-09-18
+### Added
+- Added setting to enable ROS Simulation Control extension on startup
+
 ## [1.5.0] - 2025-08-21
 ### Changed
 - Remove app selector launcher

@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.0] - 2025-09-19
+### Added
+- Add diagonal inertia triangle inequality check
+
 ## [1.0.4] - 2025-09-16
 ### Changed
 - Update tolerances for mis-configured joint poses

@@ -31,7 +31,6 @@ from isaacsim.core.api import World
 from isaacsim.core.api.objects import VisualCone, VisualCuboid
 from isaacsim.sensors.camera import SingleViewDepthSensor
 from isaacsim.storage.native.nucleus import get_assets_root_path
-from PIL import Image
 
 # Create a world
 world = World(stage_units_in_meters=1.0)
@@ -118,13 +117,14 @@ while simulation_app.is_running() and (not args.test or i < 10):
     world.step(render=True)
     i += 1
 
-# Retrieve the rendered frames
-latest_frame = camera.get_current_frame()
-img_stereoscopic_depth = Image.fromarray(latest_frame["DepthSensorDistance"]).convert("RGB")
-img_distance_to_image_plane = Image.fromarray(latest_frame["distance_to_image_plane"]).convert("RGB")
+# Saved the rendered frames as PNGs
+from isaacsim.core.utils.extensions import enable_extension
 
-# Save the rendered frames
-img_stereoscopic_depth.save("depth_sensor_distance.png")
-img_distance_to_image_plane.save("distance_to_image_plane.png")
+enable_extension("isaacsim.test.utils")
+from isaacsim.test.utils import save_depth_image
+
+latest_frame = camera.get_current_frame()
+save_depth_image(latest_frame["DepthSensorDistance"], "testing", "depth_sensor_distance.png", normalize=True)
+save_depth_image(latest_frame["distance_to_image_plane"], "testing", "distance_to_image_plane.png", normalize=True)
 
 simulation_app.close()

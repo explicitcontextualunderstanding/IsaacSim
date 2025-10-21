@@ -169,14 +169,18 @@ def draw_sample(
         # sample according to dtype
         if dtype is wp.bool:
             sample = np.random.choice([True, False], size=shape).astype(np.bool_)
+            basic_type = bool(sample.flatten()[0])
         elif dtype is wp.int32:
             sample = np.random.randint(low=low, high=high, size=shape).astype(np.int32)
+            basic_type = int(sample.flatten()[0])
         elif dtype is wp.uint32:
             sample = np.random.randint(low=low, high=high, size=shape).astype(np.uint32)
+            basic_type = int(sample.flatten()[0])
         elif dtype is wp.float32:
             sample = np.random.uniform(low=low, high=high, size=shape).astype(np.float32)
             if normalized:
                 sample = (sample / np.linalg.norm(sample, axis=-1, keepdims=True)).astype(np.float32)
+            basic_type = float(sample.flatten()[0])
         else:
             raise ValueError(f"Invalid dtype: {dtype}")
         # apply transform if provided
@@ -190,6 +194,7 @@ def draw_sample(
         else:
             raise ValueError(f"Unsupported dimensionality: {sample.ndim}")
         single_sample_broadcasted = np.broadcast_to(single_sample, shape)
+        single_sample_broadcasted_basic = np.broadcast_to(single_sample.flatten()[:1], shape)
         # create samples
         if _type is list:
             samples.append((single_sample.reshape((shape[-1],)).tolist(), single_sample_broadcasted))
@@ -205,6 +210,8 @@ def draw_sample(
             samples.append((wp.array(sample.copy()), sample))
         else:
             raise ValueError(f"Invalid type: {_type}")
+    if shape[-1] == 1:
+        samples.append((basic_type, single_sample_broadcasted_basic))
     return samples
 
 

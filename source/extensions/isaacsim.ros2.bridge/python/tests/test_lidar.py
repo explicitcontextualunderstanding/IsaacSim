@@ -131,8 +131,8 @@ class TestRos2Lidar(ROS2TestCase):
         def lidar_callback(data: LaserScan):
             self._lidar_data = data
 
-        node = rclpy.create_node("lidar_tester")
-        subscriber = node.create_subscription(LaserScan, "scan", lidar_callback, get_qos_profile())
+        node = self.create_node("lidar_tester")
+        subscriber = self.create_subscription(node, LaserScan, "scan", lidar_callback, get_qos_profile())
 
         def standard_checks():
             self.assertIsNotNone(self._lidar_data)
@@ -209,4 +209,5 @@ class TestRos2Lidar(ROS2TestCase):
 
         self._timeline.stop()
         spin()
+
         pass

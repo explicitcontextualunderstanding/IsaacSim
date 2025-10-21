@@ -17,12 +17,9 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
 
-import asyncio
-import math
 import time
 
 import carb.eventdispatcher
-import carb.events
 import carb.settings
 import omni.kit.app
 import omni.physx
@@ -31,8 +28,8 @@ import omni.usd
 from pxr import PhysxSchema, UsdPhysics
 
 # TIMELINE / STAGE
-USE_CUSTOM_TIMELINE_SETTINGS = False
-USE_FIXED_TIME_STEPPING = False
+USE_CUSTOM_TIMELINE_SETTINGS = True
+USE_FIXED_TIME_STEPPING = True
 PLAY_EVERY_FRAME = True
 PLAY_DELAY_COMPENSATION = 0.0
 SUBSAMPLE_RATE = 1
@@ -50,106 +47,40 @@ DISABLE_SIMULATIONS = False
 LIMIT_APP_FPS = False
 APP_FPS = 120
 
-# Duration after which to clear subscribers and print the cached events
-SUBSCRIBER_WALL_TIME_LIMIT_SEC = 0.5
-PRINT_EVENTS = True
+# Number of app updates to run while collecting events
+NUM_APP_UPDATES = 100
+
+# Print the captured events
+VERBOSE = False
 
 
 def on_timeline_event(event: omni.timeline.TimelineEventType):
-    global wall_start_time
-    global timeline_sub
     global timeline_events
-    elapsed_wall_time = time.time() - wall_start_time
-
-    # Cache only time advance events
     if event.type == omni.timeline.TimelineEventType.CURRENT_TIME_TICKED.value:
-        event_name = omni.timeline.TimelineEventType(event.type).name
-        event_payload = event.payload
-        timeline_events.append((elapsed_wall_time, event_name, event_payload))
-
-    # Clear subscriber and print cached events
-    if elapsed_wall_time > SUBSCRIBER_WALL_TIME_LIMIT_SEC:
-        if timeline_sub is not None:
-            timeline_sub.unsubscribe()
-            timeline_sub = None
-        num_events = len(timeline_events)
-        fps = num_events / SUBSCRIBER_WALL_TIME_LIMIT_SEC
-        print(f"[timeline] captured {num_events} events with aprox {fps} FPS")
-        if PRINT_EVENTS:
-            for i, (wall_time, event_name, payload) in enumerate(timeline_events):
-                print(f"\t[timeline][{i}]\ttime={wall_time:.4f};\tevent={event_name};\tpayload={payload}")
+        timeline_events.append(event.payload)
+        if VERBOSE:
+            print(f"  [timeline][{len(timeline_events)}] {event.payload}")
 
 
 def on_physics_step(dt: float):
-    global wall_start_time
     global physx_events
-    global physx_sub
-    elapsed_wall_time = time.time() - wall_start_time
-
-    # Cache physics events
-    physx_events.append((elapsed_wall_time, dt))
-
-    # Clear subscriber and print cached events
-    if elapsed_wall_time > SUBSCRIBER_WALL_TIME_LIMIT_SEC:
-        # Physics unsubscription needs to be defered from the callback function
-        # see: '[Error] [omni.physx.plugin] Subscription cannot be changed during the event call'
-        async def clear_physx_sub_async():
-            global physx_sub
-            if physx_sub is not None:
-                physx_sub.unsubscribe()
-                physx_sub = None
-
-        asyncio.ensure_future(clear_physx_sub_async())
-        num_events = len(physx_events)
-        fps = num_events / SUBSCRIBER_WALL_TIME_LIMIT_SEC
-        print(f"[physics] captured {num_events} events with aprox {fps} FPS")
-        if PRINT_EVENTS:
-            for i, (wall_time, dt) in enumerate(physx_events):
-                print(f"\t[physics][{i}]\ttime={wall_time:.4f};\tdt={dt};")
+    physx_events.append(dt)
+    if VERBOSE:
+        print(f"  [physics][{len(physx_events)}] dt={dt}")
 
 
 def on_stage_render_event(event: carb.eventdispatcher.Event):
-    global wall_start_time
-    global stage_render_sub
     global stage_render_events
-    elapsed_wall_time = time.time() - wall_start_time
-
-    event_name = event.event_name
-    event_payload = event.payload
-    stage_render_events.append((elapsed_wall_time, event_name, event_payload))
-
-    if elapsed_wall_time > SUBSCRIBER_WALL_TIME_LIMIT_SEC:
-        if stage_render_sub is not None:
-            stage_render_sub.reset()
-            stage_render_sub = None
-        num_events = len(stage_render_events)
-        fps = num_events / SUBSCRIBER_WALL_TIME_LIMIT_SEC
-        print(f"[stage render] captured {num_events} events with aprox {fps} FPS")
-        if PRINT_EVENTS:
-            for i, (wall_time, event_name, payload) in enumerate(stage_render_events):
-                print(f"\t[stage render][{i}]\ttime={wall_time:.4f};\tevent={event_name};\tpayload={payload}")
+    stage_render_events.append(event.event_name)
+    if VERBOSE:
+        print(f"  [stage render][{len(stage_render_events)}] {event.event_name}")
 
 
 def on_app_update(event: carb.eventdispatcher.Event):
-    global wall_start_time
-    global app_sub
     global app_update_events
-    elapsed_wall_time = time.time() - wall_start_time
-
-    event_name = event.event_name
-    event_payload = event.payload
-    app_update_events.append((elapsed_wall_time, event_name, event_payload))
-
-    if elapsed_wall_time > SUBSCRIBER_WALL_TIME_LIMIT_SEC:
-        if app_sub is not None:
-            app_sub.reset()
-            app_sub = None
-        num_events = len(app_update_events)
-        fps = num_events / SUBSCRIBER_WALL_TIME_LIMIT_SEC
-        print(f"[app] captured {num_events} events with aprox {fps} FPS")
-        if PRINT_EVENTS:
-            for i, (wall_time, event_name, payload) in enumerate(app_update_events):
-                print(f"\t[app][{i}]\ttime={wall_time:.4f};\tevent={event_name};\tpayload={payload}")
+    app_update_events.append(event.event_name)
+    if VERBOSE:
+        print(f"  [app update][{len(app_update_events)}] {event.event_name}")
 
 
 stage = omni.usd.get_context().get_stage()
@@ -200,7 +131,7 @@ if USE_CUSTOM_PHYSX_FPS:
             physx_scene = PhysxSchema.PhysxSceneAPI.Apply(prim)
             break
     if physx_scene is None:
-        physics_scene = UsdPhysics.Scene.Define(stage, "/PhysicsScene")
+        UsdPhysics.Scene.Define(stage, "/PhysicsScene")
         physx_scene = PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/PhysicsScene"))
 
     # Time step for the physics simulation
@@ -230,16 +161,32 @@ if LIMIT_APP_FPS:
 if DISABLE_SIMULATIONS:
     carb.settings.get_settings().set("/app/player/playSimulations", False)
 
+print("Configuration:")
+print(f"  Timeline:")
+print(f"    - Stage FPS: {STAGE_FPS}  (/app/stage/timeCodesPerSecond)")
+print(f"    - Fixed time stepping: {USE_FIXED_TIME_STEPPING}  (/app/player/useFixedTimeStepping)")
+print(f"    - Play every frame: {PLAY_EVERY_FRAME}  (/app/player/useFastMode)")
+print(f"    - Subsample rate: {SUBSAMPLE_RATE}  (/app/player/timelineSubsampleRate)")
+print(f"    - Play delay compensation: {PLAY_DELAY_COMPENSATION}s  (/app/player/CompensatePlayDelayInSecs)")
+print(f"  Physics:")
+print(f"    - PhysX FPS: {PHYSX_FPS}  (physxScene.timeStepsPerSecond)")
+print(f"    - Min simulation FPS: {MIN_SIM_FPS}  (/persistent/simulation/minFrameRate)")
+print(f"    - Simulations enabled: {not DISABLE_SIMULATIONS}  (/app/player/playSimulations)")
+print(f"  Rendering:")
+print(f"    - App FPS limit: {APP_FPS if LIMIT_APP_FPS else 'unlimited'}  (/app/runLoops/main/rateLimitFrequency)")
+
 
 # Start the timeline
+print(f"Starting the timeline...")
 timeline.set_current_time(0)
-timeline.set_end_time(SUBSCRIBER_WALL_TIME_LIMIT_SEC + 1)
+timeline.set_end_time(10000)
 timeline.set_looping(False)
 timeline.play()
 timeline.commit()
 wall_start_time = time.time()
 
-# Subscribe and cache various events for a limited duration
+# Subscribe to events
+print(f"Subscribing to events...")
 timeline_events = []
 timeline_sub = timeline.get_timeline_event_stream().create_subscription_to_pop(on_timeline_event)
 physx_events = []
@@ -257,16 +204,45 @@ app_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
     observer_name="subscribers_and_events.on_app_update",
 )
 
-# Run the application for a while to trigger the events, with a buffer to ensure subscribers have enough wall-clock time
-num_app_updates = int(math.ceil(SUBSCRIBER_WALL_TIME_LIMIT_SEC * STAGE_FPS * 4))
-for _ in range(num_app_updates):
+# Run app updates and cache events
+print(f"Starting running the application for {NUM_APP_UPDATES} updates.")
+for i in range(NUM_APP_UPDATES):
+    if VERBOSE:
+        print(f"[app update loop][{i+1}/{NUM_APP_UPDATES}]")
     simulation_app.update()
+elapsed_wall_time = time.time() - wall_start_time
+print(f"Finished running the application for {NUM_APP_UPDATES} updates...")
 
-print(f"Finished running the application for {num_app_updates} updates.")
-print(f"Wall time: {time.time() - wall_start_time:.4f} seconds")
-print(f"Number of timeline events: {len(timeline_events)}")
-print(f"Number of physics events: {len(physx_events)}")
-print(f"Number of stage render events: {len(stage_render_events)}")
-print(f"Number of app update events: {len(app_update_events)}")
+# Stop timeline and unsubscribe from all events
+timeline.stop()
+if app_sub:
+    app_sub.reset()
+    app_sub = None
+if stage_render_sub:
+    stage_render_sub.reset()
+    stage_render_sub = None
+if physx_sub:
+    physx_sub.unsubscribe()
+    physx_sub = None
+if timeline_sub:
+    timeline_sub.unsubscribe()
+    timeline_sub = None
+
+
+# Print summary statistics
+print("\nStats:")
+print(f"- App updates: {NUM_APP_UPDATES}")
+print(f"- Wall time: {elapsed_wall_time:.4f} seconds")
+print(f"- Timeline events: {len(timeline_events)}")
+print(f"- Physics events: {len(physx_events)}")
+print(f"- Stage render events: {len(stage_render_events)}")
+print(f"- App update events: {len(app_update_events)}")
+
+# Calculate and display real-time performance factor
+if len(physx_events) > 0:
+    sim_time = sum(physx_events)
+    realtime_factor = sim_time / elapsed_wall_time if elapsed_wall_time > 0 else 0
+    print(f"- Simulation time: {sim_time:.4f}s")
+    print(f"- Real-time factor: {realtime_factor:.2f}x")
 
 simulation_app.close()

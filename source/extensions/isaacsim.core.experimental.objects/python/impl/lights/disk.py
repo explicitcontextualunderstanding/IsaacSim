@@ -75,7 +75,7 @@ class DiskLight(Light):
         paths: str | list[str],
         *,
         # DiskLight
-        radii: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -117,7 +117,7 @@ class DiskLight(Light):
     """
 
     def set_radii(
-        self, radii: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, radii: float | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the radii of the prims.
 
@@ -148,7 +148,7 @@ class DiskLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetRadiusAttr().Set(radii[0 if radii.shape[0] == 1 else i].item())
 
-    def get_radii(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_radii(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the radii of the prims.
 
         Backends: :guilabel:`usd`.

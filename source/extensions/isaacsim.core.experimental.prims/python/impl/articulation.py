@@ -688,8 +688,8 @@ class Articulation(XformPrim):
     def get_dof_limits(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the limits of the degrees of freedom (DOFs) of the prims.
 
@@ -758,11 +758,11 @@ class Articulation(XformPrim):
 
     def set_dof_limits(
         self,
-        lower: list | np.ndarray | wp.array | None = None,
-        upper: list | np.ndarray | wp.array | None = None,
+        lower: float | list | np.ndarray | wp.array | None = None,
+        upper: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the limits of the degrees of freedom (DOFs) of the prims.
 
@@ -850,8 +850,8 @@ class Articulation(XformPrim):
     def get_dof_friction_properties(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array, wp.array]:
         """Get the friction properties of the degrees of freedom (DOFs) of the prims.
 
@@ -936,12 +936,12 @@ class Articulation(XformPrim):
 
     def set_dof_friction_properties(
         self,
-        static_frictions: list | np.ndarray | wp.array | None = None,
-        dynamic_frictions: list | np.ndarray | wp.array | None = None,
-        viscous_frictions: list | np.ndarray | wp.array | None = None,
+        static_frictions: float | list | np.ndarray | wp.array | None = None,
+        dynamic_frictions: float | list | np.ndarray | wp.array | None = None,
+        viscous_frictions: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the friction properties of the degrees of freedom (DOFs) of the prims.
 
@@ -1061,8 +1061,8 @@ class Articulation(XformPrim):
     def get_dof_drive_model_properties(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array, wp.array]:
         """Get the drive model properties of the degrees of freedom (DOFs) of the prims.
 
@@ -1151,12 +1151,12 @@ class Articulation(XformPrim):
 
     def set_dof_drive_model_properties(
         self,
-        speed_effort_gradients: list | np.ndarray | wp.array | None = None,
-        maximum_actuator_velocities: list | np.ndarray | wp.array | None = None,
-        velocity_dependent_resistances: list | np.ndarray | wp.array | None = None,
+        speed_effort_gradients: float | list | np.ndarray | wp.array | None = None,
+        maximum_actuator_velocities: float | list | np.ndarray | wp.array | None = None,
+        velocity_dependent_resistances: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the drive model properties of the degrees of freedom (DOFs) of the prims.
 
@@ -1292,10 +1292,10 @@ class Articulation(XformPrim):
 
     def set_dof_armatures(
         self,
-        armatures: list | np.ndarray | wp.array,
+        armatures: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the armatures of the degrees of freedom (DOFs) of the prims.
 
@@ -1354,8 +1354,8 @@ class Articulation(XformPrim):
     def get_dof_armatures(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the armatures of the degrees of freedom (DOFs) of the prims.
 
@@ -1410,10 +1410,10 @@ class Articulation(XformPrim):
 
     def set_dof_position_targets(
         self,
-        positions: list | np.ndarray | wp.array,
+        positions: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the position targets of the degrees of freedom (DOFs) of the prims.
 
@@ -1483,10 +1483,10 @@ class Articulation(XformPrim):
 
     def set_dof_positions(
         self,
-        positions: list | np.ndarray | wp.array,
+        positions: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the positions of the degrees of freedom (DOFs) of the prims.
 
@@ -1532,10 +1532,10 @@ class Articulation(XformPrim):
 
     def set_dof_velocity_targets(
         self,
-        velocities: list | np.ndarray | wp.array,
+        velocities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the velocity targets of the degrees of freedom (DOFs) of the prims.
 
@@ -1602,10 +1602,10 @@ class Articulation(XformPrim):
 
     def set_dof_velocities(
         self,
-        velocities: list | np.ndarray | wp.array,
+        velocities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the velocities of the degrees of freedom (DOFs) of the prims.
 
@@ -1648,10 +1648,10 @@ class Articulation(XformPrim):
 
     def set_dof_efforts(
         self,
-        efforts: list | np.ndarray | wp.array,
+        efforts: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the efforts of the degrees of freedom (DOFs) of the prims.
 
@@ -1702,8 +1702,8 @@ class Articulation(XformPrim):
     def get_dof_efforts(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the efforts of the degrees of freedom (DOFs) of the prims.
 
@@ -1745,8 +1745,8 @@ class Articulation(XformPrim):
     def get_dof_projected_joint_forces(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the degrees of freedom (DOF) projected joint forces of the prims.
 
@@ -1791,8 +1791,8 @@ class Articulation(XformPrim):
     def get_link_incoming_joint_force(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the link incoming joint forces and torques to external loads of the prims.
 
@@ -1841,8 +1841,8 @@ class Articulation(XformPrim):
     def get_dof_positions(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the positions of the degrees of freedom (DOFs) of the prims.
 
@@ -1884,8 +1884,8 @@ class Articulation(XformPrim):
     def get_dof_position_targets(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the position targets of the degrees of freedom (DOFs) of the prims.
 
@@ -1940,8 +1940,8 @@ class Articulation(XformPrim):
     def get_dof_velocities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the velocities of the degrees of freedom (DOFs) of the prims.
 
@@ -1983,8 +1983,8 @@ class Articulation(XformPrim):
     def get_dof_velocity_targets(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the velocity targets of the degrees of freedom (DOFs) of the prims.
 
@@ -2041,7 +2041,7 @@ class Articulation(XformPrim):
         positions: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the root poses (positions and orientations) in the world frame of the prims.
 
@@ -2098,7 +2098,9 @@ class Articulation(XformPrim):
         else:
             super().set_world_poses(positions=positions, orientations=orientations, indices=indices)
 
-    def get_world_poses(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_world_poses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
+    ) -> tuple[wp.array, wp.array]:
         """Get the root poses (positions and orientations) in the world frame of the prims.
 
         Backends: :guilabel:`tensor`, :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
@@ -2143,7 +2145,9 @@ class Articulation(XformPrim):
         else:
             return super().get_world_poses(indices=indices)
 
-    def get_local_poses(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_local_poses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
+    ) -> tuple[wp.array, wp.array]:
         """Get the root poses (translations and orientations) in the local frame of the prims.
 
         Backends: :guilabel:`tensor`, :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
@@ -2204,7 +2208,7 @@ class Articulation(XformPrim):
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the root poses (translations and orientations) in the local frame of the prims.
 
@@ -2277,7 +2281,7 @@ class Articulation(XformPrim):
         linear_velocities: list | np.ndarray | wp.array | None = None,
         angular_velocities: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the root velocities (linear and angular) of the prims.
 
@@ -2327,7 +2331,7 @@ class Articulation(XformPrim):
     def get_velocities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the root velocities (linear and angular) of the prims.
 
@@ -2368,7 +2372,7 @@ class Articulation(XformPrim):
     def get_solver_residual_reports(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
         report_maximum: bool = True,
     ) -> tuple[wp.array, wp.array]:
         """Get the physics solver residuals (position and velocity) of the prims.
@@ -2434,12 +2438,12 @@ class Articulation(XformPrim):
         orientations: list | np.ndarray | wp.array | None = None,
         linear_velocities: list | np.ndarray | wp.array | None = None,
         angular_velocities: list | np.ndarray | wp.array | None = None,
-        dof_positions: list | np.ndarray | wp.array | None = None,
-        dof_velocities: list | np.ndarray | wp.array | None = None,
-        dof_efforts: list | np.ndarray | wp.array | None = None,
+        dof_positions: float | list | np.ndarray | wp.array | None = None,
+        dof_velocities: float | list | np.ndarray | wp.array | None = None,
+        dof_efforts: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the default state (root positions, orientations, linear velocities and angular velocities,
         and DOF positions, velocities and efforts) of the prims.
@@ -2526,8 +2530,8 @@ class Articulation(XformPrim):
     def get_default_state(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[
         wp.array | None,
         wp.array | None,
@@ -2700,8 +2704,8 @@ class Articulation(XformPrim):
     def get_dof_drive_types(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> list[list[str]]:
         """Get the drive types of the degrees of freedom (DOFs) of the prims.
 
@@ -2753,8 +2757,8 @@ class Articulation(XformPrim):
         self,
         types: str | list[list[str]],
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the drive types of the degrees of freedom (DOFs) of the prims.
 
@@ -2793,10 +2797,10 @@ class Articulation(XformPrim):
 
     def set_dof_max_efforts(
         self,
-        max_efforts: list | np.ndarray | wp.array,
+        max_efforts: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the maximum forces applied by the drive of the degrees of freedom (DOFs) of the prims.
 
@@ -2848,8 +2852,8 @@ class Articulation(XformPrim):
     def get_dof_max_efforts(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the maximum forces applied by the drive of the degrees of freedom (DOFs) of the prims.
 
@@ -2900,10 +2904,10 @@ class Articulation(XformPrim):
 
     def set_dof_max_velocities(
         self,
-        max_velocities: list | np.ndarray | wp.array,
+        max_velocities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the maximum velocities of the degrees of freedom (DOFs) of the prims.
 
@@ -2960,8 +2964,8 @@ class Articulation(XformPrim):
     def get_dof_max_velocities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the maximum velocities of the degrees of freedom (DOFs) of the prims.
 
@@ -3017,11 +3021,11 @@ class Articulation(XformPrim):
 
     def set_dof_gains(
         self,
-        stiffnesses: list | np.ndarray | wp.array | None = None,
-        dampings: list | np.ndarray | wp.array | None = None,
+        stiffnesses: float | list | np.ndarray | wp.array | None = None,
+        dampings: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
         update_default_gains: bool = True,
     ) -> None:
         """Set the implicit Proportional-Derivative (PD) controller's gains (stiffnesses and dampings)
@@ -3113,8 +3117,8 @@ class Articulation(XformPrim):
     def get_dof_gains(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the implicit Proportional-Derivative (PD) controller's gains (stiffnesses and dampings)
         of the degrees of freedom (DOFs) of the prims.
@@ -3180,8 +3184,8 @@ class Articulation(XformPrim):
         self,
         mode: str,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Switch the control mode (understood as the gain adjustment) of the degrees of freedom (DOFs) of the prims.
 
@@ -3256,10 +3260,10 @@ class Articulation(XformPrim):
 
     def set_solver_iteration_counts(
         self,
-        position_counts: list | np.ndarray | wp.array | None = None,
-        velocity_counts: list | np.ndarray | wp.array | None = None,
+        position_counts: int | list | np.ndarray | wp.array | None = None,
+        velocity_counts: int | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the physics solver iteration counts (position and velocity) of the prims.
 
@@ -3314,7 +3318,7 @@ class Articulation(XformPrim):
     def get_solver_iteration_counts(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the physics solver iteration counts (position and velocity) of the prims.
 
@@ -3360,9 +3364,9 @@ class Articulation(XformPrim):
 
     def set_stabilization_thresholds(
         self,
-        thresholds: list | np.ndarray | wp.array,
+        thresholds: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the mass-normalized kinetic energy below which the prims may participate in stabilization.
 
@@ -3400,7 +3404,7 @@ class Articulation(XformPrim):
     def get_stabilization_thresholds(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the mass-normalized kinetic energy below which the prims may participate in stabilization.
 
@@ -3438,9 +3442,9 @@ class Articulation(XformPrim):
 
     def set_enabled_self_collisions(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the self-collisions processing of the prims.
 
@@ -3473,7 +3477,7 @@ class Articulation(XformPrim):
     def get_enabled_self_collisions(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enable state of the self-collisions processing of the prims.
 
@@ -3508,9 +3512,9 @@ class Articulation(XformPrim):
 
     def set_sleep_thresholds(
         self,
-        thresholds: list | np.ndarray | wp.array,
+        thresholds: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the sleep thresholds of the prims.
 
@@ -3548,7 +3552,7 @@ class Articulation(XformPrim):
     def get_sleep_thresholds(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the sleep thresholds of the prims.
 
@@ -3587,7 +3591,7 @@ class Articulation(XformPrim):
             data[i] = self.prims[index].GetAttribute("physxArticulation:sleepThreshold").Get()
         return ops_utils.place(data, device=self._device)
 
-    def get_jacobian_matrices(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_jacobian_matrices(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the Jacobian matrices of the prims.
 
         Backends: :guilabel:`tensor`.
@@ -3623,7 +3627,7 @@ class Articulation(XformPrim):
         indices = ops_utils.resolve_indices(indices, count=len(self), device=data.device)
         return data[indices].contiguous().to(self._device)
 
-    def get_mass_matrices(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_mass_matrices(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the mass matrices of the prims.
 
         Backends: :guilabel:`tensor`.
@@ -3662,8 +3666,8 @@ class Articulation(XformPrim):
     def get_dof_coriolis_and_centrifugal_compensation_forces(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the Coriolis and centrifugal compensation forces (DOF forces required to counteract Coriolis and
         centrifugal forces for the given articulation state) of the prims
@@ -3707,8 +3711,8 @@ class Articulation(XformPrim):
     def get_dof_gravity_compensation_forces(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        dof_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        dof_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the gravity compensation forces (DOF forces required to counteract gravitational
         forces for the given articulation pose) of the prims
@@ -3757,8 +3761,8 @@ class Articulation(XformPrim):
     def get_link_masses(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
         inverse: bool = False,
     ) -> wp.array:
         """Get the masses of the links of the prims.
@@ -3819,8 +3823,8 @@ class Articulation(XformPrim):
     def get_link_coms(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the center of mass (COM) pose (position and orientation) of the links of the prims.
 
@@ -3868,8 +3872,8 @@ class Articulation(XformPrim):
     def get_link_inertias(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
         inverse: bool = False,
     ) -> wp.array:
         """Get the inertias tensors of the links of the prims.
@@ -3916,8 +3920,8 @@ class Articulation(XformPrim):
     def get_link_enabled_gravities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the gravity on the links of the prims.
 
@@ -3971,10 +3975,10 @@ class Articulation(XformPrim):
 
     def set_link_masses(
         self,
-        masses: list | np.ndarray | wp.array,
+        masses: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the masses of the links of the prims.
 
@@ -4032,8 +4036,8 @@ class Articulation(XformPrim):
         self,
         inertias: list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the inertias of the links of the prims.
 
@@ -4078,8 +4082,8 @@ class Articulation(XformPrim):
         positions: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the center of mass (COM) pose (position and orientation) of the links of the prims.
 
@@ -4131,10 +4135,10 @@ class Articulation(XformPrim):
 
     def set_link_enabled_gravities(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        link_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        link_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the enabled state of the gravity on the links of the prims.
 
@@ -4196,8 +4200,8 @@ class Articulation(XformPrim):
     def get_fixed_tendon_stiffnesses(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the stiffness of the fixed tendons of the prims.
 
@@ -4226,8 +4230,8 @@ class Articulation(XformPrim):
     def get_fixed_tendon_dampings(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the dampings of the fixed tendons of the prims.
 
@@ -4256,8 +4260,8 @@ class Articulation(XformPrim):
     def get_fixed_tendon_limit_stiffnesses(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the limit stiffnesses of the fixed tendons of the prims.
 
@@ -4286,8 +4290,8 @@ class Articulation(XformPrim):
     def get_fixed_tendon_limits(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the limits of the fixed tendons of the prims.
 
@@ -4326,8 +4330,8 @@ class Articulation(XformPrim):
     def get_fixed_tendon_rest_lengths(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the rest length of the fixed tendons of the prims.
 
@@ -4356,8 +4360,8 @@ class Articulation(XformPrim):
     def get_fixed_tendon_offsets(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the offsets of the fixed tendons of the prims.
 
@@ -4386,15 +4390,15 @@ class Articulation(XformPrim):
     def set_fixed_tendon_properties(
         self,
         *,
-        stiffnesses: list | np.ndarray | wp.array | None = None,
-        dampings: list | np.ndarray | wp.array | None = None,
-        limit_stiffnesses: list | np.ndarray | wp.array | None = None,
-        lower_limits: list | np.ndarray | wp.array | None = None,
-        upper_limits: list | np.ndarray | wp.array | None = None,
-        rest_lengths: list | np.ndarray | wp.array | None = None,
-        offsets: list | np.ndarray | wp.array | None = None,
-        indices: list | np.ndarray | wp.array | None = None,
-        tendon_indices: list | np.ndarray | wp.array | None = None,
+        stiffnesses: float | list | np.ndarray | wp.array | None = None,
+        dampings: float | list | np.ndarray | wp.array | None = None,
+        limit_stiffnesses: float | list | np.ndarray | wp.array | None = None,
+        lower_limits: float | list | np.ndarray | wp.array | None = None,
+        upper_limits: float | list | np.ndarray | wp.array | None = None,
+        rest_lengths: float | list | np.ndarray | wp.array | None = None,
+        offsets: float | list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
+        tendon_indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the fixed tendon properties of the prims.
 

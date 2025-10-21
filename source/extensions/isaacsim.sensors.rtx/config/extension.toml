@@ -1,5 +1,5 @@
 [package]
-version = "15.8.2"
+version = "15.8.4"
 category = "Simulation"
 title = "Isaac Sim Isaac Sensor Simulation"
 description = "Provides APIs for RTX-based sensors, including RTX Lidar & RTX Radar."
@@ -92,6 +92,7 @@ stdoutFailPatterns.exclude = [
     "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a material prim*",
     "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a valid USD prim*",
     "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a material prim*",
+    "*Annotator parameters cannot be initialized, it is already attached.*",
 ]
 stdoutFailPatterns.include = [
     "*Could not open asset * for reference*",

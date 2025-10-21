@@ -95,8 +95,8 @@ class RigidPrim(XformPrim):
         scales: list | np.ndarray | wp.array | None = None,
         reset_xform_op_properties: bool = False,
         # RigidPrim
-        masses: list | np.ndarray | wp.array | None = None,
-        densities: list | np.ndarray | wp.array | None = None,
+        masses: float | list | np.ndarray | wp.array | None = None,
+        densities: float | list | np.ndarray | wp.array | None = None,
     ) -> None:
         # define properties
         # - default state properties
@@ -175,7 +175,7 @@ class RigidPrim(XformPrim):
         positions: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the poses (positions and orientations) in the world frame of the prims.
 
@@ -232,7 +232,9 @@ class RigidPrim(XformPrim):
         else:
             super().set_world_poses(positions=positions, orientations=orientations, indices=indices)
 
-    def get_world_poses(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_world_poses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
+    ) -> tuple[wp.array, wp.array]:
         """Get the poses (positions and orientations) in the world frame of the prims.
 
         Backends: :guilabel:`tensor`, :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
@@ -277,7 +279,9 @@ class RigidPrim(XformPrim):
         else:
             return super().get_world_poses(indices=indices)
 
-    def get_local_poses(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_local_poses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
+    ) -> tuple[wp.array, wp.array]:
         """Get the poses (translations and orientations) in the local frame of the prims.
 
         Backends: :guilabel:`tensor`, :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
@@ -338,7 +342,7 @@ class RigidPrim(XformPrim):
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the poses (translations and orientations) in the local frame of the prims.
 
@@ -411,7 +415,7 @@ class RigidPrim(XformPrim):
         linear_velocities: list | np.ndarray | wp.array | None = None,
         angular_velocities: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the velocities (linear and angular) of the prims.
 
@@ -478,7 +482,7 @@ class RigidPrim(XformPrim):
     def get_velocities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the velocities (linear and angular) of the prims.
 
@@ -532,7 +536,7 @@ class RigidPrim(XformPrim):
         self,
         forces: list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
         local_frame: bool = False,
     ) -> None:
         """Apply forces at the link transforms on the prims.
@@ -572,7 +576,7 @@ class RigidPrim(XformPrim):
         torques: list | np.ndarray | wp.array | None = None,
         *,
         positions: list | np.ndarray | wp.array | None = None,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
         local_frame: bool = False,
     ) -> None:
         """Apply forces and torques at specified positions on the prims.
@@ -639,7 +643,9 @@ class RigidPrim(XformPrim):
             is_global=not local_frame,
         )
 
-    def get_masses(self, *, indices: list | np.ndarray | wp.array | None = None, inverse: bool = False) -> wp.array:
+    def get_masses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None, inverse: bool = False
+    ) -> wp.array:
         """Get the masses of the prims.
 
         Backends: :guilabel:`tensor`, :guilabel:`usd`.
@@ -689,7 +695,7 @@ class RigidPrim(XformPrim):
                 masses = 1.0 / (masses + 1e-8)
             return ops_utils.place(masses, device=self._device)
 
-    def get_coms(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_coms(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
         """Get the center of mass (COM) pose (position and orientation) of the prims.
 
         Backends: :guilabel:`tensor`.
@@ -729,7 +735,9 @@ class RigidPrim(XformPrim):
             data[indices, wp.array([6, 3, 4, 5], dtype=wp.int32, device=data.device)].contiguous().to(self._device),
         )
 
-    def get_inertias(self, *, indices: list | np.ndarray | wp.array | None = None, inverse: bool = False) -> wp.array:
+    def get_inertias(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None, inverse: bool = False
+    ) -> wp.array:
         """Get the inertia tensors of the prims.
 
         Backends: :guilabel:`tensor`.
@@ -771,9 +779,9 @@ class RigidPrim(XformPrim):
 
     def set_masses(
         self,
-        masses: list | np.ndarray | wp.array,
+        masses: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the masses of the prims.
 
@@ -818,7 +826,7 @@ class RigidPrim(XformPrim):
         self,
         inertias: list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the inertia tensors of the prims.
 
@@ -859,7 +867,7 @@ class RigidPrim(XformPrim):
         positions: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the center of mass (COM) pose (position and orientation) of the prims.
 
@@ -909,9 +917,9 @@ class RigidPrim(XformPrim):
 
     def set_densities(
         self,
-        densities: list | np.ndarray | wp.array,
+        densities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the densities of the prims.
 
@@ -946,7 +954,7 @@ class RigidPrim(XformPrim):
     def get_densities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the densities of the prims.
 
@@ -986,9 +994,9 @@ class RigidPrim(XformPrim):
 
     def set_sleep_thresholds(
         self,
-        thresholds: list | np.ndarray | wp.array,
+        thresholds: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the sleep thresholds of the prims.
 
@@ -1025,7 +1033,7 @@ class RigidPrim(XformPrim):
     def get_sleep_thresholds(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the sleep thresholds of the prims.
 
@@ -1064,9 +1072,9 @@ class RigidPrim(XformPrim):
 
     def set_enabled_rigid_bodies(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the rigid body dynamics of the prims.
 
@@ -1111,7 +1119,7 @@ class RigidPrim(XformPrim):
     def get_enabled_rigid_bodies(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the rigid body dynamics of the prims.
 
@@ -1155,9 +1163,9 @@ class RigidPrim(XformPrim):
 
     def set_enabled_gravities(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the gravity on the prims.
 
@@ -1205,7 +1213,7 @@ class RigidPrim(XformPrim):
     def get_enabled_gravities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the gravity on the prims.
 
@@ -1255,7 +1263,7 @@ class RigidPrim(XformPrim):
         linear_velocities: list | np.ndarray | wp.array | None = None,
         angular_velocities: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the default state (positions, orientations, linear velocities and angular velocities) of the prims.
 
@@ -1306,7 +1314,7 @@ class RigidPrim(XformPrim):
     def get_default_state(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array | None, wp.array | None, wp.array | None, wp.array | None]:
         """Get the default state (positions, orientations, linear velocities and angular velocities) of the prims.
 

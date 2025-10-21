@@ -38,8 +38,7 @@ class TestRclpy(ROS2TestCase):
         from std_msgs.msg import String
 
         msg = String()
-        node = rclpy.create_node("minimal_publisher")
-        publisher = node.create_publisher(String, "topic", 10)
+        node = self.create_node("minimal_publisher")
+        publisher = self.create_publisher(node, String, "topic", 10)
         publisher.publish(msg)
-        node.destroy_node()
         pass

@@ -24,10 +24,13 @@ import omni.usd
 from isaacsim.test.utils.image_capture import (
     capture_depth_data_async,
     capture_rgb_data_async,
+    capture_viewport_annotator_data_async,
+)
+from isaacsim.test.utils.image_comparison import compare_images_within_tolerances
+from isaacsim.test.utils.image_io import (
     save_depth_image,
     save_rgb_image,
 )
-from isaacsim.test.utils.image_comparison import compare_images_within_tolerances
 from isaacsim.test.utils.timed_async_test import TimedAsyncTestCase
 from PIL import Image
 from pxr import UsdGeom, UsdLux
@@ -68,97 +71,6 @@ class TestImageCapture(TimedAsyncTestCase):
         # Wait for scene to settle
         for _ in range(3):
             await omni.kit.app.get_app().next_update_async()
-
-    def test_save_rgb_image_basic_functionality(self):
-        """Test save_rgb_image with basic functionality and directory creation."""
-        # Arrange RGB data and save to disk; verify file path and mode.
-        resolution = (480, 320)
-        rgb_data = np.random.randint(0, 255, (resolution[1], resolution[0], 3), dtype=np.uint8)
-        file_name = "test_image.png"
-
-        save_rgb_image(rgb_data, self.test_dir, file_name)
-
-        file_path = os.path.join(self.test_dir, file_name)
-        self.assertTrue(os.path.exists(file_path))
-
-        saved_image = Image.open(file_path)
-        self.assertEqual(saved_image.mode, "RGBA")  # PNG converts to RGBA
-
-        # Verify nested directory creation when the path does not yet exist.
-        nested_dir = os.path.join(self.test_dir, "nested", "subdir")
-        nested_file = "nested_test.png"
-
-        save_rgb_image(rgb_data, nested_dir, nested_file)
-
-        self.assertTrue(os.path.exists(nested_dir))
-        nested_path = os.path.join(nested_dir, nested_file)
-        self.assertTrue(os.path.exists(nested_path))
-
-    def test_save_rgb_image_formats(self):
-        """Test save_rgb_image with different data types and file formats."""
-        # Test PNG/JPG/JPEG writers with 3-channel data.
-        resolution = (480, 320)
-        rgb_data = np.random.randint(0, 255, (resolution[1], resolution[0], 3), dtype=np.uint8)
-        formats = ["test.png", "test.jpg", "test.jpeg"]
-
-        for file_name in formats:
-            save_rgb_image(rgb_data, self.test_dir, file_name)
-
-            file_path = os.path.join(self.test_dir, file_name)
-            self.assertTrue(os.path.exists(file_path))
-            saved_image = Image.open(file_path)
-            self.assertIsNotNone(saved_image)
-
-        # RGBA must be saved as PNG (alpha channel supported).
-        rgba_data = np.random.randint(0, 255, (resolution[1], resolution[0], 4), dtype=np.uint8)
-        save_rgb_image(rgba_data, self.test_dir, "rgba_test.png")
-
-        rgba_path = os.path.join(self.test_dir, "rgba_test.png")
-        self.assertTrue(os.path.exists(rgba_path))
-        saved_rgba = Image.open(rgba_path)
-        self.assertEqual(saved_rgba.mode, "RGBA")
-
-        # JPEG cannot encode alpha; expect ValueError for RGBA inputs.
-        for ext in ["jpg", "jpeg"]:
-            with self.assertRaises(ValueError) as context:
-                save_rgb_image(rgba_data, self.test_dir, f"rgba_test.{ext}")
-
-            self.assertIn("Cannot save RGBA data", str(context.exception))
-            self.assertIn("JPEG format doesn't support transparency", str(context.exception))
-
-    def test_save_rgb_image_file_operations(self):
-        """Test save_rgb_image with existing directories and file overwriting."""
-        resolution = (480, 320)
-        rgb_data = np.random.randint(0, 255, (resolution[1], resolution[0], 3), dtype=np.uint8)
-
-        # Test saving to existing directory
-        file_name = "existing_dir_test.png"
-        save_rgb_image(rgb_data, self.test_dir, file_name)
-
-        file_path = os.path.join(self.test_dir, file_name)
-        self.assertTrue(os.path.exists(file_path))
-
-        # Test file overwriting with different data
-        black_data = np.zeros((resolution[1], resolution[0], 3), dtype=np.uint8)  # All black
-        white_data = np.ones((resolution[1], resolution[0], 3), dtype=np.uint8) * 255  # All white
-        overwrite_file = "overwrite_test.png"
-        overwrite_path = os.path.join(self.test_dir, overwrite_file)
-
-        # Save first image (black)
-        save_rgb_image(black_data, self.test_dir, overwrite_file)
-
-        self.assertTrue(os.path.exists(overwrite_path))
-        first_image = Image.open(overwrite_path)
-        first_array = np.array(first_image.convert("RGB"))
-
-        # Save second image (white) - should overwrite
-        save_rgb_image(white_data, self.test_dir, overwrite_file)
-
-        second_image = Image.open(overwrite_path)
-        second_array = np.array(second_image.convert("RGB"))
-
-        # Verify images are different (black vs white)
-        self.assertFalse(np.array_equal(first_array, second_array))
 
     async def test_capture_rgb_data_async(self):
         """Test capture_rgb_data_async with basic functionality and compare to golden image."""
@@ -432,74 +344,40 @@ class TestImageCapture(TimedAsyncTestCase):
         jpg_img = Image.open(jpg_request_path)
         self.assertIn(jpg_img.mode, ("L", "RGB"))  # JPEG might convert to RGB
 
-    def test_save_depth_image_grayscale(self):
-        """Test save_depth_image with grayscale output."""
-        # Test basic float32 depth data normalization
-        resolution = (480, 320)
-        depth_data = np.random.rand(resolution[1], resolution[0]).astype(np.float32) * 10.0
-        file_name = "test_depth_gray.png"
+    async def test_capture_viewport_annotator_data_async_default_args(self):
+        """Test capture_viewport_annotator_data_async with default arguments."""
+        await self.setup_golden_stage()
 
-        save_depth_image(depth_data, self.test_dir, file_name, normalize=True)
+        # Get the default viewport API
+        import omni.kit.viewport.utility as viewport_utils
 
-        file_path = os.path.join(self.test_dir, file_name)
-        self.assertTrue(os.path.exists(file_path))
+        viewport_api = viewport_utils.get_active_viewport()
 
-        # Check saved image
-        saved_image = Image.open(file_path)
-        self.assertEqual(saved_image.mode, "L")  # Grayscale
-        self.assertEqual(saved_image.size, (resolution[0], resolution[1]))
+        # Test with default annotator_name="rgb"
+        rgb_data_default = await capture_viewport_annotator_data_async(viewport_api)
 
-    def test_save_depth_image_without_normalization(self):
-        """Test save_depth_image without normalization."""
-        # Test with uint8 data that doesn't need normalization
-        resolution = (480, 320)
-        depth_data = np.random.randint(0, 255, (resolution[1], resolution[0]), dtype=np.uint8)
-        file_name = "test_depth_no_norm.png"
+        # Verify RGB data was captured
+        self.assertIsNotNone(rgb_data_default, "RGB data should not be None with default arguments")
+        self.assertIsInstance(rgb_data_default, np.ndarray, "RGB data should be a numpy array")
+        self.assertEqual(len(rgb_data_default.shape), 3, "RGB data should be 3D array (H, W, C)")
+        self.assertEqual(rgb_data_default.shape[2], 4, "RGB data should have 4 channels (RGBA)")
 
-        save_depth_image(depth_data, self.test_dir, file_name, normalize=False)
+        # Test explicit annotator_name="rgb" should give same result
+        rgb_data_explicit = await capture_viewport_annotator_data_async(viewport_api, annotator_name="rgb")
 
-        file_path = os.path.join(self.test_dir, file_name)
-        self.assertTrue(os.path.exists(file_path))
-
-        saved_image = Image.open(file_path)
-        self.assertEqual(saved_image.mode, "L")  # Always L mode for non-TIFF
-
-        # Test with float data in 0-1 range
-        depth_data_float = np.random.rand(resolution[1], resolution[0]).astype(np.float32)
-        file_name_float = "test_depth_float_no_norm.png"
-
-        save_depth_image(depth_data_float, self.test_dir, file_name_float, normalize=False)
-
-        file_path_float = os.path.join(self.test_dir, file_name_float)
-        self.assertTrue(os.path.exists(file_path_float))
-
-    def test_save_depth_image_tiff_with_normalize_warning(self):
-        """Test that TIFF with normalize=True ignores normalize and saves as float32 TIFF."""
-        resolution = (480, 320)
-        depth_data = np.random.rand(resolution[1], resolution[0]).astype(np.float32) * 10.0
-        tiff_file_name = "test_depth_normalize_ignored.tiff"
-
-        # This should save as TIFF (ignoring normalize=True) and print a warning
-        stdout_capture = io.StringIO()
-        with patch("sys.stdout", stdout_capture):
-            save_depth_image(depth_data, self.test_dir, tiff_file_name, normalize=True)
-        captured_output = stdout_capture.getvalue()
-        self.assertIn(
-            "Warning: TIFF format requested with normalize=True",
-            captured_output,
-            "Should warn about normalize being ignored for TIFF",
+        # Both calls should produce the same result
+        self.assertEqual(
+            rgb_data_default.shape, rgb_data_explicit.shape, "Default and explicit RGB should have same shape"
+        )
+        self.assertEqual(
+            rgb_data_default.dtype, rgb_data_explicit.dtype, "Default and explicit RGB should have same dtype"
         )
 
-        # Check that TIFF was saved (not PNG)
-        tiff_path = os.path.join(self.test_dir, tiff_file_name)
-        self.assertTrue(os.path.exists(tiff_path), "TIFF file should exist")
+        # Test with different annotator to ensure default is actually working
+        depth_data = await capture_viewport_annotator_data_async(viewport_api, annotator_name="distance_to_camera")
 
-        # Verify the saved TIFF is float32 format
-        saved_image = Image.open(tiff_path)
-        self.assertEqual(saved_image.mode, "F")  # F mode = 32-bit float
-
-        # Verify data integrity - should be the same as original
-        tiff_data = np.array(saved_image)
-        self.assertEqual(tiff_data.shape, depth_data.shape, "TIFF shape should match original data")
-        is_close = np.allclose(tiff_data, depth_data, rtol=1e-5, atol=1e-5, equal_nan=True)
-        self.assertTrue(is_close, "TIFF should contain original float32 data, not normalized")
+        # Depth data should be different from RGB data
+        self.assertIsNotNone(depth_data, "Depth data should not be None")
+        self.assertIsInstance(depth_data, np.ndarray, "Depth data should be a numpy array")
+        # Depth typically has different shape or dtype than RGB
+        self.assertNotEqual(rgb_data_default.shape, depth_data.shape, "RGB and depth should have different shapes")

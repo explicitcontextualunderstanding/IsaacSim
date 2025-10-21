@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.3] - 2025-09-26
+### Changed
+- Update to aioboto3==15.1.0
+- Update to aiobotocore==2.24.0
+- Update to boto3==1.39.11
+- Update to botocore==1.39.11
+- Update to awscrt==0.23.8
+- Update to s3transfer==0.13.1
+
 ## [1.4.2] - 2025-09-03
 ### Changed
 - Update to boto3[crt]==1.40.16

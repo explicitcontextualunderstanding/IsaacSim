@@ -94,8 +94,8 @@ class TestRos2PointCloud(ROS2TestCase):
         def point_cloud_callback(data: PointCloud2):
             self._point_cloud_data = data
 
-        node = rclpy.create_node("point_cloud_tester")
-        lidar_sub = node.create_subscription(PointCloud2, "point_cloud", point_cloud_callback, get_qos_profile())
+        node = self.create_node("point_cloud_tester")
+        lidar_sub = self.create_subscription(node, PointCloud2, "point_cloud", point_cloud_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -171,8 +171,8 @@ class TestRos2PointCloud(ROS2TestCase):
         def point_cloud_callback(data: PointCloud2):
             self._point_cloud_data = data
 
-        node = rclpy.create_node("flat_point_cloud_tester")
-        lidar_sub = node.create_subscription(PointCloud2, "point_cloud", point_cloud_callback, get_qos_profile())
+        node = self.create_node("flat_point_cloud_tester")
+        lidar_sub = self.create_subscription(node, PointCloud2, "point_cloud", point_cloud_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -257,8 +257,10 @@ class TestRos2PointCloud(ROS2TestCase):
         def point_cloud_callback(data: PointCloud2):
             self._point_cloud_data = data
 
-        node = rclpy.create_node("depth_point_cloud_tester")
-        camera_sub = node.create_subscription(PointCloud2, "point_cloud_left", point_cloud_callback, get_qos_profile())
+        node = self.create_node("depth_point_cloud_tester")
+        camera_sub = self.create_subscription(
+            node, PointCloud2, "point_cloud_left", point_cloud_callback, get_qos_profile()
+        )
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -368,8 +370,8 @@ class TestRos2PointCloud(ROS2TestCase):
         def point_cloud_callback(data: PointCloud2):
             self._point_cloud_data = data
 
-        node = rclpy.create_node("depth_point_cloud_tester")
-        camera_sub = node.create_subscription(PointCloud2, "point_cloud", point_cloud_callback, get_qos_profile())
+        node = self.create_node("depth_point_cloud_tester")
+        camera_sub = self.create_subscription(node, PointCloud2, "point_cloud", point_cloud_callback, get_qos_profile())
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)
@@ -433,4 +435,5 @@ class TestRos2PointCloud(ROS2TestCase):
         standard_checks()
         self._timeline.stop()
         spin()
+
         pass

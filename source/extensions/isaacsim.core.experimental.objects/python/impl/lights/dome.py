@@ -79,7 +79,7 @@ class DomeLight(Light):
         paths: str | list[str],
         *,
         # DomeLight
-        radii: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
         texture_files: str | list[str] | None = None,
         texture_formats: (
             Literal["automatic", "latlong", "mirroredBall", "angular", "cubeMapVerticalCross"]
@@ -131,7 +131,7 @@ class DomeLight(Light):
     """
 
     def set_guide_radii(
-        self, radii: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, radii: float | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the guide radii (use to visualize the dome light) of the prims.
 
@@ -162,7 +162,7 @@ class DomeLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetGuideRadiusAttr().Set(radii[0 if radii.shape[0] == 1 else i].item())
 
-    def get_guide_radii(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_guide_radii(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the guide radii (use to visualize the dome light) of the prims.
 
         Backends: :guilabel:`usd`.
@@ -199,7 +199,7 @@ class DomeLight(Light):
         return ops_utils.place(data, device=self._device)
 
     def set_texture_files(
-        self, texture_files: str | list[str], *, indices: list | np.ndarray | wp.array | None = None
+        self, texture_files: str | list[str], *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the color texture files (e.g.: High Dynamic Range (HDR) texture intended for Image Based Lighting (IBL)) of the prims.
 
@@ -232,7 +232,7 @@ class DomeLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetTextureFileAttr().Set(texture_files[i])
 
-    def get_texture_files(self, *, indices: list | np.ndarray | wp.array | None = None) -> list[str]:
+    def get_texture_files(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> list[str]:
         """Get the color texture files (e.g.: High Dynamic Range (HDR) texture intended for Image Based Lighting (IBL)) of the prims.
 
         Backends: :guilabel:`usd`.
@@ -273,7 +273,7 @@ class DomeLight(Light):
             | list[Literal["automatic", "latlong", "mirroredBall", "angular", "cubeMapVerticalCross"]]
         ),
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the texture formats (parameterization of the color map file) of the prims.
 
@@ -303,7 +303,7 @@ class DomeLight(Light):
             self.lights[index].GetTextureFormatAttr().Set(texture_formats[0 if broadcast else i])
 
     def get_texture_formats(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> list[Literal["automatic", "latlong", "mirroredBall", "angular", "cubeMapVerticalCross"]]:
         """Get the texture formats (parameterization of the color map file) of the prims.
 

@@ -709,7 +709,7 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         self.__result = False
 
         # Create a node named 'waypoint_subscriber'
-        self.__node = rclpy.create_node("waypoint_subscriber")
+        self.__node = self.create_node("waypoint_subscriber")
 
         print(f"Expected Result: {self.__expected_result}")
 
@@ -723,7 +723,7 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
             self.__result = msg.data == self.__expected_result
 
         # Create a subscription to the 'topic' topic, listening for String messages
-        self.__node.create_subscription(String, "topic", listener_callback, 10)
+        self.create_subscription(self.__node, String, "topic", listener_callback, 10)
 
         # Start the spin function in a separate thread
         thread = threading.Thread(target=self.spin_thread, daemon=True)
@@ -754,7 +754,7 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         self.__result = False
 
         # Create a node named 'patrolling_subscriber'
-        self.__node = rclpy.create_node("patrolling_subscriber")
+        self.__node = self.create_node("patrolling_subscriber")
 
         print(f"Expected Result: {self.__expected_result}")
 
@@ -769,7 +769,7 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
             self.__result = msg.data == self.__expected_result
 
         # Create a subscription to the 'topic' topic, listening for String messages
-        self.__node.create_subscription(String, "topic", listener_callback, 10)
+        self.create_subscription(self.__node, String, "topic", listener_callback, 10)
 
         # Start the spin function in a separate thread
         thread = threading.Thread(target=self.spin_thread, daemon=True)

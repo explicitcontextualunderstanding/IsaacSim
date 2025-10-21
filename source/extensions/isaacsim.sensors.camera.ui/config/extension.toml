@@ -1,5 +1,5 @@
 [package]
-version = "0.2.1"
+version = "0.2.2"
 category = "Simulation"
 title = "Isaac Sim Camera Simulation UI Components"
 description = "Provides UI components for Isaac Sim camera simulation, eg. menu options."

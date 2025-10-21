@@ -30,6 +30,8 @@
 #include <physx/include/foundation/PxTransform.h>
 #include <usdrt/scenegraph/usd/rt/xformable.h>
 
+#include <unordered_map>
+
 using namespace omni::physics::tensors;
 using namespace isaacsim::core::includes::conversions;
 
@@ -100,6 +102,29 @@ public:
     }
 
     /**
+     * @brief Destructor that cleans up cached physics views.
+     */
+    ~PoseTree()
+    {
+        for (auto& pair : m_articulationViewCache)
+        {
+            if (pair.second)
+            {
+                pair.second->release();
+            }
+        }
+        for (auto& pair : m_rigidBodyViewCache)
+        {
+            if (pair.second)
+            {
+                pair.second->release();
+            }
+        }
+        m_articulationViewCache.clear();
+        m_rigidBodyViewCache.clear();
+    }
+
+    /**
      * @brief Sets the parent prim path and frame name for the pose tree.
      * @details Establishes the root reference frame for subsequent pose calculations.
      *
@@ -154,8 +179,18 @@ public:
             if (objectType == ObjectType::eArticulationLink || objectType == ObjectType::eArticulationRootLink ||
                 objectType == ObjectType::eRigidBody)
             {
-                IRigidBodyView* rb = m_simulationView->createRigidBodyView(m_parentPath.GetString().c_str());
-                m_parentPose = getRigidBodyPose(rb);
+                std::string parentPathStr = m_parentPath.GetString();
+                IRigidBodyView* rigidBody = nullptr;
+                if (m_rigidBodyViewCache.find(parentPathStr) != m_rigidBodyViewCache.end())
+                {
+                    rigidBody = m_rigidBodyViewCache[parentPathStr];
+                }
+                else
+                {
+                    rigidBody = m_simulationView->createRigidBodyView(parentPathStr.c_str());
+                    m_rigidBodyViewCache[parentPathStr] = rigidBody;
+                }
+                m_parentPose = getRigidBodyPose(rigidBody);
             }
             else
             {
@@ -172,7 +207,17 @@ public:
             ObjectType objectType = m_simulationView->getObjectType(primPath.GetString().c_str());
             if (objectType == ObjectType::eArticulation || objectType == ObjectType::eArticulationRootLink)
             {
-                IArticulationView* articulation = m_simulationView->createArticulationView(primPath.GetString().c_str());
+                std::string primPathStr = primPath.GetString();
+                IArticulationView* articulation = nullptr;
+                if (m_articulationViewCache.find(primPathStr) != m_articulationViewCache.end())
+                {
+                    articulation = m_articulationViewCache[primPathStr];
+                }
+                else
+                {
+                    articulation = m_simulationView->createArticulationView(primPathStr.c_str());
+                    m_articulationViewCache[primPathStr] = articulation;
+                }
                 const IArticulationMetatype* mt = articulation->getSharedMetatype();
                 uint32_t linkCount = articulation->getMaxLinks();
                 std::vector<std::string> linkPaths(linkCount);
@@ -239,7 +284,17 @@ public:
             }
             else if (objectType == ObjectType::eArticulationLink || objectType == ObjectType::eRigidBody)
             {
-                IRigidBodyView* rigidBody = m_simulationView->createRigidBodyView(primPath.GetString().c_str());
+                std::string primPathStr = primPath.GetString();
+                IRigidBodyView* rigidBody = nullptr;
+                if (m_rigidBodyViewCache.find(primPathStr) != m_rigidBodyViewCache.end())
+                {
+                    rigidBody = m_rigidBodyViewCache[primPathStr];
+                }
+                else
+                {
+                    rigidBody = m_simulationView->createRigidBodyView(primPathStr.c_str());
+                    m_rigidBodyViewCache[primPathStr] = rigidBody;
+                }
                 ::physx::PxTransform body1Pose = getRigidBodyPose(rigidBody);
                 std::string childFrameId =
                     getUniqueFrameName(getName(m_usdStage->GetPrimAtPath(primPath)), primPath.GetString());
@@ -422,6 +477,12 @@ private:
 
     /** @brief Storage for articulation link transform data (CPU, for PxTransform) */
     std::vector<float> m_linkTransformData;
+
+    /** @brief Cache of articulation views by prim path */
+    std::unordered_map<std::string, IArticulationView*> m_articulationViewCache;
+
+    /** @brief Cache of rigid body views by prim path */
+    std::unordered_map<std::string, IRigidBodyView*> m_rigidBodyViewCache;
 };
 }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.4.4] - 2025-09-19
+### Changed
+- Update test to use isaacsim.test.utils for image capture and comparison
+
 ## [2.4.3] - 2025-09-07
 ### Changed
 - Update test settings

@@ -92,6 +92,12 @@ class Extension(omni.ext.IExt):
                 "usd_path": "/Isaac/Sensors/Sensing/SG8/H60SA/SG8S-AR0820C-5300-G2A-H60SA.usd",
             },
         },
+        "SICK": {
+            "Inspector83x": {
+                "prim_prefix": "/Inspector83x",
+                "usd_path": "/Isaac/Sensors/SICK/Inspector83x/SICK_Inspector83x.usd",
+            },
+        },
         "Stereolabs": {
             "ZED_X": {
                 "prim_prefix": "/ZED_X",
@@ -139,6 +145,7 @@ class Extension(omni.ext.IExt):
                     vendor_dicts.get("Orbbec", {}),
                     vendor_dicts.get("Leopard Imaging", {}),
                     vendor_dicts.get("Sensing", {}),
+                    vendor_dicts.get("SICK", {}),
                     vendor_dicts.get("Stereolabs", {}),
                 ]
             }

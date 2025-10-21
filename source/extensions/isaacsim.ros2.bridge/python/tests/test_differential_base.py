@@ -56,17 +56,14 @@ class TestRos2DifferentialBase(ROS2TestCase):
         # Create ROS2 node for this test
         import rclpy
 
-        self.node = rclpy.create_node("isaac_sim_test_diff_drive")
+        self.node = self.create_node("isaac_sim_test_diff_drive")
 
     # After running each test
     async def tearDown(self):
         for _ in range(10):
             self.spin()
             time.sleep(0.1)
-        # Clean up ROS2 node and its publishers/subscribers
-        if hasattr(self, "node") and self.node is not None:
-            self.node.destroy_node()
-            self.node = None
+        self.node = None
 
         # Reset class members
         self._trans = None
@@ -142,9 +139,9 @@ class TestRos2DifferentialBase(ROS2TestCase):
         set_rotate(carter_prim, new_rotate)
         await omni.kit.app.get_app().next_update_async()
 
-        tf_sub = self.node.create_subscription(TFMessage, "tf_test", self.tf_callback, get_qos_profile())
-        odom_sub = self.node.create_subscription(Odometry, "odom", self.odom_callback, get_qos_profile())
-        cmd_vel_pub = self.node.create_publisher(Twist, "cmd_vel", 1)
+        tf_sub = self.create_subscription(self.node, TFMessage, "tf_test", self.tf_callback, get_qos_profile())
+        odom_sub = self.create_subscription(self.node, Odometry, "odom", self.odom_callback, get_qos_profile())
+        cmd_vel_pub = self.create_publisher(self.node, Twist, "cmd_vel", 1)
 
         await omni.kit.app.get_app().next_update_async()
         self._timeline.play()
@@ -238,8 +235,8 @@ class TestRos2DifferentialBase(ROS2TestCase):
 
         await add_carter(self._assets_root_path)
 
-        odom_sub = self.node.create_subscription(Odometry, "odom", self.odom_callback, 10)
-        cmd_vel_pub = self.node.create_publisher(Twist, "cmd_vel", 1)
+        odom_sub = self.create_subscription(self.node, Odometry, "odom", self.odom_callback, 10)
+        cmd_vel_pub = self.create_publisher(self.node, Twist, "cmd_vel", 1)
 
         graph_path = "/ActionGraph"
         (graph_id, created_nodes) = self.add_differential_drive(graph_path, "/Carter")
@@ -359,9 +356,9 @@ class TestRos2DifferentialBase(ROS2TestCase):
         set_rotate(carter_prim, new_rotate)
         await omni.kit.app.get_app().next_update_async()
 
-        tf_sub = self.node.create_subscription(TFMessage, "tf_test", self.tf_callback, get_qos_profile())
-        odom_sub = self.node.create_subscription(Odometry, "chassis/odom", self.odom_callback, get_qos_profile())
-        cmd_vel_pub = self.node.create_publisher(Twist, "cmd_vel", 1)
+        tf_sub = self.create_subscription(self.node, TFMessage, "tf_test", self.tf_callback, get_qos_profile())
+        odom_sub = self.create_subscription(self.node, Odometry, "chassis/odom", self.odom_callback, get_qos_profile())
+        cmd_vel_pub = self.create_publisher(self.node, Twist, "cmd_vel", 1)
 
         await omni.kit.app.get_app().next_update_async()
         self._timeline.play()

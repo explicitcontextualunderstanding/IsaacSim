@@ -109,9 +109,9 @@ class Light(XformPrim, ABC):
 
     def set_intensities(
         self,
-        intensities: list | np.ndarray | wp.array,
+        intensities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the intensities (scale light power linearly) of the prims.
 
@@ -146,7 +146,7 @@ class Light(XformPrim, ABC):
     def get_intensities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the intensities (scale light power linearly) of the prims.
 
@@ -186,9 +186,9 @@ class Light(XformPrim, ABC):
 
     def set_exposures(
         self,
-        exposures: list | np.ndarray | wp.array,
+        exposures: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the exposures (scale light power exponentially as a power of 2) of the prims.
 
@@ -225,7 +225,7 @@ class Light(XformPrim, ABC):
     def get_exposures(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the exposures (scale light power exponentially as a power of 2) of the prims.
 
@@ -267,10 +267,10 @@ class Light(XformPrim, ABC):
 
     def set_multipliers(
         self,
-        diffuse_multipliers: list | np.ndarray | wp.array = None,
-        specular_multipliers: list | np.ndarray | wp.array = None,
+        diffuse_multipliers: float | list | np.ndarray | wp.array = None,
+        specular_multipliers: float | list | np.ndarray | wp.array = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the multipliers (for the effect on the diffuse and specular response of materials) of the prims.
 
@@ -321,7 +321,7 @@ class Light(XformPrim, ABC):
     def get_multipliers(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the multipliers (for the effect on the diffuse and specular response of materials) of the prims.
 
@@ -367,9 +367,9 @@ class Light(XformPrim, ABC):
 
     def set_enabled_normalizations(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the power normalization (by the surface area of the light) of the prims.
 
@@ -404,7 +404,7 @@ class Light(XformPrim, ABC):
     def get_enabled_normalizations(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the power normalization (by the surface area of the light) of the prims.
 
@@ -441,9 +441,9 @@ class Light(XformPrim, ABC):
 
     def set_enabled_color_temperatures(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the use of color temperatures (in degrees Kelvin) of the prims.
 
@@ -478,7 +478,7 @@ class Light(XformPrim, ABC):
     def get_enabled_color_temperatures(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the use of color temperatures (in degrees Kelvin) of the prims.
 
@@ -515,9 +515,9 @@ class Light(XformPrim, ABC):
 
     def set_color_temperatures(
         self,
-        color_temperatures: list | np.ndarray | wp.array,
+        color_temperatures: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the color temperatures (in degrees Kelvin) of the prims.
 
@@ -558,7 +558,7 @@ class Light(XformPrim, ABC):
     def get_color_temperatures(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the color temperatures (in degrees Kelvin) of the prims.
 
@@ -604,7 +604,7 @@ class Light(XformPrim, ABC):
         self,
         colors: list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the color (normalized RGB) of emitted light (in energy-linear terms) of the prims.
 
@@ -641,7 +641,7 @@ class Light(XformPrim, ABC):
     def get_colors(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the color (normalized RGB) of emitted light (in energy-linear terms) of the prims.
 

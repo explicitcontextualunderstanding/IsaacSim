@@ -472,7 +472,7 @@ class RobotAssembler:
 
         attachment_parent_pose = omni.usd.get_world_transform_matrix(attachment_prim.GetParent())
 
-        attachment_pose_local = attachment_parent_pose.GetInverse() * base_mount_pose
+        attachment_pose_local = base_mount_pose * attachment_parent_pose.GetInverse()
 
         omni.kit.commands.execute(
             "TransformPrimCommand", path=attachment_prim.GetPath(), new_transform_matrix=attachment_pose_local

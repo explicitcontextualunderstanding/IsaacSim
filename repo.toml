@@ -72,6 +72,7 @@ fetch.pip.publish_pip_cache = false
 enable_compiler_version_check = true
 
 "platform:linux-x86_64".version_check_gcc_version = "11.*.*"
+"platform:linux-aarch64".version_check_gcc_version = "11.*.*"
 
 
 
@@ -654,36 +655,6 @@ name = "ar"
 #   tc_report_enabled = false
 #   timeout = 960
 #
-# [repo_test.suites.dockertests]
-# kind = "glob_and_exec"
-# path = "${test_root}"
-# tests_per_process = 1
-#   [[repo_test.suites.dockertests.group]]
-#   include = ["isaac-sim.docker${shell_ext}"]
-#   args = ["nvidia-smi && ls && ./isaac-sim.streaming.sh --allow-root --/app/quitAfter=500"]
-#   timeout = 1200
-#   [[repo_test.suites.dockertests.group]]
-#   include = ["isaac-sim.docker.gui${shell_ext}"]
-#   args = ["nvidia-smi && ls && ./isaac-sim.sh --allow-root --/app/quitAfter=500"]
-#   timeout = 1200
-# # stdout_fail_patterns.include = ["*[[]error[]]*", "*[[]fatal[]]*"]
-#
-# [repo_test.suites.internaldockertests]
-# kind = "glob_and_exec"
-# path = "${test_root}/tests"
-# tests_per_process = 1
-#   [[repo_test.suites.internaldockertests.group]]
-#   include = ["tests-internaldocker*${shell_ext}"]
-#   timeout = 1500
-# # stdout_fail_patterns.include = ["*[[]error[]]*", "*[[]fatal[]]*"]
-#
-# [[repo_test.suites.internaldockertests.bucket]]
-# name = "1"
-# include = ["tests-internaldocker-python*${shell_ext}"]
-# [[repo_test.suites.internaldockertests.bucket]]
-# name = "2"
-# include = ["*"]
-
 # Catch2 Unit Tests
 # [repo_test.suites.unittests]
 # kind = "catch2"
@@ -924,7 +895,7 @@ excluded_extensions = [
     "usdrt.scenegraph",
 ]
 
-# Extensions from extsbuild that needed to be included in docs 
+# Extensions from extsbuild that needed to be included in docs
 extsbuild_exts_includes = [
     "isaacsim.util.debug_draw",
 ]

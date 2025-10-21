@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.7.4] - 2025-10-02
+### Changed
+- Updated franka, humanoid, quadruped examples
+
 ## [4.7.3] - 2025-08-30
 ### Changed
 - Updated Surface Gripper sample
@@ -373,7 +377,7 @@
 - Replaced find_nucleus_server() with get_assets_root_path()
 - Jetbot Keyboard example and Kaya Gamepad example are now powered by Omnigraph
 
-## [0.1.19] - 2022-2-10
+## [0.1.19] - 2022-02-10
 ### Changed
 - Updated references to MotionGeneration
 

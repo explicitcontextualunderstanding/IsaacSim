@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.5.2] - 2025-10-02
+### Changed
+- Use cached physics views for PoseTree.h
+
 ## [2.5.1] - 2025-08-27
 ### Changed
 - Use the IFabricHierarchy cached transform (with explicit update call) and set it to be the default call in `computeWorldXformNoCache`

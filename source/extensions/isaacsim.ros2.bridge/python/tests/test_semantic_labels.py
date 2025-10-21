@@ -115,9 +115,11 @@ class TestRos2SemanticLabels(ROS2TestCase):
         def semantic_labels_callback(data):
             self._label_data = data.data
 
-        node = rclpy.create_node("semantic_label_tester")
-        clock_sub = node.create_subscription(Clock, "/clock", clock_callback, get_qos_profile())
-        label_sub = node.create_subscription(String, "/semantic_labels", semantic_labels_callback, get_qos_profile())
+        node = self.create_node("semantic_label_tester")
+        clock_sub = self.create_subscription(node, Clock, "/clock", clock_callback, get_qos_profile())
+        label_sub = self.create_subscription(
+            node, String, "/semantic_labels", semantic_labels_callback, get_qos_profile()
+        )
 
         def spin():
             rclpy.spin_once(node, timeout_sec=0.1)

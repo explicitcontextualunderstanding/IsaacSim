@@ -54,71 +54,94 @@ class MobilityGenRobot(Module):
     The two main abstract methods subclasses must define are the build() and write_action()
     methods.
 
-    Parameters:
-        physics_dt (float): The physics time step the robot requires (in seconds).
-            This may need to be modified depending on the underlying controller's
-
-        z_offset (float): A z offset to use when spawning the robot to ensure it
-            drops at an appropriate height when initializing.
-        chase_camera_base_path (str):  A path (in the USD stage) relative to the
-            base path to use as a parent when defining the "chase" camera.  Typically,
-            this is the same as the path to the transform used for determining
-            the 2D pose of the robot.
-        chase_camera_x_offset (str):  The x offset of the chase camera.  Typically this is
-            negative, to locate the camera behind the robot.
-        chase_camera_z_offset (str): The z offset of the chase camera.  Typically this is
-            positive, to locate the camera above the robot.
-        chase_camera_tile_angle (float):  The tilt angle of the chase camera.  Typically
-            this does not need to be modified.
-        front_camera_type (Type[Sensor]):  The configurable sensor class to attach
-            at the front camera for the robot.  This should be a final sensor class (like HawkCamera)
-            that can be built using the class method HawkCamera.build(prim_path).
-        front_camera_base_path (str):  The relative path (in the USD stage) relative to the
-            robot prim path to use as the basis for creating the front camera XForm.
-        front_camera_rotation (Tuple[float, float, float]):  The (x, y, z) rotation to apply
-            when building the XForm for the front camera.
-        front_camera_translation (Tuple[float, float, float]):  The (x, y, z) rotation to apply
-            when building the XForm for the front camera.
-
     """
 
     physics_dt: float
+    """The physics timestep to use for simulating the robot."""
 
     z_offset: float
+    """The Z-axis offset height to spawn the robot. """
 
     chase_camera_base_path: str
+    """The relative USD path which will be used to spawn the third person view camera.  This is typically set
+    to the robot base frame."""
+
     chase_camera_x_offset: float
+    """The relative X-axis offset to spawn the third person view camera."""
+
     chase_camera_z_offset: float
+    """The relative Z-axis offset to spawn the third person view camera."""
+
     chase_camera_tilt_angle: float
+    """The tilt angle to apply to the third person view camera."""
 
     occupancy_map_radius: float
-    occupancy_map_z_min: float
-    occupancy_map_z_max: float
-    occupancy_map_cell_size: float
+    """The robot footprint radius to use for spawning and path planning."""
+
     occupancy_map_collision_radius: float
+    """The robot footprint radius to use for collision based episode termination."""
 
     front_camera_type: Type[Module]
+    """The static class representing the front camera.  It should define a build() and attach() method. """
+
     front_camera_base_path: str
+    """The relative USD path to spawn the front camera."""
+
     front_camera_rotation: Tuple[float, float, float]
+    """The relative XYZ rotation used when spawning the front camera. """
+
     front_camera_translation: Tuple[float, float, float]
+    """The relative XYZ translation used when spawning the front camera. """
 
     keyboard_linear_velocity_gain: float
+    """The gain used to map keyboard button presses to the robot's linear velocity.  A larger
+    gain results in faster movement."""
+
     keyboard_angular_velocity_gain: float
+    """The gain used to map keyboard button presses to the robot's angular velocity.  A larger
+    gain results in faster movement."""
 
     gamepad_linear_velocity_gain: float
+    """The gain used to map gamepad axis movement to the robot's linear velocity.  A larger
+    gain results in faster movement."""
+
     gamepad_angular_velocity_gain: float
+    """The gain used to map gamepad axis movement to the robot's angular velocity.  A larger
+    gain results in faster movement."""
 
     random_action_linear_velocity_range: Tuple[float, float]
+    """The robot linear velocity limits for the random acceleration scenario."""
+
     random_action_angular_velocity_range: Tuple[float, float]
+    """The robot angular velocity limits for the random acceleration scenario."""
+
     random_action_linear_acceleration_std: float
+    """The standard deviation used for sampling the robot linear acceleration each timestep during
+    the random acceleration scenario."""
+
     random_action_angular_acceleration_std: float
+    """The standard deviation used for sampling the robot angular acceleration each timestep during
+    the random acceleration scenario."""
+
     random_action_grid_pose_sampler_grid_size: float
+    """The grid size to use for spawning the robot during the random acceleration scenario."""
 
     path_following_speed: float
+    """The constant linear speed to use for the path following scenario."""
+
     path_following_angular_gain: float
+    """The gain used for the proportional steering control in the path following scenario.
+    A larger gain results in quicker turning, but potential overshoot and wobbling."""
+
     path_following_stop_distance_threshold: float
+    """The distance threshold at which point the robot will stop.  Applies to the path following scenario."""
+
     path_following_forward_angle_threshold = math.pi
+    """The angle threshold at which point the robot will move forward.  Applies to the path following scenario."""
+
     path_following_target_point_offset_meters: float
+    """The offset distance used to generate the 'target point' that the robot will follow in the path following scenario.
+    A larger offset results in smoother motion, but too large may cause the robot to cut corners during turns."""
 
     def __init__(self, prim_path: str, robot: _Robot, articulation_view: _ArticulationView, front_camera: Module):
         self.prim_path = prim_path

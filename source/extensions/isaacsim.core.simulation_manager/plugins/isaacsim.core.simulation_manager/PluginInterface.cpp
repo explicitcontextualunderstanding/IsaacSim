@@ -430,7 +430,7 @@ public:
         }
         else
         {
-            CARB_LOG_WARN("getSimulationTimeAtTime: no data found for time %s, returning current sim time",
+            CARB_LOG_INFO("getSimulationTimeAtTime: no data found for time %s, returning current sim time",
                           rtime.toString().c_str());
             return g_simulationTime;
         }

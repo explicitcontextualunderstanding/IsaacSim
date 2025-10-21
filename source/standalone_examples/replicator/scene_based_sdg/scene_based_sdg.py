@@ -93,6 +93,8 @@ config.update(args_config)
 # Create the simulation app with the given launch_config
 simulation_app = SimulationApp(launch_config=config["launch_config"])
 
+import carb.settings
+
 # Late import of runtime modules (the SimulationApp needs to be created before loading the modules)
 import omni.replicator.core as rep
 import omni.usd
@@ -119,6 +121,9 @@ if not open_stage(assets_root_path + config["env_url"]):
 
 # Disable capture on play (data generation will be triggered manually)
 rep.orchestrator.set_capture_on_play(False)
+
+# Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
 # Clear any previous semantic data in the loaded stage
 if config["clear_previous_semantics"]:

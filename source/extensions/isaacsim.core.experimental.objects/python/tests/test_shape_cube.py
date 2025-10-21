@@ -19,13 +19,18 @@ import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.test
 import warp as wp
 from isaacsim.core.experimental.objects import Cube as TargetShape
-from isaacsim.core.experimental.prims.tests.common import check_allclose, check_array, draw_indices, draw_sample
+from isaacsim.core.experimental.prims.tests.common import (
+    check_allclose,
+    check_array,
+    cprint,
+    draw_indices,
+    draw_sample,
+    parametrize,
+)
 from pxr import UsdGeom
 
-from .common import parametrize
 
-
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"]) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
     # create new stage
     await stage_utils.create_new_stage_async()
     # define prims
@@ -45,19 +50,19 @@ class TestCube(omni.kit.test.AsyncTestCase):
 
     # --------------------------------------------------------------------
 
-    @parametrize(backends=["usd"], prim_classes=[TargetShape], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
     async def test_len(self, prim, num_prims, device, backend):
         self.assertEqual(len(prim), num_prims, f"Invalid len ({num_prims} prims)")
 
-    @parametrize(backends=["usd"], prim_classes=[TargetShape], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
     async def test_geoms(self, prim, num_prims, device, backend):
         for usd_prim, geom in zip(prim.prims, prim.geoms):
             self.assertTrue(usd_prim.IsA(UsdGeom.Cube), f"Invalid geom type: {usd_prim.GetTypeName()}")
 
-    @parametrize(backends=["usd"], prim_classes=[TargetShape], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetShape, populate_stage_func=populate_stage)
     async def test_sizes(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
                 prim.set_sizes(v0, indices=indices)
                 output = prim.get_sizes(indices=indices)

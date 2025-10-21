@@ -7,28 +7,32 @@ The ROS 2 Simulation Control extension uses the ROS 2 Simulation Interfaces to c
 ## Features
 
 - Uses ROS 2 services to control Isaac Sim:
-  - `isaacsim/GetSimulatorFeatures`: Lists the supported features in this Isaac Sim implementation
-  - `isaacsim/SetSimulationState`: Set simulation to specific state (playing/paused/stopped)
-  - `isaacsim/GetSimulationState`: Get current simulation state
-  - `isaacsim/GetEntities`: Get list of all entities (prims) in the simulation
-  - `isaacsim/GetEntityInfo`: Get detailed information about a specific entity (currently returns OBJECT category type)
-  - `isaacsim/GetEntityState`: Get the pose, twist, and acceleration of a specific entity
-  - `isaacsim/GetEntitiesStates`: Get the states (pose, twist, acceleration) of multiple entities with filtering
-  - `isaacsim/DeleteEntity`: Delete a specific entity (prim) from the simulation
-  - `isaacsim/SpawnEntity`: Spawn a new entity into the simulation at a specified location
-  - `isaacsim/ResetSimulation`: Reset the simulation environment to its initial state
-  - `isaacsim/SetEntityState`: Sets the state (pose, twist) of a specific entity in the simulation
-  - `isaacsim/StepSimulation`: Step the simulation forward by a specific number of frames
+  - `get_simulator_features`: Lists the supported features in this Isaac Sim implementation
+  - `set_simulation_state`: Set simulation to specific state (playing/paused/stopped)
+  - `get_simulation_state`: Get current simulation state
+  - `get_entities`: Get list of all entities (prims) in the simulation
+  - `get_entity_info`: Get detailed information about a specific entity (currently returns OBJECT category type)
+  - `get_entity_state`: Get the pose, twist, and acceleration of a specific entity
+  - `get_entities_states`: Get the states (pose, twist, acceleration) of multiple entities with filtering
+  - `delete_entity`: Delete a specific entity (prim) from the simulation
+  - `spawn_entity`: Spawn a new entity into the simulation at a specified location
+  - `reset_simulation`: Reset the simulation environment to its initial state
+  - `set_entity_state`: Sets the state (pose, twist) of a specific entity in the simulation
+  - `step_simulation`: Step the simulation forward by a specific number of frames
+  - `load_world`: Load a world or environment file into the simulation
+  - `unload_world`: Unload the current world and create an empty stage
+  - `get_current_world`: Get information about the currently loaded world
+  - `get_available_worlds`: Get a list of available world files that can be loaded
 
 - Uses ROS 2 actions to control Isaac Sim:
-  - `isaacsim/SimulateSteps`: Action for stepping the simulation with progress feedback
+  - `simulate_steps`: Action for stepping the simulation with progress feedback
 
 
 ## Requirements
 
 - Isaac Sim 5.0 or later
 - ROS 2 (Humble or later)
-- [Simulation Interfaces](https://github.com/ros-simulation/simulation_interfaces) ROS 2 package installed. This extension is currently tested with [v1.0.1](https://github.com/ros-simulation/simulation_interfaces/releases/tag/1.0.1).  
+- [Simulation Interfaces](https://github.com/ros-simulation/simulation_interfaces) ROS 2 package installed. This extension is currently tested with [v1.1.0](https://github.com/ros-simulation/simulation_interfaces/releases/tag/1.1.0).  
 
 ## Usage
 
@@ -42,7 +46,7 @@ The ROS 2 Simulation Control extension uses the ROS 2 Simulation Interfaces to c
 The GetSimulatorFeatures service lists the subset of services and actions supported by Isaac Sim from simulation_interfaces.
 
 ```bash
-ros2 service call /isaacsim/GetSimulatorFeatures simulation_interfaces/srv/GetSimulatorFeatures
+ros2 service call /get_simulator_features simulation_interfaces/srv/GetSimulatorFeatures
 ```
 
 Notes:
@@ -56,22 +60,22 @@ The SetSimulationState service updates the global state of the simulation (stopp
 
 1. To set simulation state to playing:
    ```bash
-   ros2 service call /isaacsim/SetSimulationState simulation_interfaces/srv/SetSimulationState "{state: {state: 1}}"  # 1=playing
+   ros2 service call /set_simulation_state simulation_interfaces/srv/SetSimulationState "{state: {state: 1}}"  # 1=playing
    ```
 
 2. To set simulation state to paused:
    ```bash
-   ros2 service call /isaacsim/SetSimulationState simulation_interfaces/srv/SetSimulationState "{state: {state: 2}}"  # 2=paused
+   ros2 service call /set_simulation_state simulation_interfaces/srv/SetSimulationState "{state: {state: 2}}"  # 2=paused
    ```
 
 3. To set simulation state to stopped:
    ```bash
-   ros2 service call /isaacsim/SetSimulationState simulation_interfaces/srv/SetSimulationState "{state: {state: 0}}"  # 0=stopped
+   ros2 service call /set_simulation_state simulation_interfaces/srv/SetSimulationState "{state: {state: 0}}"  # 0=stopped
    ```
 
 4. To quit the simulator:
    ```bash
-   ros2 service call /isaacsim/SetSimulationState simulation_interfaces/srv/SetSimulationState "{state: {state: 3}}"  # 3=quit
+   ros2 service call /set_simulation_state simulation_interfaces/srv/SetSimulationState "{state: {state: 3}}"  # 3=quit
    ```
 
 Notes:
@@ -85,7 +89,7 @@ Notes:
 The GetSimulationState service retrieves the current state of the entire simulation (stopped/playing/paused/quitting) corresponding to enums defined in SimulationState.msg (STATE_STOPPED, STATE_PLAYING, STATE_PAUSED, STATE_QUITTING).
 
 ```bash
-ros2 service call /isaacsim/GetSimulationState simulation_interfaces/srv/GetSimulationState
+ros2 service call /get_simulation_state simulation_interfaces/srv/GetSimulationState
 ```
 
 Notes:
@@ -98,22 +102,22 @@ The GetEntities service retrieves a list of all entities present in the simulati
 
 1. Get all entities in the simulation:
    ```bash
-   ros2 service call /isaacsim/GetEntities simulation_interfaces/srv/GetEntities "{filters: {filter: ''}}"
+   ros2 service call /get_entities simulation_interfaces/srv/GetEntities "{filters: {filter: ''}}"
    ```
    
 2. Get entities with full paths or partial paths. In this case filter for prims containing 'camera' in the path:
    ```bash
-   ros2 service call /isaacsim/GetEntities simulation_interfaces/srv/GetEntities "{filters: {filter: 'camera'}}"
+   ros2 service call /get_entities simulation_interfaces/srv/GetEntities "{filters: {filter: 'camera'}}"
    ```
 
 3. Get entities with paths starting with '/World':
    ```bash
-   ros2 service call /isaacsim/GetEntities simulation_interfaces/srv/GetEntities "{filters: {filter: '^/World'}}"
+   ros2 service call /get_entities simulation_interfaces/srv/GetEntities "{filters: {filter: '^/World'}}"
    ```
 
 4. Get entities with paths ending with 'mesh':
    ```bash
-   ros2 service call /isaacsim/GetEntities simulation_interfaces/srv/GetEntities "{filters: {filter: 'mesh$'}}"
+   ros2 service call /get_entities simulation_interfaces/srv/GetEntities "{filters: {filter: 'mesh$'}}"
    ```
 
 Notes:
@@ -125,7 +129,7 @@ Notes:
 The GetEntityInfo service provides detailed information about a specific entity, such as its type and properties.
 
 ```bash
-ros2 service call /isaacsim/GetEntityInfo simulation_interfaces/srv/GetEntityInfo "{entity: '/World/robot'}"
+ros2 service call /get_entity_info simulation_interfaces/srv/GetEntityInfo "{entity: '/World/robot'}"
 ```
 
 Notes:
@@ -141,7 +145,7 @@ Notes:
 The GetEntityState service gets the pose, twist, acceleration of a specific entity relative to a given reference frame. Currently only world frames are supported.
 
 ```bash
-ros2 service call /isaacsim/GetEntityState simulation_interfaces/srv/GetEntityState "{entity: '/World/robot'}"
+ros2 service call /get_entity_state simulation_interfaces/srv/GetEntityState "{entity: '/World/robot'}"
 ```
 
 Notes:
@@ -158,17 +162,17 @@ The GetEntitiesStates service fetches the states (pose, twist, acceleration) of 
 
 1. Get states for all entities in the simulation:
    ```bash
-   ros2 service call /isaacsim/GetEntitiesStates simulation_interfaces/srv/GetEntitiesStates "{filters: {filter: ''}}"
+   ros2 service call /get_entities_states simulation_interfaces/srv/GetEntitiesStates "{filters: {filter: ''}}"
    ```
 
 2. Get states for entities containing 'robot' in their path:
    ```bash
-   ros2 service call /isaacsim/GetEntitiesStates simulation_interfaces/srv/GetEntitiesStates "{filters: {filter: 'robot'}}"
+   ros2 service call /get_entities_states simulation_interfaces/srv/GetEntitiesStates "{filters: {filter: 'robot'}}"
    ```
 
 3. Get states for entities with paths starting with '/World':
    ```bash
-   ros2 service call /isaacsim/GetEntitiesStates simulation_interfaces/srv/GetEntitiesStates "{filters: {filter: '^/World'}}"
+   ros2 service call /get_entities_states simulation_interfaces/srv/GetEntitiesStates "{filters: {filter: '^/World'}}"
    ```
 
 Notes:
@@ -188,7 +192,7 @@ Notes:
 The DeleteEntity service deletes a specified entity in the simulation.
 
 ```bash
-ros2 service call /isaacsim/DeleteEntity simulation_interfaces/srv/DeleteEntity "{entity: '/World/robot'}"
+ros2 service call /delete_entity simulation_interfaces/srv/DeleteEntity "{entity: '/World/robot'}"
 ```
 
 Notes:
@@ -202,27 +206,27 @@ The SpawnEntity service spawns a new entity into the simulation at a specified l
 
 1. Basic entity spawn with default position:
    ```bash
-   ros2 service call /isaacsim/SpawnEntity simulation_interfaces/srv/SpawnEntity "{name: 'MyEntity', allow_renaming: false, uri: '/path/to/model.usd'}"
+   ros2 service call /spawn_entity simulation_interfaces/srv/SpawnEntity "{name: 'MyEntity', allow_renaming: false, uri: '/path/to/model.usd'}"
    ```
 
 2. Spawn with specific position and orientation:
    ```bash
-   ros2 service call /isaacsim/SpawnEntity simulation_interfaces/srv/SpawnEntity "{name: 'PositionedEntity', allow_renaming: false, uri: '/path/to/model.usd', initial_pose: {pose: {position: {x: 1.0, y: 2.0, z: 3.0}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}}"
+   ros2 service call /spawn_entity simulation_interfaces/srv/SpawnEntity "{name: 'PositionedEntity', allow_renaming: false, uri: '/path/to/model.usd', initial_pose: {pose: {position: {x: 1.0, y: 2.0, z: 3.0}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}}"
    ```
 
 3. Empty Xform creation (no URI):
    ```bash
-   ros2 service call /isaacsim/SpawnEntity simulation_interfaces/srv/SpawnEntity "{name: 'EmptyXform', allow_renaming: false, uri: ''}"
+   ros2 service call /spawn_entity simulation_interfaces/srv/SpawnEntity "{name: 'EmptyXform', allow_renaming: false, uri: ''}"
    ```
 
 4. With auto-renaming enabled:
    ```bash
-   ros2 service call /isaacsim/SpawnEntity simulation_interfaces/srv/SpawnEntity "{name: 'AutoRenamedEntity', allow_renaming: true, uri: '/path/to/model.usd'}"
+   ros2 service call /spawn_entity simulation_interfaces/srv/SpawnEntity "{name: 'AutoRenamedEntity', allow_renaming: true, uri: '/path/to/model.usd'}"
    ```
 
 5. With namespace specified:
    ```bash
-   ros2 service call /isaacsim/SpawnEntity simulation_interfaces/srv/SpawnEntity "{name: 'NamespacedEntity', allow_renaming: false, uri: '/path/to/model.usd', entity_namespace: 'robot1'}"
+   ros2 service call /spawn_entity simulation_interfaces/srv/SpawnEntity "{name: 'NamespacedEntity', allow_renaming: false, uri: '/path/to/model.usd', entity_namespace: 'robot1'}"
    ```
 
 Notes:
@@ -239,7 +243,7 @@ Notes:
 The ResetSimulation service resets the simulation environment to its initial state.
 
 ```bash
-ros2 service call /isaacsim/ResetSimulation simulation_interfaces/srv/ResetSimulation
+ros2 service call /reset_simulation simulation_interfaces/srv/ResetSimulation
 ```
 
 Notes:
@@ -256,7 +260,7 @@ The SetEntityState service sets the state (pose, twist) of a specific entity in 
 
 1. Set only position and orientation:
    ```bash
-   ros2 service call /isaacsim/SetEntityState simulation_interfaces/srv/SetEntityState "{
+   ros2 service call /set_entity_state simulation_interfaces/srv/SetEntityState "{
      entity: '/World/Cube', 
      state: {
        header: {frame_id: 'world'}, 
@@ -274,7 +278,7 @@ The SetEntityState service sets the state (pose, twist) of a specific entity in 
 
 2. Set position, orientation and velocity (for entities with rigid body physics):
    ```bash
-   ros2 service call /isaacsim/SetEntityState simulation_interfaces/srv/SetEntityState "{
+   ros2 service call /set_entity_state simulation_interfaces/srv/SetEntityState "{
      entity: '/World/RigidBody', 
      state: {
        header: {frame_id: 'world'}, 
@@ -305,24 +309,23 @@ The StepSimulation service simulates a finite number of steps and returns to PAU
 
 1. Step the simulation by 1 frame (note: will use 2 steps internally):
    ```bash
-   ros2 service call /isaacsim/StepSimulation simulation_interfaces/srv/StepSimulation "{steps: 1}"
+   ros2 service call /step_simulation simulation_interfaces/srv/StepSimulation "{steps: 1}"
    ```
 
 2. Step the simulation by 10 frames:
    ```bash
-   ros2 service call /isaacsim/StepSimulation simulation_interfaces/srv/StepSimulation "{steps: 10}"
+   ros2 service call /step_simulation simulation_interfaces/srv/StepSimulation "{steps: 10}"
    ```
 
 3. Step the simulation by 100 frames:
    ```bash
-   ros2 service call /isaacsim/StepSimulation simulation_interfaces/srv/StepSimulation "{steps: 100}"
+   ros2 service call /step_simulation simulation_interfaces/srv/StepSimulation "{steps: 100}"
    ```
 
 Notes:
 - The simulation must be in a paused state before stepping can be performed
 - The service call will block until all steps are completed
 - After stepping completes, the simulation will automatically return to a paused state
-- **Important limitation**: When steps=1 is requested, the service will automatically use steps=2 instead. Only step values greater than 1 are available. The minimum effective step count is 2.
 - Returns `RESULT_OK` if stepping completed successfully
 - Returns `RESULT_INCORRECT_STATE` if the simulation is not paused when the service is called
 - Returns `RESULT_OPERATION_FAILED` if any error occurs during stepping
@@ -333,12 +336,12 @@ The SimulateSteps action simulates a finite number of steps and returns to PAUSE
 
 1. Basic usage - Step the simulation by 10 frames:
    ```bash
-   ros2 action send_goal /isaacsim/SimulateSteps simulation_interfaces/action/SimulateSteps "{steps: 10}"
+   ros2 action send_goal /simulate_steps simulation_interfaces/action/SimulateSteps "{steps: 10}"
    ```
 
 2. With feedback - Step the simulation by 20 frames and show feedback:
    ```bash
-   ros2 action send_goal /isaacsim/SimulateSteps simulation_interfaces/action/SimulateSteps "{steps: 20}" --feedback
+   ros2 action send_goal /simulate_steps simulation_interfaces/action/SimulateSteps "{steps: 20}" --feedback
    ```
 
 Notes:
@@ -346,7 +349,97 @@ Notes:
 - After steps are completed, the simulation will return to a paused state
 - You will receive feedback after each step showing completed and remaining steps
 - The action can be canceled while executing
-- **Important limitation**: When steps=1 is requested, the action will automatically use steps=2 instead. Only step values greater than 1 are available. The minimum effective step count is 2.
+
+### Using the LoadWorld Service
+
+The LoadWorld service loads a world or environment file into the simulation, clearing the current scene and setting the simulation to stopped state. Currently supports USD format worlds.
+
+1. Load a world from a USD file:
+   ```bash
+   ros2 service call /load_world simulation_interfaces/srv/LoadWorld "{uri: '/path/to/world.usd'}"
+   ```
+
+2. Load a sample world with Isaac Sim sample environments:
+   ```bash
+   ros2 service call /load_world simulation_interfaces/srv/LoadWorld "{uri: '/Isaac/Environments/Simple_Room/simple_room.usd'}"
+   ```
+
+3. Load a sample world with a ROS2 scenario:
+   ```bash
+   ros2 service call /load_world simulation_interfaces/srv/LoadWorld "{uri: '/Isaac/Samples/ROS2/Scenario/carter_warehouse_apriltags_worker.usd'}"
+   ```
+
+Notes:
+- Only USD files (.usd, .usda, .usdc, .usdz) are supported
+- The simulation must be stopped or paused before loading a world (not playing)
+- Loading a world will clear the current scene and create a new stage from the USD file
+- If the given path cannot be found directly, Isaac Sim will automatically try prefixing it with the default asset root path
+- Returns `RESULT_OK` if the world was successfully loaded
+- Returns `UNSUPPORTED_FORMAT` if the file format is not supported
+- Returns `RESOURCE_PARSE_ERROR` if the USD file cannot be parsed or loaded
+- Returns `RESULT_OPERATION_FAILED` if the simulation is playing when the service is called
+
+### Using the UnloadWorld Service
+
+The UnloadWorld service unloads the current world from the simulation, clearing the current scene and creating a new empty stage. Any previously spawned entities will be removed.
+
+```bash
+ros2 service call /unload_world simulation_interfaces/srv/UnloadWorld
+```
+
+Notes:
+- The simulation must be stopped or paused before unloading a world (not playing)
+- Creates a new empty stage after unloading the current world
+- Returns `RESULT_OK` if the world was successfully unloaded
+- Returns `NO_WORLD_LOADED` if no world is currently loaded
+- Returns `RESULT_OPERATION_FAILED` if the simulation is playing when the service is called
+
+### Using the GetCurrentWorld Service
+
+The GetCurrentWorld service returns information about the currently loaded world, including its URI, name, and format.
+
+```bash
+ros2 service call /get_current_world simulation_interfaces/srv/GetCurrentWorld
+```
+
+Notes:
+- Returns world information including URI and name if a world is loaded from a file
+- For worlds created in memory (new stage), returns empty URI and "untitled_world" as the name
+- Returns `RESULT_OK` with world information if successful
+- Returns `NO_WORLD_LOADED` if no world is currently loaded
+
+### Using the GetAvailableWorlds Service
+
+The GetAvailableWorlds service returns a list of available world files that can be loaded into the simulation. It searches default Isaac Sim paths for USD world files, with support for TagsFilter-based filtering.
+
+1. Get all default available worlds:
+   ```bash
+   ros2 service call /get_available_worlds simulation_interfaces/srv/GetAvailableWorlds
+   ```
+
+2. Get worlds with tag filtering (search for default worlds with specific tags in filename):
+   ```bash
+   ros2 service call /get_available_worlds simulation_interfaces/srv/GetAvailableWorlds "{filter: {tags: ['warehouse', 'carter']}, continue_on_error: true}"
+   ```
+
+3. Search additional custom paths:
+   ```bash
+   ros2 service call /get_available_worlds simulation_interfaces/srv/GetAvailableWorlds "{additional_sources: ['/custom/worlds/path'], continue_on_error: true}"
+   ```
+
+4. Offline-only search with additional local sources:
+   ```bash
+   ros2 service call /get_available_worlds simulation_interfaces/srv/GetAvailableWorlds "{additional_sources: ['/home/user/custom_worlds', '/opt/isaac_worlds'], offline_only: true, continue_on_error: true}"
+   ```
+
+Notes:
+- Searches default Isaac Sim paths: `/Isaac/Environments` and `/Isaac/Samples/ROS2/Scenario`
+- Supports TagsFilter with FILTER_MODE_ANY (default) or FILTER_MODE_ALL for tag matching
+- Can search additional custom paths specified in `additional_sources`
+- Set `offline_only: true` to only search local filesystem paths
+- Set `continue_on_error: true` to continue searching even if some paths fail
+- Returns `RESULT_OK` with list of available worlds
+- Returns `DEFAULT_SOURCES_FAILED` if default asset paths are not accessible and no additional sources are provided
 
 ## Technical Details
 

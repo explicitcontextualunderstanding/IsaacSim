@@ -107,9 +107,9 @@ class TestRos2Subscribers(ROS2TestCase):
 
         self._stage = omni.usd.get_context().get_stage()
 
-        node = rclpy.create_node("isaac_sim_test_joint_state_sub_queue")
+        node = self.create_node("isaac_sim_test_joint_state_sub_queue")
         ros_topic = "joint_sub"
-        test_pub = node.create_publisher(JointState, ros_topic, 1)
+        test_pub = self.create_publisher(node, JointState, ros_topic, 1)
 
         self.graph_path = "/ActionGraph"
 
@@ -217,9 +217,9 @@ class TestRos2Subscribers(ROS2TestCase):
 
         self._stage = omni.usd.get_context().get_stage()
 
-        node = rclpy.create_node("isaac_sim_test_clock_sub_queue")
+        node = self.create_node("isaac_sim_test_clock_sub_queue")
         ros_topic = "clock_sub"
-        test_pub = node.create_publisher(Clock, ros_topic, 1)
+        test_pub = self.create_publisher(node, Clock, ros_topic, 1)
 
         self.graph_path = "/ActionGraph"
 
@@ -323,9 +323,9 @@ class TestRos2Subscribers(ROS2TestCase):
 
         self._stage = omni.usd.get_context().get_stage()
 
-        node = rclpy.create_node("isaac_sim_test_twist_sub_queue")
+        node = self.create_node("isaac_sim_test_twist_sub_queue")
         ros_topic = "twist_sub"
-        test_pub = node.create_publisher(Twist, ros_topic, 1)
+        test_pub = self.create_publisher(node, Twist, ros_topic, 1)
 
         self.graph_path = "/ActionGraph"
 
@@ -428,9 +428,9 @@ class TestRos2Subscribers(ROS2TestCase):
 
         self._stage = omni.usd.get_context().get_stage()
 
-        node = rclpy.create_node("isaac_sim_test_AckermannDrive_sub_queue")
+        node = self.create_node("isaac_sim_test_AckermannDrive_sub_queue")
         ros_topic = "ackermann_sub"
-        test_pub = node.create_publisher(AckermannDriveStamped, ros_topic, 1)
+        test_pub = self.create_publisher(node, AckermannDriveStamped, ros_topic, 1)
 
         self.graph_path = "/ActionGraph"
 
@@ -536,9 +536,9 @@ class TestRos2Subscribers(ROS2TestCase):
         self._stage = omni.usd.get_context().get_stage()
 
         # Create a node to subscribe to TFs
-        node = rclpy.create_node("isaac_sim_test_transform_tree_sub_queue")
+        node = self.create_node("isaac_sim_test_transform_tree_sub_queue")
         ros_topic = "tf_sub"
-        test_pub = node.create_publisher(TFMessage, ros_topic, 1)
+        test_pub = self.create_publisher(node, TFMessage, ros_topic, 1)
 
         self.graph_path = "/ActionGraph"
 
@@ -641,9 +641,9 @@ class TestRos2Subscribers(ROS2TestCase):
         self._stage = omni.usd.get_context().get_stage()
 
         # Create a node to subscribe to TFs
-        node = rclpy.create_node("isaac_sim_test_transform_tree_sub_nova_carter")
+        node = self.create_node("isaac_sim_test_transform_tree_sub_nova_carter")
         ros_topic = "tf_sub"
-        test_pub = node.create_publisher(TFMessage, ros_topic, 1)
+        test_pub = self.create_publisher(node, TFMessage, ros_topic, 1)
 
         self.graph_path = "/ActionGraph"
 

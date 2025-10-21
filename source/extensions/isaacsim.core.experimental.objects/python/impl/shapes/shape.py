@@ -161,9 +161,10 @@ class Shape(XformPrim, ABC):
         from .cone import Cone
         from .cube import Cube
         from .cylinder import Cylinder
+        from .plane import Plane
         from .sphere import Sphere
 
-        classes = [Capsule, Cone, Cube, Cylinder, Sphere]
+        classes = [Capsule, Cone, Cube, Cylinder, Plane, Sphere]
 
         instances = []
         stage = stage_utils.get_current_stage(backend="usd")

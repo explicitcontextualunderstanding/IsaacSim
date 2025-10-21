@@ -234,7 +234,7 @@
 - Replaced find_nucleus_server() with get_assets_root_path()
 - Jetbot Keyboard example and Kaya Gamepad example are now powered by Omnigraph
 
-## [0.1.19] - 2022-2-10
+## [0.1.19] - 2022-02-10
 ### Changed
 - Updated references to MotionGeneration
 

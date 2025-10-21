@@ -17,5 +17,6 @@ from .capsule import Capsule
 from .cone import Cone
 from .cube import Cube
 from .cylinder import Cylinder
+from .plane import Plane
 from .shape import Shape
 from .sphere import Sphere

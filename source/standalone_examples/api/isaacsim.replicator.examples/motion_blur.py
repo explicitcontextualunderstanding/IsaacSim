@@ -92,6 +92,9 @@ def run_motion_blur_example(num_frames=3, custom_delta_time=None, use_path_traci
     setup_stage()
     stage = omni.usd.get_context().get_stage()
 
+    # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+    carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
     # Set replicator settings (capture only on request and enable motion blur)
     carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
     carb.settings.get_settings().set("/omni/replicator/captureMotionBlur", True)

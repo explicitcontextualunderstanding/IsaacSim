@@ -1,5 +1,5 @@
 [package]
-version = "1.3.2"
+version = "1.3.4"
 category = "Simulation"
 title = "Isaac Sim USD to URDF exporter"
 description = "Extension that exports USD files to URDF"

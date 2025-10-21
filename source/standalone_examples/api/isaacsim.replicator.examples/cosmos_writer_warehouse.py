@@ -30,11 +30,14 @@ from pxr import UsdGeom
 STAGE_URL = "/Isaac/Samples/Replicator/Stage/full_warehouse_worker_and_anim_cameras.usd"
 CARTER_NAV_ASSET_URL = "/Isaac/Samples/Replicator/OmniGraph/nova_carter_nav_only.usd"
 CARTER_NAV_PATH = "/NavWorld/CarterNav"
-CARTER_CHASSIS_PATH = f"{CARTER_NAV_PATH}/chassis_link"
 CARTER_NAV_TARGET_PATH = f"{CARTER_NAV_PATH}/targetXform"
 CARTER_CAMERA_PATH = f"{CARTER_NAV_PATH}/chassis_link/sensors/front_hawk/left/camera_left"
 CARTER_NAV_POSITION = (-6, 4, 0)
 CARTER_NAV_TARGET_POSITION = (3, 3, 0)
+
+NUM_FRAMES = 4
+CAPTURE_INTERVAL = 2
+START_DELAY = 0.1
 
 
 def advance_timeline_by_duration(duration: float, max_updates: int = 1000):
@@ -72,7 +75,7 @@ def run_sdg_pipeline(camera_path, num_frames, capture_interval, use_instance_id=
     rp = rep.create.render_product(camera_path, (1280, 720))
     cosmos_writer = rep.WriterRegistry.get("CosmosWriter")
     backend = rep.backends.get("DiskBackend")
-    out_dir = os.path.join(os.getcwd(), f"_out_cosmos")
+    out_dir = os.path.join(os.getcwd(), f"_out_cosmos_warehouse")
     print(f"output_directory: {out_dir}")
     backend.initialize(output_dir=out_dir)
     cosmos_writer.initialize(
@@ -113,6 +116,10 @@ def run_example(num_frames, capture_interval=1, start_delay=None, use_instance_i
     omni.usd.get_context().open_stage(stage_path)
     stage = omni.usd.get_context().get_stage()
     simulation_app.update()
+
+    # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+    carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
     # Enable script nodes
     carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
@@ -151,9 +158,6 @@ def run_example(num_frames, capture_interval=1, start_delay=None, use_instance_i
     run_sdg_pipeline(camera_prim.GetPath(), num_frames, capture_interval, use_instance_id, segmentation_mapping)
 
 
-NUM_FRAMES = 4
-CAPTURE_INTERVAL = 2
-START_DELAY = 0.1
 run_example(num_frames=NUM_FRAMES, capture_interval=4, start_delay=START_DELAY, use_instance_id=True)
 
 simulation_app.close()

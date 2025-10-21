@@ -207,7 +207,7 @@
 ### Fixed
 - Unit tests
 
-## [3.3.0] - 2023-12-1
+## [3.3.0] - 2023-12-01
 ### Changed
 - Add more articulation metadata for OM-116002
 - Fix contact reporter API schema preparation for OM-116001

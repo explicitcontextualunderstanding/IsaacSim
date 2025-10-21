@@ -13,27 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Literal
-
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.commands
 import omni.kit.test
-from isaacsim.core.experimental.objects import Capsule, Cone, Cube, Cylinder, Shape, Sphere
-
-
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"]) -> None:
-    # create new stage
-    await stage_utils.create_new_stage_async()
-    # define prims
-    if operation == "wrap":
-        for i in range(max_num_prims):
-            omni.kit.commands.execute(
-                "CreatePrimWithDefaultXform",
-                prim_type="SphereLight",
-                prim_path=f"/World/A_{i}",
-                attributes={"inputs:intensity": 30000},
-                select_new_prim=False,
-            )
+from isaacsim.core.experimental.objects import Capsule, Cone, Cube, Cylinder, Plane, Shape, Sphere
 
 
 class TestShape(omni.kit.test.AsyncTestCase):
@@ -54,7 +37,8 @@ class TestShape(omni.kit.test.AsyncTestCase):
         Cone("/World/shape_02")
         Cube("/World/shape_03")
         Cylinder("/World/shape_04")
-        Sphere("/World/shape_05")
+        Plane("/World/shape_05")
+        Sphere("/World/shape_06")
         # fetch instances
         instances = Shape.fetch_instances(
             [
@@ -64,13 +48,15 @@ class TestShape(omni.kit.test.AsyncTestCase):
                 "/World/shape_03",
                 "/World/shape_04",
                 "/World/shape_05",
+                "/World/shape_06",
             ]
         )
         # check
-        self.assertEqual(len(instances), 6)
+        self.assertEqual(len(instances), 7)
         self.assertIsNone(instances[0])
         self.assertIsInstance(instances[1], Capsule)
         self.assertIsInstance(instances[2], Cone)
         self.assertIsInstance(instances[3], Cube)
         self.assertIsInstance(instances[4], Cylinder)
-        self.assertIsInstance(instances[5], Sphere)
+        self.assertIsInstance(instances[5], Plane)
+        self.assertIsInstance(instances[6], Sphere)

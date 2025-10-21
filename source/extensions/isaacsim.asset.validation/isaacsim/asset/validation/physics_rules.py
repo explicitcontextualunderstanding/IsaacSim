@@ -56,8 +56,27 @@ class RigidBodyHasMassAPI(av_core.BaseRuleChecker):
             self._AddError(message=f"Rigid body {prim.GetPath()} has mass api but no diagonal inertia attr", at=prim)
 
         # check if diagonal inertia is non-zero
-        if prim.GetAttribute("physics:diagonalInertia").Get() == Gf.Vec3f(0, 0, 0):
+        diagonal_inertia = prim.GetAttribute("physics:diagonalInertia").Get()
+        if diagonal_inertia == Gf.Vec3f(0, 0, 0):
             self._AddInfo(message=f"Rigid body {prim.GetPath()} has diagonal inertia of [0, 0, 0]", at=prim)
+        else:
+            # check triangle inequality: I1 + I2 >= I3, I1 + I3 >= I2, I2 + I3 >= I1
+            i1, i2, i3 = diagonal_inertia[0], diagonal_inertia[1], diagonal_inertia[2]
+            if i1 + i2 < i3:
+                self._AddError(
+                    message=f"Rigid body {prim.GetPath()} violates inertia triangle inequality: I1 + I2 ({i1 + i2}) < I3 ({i3})",
+                    at=prim,
+                )
+            if i1 + i3 < i2:
+                self._AddError(
+                    message=f"Rigid body {prim.GetPath()} violates inertia triangle inequality: I1 + I3 ({i1 + i3}) < I2 ({i2})",
+                    at=prim,
+                )
+            if i2 + i3 < i1:
+                self._AddError(
+                    message=f"Rigid body {prim.GetPath()} violates inertia triangle inequality: I2 + I3 ({i2 + i3}) < I1 ({i1})",
+                    at=prim,
+                )
 
         # check if principal axes is authored
         if not prim.HasAttribute("physics:principalAxes"):

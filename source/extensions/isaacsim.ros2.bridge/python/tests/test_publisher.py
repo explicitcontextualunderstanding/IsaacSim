@@ -68,7 +68,7 @@ class TestRos2Publisher(ROS2TestCase):
         ogn_node = new_nodes[-1]
 
         ros2_subscriber = None
-        ros2_node = rclpy.create_node("isaac_sim_test_publisher")
+        ros2_node = self.create_node("isaac_sim_test_publisher")
         qos_profile = rclpy.qos.QoSPresetProfiles.SYSTEM_DEFAULT.value
 
         # define messages
@@ -148,10 +148,10 @@ class TestRos2Publisher(ROS2TestCase):
             print(message_type)
             # create subscriber
             if ros2_subscriber:
-                ros2_node.destroy_subscription(ros2_subscriber)
+                self.destroy_subscription(ros2_node, ros2_subscriber)
                 ros2_subscriber = None
-            ros2_subscriber = ros2_node.create_subscription(
-                eval(message_type), "custom_topic", self._callback, qos_profile
+            ros2_subscriber = self.create_subscription(
+                ros2_node, eval(message_type), "custom_topic", self._callback, qos_profile
             )
 
             # change message type

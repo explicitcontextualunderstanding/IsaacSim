@@ -78,8 +78,8 @@ class CylinderLight(Light):
         paths: str | list[str],
         *,
         # CylinderLight
-        radii: list | np.ndarray | wp.array | None = None,
-        lengths: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
+        lengths: float | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -123,7 +123,10 @@ class CylinderLight(Light):
     """
 
     def set_lengths(
-        self, lengths: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self,
+        lengths: float | list | np.ndarray | wp.array,
+        *,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the lengths (in the local X axis) of the prims.
 
@@ -154,7 +157,7 @@ class CylinderLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetLengthAttr().Set(lengths[0 if lengths.shape[0] == 1 else i].item())
 
-    def get_lengths(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_lengths(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the lengths (in the local X axis) of the prims.
 
         Backends: :guilabel:`usd`.
@@ -191,7 +194,7 @@ class CylinderLight(Light):
         return ops_utils.place(data, device=self._device)
 
     def set_radii(
-        self, radii: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, radii: float | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the radii of the prims.
 
@@ -222,7 +225,7 @@ class CylinderLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetRadiusAttr().Set(radii[0 if radii.shape[0] == 1 else i].item())
 
-    def get_radii(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_radii(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the radii of the prims.
 
         Backends: :guilabel:`usd`.
@@ -259,7 +262,7 @@ class CylinderLight(Light):
         return ops_utils.place(data, device=self._device)
 
     def set_enabled_treat_as_lines(
-        self, enabled: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, enabled: bool | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Enable or disable the treat as lines (effectively, a zero-radius cylinder) of the prims.
 
@@ -294,7 +297,7 @@ class CylinderLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetTreatAsLineAttr().Set(bool(enabled[0 if enabled.shape[0] == 1 else i].item()))
 
-    def get_enabled_treat_as_lines(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_enabled_treat_as_lines(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the enabled state of the treat as lines (effectively, a zero-radius cylinder) of the prims.
 
         Backends: :guilabel:`usd`.

@@ -14,13 +14,11 @@
 # limitations under the License.
 
 import re
-from typing import List
 
 import carb
 import isaacsim.core.utils.prims as prim_utils
 from geometry_msgs.msg import Accel, Point, Pose, Quaternion, Twist, Vector3
 from isaacsim.core.experimental.prims import RigidPrim, XformPrim
-from isaacsim.storage.native import find_filtered_files
 from simulation_interfaces.msg import EntityState, Result
 from std_msgs.msg import Header
 

@@ -1,5 +1,5 @@
 [package]
-version = "1.2.0"
+version = "1.3.2"
 category = "Simulation"
 title = "ROS 2 Simulation Control"
 description = "Extension that uses the ROS 2 Simulation Interfaces to control Isaac Sim"

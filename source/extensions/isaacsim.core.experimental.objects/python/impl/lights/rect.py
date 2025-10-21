@@ -80,8 +80,8 @@ class RectLight(Light):
         paths: str | list[str],
         *,
         # RectLight
-        widths: list | np.ndarray | wp.array | None = None,
-        heights: list | np.ndarray | wp.array | None = None,
+        widths: float | list | np.ndarray | wp.array | None = None,
+        heights: float | list | np.ndarray | wp.array | None = None,
         texture_files: str | list[str] | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
@@ -128,7 +128,7 @@ class RectLight(Light):
     """
 
     def set_widths(
-        self, widths: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, widths: float | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the widths of the prims.
 
@@ -159,7 +159,7 @@ class RectLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetWidthAttr().Set(widths[0 if widths.shape[0] == 1 else i].item())
 
-    def get_widths(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_widths(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the widths of the prims.
 
         Backends: :guilabel:`usd`.
@@ -196,7 +196,10 @@ class RectLight(Light):
         return ops_utils.place(data, device=self._device)
 
     def set_heights(
-        self, heights: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self,
+        heights: float | list | np.ndarray | wp.array,
+        *,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the heights of the prims.
 
@@ -227,7 +230,7 @@ class RectLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetHeightAttr().Set(heights[0 if heights.shape[0] == 1 else i].item())
 
-    def get_heights(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_heights(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the heights of the prims.
 
         Backends: :guilabel:`usd`.
@@ -264,7 +267,7 @@ class RectLight(Light):
         return ops_utils.place(data, device=self._device)
 
     def set_texture_files(
-        self, texture_files: str | list[str], *, indices: list | np.ndarray | wp.array | None = None
+        self, texture_files: str | list[str], *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the color texture files (to use on the rectangle) of the prims.
 
@@ -298,7 +301,7 @@ class RectLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetTextureFileAttr().Set(texture_files[i])
 
-    def get_texture_files(self, *, indices: list | np.ndarray | wp.array | None = None) -> list[str | None]:
+    def get_texture_files(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> list[str | None]:
         """Get the color texture files (to use on the rectangle) of the prims.
 
         Backends: :guilabel:`usd`.

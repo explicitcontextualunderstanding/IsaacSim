@@ -18,9 +18,9 @@ from typing import List, Optional
 import carb
 import numpy as np
 import omni
+from isaacsim.core.prims import SingleXFormPrim
 from isaacsim.core.utils.prims import get_prim_at_path
 from isaacsim.core.utils.stage import add_reference_to_stage
-from isaacsim.core.utils.xforms import reset_and_set_xform_ops
 from isaacsim.sensors.camera.camera import Camera
 from pxr import Gf, Usd
 
@@ -301,12 +301,12 @@ class SingleViewDepthSensorAsset:
         )
 
         # Set translation and orientation of prim
-        if position is None and translation is None:
-            position = np.array([0.0, 0.0, 0.0])
-        p = position if translation is None else translation
-        translation = Gf.Vec3d(p[0], p[1], p[2])
-        orientation = Gf.Quatd(orientation[0], orientation[1], orientation[2], orientation[3])
-        reset_and_set_xform_ops(self._prim.GetPrim(), translation, orientation)
+        if position is not None and translation is not None:
+            carb.log_warn("Both position and translation are provided. Using position.")
+            translation = None
+        xform_prim = SingleXFormPrim(
+            prim_path=prim_path, position=position, translation=translation, orientation=orientation
+        )
 
         # Iterate over children of the prim, looking for render products with the appropriate schema
         for child in Usd.PrimRange(self._prim.GetPrim()):
@@ -386,7 +386,12 @@ class SingleViewDepthSensorAsset:
             render_product_prim = get_prim_at_path(depth_sensor.get_render_product_path())
             for attribute in template_render_product_prim.GetAttributes():
                 if attribute.GetName().startswith("omni:rtx:post:depthSensor:"):
-                    render_product_prim.GetAttribute(attribute.GetName()).Set(attribute.Get())
+                    if render_product_prim.HasAttribute(attribute.GetName()):
+                        render_product_prim.GetAttribute(attribute.GetName()).Set(attribute.Get())
+                    else:
+                        carb.log_warn(
+                            f"Render product prim {render_product_prim.GetPath()} does not have attribute {attribute.GetName()}."
+                        )
 
             # Explicitly enable the depth sensor, in case the template render product is disabled
             depth_sensor.set_enabled(enabled=True)

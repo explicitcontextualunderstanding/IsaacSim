@@ -42,13 +42,18 @@ ENV_URL = "/Isaac/Environments/Grid/default_environment.usd"
 # Enable scripts
 carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
+# Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
 
 # Gaussian noise augmentation on rgba data in numpy (CPU) and warp (GPU)
 def gaussian_noise_rgb_np(data_in, sigma: float, seed: int):
     np.random.seed(seed)
+    data_in = data_in.astype(np.float32)
     data_in[:, :, 0] = data_in[:, :, 0] + np.random.randn(*data_in.shape[:-1]) * sigma
     data_in[:, :, 1] = data_in[:, :, 1] + np.random.randn(*data_in.shape[:-1]) * sigma
     data_in[:, :, 2] = data_in[:, :, 2] + np.random.randn(*data_in.shape[:-1]) * sigma
+    data_in = np.clip(data_in, 0, 255).astype(np.uint8)
     return data_in
 
 
@@ -77,7 +82,8 @@ def gaussian_noise_rgb_wp(
 # Gaussian noise augmentation on depth data in numpy (CPU) and warp (GPU)
 def gaussian_noise_depth_np(data_in, sigma: float, seed: int):
     np.random.seed(seed)
-    return data_in + np.random.randn(*data_in.shape) * sigma
+    result = data_in.astype(np.float32) + np.random.randn(*data_in.shape) * sigma
+    return np.clip(result, 0, None).astype(data_in.dtype)
 
 
 rep.AnnotatorRegistry.register_augmentation(
@@ -127,10 +133,10 @@ hsv_to_rgb_augm = rep.annotators.Augmentation.from_function(rep.augmentations_de
 gn_rgb_augm = None
 gn_depth_augm = None
 if USE_WARP:
-    gn_rgb_augm = rep.annotators.Augmentation.from_function(gaussian_noise_rgb_wp, sigma=6.0, seed=None)
+    gn_rgb_augm = rep.annotators.Augmentation.from_function(gaussian_noise_rgb_wp, sigma=15.0, seed=None)
     gn_depth_augm = rep.AnnotatorRegistry.get_augmentation("gn_depth_wp")
 else:
-    gn_rgb_augm = rep.annotators.Augmentation.from_function(gaussian_noise_rgb_np, sigma=6.0, seed=None)
+    gn_rgb_augm = rep.annotators.Augmentation.from_function(gaussian_noise_rgb_np, sigma=15.0, seed=None)
     gn_depth_augm = rep.AnnotatorRegistry.get_augmentation("gn_depth_np")
 
 # Create a writer and apply the augmentations to its corresponding annotators

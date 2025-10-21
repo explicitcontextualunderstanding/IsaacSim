@@ -52,8 +52,9 @@ class TestCameraContextMenu(OmniUiTest):
             Orbbec: 4
             Leopard Imaging: 2
             Sensing: 7
+            SICK: 1
             Stereolabs: 1
-        Total expected = 15.
+        Total expected = 16.
         """
         # Open the Stage window context menu with retry mechanism
         max_attempts = 5
@@ -89,7 +90,7 @@ class TestCameraContextMenu(OmniUiTest):
             return count
 
         n_items = count_menu_items(camera_menu_dict)
-        expected_items = 1 + 4 + 2 + 7 + 1  # equal to 15 based on extension definition.
+        expected_items = 1 + 4 + 2 + 7 + 1 + 1  # equal to 16 based on extension definition.
         self.assertEqual(
             n_items,
             expected_items,

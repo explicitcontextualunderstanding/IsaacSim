@@ -150,9 +150,9 @@ class XformPrim(Prim):
 
     def set_visibilities(
         self,
-        visibilities: list | np.ndarray | wp.array,
+        visibilities: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the visibility state (whether prims are visible or invisible during rendering) of the prims.
 
@@ -186,7 +186,7 @@ class XformPrim(Prim):
             imageable = UsdGeom.Imageable(self.prims[index])
             imageable.MakeVisible() if visibilities[0 if broadcast else i].item() else imageable.MakeInvisible()
 
-    def get_visibilities(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_visibilities(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the visibility state (whether prims are visible or invisible during rendering) of the prims.
 
         Backends: :guilabel:`usd`.
@@ -228,7 +228,7 @@ class XformPrim(Prim):
     def get_default_state(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array | None, wp.array | None]:
         """Get the default state (positions and orientations) of the prims.
 
@@ -266,7 +266,7 @@ class XformPrim(Prim):
         positions: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the default state (positions and orientations) of the prims.
 
@@ -318,8 +318,8 @@ class XformPrim(Prim):
         self,
         materials: type["VisualMaterial"] | list[type["VisualMaterial"]],
         *,
-        weaker_than_descendants: list | np.ndarray | wp.array | None = None,
-        indices: list | np.ndarray | wp.array | None = None,
+        weaker_than_descendants: bool | list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Apply visual materials to the prims, and optionally, to their descendants.
 
@@ -374,7 +374,7 @@ class XformPrim(Prim):
             )
 
     def get_applied_visual_materials(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> list[type["VisualMaterial"] | None]:
         """Get the applied visual materials.
 
@@ -414,7 +414,9 @@ class XformPrim(Prim):
             materials.append(material)
         return materials
 
-    def get_world_poses(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_world_poses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
+    ) -> tuple[wp.array, wp.array]:
         """Get the poses (positions and orientations) in the world frame of the prims.
 
         Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
@@ -508,7 +510,7 @@ class XformPrim(Prim):
         positions: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the poses (positions and orientations) in the world frame of the prims.
 
@@ -597,7 +599,9 @@ class XformPrim(Prim):
                     matrix = scaling_matrix * matrix
                 fabric_hierarchy.set_world_xform(path, matrix)
 
-    def get_local_poses(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_local_poses(
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
+    ) -> tuple[wp.array, wp.array]:
         """Get the poses (translations and orientations) in the local frame of the prims.
 
         Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
@@ -696,7 +700,7 @@ class XformPrim(Prim):
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the poses (translations and orientations) in the local frame of the prims.
 
@@ -823,7 +827,7 @@ class XformPrim(Prim):
         self,
         scales: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the local scales of the prims.
 
@@ -904,7 +908,7 @@ class XformPrim(Prim):
                 device=self._device,
             )
 
-    def get_local_scales(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_local_scales(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the local scales of the prims.
 
         Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.

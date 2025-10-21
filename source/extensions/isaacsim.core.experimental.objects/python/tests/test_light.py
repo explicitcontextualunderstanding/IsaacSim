@@ -28,14 +28,19 @@ from isaacsim.core.experimental.objects import (
     RectLight,
     SphereLight,
 )
-from isaacsim.core.experimental.prims.tests.common import check_allclose, check_array, draw_indices, draw_sample
-
-from .common import parametrize
+from isaacsim.core.experimental.prims.tests.common import (
+    check_allclose,
+    check_array,
+    cprint,
+    draw_indices,
+    draw_sample,
+    parametrize,
+)
 
 TargetLight = SphereLight
 
 
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"]) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
     # create new stage
     await stage_utils.create_new_stage_async()
     # define prims
@@ -94,30 +99,30 @@ class TestLight(omni.kit.test.AsyncTestCase):
 
     # --------------------------------------------------------------------
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_intensities(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
                 prim.set_intensities(v0, indices=indices)
                 output = prim.get_intensities(indices=indices)
                 check_array(output, shape=(expected_count, 1), dtype=wp.float32, device=device)
                 check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_exposures(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
                 prim.set_exposures(v0, indices=indices)
                 output = prim.get_exposures(indices=indices)
                 check_array(output, shape=(expected_count, 1), dtype=wp.float32, device=device)
                 check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_multipliers(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1) in zip(
                 draw_sample(shape=(expected_count, 1), dtype=wp.float32),
                 draw_sample(shape=(expected_count, 1), dtype=wp.float32),
@@ -127,41 +132,41 @@ class TestLight(omni.kit.test.AsyncTestCase):
                 check_array(output, shape=(expected_count, 1), dtype=wp.float32, device=device)
                 check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_enabled_normalizations(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.bool):
                 prim.set_enabled_normalizations(v0, indices=indices)
                 output = prim.get_enabled_normalizations(indices=indices)
                 check_array(output, shape=(expected_count, 1), dtype=wp.bool, device=device)
                 check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_enabled_color_temperatures(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.bool):
                 prim.set_enabled_color_temperatures(v0, indices=indices)
                 output = prim.get_enabled_color_temperatures(indices=indices)
                 check_array(output, shape=(expected_count, 1), dtype=wp.bool, device=device)
                 check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_color_temperatures(self, prim, num_prims, device, backend):
         prim.set_enabled_color_temperatures([True])  # enable use of color temperatures
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 1), dtype=wp.float32):
                 prim.set_color_temperatures(v0, indices=indices)
                 output = prim.get_color_temperatures(indices=indices)
                 check_array(output, shape=(expected_count, 1), dtype=wp.float32, device=device)
                 check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["usd"], prim_classes=[TargetLight], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=TargetLight, populate_stage_func=populate_stage)
     async def test_colors(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in draw_sample(shape=(expected_count, 3), dtype=wp.float32):
                 prim.set_colors(v0, indices=indices)
                 output = prim.get_colors(indices=indices)

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.1] - 2025-10-10
+### Changed
+- Update assets path to production
+
+## [1.5.0] - 2025-10-07
+### Added
+- Added `resolve_asset_path_async` utility function to resolve asset paths by checking original location and falling back to asset root
+
+## [1.4.1] - 2025-09-18
+### Fixed
+- Update is_absolute_path function to also check http:// and https://
+
 ## [1.4.0] - 2025-09-08
 ### Added
 - Add `skip_check` optional argument to allow skipping the verification check step when resolving the asset root path

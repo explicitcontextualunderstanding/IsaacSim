@@ -80,8 +80,8 @@ class Capsule(Shape):
         paths: str | list[str],
         *,
         # Capsule
-        radii: list | np.ndarray | wp.array | None = None,
-        heights: list | np.ndarray | wp.array | None = None,
+        radii: float | list | np.ndarray | wp.array | None = None,
+        heights: float | list | np.ndarray | wp.array | None = None,
         axes: Literal["X", "Y", "Z"] | list[Literal["X", "Y", "Z"]] | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
@@ -190,9 +190,9 @@ class Capsule(Shape):
 
     def set_radii(
         self,
-        radii: list | np.ndarray | wp.array,
+        radii: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the radii (capsule's two half-spheres radius) of the prims.
 
@@ -228,7 +228,7 @@ class Capsule(Shape):
     def get_radii(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the radii (capsule's two half-spheres radius) of the prims.
 
@@ -267,9 +267,9 @@ class Capsule(Shape):
 
     def set_heights(
         self,
-        heights: list | np.ndarray | wp.array,
+        heights: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the heights (capsule's spine length along the axis excluding the size of the two half spheres) of the prims.
 
@@ -305,7 +305,7 @@ class Capsule(Shape):
     def get_heights(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the heights (capsule's spine length along the axis excluding the size of the two half spheres) of the prims.
 
@@ -346,7 +346,7 @@ class Capsule(Shape):
         self,
         axes: Literal["X", "Y", "Z"] | list[Literal["X", "Y", "Z"]],
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the axes (capsule's axis along which the spine is aligned) of the prims.
 
@@ -386,7 +386,7 @@ class Capsule(Shape):
     def get_axes(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> list[Literal["X", "Y", "Z"]]:
         """Get the axes (capsule's axis along which the spine is aligned) of the prims.
 

@@ -27,7 +27,9 @@ class FrankaExampleExtension(omni.ext.IExt):
         self.example_name = "Franka"
         self.category = "Policy"
 
-        overview = "This Example shows a Franka panda open drawer policy trained in Isaac Lab"
+        overview = "This Example shows a Franka panda open drawer policy trained in Isaac Lab. "
+        overview += "The franka will attempt to open the drawer infront of it, hold it open. "
+        overview += "The scene will reset every 10s (sim time) and the franka will try again."
 
         ui_kwargs = {
             "ext_id": ext_id,

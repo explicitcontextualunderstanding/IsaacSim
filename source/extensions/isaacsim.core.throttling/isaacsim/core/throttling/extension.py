@@ -16,6 +16,7 @@
 
 import carb
 import omni.ext
+import omni.kit.app
 import omni.timeline
 
 ASYNC_TOGGLE_SETTING = "/exts/isaacsim.core.throttling/enable_async"
@@ -32,6 +33,12 @@ class Extension(omni.ext.IExt):
             self._loop_runner = omni_loop.acquire_loop_interface()
         except Exception:
             pass
+
+        # frame counting for async toggle
+        self._frame_count = 0
+        self._waiting_for_async_reenable = False
+        self._frame_update_subscription = None
+        self._frame_delay = 10  # default 10 frame delay
 
         # Enable the developer throttling settings when extension starts
         carb.settings.get_settings().set("/app/show_developer_preference_section", True)
@@ -58,11 +65,49 @@ class Extension(omni.ext.IExt):
             except Exception:
                 pass
 
+    def _on_frame_update(self, event: carb.events.IEvent):
+        """Frame update callback for async toggle frame delay."""
+        if not self._waiting_for_async_reenable:
+            return
+        self._frame_count += 1
+
+        if self._frame_count >= self._frame_delay:
+            # Check timeline did not play within the frame delay
+            timeline = omni.timeline.get_timeline_interface()
+            if not timeline.is_playing():
+                # toggle async rendering
+                _settings = carb.settings.get_settings()
+                if _settings.get(ASYNC_TOGGLE_SETTING):
+                    _settings.set("/app/asyncRendering", True)
+                    _settings.set("/app/asyncRenderingLowLatency", True)
+
+            self._waiting_for_async_reenable = False
+            self._frame_count = 0
+
+            # Unsubscribe to save on frame update callback overhead
+            if self._frame_update_subscription is not None:
+                self._frame_update_subscription = None
+
+    def _start_frame_counting(self):
+        """Start counting frames for async rendering delay."""
+        if self._waiting_for_async_reenable:
+            return
+
+        self._frame_count = 0
+        self._waiting_for_async_reenable = True
+
+        # Create subscription on-demand to save on overhead
+        self._frame_update_subscription = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+            on_event=self._on_frame_update,
+            observer_name="IsaacSimThrottling._on_frame_update",
+        )
+
     def on_stop_play(self, event: carb.events.IEvent):
         # Disable eco mode if playing sim, enable if stopped
         # Disable legacy gizmos during runtime
         # Disable manual mode on stop, enable on play
-        # Disable async rendering during runtime
+        # Disable async rendering during runtime (with frame delay)
         _settings = carb.settings.get_settings()
         if event.type == int(omni.timeline.TimelineEventType.PLAY):
             _settings.set("/rtx/ecoMode/enabled", False)
@@ -82,13 +127,17 @@ class Extension(omni.ext.IExt):
             _settings.set("/exts/omni.kit.hydra_texture/gizmos/enabled", True)
 
             if _settings.get(ASYNC_TOGGLE_SETTING):
-                _settings.set("/app/asyncRendering", True)
-                _settings.set("/app/asyncRenderingLowLatency", True)
+                # Start frame delay counting to give replicator time to finish
+                self._start_frame_counting()
 
             if _settings.get(MANUAL_TOGGLE_SETTING):
                 self._set_loop_manual_mode(False)
-        pass
 
     def on_shutdown(self):
         self.timeline_event_sub = None
-        pass
+
+        if self._frame_update_subscription is not None:
+            self._frame_update_subscription = None
+
+        self._waiting_for_async_reenable = False
+        self._frame_count = 0

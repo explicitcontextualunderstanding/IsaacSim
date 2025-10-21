@@ -464,3 +464,13 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # The remaining samples should be the most recent ones
         # (we can't easily test this without knowing exact timing,
         #  but the monotonic check verifies basic correctness)
+
+    async def test_get_simulation_time_at_time(self):
+        """Test that get_simulation_time_at_time works correctly."""
+        invalid_time = SimulationManager._simulation_manager_interface.get_simulation_time_at_time((0, 0))
+        self.assertAlmostEqual(invalid_time, 0.0)
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.play()
+        await update_stage_async()
+        invalid_time = SimulationManager._simulation_manager_interface.get_simulation_time_at_time((0, 0))
+        self.assertAlmostEqual(invalid_time, 3 * 1 / 60)  # two initial steps done during play + 1 more step

@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 
 import numpy as np
@@ -11,6 +26,7 @@ def compute_difference_metrics(
     percentiles: list[float] | tuple[float, ...] = (50, 75, 90, 95, 99),
     allclose_rtol: float = 1e-05,
     allclose_atol: float = 1e-08,
+    ignore_blank_pixels: bool = False,
 ) -> dict[str, object]:
     """Compute difference metrics between two image arrays.
 
@@ -24,6 +40,7 @@ def compute_difference_metrics(
         param percentiles: Sequence of percentiles to compute for absolute differences.
         param allclose_rtol: Relative tolerance for the allclose metric.
         param allclose_atol: Absolute tolerance for the allclose metric.
+        param ignore_blank_pixels: If True, ignore blank pixels in the comparison.
 
     Returns:
         A dictionary containing the computed metrics: ``allclose``, ``rtol``, ``atol``,
@@ -54,6 +71,8 @@ def compute_difference_metrics(
 
     # Build mask to compute stats on valid numeric entries only.
     valid_mask = np.isfinite(golden_float) & np.isfinite(test_float)
+    if ignore_blank_pixels:
+        valid_mask = valid_mask & (golden_float != 0) & (test_float != 0)
     if np.any(valid_mask):
         diff_vals = np.abs(golden_float[valid_mask] - test_float[valid_mask])
         rmse = float(np.sqrt(np.mean((golden_float[valid_mask] - test_float[valid_mask]) ** 2)))

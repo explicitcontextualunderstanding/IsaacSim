@@ -30,10 +30,13 @@ import omni.kit.commands
 import omni.kit.test
 import usdrt.Sdf
 from isaacsim.core.api import World
-from isaacsim.core.prims import SingleRigidPrim, SingleXFormPrim
+from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.api.objects.ground_plane import GroundPlane
+from isaacsim.core.api.physics_context import PhysicsContext
+from isaacsim.core.prims import RigidPrim, SingleRigidPrim, SingleXFormPrim
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.prims import add_reference_to_stage, delete_prim
-from isaacsim.sensors.physics import _sensor
+from isaacsim.sensors.physics import ContactSensor, _sensor
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
 
@@ -1002,3 +1005,97 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
     #     #            # print("sensor sim: " + str(sensor_sim))
 
     #     pass
+
+    async def test_stacked_cubes_contact_forces(self):
+        """Test contact sensor force calculations with stacked cubes in equilibrium."""
+
+        self.my_world = World(stage_units_in_meters=1.0, backend="torch")
+        physics_context = PhysicsContext()
+        GroundPlane(prim_path="/World/groundPlane", size=10, color=np.array([0.5, 0.5, 0.5]))
+        self.my_world._physics_context.set_gravity(-10)
+
+        # Create stacked cubes
+        cube = DynamicCuboid(
+            prim_path="/World/Cube",
+            mass=1.0,
+            position=np.array([-20, -0.2, 0.25]),
+            scale=np.array([0.5, 0.5, 0.5]),
+            color=np.array([0.2, 0.3, 0.0]),
+        )
+
+        cube2 = DynamicCuboid(
+            prim_path="/World/Cube2",
+            mass=1.0,
+            position=np.array([-20, -0.2, 0.75]),
+            scale=np.array([0.5, 0.5, 0.5]),
+            color=np.array([0.0, 0.2, 0.3]),
+        )
+
+        # Create contact sensors
+        bottom_sensor = ContactSensor(
+            prim_path="/World/Cube/Contact_Sensor",
+            name="BottomContactSensor",
+            frequency=60,
+            translation=np.array([0, 0, 0]),
+            min_threshold=0,
+            max_threshold=100,
+            radius=-1,
+        )
+
+        top_sensor = ContactSensor(
+            prim_path="/World/Cube2/Contact_Sensor",
+            name="TopContactSensor",
+            frequency=60,
+            translation=np.array([0, 0, 0]),
+            min_threshold=0,
+            max_threshold=100,
+            radius=-1,
+        )
+
+        # Initialize world
+        self.my_world.reset(soft=False)
+
+        # Allow settling time for cubes to come into contact
+        for _ in range(10):
+            self.my_world.step(render=False)
+
+        # Get latest contact data
+        bottom_data = bottom_sensor.get_current_frame()
+        top_data = top_sensor.get_current_frame()
+
+        # Print contact forces from sensors
+        bottom_force = bottom_data.get("force", 0)
+        top_force = top_data.get("force", 0)
+        bottom_contacts = bottom_data.get("number_of_contacts", 0)
+        top_contacts = top_data.get("number_of_contacts", 0)
+
+        print(f"Bottom cube contact force: {bottom_force:.3f} N")
+        print(f"Top cube contact force: {top_force:.3f} N")
+
+        # Validate that contacts are detected
+        self.assertTrue(bottom_data.get("in_contact", False), "Bottom cube should be in contact")
+        self.assertTrue(top_data.get("in_contact", False), "Top cube should be in contact")
+
+        # Validate contact counts
+        self.assertGreater(bottom_contacts, 1, f"Bottom cube should have multiple contacts (got {bottom_contacts})")
+        self.assertGreaterEqual(top_contacts, 1, f"Top cube should have at least 1 contact (got {top_contacts})")
+
+        # Validate equilibrium physics: contact forces should be approximately m*g for each cube
+        cube_mass = 1.0  # kg
+        gravity = 10.0  # m/s^2 (magnitude)
+        expected_force = cube_mass * gravity  # 10.0 N
+        tolerance = 0.05
+
+        # Each cube should have contact force approximately equal to its weight
+        self.assertAlmostEqual(
+            bottom_force,
+            expected_force,
+            delta=expected_force * tolerance,
+            msg=f"Bottom cube force {bottom_force:.3f} should be approximately {expected_force:.3f} N (m*g)",
+        )
+        self.assertAlmostEqual(
+            top_force,
+            expected_force,
+            delta=expected_force * tolerance,
+            msg=f"Top cube force {top_force:.3f} should be approximately {expected_force:.3f} N (m*g)",
+        )

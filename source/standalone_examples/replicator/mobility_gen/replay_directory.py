@@ -45,22 +45,57 @@ else:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default=None)
-    parser.add_argument("--output", type=str, default=None)
-    parser.add_argument("--rgb_enabled", type=bool, default=True)
-    parser.add_argument("--segmentation_enabled", type=bool, default=True)
-    parser.add_argument("--depth_enabled", type=bool, default=True)
-    parser.add_argument("--instance_id_segmentation_enabled", type=bool, default=False)
-    parser.add_argument("--normals_enabled", type=bool, default=False)
-    parser.add_argument("--render_rt_subframes", type=int, default=1)
-    parser.add_argument("--render_interval", type=int, default=1)
+
+    parser.add_argument(
+        "--input", type=str, default=os.path.join(DATA_DIR, "recordings"), help="The path to the input recordings."
+    )
+
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=os.path.join(DATA_DIR, "replays"),
+        help="The path to output the recordings with rendered sensor data",
+    )
+
+    parser.add_argument("--rgb_enabled", type=bool, default=True, help="Set true to enable RGB image rendering.")
+
+    parser.add_argument(
+        "--segmentation_enabled",
+        type=bool,
+        default=True,
+        help="Set true to enable semantic segmentation image rendering.",
+    )
+
+    parser.add_argument("--depth_enabled", type=bool, default=True, help="Set true to enable depth image rendering.")
+
+    parser.add_argument(
+        "--instance_id_segmentation_enabled",
+        type=bool,
+        default=False,
+        help="Set true to enable instance segmentation image rendering.",
+    )
+
+    parser.add_argument(
+        "--normals_enabled", type=bool, default=False, help="Set true to enable surface normal image rendering."
+    )
+
+    parser.add_argument(
+        "--render_rt_subframes",
+        type=int,
+        default=1,
+        help="The number of subframes for RT rendering.  Increase this number to improve rendering quality at the cost of speed.",
+    )
+
+    parser.add_argument(
+        "--render_interval",
+        type=int,
+        default=1,
+        help="The number of physics steps per rendering.  For example, setting this value to 2 will render only once "
+        "every 2 physics timesteps.  This may speed up the replay rendering and result in smaller datasets, but with "
+        "some timesteps missing images.",
+    )
+
     args, unknown = parser.parse_known_args()
-
-    if args.input is None:
-        args.input = os.path.join(DATA_DIR, "recordings")
-
-    if args.output is None:
-        args.output = os.path.join(DATA_DIR, "replays")
 
     args.input = os.path.expanduser(args.input)
     args.output = os.path.expanduser(args.output)

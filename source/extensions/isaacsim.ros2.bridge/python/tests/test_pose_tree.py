@@ -59,8 +59,8 @@ class TestRos2PoseTree(ROS2TestCase):
         def tf_callback(data: TFMessage):
             self._tf_data = data
 
-        node = rclpy.create_node("tf_tester")
-        tf_sub = node.create_subscription(TFMessage, "/tf_test", tf_callback, get_qos_profile())
+        node = self.create_node("tf_tester")
+        tf_sub = self.create_subscription(node, TFMessage, "/tf_test", tf_callback, get_qos_profile())
 
         try:
             og.Controller.edit(
@@ -134,6 +134,7 @@ class TestRos2PoseTree(ROS2TestCase):
 
         self._timeline.stop()
         spin()
+
         pass
 
     async def test_duplicate_names_tree(self):
@@ -160,8 +161,8 @@ class TestRos2PoseTree(ROS2TestCase):
         def tf_callback(data: TFMessage):
             self._tf_data = data
 
-        node = rclpy.create_node("tf_tester")
-        tf_sub = node.create_subscription(TFMessage, "/tf_test", tf_callback, 10)
+        node = self.create_node("tf_tester")
+        tf_sub = self.create_subscription(node, TFMessage, "/tf_test", tf_callback, 10)
 
         try:
             og.Controller.edit(
@@ -230,6 +231,7 @@ class TestRos2PoseTree(ROS2TestCase):
 
         self._timeline.stop()
         spin()
+
         pass
 
     async def test_frame_name_override(self):
@@ -267,8 +269,8 @@ class TestRos2PoseTree(ROS2TestCase):
         def tf_callback(data: TFMessage):
             self._tf_data = data
 
-        node = rclpy.create_node("tf_tester")
-        self._tf_sub = node.create_subscription(TFMessage, "/tf_test", tf_callback, 10)
+        node = self.create_node("tf_tester")
+        self._tf_sub = self.create_subscription(node, TFMessage, "/tf_test", tf_callback, 10)
 
         try:
             og.Controller.edit(

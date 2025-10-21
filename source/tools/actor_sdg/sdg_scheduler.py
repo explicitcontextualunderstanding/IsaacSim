@@ -126,11 +126,10 @@ class ActorSDG:
 
         rep.settings.carb_settings("/omni/replicator/backend/writeThreads", 16)
         self._settings = carb.settings.get_settings()
-        self._settings.set("/rtx/rtxsensor/coordinateFrameQuaternion", "0.5,-0.5,-0.5,-0.5")
         self._settings.set("/app/scripting/ignoreWarningDialog", True)
         self._settings.set("/persistent/exts/omni.anim.navigation.core/navMesh/viewNavMesh", False)
         self._settings.set("/exts/omni.anim.people/navigation_settings/navmesh_enabled", True)
-        self._settings.set("/persistent/exts/isaacsim.replicator.agent/aim_camera_to_character", True)
+        self._settings.set("/persistent/exts/isaacsim.replicator.agent/aim_cameras_at_characters", True)
         self._settings.set("/persistent/exts/isaacsim.replicator.agent/min_camera_distance", 6.5)
         self._settings.set("/persistent/exts/isaacsim.replicator.agent/max_camera_distance", 14.5)
         self._settings.set("/persistent/exts/isaacsim.replicator.agent/max_camera_look_down_angle", 60)

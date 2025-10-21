@@ -69,6 +69,7 @@ class CreateSetupExtension(omni.ext.IExt):
         self.__setup_window_task = asyncio.ensure_future(self.__dock_windows())
         self.__setup_property_window = asyncio.ensure_future(self.__property_window())
         asyncio.ensure_future(self.__enable_ros_bridge())
+        asyncio.ensure_future(self.__enable_ros_sim_control())
         self.__menu_update()
         self.__add_app_icon(ext_id)
         self.create_new_stage = self._settings.get("/isaac/startup/create_new_stage")
@@ -258,3 +259,14 @@ StartupWMClass=IsaacSim"""
                 await omni.kit.app.get_app().next_update_async()
         except Exception as e:
             carb.log_warn(f"isaacsim.app.setup shutdown before ros bridge enabled")
+
+    async def __enable_ros_sim_control(self):
+        """Enable the simulation control extension if specified in settings."""
+        try:
+            ros_sim_control_enabled = self._settings.get("isaac/startup/ros_sim_control_extension")
+            if ros_sim_control_enabled:
+                await omni.kit.app.get_app().next_update_async()
+                self._ext_manager.set_extension_enabled_immediate("isaacsim.ros2.sim_control", True)
+                await omni.kit.app.get_app().next_update_async()
+        except Exception as e:
+            carb.log_warn(f"isaacsim.app.setup shutdown before sim control enabled")

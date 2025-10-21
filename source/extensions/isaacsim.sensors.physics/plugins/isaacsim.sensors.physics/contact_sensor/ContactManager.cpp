@@ -142,6 +142,13 @@ void ContactManager::onPhysicsStep(const float& currentTime, const float& timeEl
     m_currentTime = currentTime;
     m_currentDt = timeElapsed;
 
+    // Clear previous contact data at start of physics step
+    m_contactRaw.clear();
+    for (auto& it : m_contactRawMap)
+    {
+        it.second.clear();
+    }
+
     const omni::physx::ContactEventHeader* contactEventHeadersBuffer = nullptr;
     const omni::physx::ContactData* contactDataBuffer = nullptr;
     const ::omni::physx::FrictionAnchor* frictionAnchorData = nullptr;

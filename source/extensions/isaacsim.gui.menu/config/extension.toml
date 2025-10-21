@@ -1,5 +1,5 @@
 [package]
-version = "2.4.3"
+version = "2.4.4"
 category = "Simulation"
 title = "Isaac Sim Menus"
 description = "Menus specific to Isaac Sim"
@@ -32,7 +32,7 @@ dependencies = [
     "isaacsim.sensors.camera.ui",
     "isaacsim.sensors.physics.ui",
     "isaacsim.sensors.physx.ui",
-    "omni.kit.test_helpers_gfx",
+    "isaacsim.test.utils",
 ]
 args = [
     "--enable",

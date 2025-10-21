@@ -179,7 +179,7 @@ async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"
                 collision_tetmesh_path=f"/World/A_{i}/collision_mesh",
                 cooking_src_mesh_path=f"/World/A_{i}/mesh",
                 simulation_hex_mesh_enabled=True,
-                cooking_src_simplification_enabled=True,
+                cooking_src_simplification_enabled=kwargs.get("mesh_simplification", True),
             ):
                 raise ValueError(f"Failed to create auto-volume deformable hierarchy for {f'/World/A_{i}'}")
 
@@ -192,9 +192,11 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
         if sys.platform == "win32":
             self._nnpb = (1350, 1717, 1350)
             self._nepb = (6096, 5395, 6096)
+            self._nepb_nms = (5280, -1, 5280)
         else:
             self._nnpb = (1348, 1717, 1348)
             self._nepb = (6120, 5432, 6120)
+            self._nepb_nms = (5280, -1, 5280)
 
     async def tearDown(self):
         """Method called immediately after the test method has been called"""
@@ -744,6 +746,82 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
             number_of_materials == count
         ), f"{count} materials should have been applied. Applied: {number_of_materials}"
 
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],
+        operations=["wrap"],
+        prim_class=DeformablePrim,
+        prim_class_kwargs={},
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "volume"},
+    )
+    async def test_volume_element_rotations(self, prim, num_prims, device, backend):
+        # check backend
+        self.check_backend(backend, prim)
+        # test cases
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                output = prim.get_nodal_rotations(indices=indices)
+            check_array(output, shape=(expected_count, 1, 4), dtype=wp.float32, device=device)
+            identity_quaternions = np.tile([0.0, 0.0, 0.0, 1.0], (expected_count, 1, 1))
+            check_allclose(identity_quaternions.astype(np.float32), output)
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],
+        operations=["wrap"],
+        instances=["one"],
+        prim_class=DeformablePrim,
+        prim_class_kwargs={},
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "volume"},
+    )
+    async def test_volume_element_gradients(self, prim, num_prims, device, backend):
+        # check backend
+        self.check_backend(backend, prim)
+        # test cases
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            # - get nodal gradients
+            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                output = prim.get_nodal_gradients(indices=indices)
+            check_array(output, shape=(expected_count, 1), dtype=wp.mat33, device=device)
+            expected_output = np.tile(np.identity(3), (expected_count, 1, 1)).reshape(expected_count, 1, 3, 3)
+            check_allclose(expected_output, output)
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],
+        operations=["wrap"],
+        instances=["one"],
+        prim_class=DeformablePrim,
+        prim_class_kwargs={},
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "volume"},
+    )
+    async def test_volume_element_stresses(self, prim, num_prims, device, backend):
+        from isaacsim.core.experimental.materials import VolumeDeformableMaterial
+
+        choices = [
+            VolumeDeformableMaterial("/physics_materials/volume_0", poissons_ratios=[0.1], youngs_moduli=[1000000.0]),
+            VolumeDeformableMaterial("/physics_materials/volume_1", poissons_ratios=[0.6], youngs_moduli=[2000000.0]),
+        ]
+        # check backend
+        self.check_backend(backend, prim)
+        # test cases
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            # - apply physics materials
+            for v0, expected_v0 in draw_choice(shape=(expected_count,), choices=choices):
+                with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                    prim.apply_physics_materials(v0, indices=indices)
+            # - get nodal stresses
+            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                output = prim.get_nodal_stresses(indices=indices)
+            check_array(output, shape=(expected_count, 1), dtype=wp.mat33, device=device)
+            check_allclose(np.zeros((expected_count, 1, 3, 3)), output)
+
     # --------------------------------------------------------------------
     # auto-volume
     # --------------------------------------------------------------------
@@ -935,3 +1013,76 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
         assert (
             number_of_materials == count
         ), f"{count} materials should have been applied. Applied: {number_of_materials}"
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],
+        operations=["wrap"],
+        prim_class=DeformablePrim,
+        prim_class_kwargs={},
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "auto-volume", "mesh_simplification": False},
+    )
+    async def test_auto_volume_element_rotations(self, prim, num_prims, device, backend):
+        # check backend
+        self.check_backend(backend, prim)
+        # test cases
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                output = prim.get_nodal_rotations(indices=indices)
+            check_array(output, shape=(expected_count, self._nepb_nms[0], 4), dtype=wp.float32, device=device)
+            identity_quaternions = np.tile([0.0, 0.0, 0.0, 1.0], (expected_count, self._nepb_nms[0], 1))
+            check_allclose(identity_quaternions.astype(np.float32), output)
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],
+        operations=["wrap"],
+        prim_class=DeformablePrim,
+        prim_class_kwargs={},
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "auto-volume", "mesh_simplification": False},
+    )
+    async def test_auto_volume_element_gradients(self, prim, num_prims, device, backend):
+        # check backend
+        self.check_backend(backend, prim)
+        # test cases
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                output = prim.get_nodal_gradients(indices=indices)
+            check_array(output, shape=(expected_count, self._nepb_nms[0]), dtype=wp.mat33, device=device)
+            identity_matrices = np.tile(np.identity(3), (expected_count, self._nepb_nms[0], 1, 1))
+            check_allclose(identity_matrices.astype(np.float32), output)
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],
+        operations=["wrap"],
+        prim_class=DeformablePrim,
+        prim_class_kwargs={},
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "auto-volume", "mesh_simplification": False},
+    )
+    async def test_auto_volume_element_stresses(self, prim, num_prims, device, backend):
+        from isaacsim.core.experimental.materials import VolumeDeformableMaterial
+
+        choices = [
+            VolumeDeformableMaterial("/physics_materials/volume_0", poissons_ratios=[0.1], youngs_moduli=[1000000.0]),
+            VolumeDeformableMaterial("/physics_materials/volume_1", poissons_ratios=[0.6], youngs_moduli=[2000000.0]),
+        ]
+        # check backend
+        self.check_backend(backend, prim)
+        # test cases
+        for indices, expected_count in draw_indices(count=num_prims, step=2):
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            # - apply physics materials
+            for v0, expected_v0 in draw_choice(shape=(expected_count,), choices=choices):
+                with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                    prim.apply_physics_materials(v0, indices=indices)
+            # - get nodal stresses
+            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+                output = prim.get_nodal_stresses(indices=indices)
+            check_array(output, shape=(expected_count, self._nepb_nms[0]), dtype=wp.mat33, device=device)
+            check_allclose(np.zeros((expected_count, self._nepb_nms[0], 3, 3)), output, atol=20)

@@ -1,4 +1,33 @@
 # Changelog
+## [1.3.6] - 2025-10-08
+### Changed
+- Added physics to custom fps example snippet, changed to dome light
+
+## [1.3.5] - 2025-10-07
+### Changed
+- Updated subscribers and events example snippet to use a custom number of app updates for capturing events
+
+## [1.3.4] - 2025-10-06
+### Changed
+- Set DLSS (`rtx/post/dlss/execMode`) to Quality mode (2) in the replicator tests
+- Added `rt_subframes` to the custom fps example
+
+## [1.3.3] - 2025-10-06
+### Fixed
+- Fixed data augmentation conversion issues
+
+## [1.3.2] - 2025-09-24
+### Changed
+- Kept only arxiv paper link in sphere point distribution comments in `test_sdg_randomizer_snippets.py`
+
+## [1.3.1] - 2025-09-23
+### Changed
+- Updated cosmos writer test example to generate multiple video clips
+
+## [1.3.0] - 2025-09-18
+### Changed
+- Added cosmos writer tests
+
 ## [1.2.2] - 2025-09-15
 ### Changed
 - switched to isaacsim.test.utils for folder contents validation and goldenimage comparison in tests

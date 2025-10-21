@@ -45,3 +45,5 @@ stage.SetDefaultPrim(root)
 
 # Export the stage
 stage.Export("example_camera_with_depth_sensor.usd")
+
+simulation_app.close()

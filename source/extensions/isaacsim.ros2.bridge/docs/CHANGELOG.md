@@ -1,13 +1,25 @@
 # Changelog
 
+## [4.12.4] - 2025-10-04
+### Fixed
+- Nitros bridge tasking
+
+## [4.12.3] - 2025-09-22
+### Fixed
+- CameraInfo message always sets fy == fx, as renderer assumes square pixels.
+
+## [4.12.2] - 2025-09-20
+### Fixed
+- Properly cleanup subscriber, publisher and node resources at the end of each test
+
 ## [4.12.1] - 2025-09-08
 ### Changed
-- Use base test class from isaacsim.test.utils 
+- Use base test class from isaacsim.test.utils
 - Reduce test time by using fast asset root path function
 
 ## [4.12.0] - 2025-09-05
 ### Changed
-- Update internal ROS 2 Humble and Jazzy libs to include common_interfaces, tf2_ros, sensor_msgs_py, Simulation Interfaces v1.1.0. 
+- Update internal ROS 2 Humble and Jazzy libs to include common_interfaces, tf2_ros, sensor_msgs_py, Simulation Interfaces v1.1.0.
 
 ## [4.11.2] - 2025-08-29
 ### Changed
@@ -18,7 +30,7 @@
 - Improvements to test stability and cleanup test code
 
 ## [4.11.0] - 2025-08-19
-## Changed
+### Changed
 - Set default ROS bridge lib setting to system_default and cleanup ROS Bridge loading
 
 ## [4.10.1] - 2025-08-14
@@ -55,21 +67,22 @@
 - Fix bugs with registering and deregistering examples in the browser
 
 ## [4.9.3] - 2025-07-29
-## Changed
+### Changed
 - CycloneDDS is now supported for Jazzy
 
 ## [4.9.2] - 2025-07-26
-## Changed
+### Changed
 - Update test settings and exclude error messages from test logs
 
 ## [4.9.1] - 2025-07-26
-## Changed
+### Changed
 - PublishPointCloudBuffer writer uses IsaacCreateRTXLidarScanBuffer annotator.
 
 ## [4.9.0] - 2025-07-25
-## Changed
+### Changed
 - NITROS bridge image publishing is disabled by default
-## Added
+
+### Added
 - Added carb setting enable_nitros_bridge to enable NITROS image publishing
 
 ## [4.8.17] - 2025-07-16

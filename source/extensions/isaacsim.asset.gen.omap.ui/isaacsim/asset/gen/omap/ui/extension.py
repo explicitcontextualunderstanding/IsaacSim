@@ -436,10 +436,10 @@ class OccupancyMapWindow(MenuHelperWindow):
         rotate_image_angle = 180
         current_image_rotation_index = self._models["rotation"].get_item_value_model().as_int
         if current_image_rotation_index == 0:  # 180 degrees
-            top_left, top_right, bottom_left, bottom_right, image_coords = compute_coordinates(self._om, scale)
+            bottom_right, bottom_left, top_right, top_left, image_coords = compute_coordinates(self._om, scale)
             rotate_image_angle = 180
         elif current_image_rotation_index == 1:  # 0 degrees
-            top_right, bottom_right, top_left, bottom_left, image_coords = compute_coordinates(self._om, scale)
+            top_left, top_right, bottom_left, bottom_right, image_coords = compute_coordinates(self._om, scale)
             rotate_image_angle = 0
         elif current_image_rotation_index == 2:  # -90 degrees
             top_right, bottom_right, top_left, bottom_left, image_coords = compute_coordinates(self._om, scale)

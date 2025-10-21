@@ -33,7 +33,7 @@ Main features (compared to the current Core API)
   Functions, properties and methods that operate on numeric data containers:
 
   * always return data as Warp array, and
-  * have native support for input data presented as Python lists or NumPy arrays.
+  * have native support for input data presented as Python basic types (e.g.: int, float), lists, or NumPy arrays.
 
   |br| E.g.: for a ``RigidPrim`` instance wrapping 2 rigid bodies,
   calling the :meth:`~isaacsim.core.experimental.prims.RigidPrim.set_masses`
@@ -45,6 +45,7 @@ Main features (compared to the current Core API)
       >>> rb.set_masses(wp.array([5.0, 5.0]))  # expected data (Warp array)
       >>> rb.set_masses(np.array([5.0, 5.0]))  # <-- this is fine (NumPy array)
       >>> rb.set_masses([5.0, 5.0])            # <-- this is fine (Python list)
+      >>> rb.set_masses(5.0)                   # <-- this is fine (Python basic type)
       >>>
       >>> output = rb.get_masses()             # 'output' is a Warp array
 
@@ -80,6 +81,7 @@ Main features (compared to the current Core API)
         >>> rb.set_masses(wp.array([[5.0], [5.0]], dtype=wp.float32))  # expected dtype
         >>> rb.set_masses(wp.array([[5], [5]], dtype=wp.uint8))        # <-- this is fine
         >>> rb.set_masses(wp.array([[5], [5]]))  # <-- this is fine (int64, implicit)
+        >>> rb.set_masses(5)                     # <-- this is fine (int, implicit)
 
   * Broadcasting (following `NumPy's broadcasting rules <https://numpy.org/doc/stable/user/basics.broadcasting.html>`_)
 
@@ -88,6 +90,7 @@ Main features (compared to the current Core API)
         >>> rb.set_masses(wp.array([[5.0], [5.0]]))  # expected shape
         >>> rb.set_masses(wp.array([5.0, 5.0]))      # <-- this is fine
         >>> rb.set_masses(wp.array([5.0]))  # <-- this is fine (same value for all prims)
+        >>> rb.set_masses(5.0)              # <-- this is fine (same value for all prims)
 
 * **Backend selection** with fallback mechanism.
 

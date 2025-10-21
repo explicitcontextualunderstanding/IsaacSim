@@ -1278,7 +1278,8 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
         # Run simulation
         frame_ids = set()
         child_frame_ids = set()
-        for _ in range(10):
+        MAX_ITERATIONS = 20
+        for i in range(MAX_ITERATIONS):
             await simulate_async(0.5, callback=spin_ros)
 
             # Check if we have received both types of messages
@@ -1288,6 +1289,8 @@ class TestMenuROS2OdometryGraph(ROS2MenuTestBase):
 
                 if "base_link" in frame_ids or "base_link" in child_frame_ids:
                     break
+            if i == MAX_ITERATIONS - 1:
+                self.fail("No base_link frame found")
 
         # Validate TF data
         self.assertIsNotNone(self.tf_data, "No TF messages received")

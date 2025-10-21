@@ -238,6 +238,9 @@ class NavSDGDemo:
         carb.settings.get_settings().set("/omni/replicator/asyncRendering", False)
         carb.settings.get_settings().set("/app/asyncRendering", False)
 
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
         # Set camera sensors fStop to 0.0 to get well lit sharp images
         left_camera_prim = self._stage.GetPrimAtPath(self.LEFT_CAMERA_PATH)
         left_camera_prim.GetAttribute("fStop").Set(0.0)

@@ -1,4 +1,8 @@
 # Changelog
+## [2.2.17] - 2025-09-26
+### Changed
+- Restored capture on play flag to its original value after recording
+
 ## [2.2.16] - 2025-09-15
 ### Changed
 - enabled tests blocked by ISIM-2602

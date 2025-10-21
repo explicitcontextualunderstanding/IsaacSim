@@ -25,16 +25,16 @@ from isaacsim.core.experimental.prims.tests.common import (
     check_allclose,
     check_array,
     check_lists,
+    cprint,
     draw_choice,
     draw_indices,
     draw_sample,
+    parametrize,
 )
 from pxr import UsdGeom
 
-from .common import parametrize
 
-
-async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"]) -> None:
+async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
     # create new stage
     await stage_utils.create_new_stage_async()
     # define prims
@@ -178,11 +178,11 @@ class TestMesh(omni.kit.test.AsyncTestCase):
 
     # --------------------------------------------------------------------
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_len(self, prim, num_prims, device, backend):
         self.assertEqual(len(prim), num_prims, f"Invalid len ({num_prims} prims)")
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_properties_and_getters(self, prim, num_prims, device, backend):
         # test cases (properties)
         # - geoms
@@ -197,10 +197,10 @@ class TestMesh(omni.kit.test.AsyncTestCase):
         for geom, num_faces in zip(prim.geoms, prim.num_faces):
             self.assertEqual(geom.GetFaceCount(), num_faces, f"Invalid num_faces: {geom.GetFaceCount()}")
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_points(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in self.custom_sample(
                 num_prims=expected_count, batch_range=(5, 10), data_shape=(3,), dtype=wp.float32
             ):
@@ -210,10 +210,10 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                     check_array(output[i], shape=(expected_v0[i].shape[0], 3), dtype=wp.float32, device=device)
                     check_allclose(expected_v0[i], output[i], given=(v0[i],))
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_normals(self, prim, num_prims, device, backend):
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for v0, expected_v0 in self.custom_sample(
                 num_prims=expected_count, batch_range=(5, 10), data_shape=(3,), dtype=wp.float32
             ):
@@ -223,14 +223,14 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                     check_array(output[i], shape=(expected_v0[i].shape[0], 3), dtype=wp.float32, device=device)
                     check_allclose(expected_v0[i], output[i], given=(v0[i],))
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_face_specs(self, prim, num_prims, device, backend):
         num_points = prim.get_points()[0].shape[0]
         if not num_points:  # empty mesh
             num_points = 50
         varying_linear_interp_choices = ["none", "cornersOnly", "cornersPlus1", "cornersPlus2", "boundaries", "all"]
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for ((v0, expected_v0), (v1, expected_v1), (v2, expected_v2)), (vv, expected_vv) in zip(
                 self.custom_face_test_set(num_prims=expected_count, num_points=num_points),
                 draw_choice(shape=(expected_count,), choices=varying_linear_interp_choices),
@@ -248,13 +248,13 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                         given=(v0[i], v1[i], v2[i]),
                     )
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_crease_specs(self, prim, num_prims, device, backend):
         num_points = prim.get_points()[0].shape[0]
         if not num_points:  # empty mesh
             num_points = 50
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1), (v2, expected_v2) in self.custom_crease_test_set(
                 num_prims=expected_count, num_points=num_points
             ):
@@ -270,13 +270,13 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                         given=(v0[i], v1[i], v2[i]),
                     )
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_corner_specs(self, prim, num_prims, device, backend):
         num_points = prim.get_points()[0].shape[0]
         if not num_points:  # empty mesh
             num_points = 50
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1) in self.custom_corner_test_set(
                 num_prims=expected_count, num_points=num_points
             ):
@@ -287,13 +287,13 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                     check_array(output[1][i], shape=(expected_v0[i].shape[0],), dtype=wp.float32, device=device)
                     check_allclose((expected_v0[i], expected_v1[i]), (output[0][i], output[1][i]), given=(v0[i], v1[i]))
 
-    @parametrize(backends=["usd"], prim_classes=[Mesh], populate_stage_func=populate_stage)
+    @parametrize(backends=["usd"], prim_class=Mesh, populate_stage_func=populate_stage)
     async def test_subdivision_specs(self, prim, num_prims, device, backend):
         subdivision_scheme_choices = ["catmullClark", "loop", "bilinear", "none"]
         interpolate_boundary_choices = ["none", "edgeOnly", "edgeAndCorner"]
         triangle_subdivision_rule_choices = ["catmullClark", "smooth"]
         for indices, expected_count in draw_indices(count=num_prims, step=2):
-            print(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
+            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
             for (v0, expected_v0), (v1, expected_v1), (v2, expected_v2) in zip(
                 draw_choice(shape=(expected_count,), choices=subdivision_scheme_choices),
                 draw_choice(shape=(expected_count,), choices=interpolate_boundary_choices),

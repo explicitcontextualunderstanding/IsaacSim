@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.8.0] - 2025-09-23
+### Added
+- Expose PhysX scene attribute to reorder the articulation contact constraints to be solved last
+
 ## [4.7.1] - 2025-08-28
 ### Changed
 - Fixes and more logging for xform tests
@@ -466,7 +470,7 @@
 ### Fixed
 - Unit tests
 
-## [3.3.0] - 2023-12-1
+## [3.3.0] - 2023-12-01
 ### Changed
 - Add more articulation metadata for OM-116002
 - Fix contact reporter API schema preparation for OM-116001

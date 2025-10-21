@@ -30,11 +30,15 @@ from isaacsim.storage.native import (
     get_assets_root_path_async,
     is_local_path,
     is_valid_usd_file,
+    resolve_asset_path_async,
 )
 from pxr import Sdf
 from usdrt import Usd
 
 from .entity_utils import create_empty_entity_state, get_entity_state, get_filtered_entities
+
+# Service prefix constant
+SERVICE_PREFIX = ""  # Prefix for all ROS2 services (empty by default)
 
 # ROS2 Interface Configuration
 # Format: (module_name, class_name, endpoint_name)
@@ -95,11 +99,13 @@ class ROS2ServiceManager:
         self.node_name = "isaac_sim_control"
         self.node = None
         self.services = {}
-        self.action_servers = {}  # New dictionary to store action servers
+        self.action_servers = {}
         self.is_initialized = False
-        self.running = False
-        self.spin_thread = None
+        self.executor = None
+        self.executor_thread = None
         self.loop = None
+        # Single callback group for parallel execution of both services and actions
+        self.callback_group = None
 
     def initialize(self):
         """Initialize the ROS2 node for simulation control services.
@@ -117,6 +123,8 @@ class ROS2ServiceManager:
 
         try:
             import rclpy
+            from rclpy.callback_groups import ReentrantCallbackGroup
+            from rclpy.executors import MultiThreadedExecutor
             from rclpy.node import Node
 
             # Initialize ROS2 if it's not already initialized
@@ -126,22 +134,27 @@ class ROS2ServiceManager:
                 # ROS2 is already initialized
                 pass
 
-            # Create a ROS2 node
             self.node = rclpy.create_node(self.node_name)
+
+            self.callback_group = ReentrantCallbackGroup()
+
+            self.executor = MultiThreadedExecutor()
+            self.executor.add_node(self.node)
+
             self.is_initialized = True
 
-            # Create event loop in main thread
             self.loop = asyncio.get_event_loop()
-            # Allow nested event loops
+
             nest_asyncio.apply(self.loop)
 
-            # Start a separate thread for ROS2 spinning
-            self.running = True
-            self.spin_thread = threading.Thread(target=self._spin)
-            self.spin_thread.daemon = True
-            self.spin_thread.start()
+            # Start a separate thread for ROS2 spinning with the multithreaded executor
+            self.executor_thread = threading.Thread(target=self._spin)
+            self.executor_thread.daemon = True
+            self.executor_thread.start()
 
-            carb.log_info(f"ROS2 ServiceManager initialized with node '{self.node_name}'")
+            carb.log_info(
+                f"ROS2 ServiceManager initialized with node '{self.node_name}' using single callback group for parallel execution"
+            )
 
         except ImportError as e:
             carb.log_error(f"Failed to import ROS2 Python libraries: {e}")
@@ -161,28 +174,30 @@ class ROS2ServiceManager:
 
         import rclpy
 
-        self.running = False
+        if self.executor:
+            self.executor.shutdown()
 
-        # Wait for the spin thread to finish
-        if self.spin_thread and self.spin_thread.is_alive():
-            self.spin_thread.join(timeout=1.0)
+        # Wait for the executor thread to finish
+        if self.executor_thread and self.executor_thread.is_alive():
+            self.executor_thread.join(timeout=1.0)
 
-        # Destroy all services
-        for service_name, service in self.services.items():
-            self.node.destroy_service(service)
+        # Unregister all services using the proper unregister methods
+        for service_name in self.services:
+            self.unregister_service(service_name, remove_from_dict=False)
         self.services.clear()
 
-        # Destroy all action servers
-        for action_name, action_server in self.action_servers.items():
-            action_server.destroy()
+        # Unregister all action servers using the proper unregister methods
+        for action_name in self.action_servers:
+            self.unregister_action_server(action_name, remove_from_dict=False)
         self.action_servers.clear()
 
-        # Destroy the node
         if self.node:
             self.node.destroy_node()
             self.node = None
 
-        # Try to shut down ROS2
+        self.callback_group = None
+        self.executor = None
+
         try:
             rclpy.shutdown()
         except Exception:
@@ -211,36 +226,58 @@ class ROS2ServiceManager:
             return False
 
         try:
-            # Wrap async callback to work with ROS2 sync service
-            def sync_wrapper(request, response):
-                if not self.loop:
-                    self.loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self.loop)
-                future = asyncio.run_coroutine_threadsafe(callback(request, response), self.loop)
-                return future.result()
-
-            service = self.node.create_service(service_type, service_name, sync_wrapper)
+            # Create service with callback group for parallel execution
+            service = self.node.create_service(
+                service_type, service_name, self._wrap_async_callback(callback), callback_group=self.callback_group
+            )
             self.services[service_name] = service
-            carb.log_info(f"Registered ROS2 service: {service_name}")
+            carb.log_info(f"Registered ROS2 service: {service_name} with parallel callback execution")
             return True
         except Exception as e:
             carb.log_error(f"Failed to register service '{service_name}': {e}")
             return False
 
-    def unregister_service(self, service_name):
-        """Unregister a ROS2 service
+    def unregister_service(self, service_name, remove_from_dict=True):
+        """Unregister a ROS2 service.
+
+        Cleanly destroys a ROS2 service and optionally removes it from the internal
+        services registry. This method provides proper error handling and logging
+        for service cleanup operations.
 
         Args:
-            service_name (str): Name of the service to unregister
+            service_name (str): Name of the service to unregister.
+            remove_from_dict (bool): Whether to remove the service from the internal services
+                dictionary. Set to False when iterating over services during bulk
+                cleanup operations like shutdown to avoid modifying dictionary during
+                iteration. Defaults to True for individual service cleanup.
 
         Returns:
-            bool: True if unregistration was successful, False otherwise
+            bool: True if unregistration was successful, False otherwise.
+            Returns False if the service manager is not initialized or the service
+            does not exist.
+
+        Example:
+
+        .. code-block:: python
+
+            # Individual service cleanup (normal usage)
+            >>> success = service_manager.unregister_service("my_service")
+            >>> success
+            True
+
+            # Bulk cleanup during iteration (shutdown scenario)
+            >>> for name in service_manager.services:
+            ...     service_manager.unregister_service(name, remove_from_dict=False)
+            >>> service_manager.services.clear()
         """
         if not self.is_initialized or service_name not in self.services:
             return False
 
         try:
-            service = self.services.pop(service_name)
+            if remove_from_dict:
+                service = self.services.pop(service_name)
+            else:
+                service = self.services[service_name]
             self.node.destroy_service(service)
             carb.log_info(f"Unregistered ROS2 service: {service_name}")
             return True
@@ -275,57 +312,85 @@ class ROS2ServiceManager:
             import rclpy
             from rclpy.action import ActionServer
 
-            # Create the action server
+            # Create the action server with callback group for parallel execution
             action_server = ActionServer(
                 node=self.node,
                 action_type=action_type,
                 action_name=action_name,
-                execute_callback=self._wrap_execute_callback(execute_callback),
+                execute_callback=self._wrap_async_callback(execute_callback),
                 goal_callback=goal_callback,
                 cancel_callback=cancel_callback,
+                callback_group=self.callback_group,
             )
 
             self.action_servers[action_name] = action_server
-            carb.log_info(f"Registered ROS2 action server: {action_name}")
+            carb.log_info(f"Registered ROS2 action server: {action_name} with parallel callback execution")
             return True
 
         except Exception as e:
             carb.log_error(f"Failed to register action server '{action_name}': {e}")
             return False
 
-    def _wrap_execute_callback(self, execute_callback):
-        """Wrap async execute callback to work with ROS2 action server
+    def _wrap_async_callback(self, async_callback):
+        """Wrap any async callback to work with ROS2 services and actions
 
         Args:
-            execute_callback: Async callback function
+            async_callback: Async callback function
 
         Returns:
             function: Wrapped callback that handles the event loop
         """
 
-        def wrapped_execute(goal_handle):
+        def wrapper(*args, **kwargs):
             if not self.loop:
                 self.loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(self.loop)
-            future = asyncio.run_coroutine_threadsafe(execute_callback(goal_handle), self.loop)
+            future = asyncio.run_coroutine_threadsafe(async_callback(*args, **kwargs), self.loop)
             return future.result()
 
-        return wrapped_execute
+        return wrapper
 
-    def unregister_action_server(self, action_name):
-        """Unregister a ROS2 action server
+    def unregister_action_server(self, action_name, remove_from_dict=True):
+        """Unregister a ROS2 action server.
+
+        Cleanly destroys a ROS2 action server and optionally removes it from the internal
+        action servers registry. This method provides proper error handling and logging
+        for action server cleanup operations.
 
         Args:
-            action_name (str): Name of the action server to unregister
+            action_name (str): Name of the action server to unregister.
+            remove_from_dict (bool): Whether to remove the action server from the internal
+                action_servers dictionary. Set to False when iterating over action servers
+                during bulk cleanup operations like shutdown to avoid modifying dictionary
+                during iteration. Defaults to True for individual action server cleanup.
 
         Returns:
-            bool: True if unregistration was successful, False otherwise
+            bool: True if unregistration was successful, False otherwise.
+            Returns False if the service manager is not initialized or the action server
+            does not exist.
+
+        Example:
+
+        .. code-block:: python
+
+            # Individual action server cleanup (normal usage)
+            >>> success = service_manager.unregister_action_server("my_action")
+            >>> success
+            True
+
+            # Bulk cleanup during iteration (shutdown scenario)
+            >>> for name in service_manager.action_servers:
+            ...     service_manager.unregister_action_server(name, remove_from_dict=False)
+            >>> service_manager.action_servers.clear()
         """
         if not self.is_initialized or action_name not in self.action_servers:
             return False
 
         try:
-            action_server = self.action_servers.pop(action_name)
+            if remove_from_dict:
+                action_server = self.action_servers.pop(action_name)
+            else:
+                action_server = self.action_servers[action_name]
             action_server.destroy()
             carb.log_info(f"Unregistered ROS2 action server: {action_name}")
             return True
@@ -334,23 +399,24 @@ class ROS2ServiceManager:
             return False
 
     def _spin(self):
-        """Spin the ROS2 node in a separate thread.
+        """Spin the ROS2 executor in a separate thread.
 
-        This method runs continuously in a separate thread, processing
-        ROS2 callbacks and service requests. It stops when the running
-        flag is set to False or when ROS2 shuts down.
+        This method runs the multithreaded executor which enables parallel
+        callback execution. The executor will run until shutdown() is called.
         """
         import rclpy
 
-        while self.running and rclpy.ok():
-            try:
-                rclpy.spin_once(self.node, timeout_sec=0.1)
-            except rclpy.executors.ExternalShutdownException:
-                break
+        try:
+            self.executor.spin()
+        except KeyboardInterrupt:
+            pass
+        except Exception as e:
+            carb.log_error(f"Error in executor thread: {e}")
+        finally:
+            carb.log_info("ROS2 executor thread stopping")
 
 
 class SimulationControl:
-    SERVICE_PREFIX = ""  # New constant for service prefix
 
     def _import_interfaces(self, interface_types, interface_kind):
         """Import ROS2 interfaces with graceful fallback.
@@ -389,6 +455,46 @@ class SimulationControl:
         # Initialize and register services
         self._initialize_ros2_services()
 
+    def _register_service_if_available(self, service_class_name, handler):
+        """Register a service if its type is available.
+
+        Args:
+            service_class_name (str): Name of the service class attribute (e.g., 'GetSimulationState').
+            handler: The handler function for the service.
+        """
+        if hasattr(self, service_class_name):
+            service_class = getattr(self, service_class_name)
+            if service_class:
+                service_name = getattr(self, f"{service_class_name}_service_name")
+                self.service_manager.register_service(f"{SERVICE_PREFIX}{service_name}", service_class, handler)
+            else:
+                carb.log_error(f"{service_class_name} service type not available")
+
+    def _register_action_server_if_available(
+        self, action_class_name, execute_handler, goal_callback=None, cancel_callback=None
+    ):
+        """Register an action server if its type is available.
+
+        Args:
+            action_class_name (str): Name of the action class attribute (e.g., 'SimulateSteps').
+            execute_handler: The execute callback function for the action server.
+            goal_callback: Callback to accept/reject goals (optional).
+            cancel_callback: Callback to handle cancellation (optional).
+        """
+        if hasattr(self, action_class_name):
+            action_class = getattr(self, action_class_name)
+            if action_class:
+                action_name = getattr(self, f"{action_class_name}_action_name")
+                self.service_manager.register_action_server(
+                    f"{SERVICE_PREFIX}{action_name}",
+                    action_class,
+                    execute_handler,
+                    goal_callback=goal_callback,
+                    cancel_callback=cancel_callback,
+                )
+            else:
+                carb.log_error(f"{action_class_name} action type not available")
+
     def _initialize_ros2_services(self):
         """Initialize ROS2 services for simulation control.
 
@@ -410,171 +516,31 @@ class SimulationControl:
                 carb.log_error("Failed to initialize ROS2 service manager")
                 return
 
-            # Register the basic simulation control services
-            service_prefix = SimulationControl.SERVICE_PREFIX
+            # Register services using helper methods
+            self._register_service_if_available("GetSimulationState", self._handle_get_simulation_state)
+            self._register_service_if_available("SetSimulationState", self._handle_set_simulation_state)
+            self._register_service_if_available("GetEntities", self._handle_get_entities)
+            self._register_service_if_available("DeleteEntity", self._handle_delete_entity)
+            self._register_service_if_available("GetEntityInfo", self._handle_get_entity_info)
+            self._register_service_if_available("SpawnEntity", self._handle_spawn_entity)
+            self._register_service_if_available("ResetSimulation", self._handle_reset_simulation)
+            self._register_service_if_available("StepSimulation", self._handle_step_simulation)
+            self._register_service_if_available("GetEntityState", self._handle_get_entity_state)
+            self._register_service_if_available("GetEntitiesStates", self._handle_get_entities_states)
+            self._register_service_if_available("SetEntityState", self._handle_set_entity_state)
+            self._register_service_if_available("GetSimulatorFeatures", self._handle_get_simulator_features)
+            self._register_service_if_available("LoadWorld", self._handle_load_world)
+            self._register_service_if_available("UnloadWorld", self._handle_unload_world)
+            self._register_service_if_available("GetCurrentWorld", self._handle_get_current_world)
+            self._register_service_if_available("GetAvailableWorlds", self._handle_get_available_worlds)
 
-            # Register the simulation state services
-            if self.GetSimulationState:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetSimulationState_service_name}",
-                    self.GetSimulationState,
-                    self._handle_get_simulation_state,
-                )
-            else:
-                carb.log_error("GetSimulationState service type not available")
-
-            if self.SetSimulationState:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.SetSimulationState_service_name}",
-                    self.SetSimulationState,
-                    self._handle_set_simulation_state,
-                )
-            else:
-                carb.log_error("SetSimulationState service type not available")
-
-            # Register the GetEntities service
-            if self.GetEntities:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetEntities_service_name}", self.GetEntities, self._handle_get_entities
-                )
-            else:
-                carb.log_error("GetEntities service type not available")
-
-            # Register the DeleteEntity service
-            if self.DeleteEntity:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.DeleteEntity_service_name}", self.DeleteEntity, self._handle_delete_entity
-                )
-            else:
-                carb.log_error("DeleteEntity service type not available")
-
-            # Register the GetEntityInfo service
-            if self.GetEntityInfo:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetEntityInfo_service_name}",
-                    self.GetEntityInfo,
-                    self._handle_get_entity_info,
-                )
-            else:
-                carb.log_error("GetEntityInfo service type not available")
-
-            # Register the SpawnEntity service
-            if self.SpawnEntity:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.SpawnEntity_service_name}", self.SpawnEntity, self._handle_spawn_entity
-                )
-            else:
-                carb.log_error("SpawnEntity service type not available")
-
-            # Register the ResetSimulation service
-            if self.ResetSimulation:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.ResetSimulation_service_name}",
-                    self.ResetSimulation,
-                    self._handle_reset_simulation,
-                )
-            else:
-                carb.log_error("ResetSimulation service type not available")
-
-            # Register the StepSimulation service
-            if self.StepSimulation:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.StepSimulation_service_name}",
-                    self.StepSimulation,
-                    self._handle_step_simulation,
-                )
-            else:
-                carb.log_error("StepSimulation service type not available")
-
-            # Register the GetEntityState service
-            if self.GetEntityState:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetEntityState_service_name}",
-                    self.GetEntityState,
-                    self._handle_get_entity_state,
-                )
-            else:
-                carb.log_error("GetEntityState service type not available")
-
-            # Register the GetEntitiesStates service
-            if self.GetEntitiesStates:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetEntitiesStates_service_name}",
-                    self.GetEntitiesStates,
-                    self._handle_get_entities_states,
-                )
-            else:
-                carb.log_error("GetEntitiesStates service type not available")
-
-            # Register the SetEntityState service
-            if hasattr(self, "SetEntityState") and self.SetEntityState:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.SetEntityState_service_name}",
-                    self.SetEntityState,
-                    self._handle_set_entity_state,
-                )
-            else:
-                carb.log_error("SetEntityState service type not available")
-
-            # Register the SimulateSteps action server
-            if hasattr(self, "SimulateSteps") and self.SimulateSteps:
-                self.service_manager.register_action_server(
-                    f"{service_prefix}{self.SimulateSteps_action_name}",
-                    self.SimulateSteps,
-                    self._handle_simulate_steps_action,
-                )
-            else:
-                carb.log_error("SimulateSteps action type not available")
-
-            # Register the GetSimulatorFeatures service
-            if hasattr(self, "GetSimulatorFeatures") and self.GetSimulatorFeatures:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetSimulatorFeatures_service_name}",
-                    self.GetSimulatorFeatures,
-                    self._handle_get_simulator_features,
-                )
-            else:
-                carb.log_error("GetSimulatorFeatures service type not available")
-
-            # Register the LoadWorld service
-            if hasattr(self, "LoadWorld") and self.LoadWorld:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.LoadWorld_service_name}",
-                    self.LoadWorld,
-                    self._handle_load_world,
-                )
-            else:
-                carb.log_error("LoadWorld service type not available")
-
-            # Register the UnloadWorld service
-            if hasattr(self, "UnloadWorld") and self.UnloadWorld:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.UnloadWorld_service_name}",
-                    self.UnloadWorld,
-                    self._handle_unload_world,
-                )
-            else:
-                carb.log_error("UnloadWorld service type not available")
-
-            # Register the GetCurrentWorld service
-            if hasattr(self, "GetCurrentWorld") and self.GetCurrentWorld:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetCurrentWorld_service_name}",
-                    self.GetCurrentWorld,
-                    self._handle_get_current_world,
-                )
-            else:
-                carb.log_error("GetCurrentWorld service type not available")
-
-            # Register the GetAvailableWorlds service
-            if hasattr(self, "GetAvailableWorlds") and self.GetAvailableWorlds:
-                self.service_manager.register_service(
-                    f"{service_prefix}{self.GetAvailableWorlds_service_name}",
-                    self.GetAvailableWorlds,
-                    self._handle_get_available_worlds,
-                )
-            else:
-                carb.log_error("GetAvailableWorlds service type not available")
+            # Register action servers using helper method
+            self._register_action_server_if_available(
+                "SimulateSteps",
+                self._handle_simulate_steps_action,
+                goal_callback=None,
+                cancel_callback=self._handle_simulate_steps_cancel_callback,
+            )
 
             self.is_initialized = True
             carb.log_info("ROS 2 Simulation Control services initialized")
@@ -807,6 +773,25 @@ class SimulationControl:
         try:
             from simulation_interfaces.msg import Result
 
+            # Path validation and resolution
+            path_to_load = None
+            if request.uri:
+                # Validate USD format
+                if not is_valid_usd_file(request.uri, []):
+                    response.result.result = response.UNSUPPORTED_FORMAT
+                    response.result.error_message = f"Unsupported format. Only USD files (.usd, .usda, .usdc, .usdz) are supported. Got: {request.uri}"
+                    return response
+
+                # Use the new utility function to resolve the asset path
+                path_to_load = await resolve_asset_path_async(request.uri)
+
+                # Use the path that exists, or report error if neither exists
+                if not path_to_load:
+                    response.result.result = response.RESOURCE_PARSE_ERROR
+                    response.result.error_message = (
+                        f"Could not find path '{request.uri}' or default asset root based path"
+                    )
+                    return response
             # Get regular stage for prim operations
             stage = stage_utils.get_current_stage()
             if not stage:
@@ -817,11 +802,11 @@ class SimulationControl:
             # Check name validity and try to get default prim name from URI if possible
             entity_name = request.name
 
-            # If name is empty, try to get default prim name from URI
-            if not entity_name and request.uri:
+            # If name is empty, try to get default prim name from URI if possible
+            if not entity_name and path_to_load:
                 try:
                     # Try to open the stage and get its default prim
-                    temp_stage = Usd.Stage.Open(request.uri)
+                    temp_stage = Usd.Stage.Open(path_to_load)
                     if temp_stage:
                         default_prim = temp_stage.GetDefaultPrim()
                         if default_prim:
@@ -893,25 +878,12 @@ class SimulationControl:
                     ]
 
             # Create the entity based on URI or create a new Xform
-            if request.uri:
-                # Check if the URI is accessible without opening the stage
-                try:
-                    result, _ = omni.client.stat(request.uri)
-                    if result != omni.client.Result.OK:
-                        response.result.result = response.RESOURCE_PARSE_ERROR
-                        response.result.error_message = f"Cannot access USD file: {request.uri}"
-                        return response
-
-                except Exception as e:
-                    response.result.result = response.RESOURCE_PARSE_ERROR
-                    response.result.error_message = f"Failed to validate USD file: {e}"
-                    return response
-
+            if path_to_load:
                 # Load USD file as reference
                 try:
-                    # Create a reference
+                    # Create a reference using the validated path
                     prim = stage.DefinePrim(entity_name)
-                    prim.GetReferences().AddReference(request.uri)
+                    prim.GetReferences().AddReference(path_to_load)
 
                     try:
                         # Create XformPrim wrapper for the spawned entity
@@ -926,7 +898,7 @@ class SimulationControl:
                         carb.log_error(f"Error setting transform for {entity_name}: {e}")
 
                     carb.log_info(
-                        f"Successfully spawned entity from URI: {entity_name} with reference to {request.uri}"
+                        f"Successfully spawned entity from URI: {entity_name} with reference to {path_to_load}"
                     )
                 except Exception as e:
                     response.result.result = response.RESOURCE_PARSE_ERROR
@@ -1426,12 +1398,6 @@ class SimulationControl:
                 # Check if goal has been canceled
                 if goal_handle.is_cancel_requested:
                     goal_handle.canceled()
-                    # Pause the simulation when canceled
-                    self.timeline.pause()
-                    self.timeline.commit()
-                    await app.next_update_async()
-                    await app.next_update_async()
-
                     result_msg.result.result = Result.RESULT_OPERATION_FAILED
                     result_msg.result.error_message = "Simulation stepping was canceled"
                     return result_msg
@@ -1481,12 +1447,48 @@ class SimulationControl:
 
         return result_msg
 
+    def _handle_simulate_steps_cancel_callback(self, goal_handle):
+        """Handle cancellation requests for SimulateSteps action.
+
+        This callback is invoked when a client requests to cancel the SimulateSteps action.
+        It immediately pauses the simulation and returns the appropriate response.
+
+        Args:
+            goal_handle: ROS2 action goal handle for the cancellation request.
+
+        Returns:
+            rclpy.action.CancelResponse: Response indicating if cancellation is accepted.
+        """
+        try:
+            from rclpy.action import CancelResponse
+
+            carb.log_info("SimulateSteps action cancellation requested")
+
+            # Pause the simulation immediately when cancellation is requested
+            try:
+                self.timeline.pause()
+                self.timeline.commit()
+                carb.log_info("Simulation paused due to SimulateSteps cancellation")
+            except Exception as pause_error:
+                carb.log_error(f"Error pausing simulation during cancellation: {pause_error}")
+
+            carb.log_info("SimulateSteps action cancellation accepted")
+            return CancelResponse.ACCEPT
+
+        except Exception as e:
+            carb.log_error(f"Error in SimulateSteps cancel callback: {e}")
+            # Default to accepting cancellation even if there's an error to prevent
+            # the action from being stuck in an unresponsive state
+            from rclpy.action import CancelResponse
+
+            return CancelResponse.ACCEPT
+
     async def _handle_load_world(self, request, response):
         """Handle LoadWorld service request.
 
         This service loads a world or environment file into the simulation,
         clearing the current scene and setting the simulation to stopped state.
-        Currently supports USD format worlds.
+        Currently supports USD format worlds. If the given path fails to load, the default asset root prefix is attempted with the given path.
 
         Args:
             request: LoadWorld request with world file path and parameters.
@@ -1502,7 +1504,15 @@ class SimulationControl:
             response.result = Result()
             response.world = WorldResource()
 
-            # Validate USD format using Isaac Sim's utility function
+            # Check if simulation is playing - load world is only allowed when simulation is not playing
+            if self.timeline.is_playing():
+                response.result.result = Result.RESULT_OPERATION_FAILED
+                response.result.error_message = (
+                    "Load world operation requires simulation to be stopped or paused. Current state: playing"
+                )
+                return response
+
+            # Validate USD format
             if not is_valid_usd_file(request.uri, []):
                 response.result.result = response.UNSUPPORTED_FORMAT
                 response.result.error_message = (
@@ -1510,38 +1520,48 @@ class SimulationControl:
                 )
                 return response
 
-            # Stop the simulation first
-            carb.log_info("Stopping simulation before loading world")
-            self.timeline.stop()
-            await omni.kit.app.get_app().next_update_async()
+            # Use the new utility function to resolve the asset path
+            path_to_load = await resolve_asset_path_async(request.uri)
 
-            # Simply open the USD file as the new stage using stage_utils
-            carb.log_info(f"Loading world from USD file: {request.uri}")
-            (success, error) = await stage_utils.open_stage_async(request.uri)
-            if not success:
+            # Load the path that exists, or report error if neither exists
+            if path_to_load:
+
+                # Stop the simulation first
+                carb.log_info("Stopping simulation before loading world")
+                self.timeline.stop()
+                await omni.kit.app.get_app().next_update_async()
+
+                carb.log_info(f"Loading world from USD file: {path_to_load}")
+                (success, error) = await stage_utils.open_stage_async(path_to_load)
+                if not success:
+                    response.result.result = response.RESOURCE_PARSE_ERROR
+                    response.result.error_message = f"Failed to load world: {error}"
+                    return response
+            else:
                 response.result.result = response.RESOURCE_PARSE_ERROR
-                response.result.error_message = f"Failed to open USD stage: {request.uri}, Error: {error}"
+                response.result.error_message = f"Could not find path '{request.uri}' or default asset root based path"
                 return response
 
-            # Wait for stage to be fully loaded
             await omni.kit.app.get_app().next_update_async()
             await omni.kit.app.get_app().next_update_async()
 
-            # Verify stage was loaded
             stage = stage_utils.get_current_stage(fabric=True)
             if not stage:
                 response.result.result = Result.RESULT_OPERATION_FAILED
                 response.result.error_message = "Failed to get loaded stage"
                 return response
 
-            # Set world resource information
-            response.world.world_resource.uri = request.uri
-            response.world.name = os.path.splitext(os.path.basename(request.uri))[0]
-
-            # Success
+            response.world.world_resource.uri = path_to_load
+            response.world.name = os.path.splitext(os.path.basename(path_to_load))[0]
             response.result.result = Result.RESULT_OK
-            response.result.error_message = f"Successfully loaded world: {response.world.name}"
-            carb.log_info(f"Successfully loaded world: {response.world.name}")
+            if path_to_load != request.uri:
+                response.result.error_message = (
+                    f"Successfully loaded world: {response.world.name} (using default asset root path)"
+                )
+                carb.log_info(f"Successfully loaded world: {response.world.name} using default asset root path")
+            else:
+                response.result.error_message = f"Successfully loaded world: {response.world.name}"
+                carb.log_info(f"Successfully loaded world: {response.world.name}")
 
         except Exception as e:
             response.result.result = Result.RESULT_OPERATION_FAILED
@@ -1569,6 +1589,14 @@ class SimulationControl:
 
             # Initialize response
             response.result = Result()
+
+            # Check if simulation is playing - unload world is only allowed when simulation is not playing
+            if self.timeline.is_playing():
+                response.result.result = Result.RESULT_OPERATION_FAILED
+                response.result.error_message = (
+                    "Unload world operation requires simulation to be stopped or paused. Current state: playing"
+                )
+                return response
 
             usdrt_stage = stage_utils.get_current_stage(fabric=True)
             if not usdrt_stage:

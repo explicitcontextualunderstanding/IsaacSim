@@ -265,6 +265,10 @@ class DeformablePrim(XformPrim):
         self._physics_deformable_body_view_paths = paths  # TODO: remove by `self.paths` when `list[str]` is supported
         self._physics_deformable_body_view = None
         self._physics_tensor_entity_initialized = False
+        # - volume-specific properties
+        self._simulation_rotations = None
+        self._simulation_stresses = None
+        self._rest_pose_inverse_matrices = None
         # initialize base class
         super().__init__(
             existent_paths,
@@ -445,7 +449,7 @@ class DeformablePrim(XformPrim):
         return SimulationManager._physics_sim_view__warp is not None and self._physics_deformable_body_view is not None
 
     def get_element_indices(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[wp.array, wp.array, wp.array]:
         """Get the element (triangular faces for surface, tetrahedrons for volume) indices
         of the simulation, collision and rest meshes of the prims.
@@ -498,7 +502,7 @@ class DeformablePrim(XformPrim):
         )
 
     def get_nodal_positions(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[wp.array, wp.array, wp.array]:
         """Get the nodal (mesh points) positions of the simulation, collision and rest meshes of the prims.
 
@@ -549,7 +553,7 @@ class DeformablePrim(XformPrim):
         self,
         positions: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the nodal (mesh points) positions of the simulation mesh of the prims.
 
@@ -587,7 +591,7 @@ class DeformablePrim(XformPrim):
         wp.copy(data[indices], positions)
         self._physics_deformable_body_view.set_simulation_nodal_positions(data, indices)
 
-    def get_nodal_velocities(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_nodal_velocities(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the nodal (mesh points) velocities of the simulation mesh of the prims.
 
         Backends: :guilabel:`tensor`. |br|
@@ -628,7 +632,7 @@ class DeformablePrim(XformPrim):
         self,
         velocities: list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the nodal (mesh points) velocities of the simulation mesh of the prims.
 
@@ -667,16 +671,12 @@ class DeformablePrim(XformPrim):
         self._physics_deformable_body_view.set_simulation_nodal_velocities(data, indices)
 
     def get_nodal_kinematic_position_targets(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[wp.array, wp.array]:
         """Get the nodal (mesh points) kinematic position targets of the simulation mesh of the prims.
 
         Backends: :guilabel:`tensor`. |br|
         Deformable type: :guilabel:`volume`.
-
-        .. note::
-
-            This method is only supported for volume deformable bodies.
 
         Args:
             indices: Indices of prims to process (shape ``(N,)``). If not defined, all wrapped prims are processed.
@@ -720,18 +720,14 @@ class DeformablePrim(XformPrim):
     def set_nodal_kinematic_position_targets(
         self,
         positions: list | np.ndarray | wp.array | None = None,
-        enabled: list | np.ndarray | wp.array | None = None,
+        enabled: bool | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the nodal (mesh points) kinematic position targets of the simulation mesh of the prims.
 
         Backends: :guilabel:`tensor`. |br|
         Deformable type: :guilabel:`volume`.
-
-        .. note::
-
-            This method is only supported for volume deformable bodies.
 
         Args:
             positions: Nodal positions (shape ``(N, num_nodes_per_body, 3)``).
@@ -776,8 +772,8 @@ class DeformablePrim(XformPrim):
         self,
         materials: type["PhysicsMaterial"] | list[type["PhysicsMaterial"]],
         *,
-        weaker_than_descendants: list | np.ndarray | wp.array | None = None,
-        indices: list | np.ndarray | wp.array | None = None,
+        weaker_than_descendants: bool | list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Apply physics materials to the prims, and optionally, to their descendants.
 
@@ -840,7 +836,7 @@ class DeformablePrim(XformPrim):
             )
 
     def get_applied_physics_materials(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> list[type["PhysicsMaterial"] | None]:
         """Get the applied physics materials.
 
@@ -880,6 +876,239 @@ class DeformablePrim(XformPrim):
                     carb.log_warn(f"Unsupported physics material ({material_path}): {self.paths[index]}")
             materials.append(material)
         return materials
+
+    def get_nodal_rotations(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
+        """Get the nodal (tetrahedrons) rotations of the simulation mesh of the prims.
+
+        Backends: :guilabel:`tensor`. |br|
+        Deformable type: :guilabel:`volume`.
+
+        Args:
+            indices: Indices of prims to process (shape ``(N,)``). If not defined, all wrapped prims are processed.
+
+        Returns:
+            The simulation mesh's nodal rotations (shape ``(N, num_nodes_per_body, 3)``).
+
+        Raises:
+            AssertionError: When the deformable body is not a volume.
+            AssertionError: Wrapped prims are not valid.
+            AssertionError: Physics tensor entity is not valid.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get the nodal rotations of all prims
+            >>> simulation_rotations = prims.get_nodal_rotations()  # doctest: +NO_CHECK
+            >>> simulation_rotations.shape
+            (3, 1, 4)
+            >>>
+            >>> # get the nodal rotations of the first and last prims
+            >>> simulation_rotations = prims.get_nodal_rotations(indices=[0, 2])  # doctest: +NO_CHECK
+            >>> simulation_rotations.shape
+            (2, 1, 4)
+        """
+        assert self.deformable_type == "volume", "Nodal rotations is only supported for volume deformable bodies"
+        assert self.valid, _MSG_PRIM_NOT_VALID
+        assert self.is_physics_tensor_entity_valid(), _MSG_PHYSICS_TENSOR_ENTITY_NOT_VALID
+        # Tensor API
+        simulation_indices = self._physics_deformable_body_view.get_simulation_element_indices()  # shape: (N, EpB, NpE)
+        simulation_positions = self._physics_deformable_body_view.get_simulation_nodal_positions()  # shape: (N, NpB, 3)
+        rest_positions = self._physics_deformable_body_view.get_rest_nodal_positions()  # shape: (N, NpB, 3)
+        indices = ops_utils.resolve_indices(indices, count=len(self), device=simulation_positions.device)
+        # - precompute rotations
+        precompute_rotations = self._simulation_rotations is None
+        if precompute_rotations:
+            device = simulation_indices.device
+            shape = simulation_indices.shape[:2]
+            self._simulation_stresses = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+            self._simulation_gradients = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+            self._simulation_rotations = wp.zeros(shape=shape + (4,), dtype=wp.float32, device=device)
+            self._rest_pose_inverse_matrices = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+        # - compute rotations
+        wp.launch(
+            kernel=_wk_compute_deformable_rotation,
+            dim=simulation_indices.shape[:2],
+            inputs=[
+                simulation_indices,
+                simulation_positions,
+                rest_positions,
+                self._rest_pose_inverse_matrices,
+                self._simulation_rotations,
+                precompute_rotations,
+            ],
+            device=simulation_indices.device,
+        )
+        wp.synchronize()
+        return self._simulation_rotations[indices].contiguous().to(self._device)
+
+    def get_nodal_gradients(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
+        """Get the nodal (tetrahedrons) gradients of the simulation mesh of the prims.
+
+        Backends: :guilabel:`tensor`. |br|
+        Deformable type: :guilabel:`volume`.
+
+        Args:
+            indices: Indices of prims to process (shape ``(N,)``). If not defined, all wrapped prims are processed.
+
+        Returns:
+            The simulation mesh's nodal gradients (shape ``(N, num_elements_per_body)``, where items are 3x3 matrices).
+
+        Raises:
+            AssertionError: When the deformable body is not a volume.
+            AssertionError: Wrapped prims are not valid.
+            AssertionError: Physics tensor entity is not valid.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get the nodal gradients of all prims
+            >>> simulation_gradients = prims.get_nodal_gradients()  # doctest: +NO_CHECK
+            >>> simulation_gradients.shape
+            (3, 1)
+            >>>
+            >>> # get the nodal gradients of the first and last prims
+            >>> simulation_gradients = prims.get_nodal_gradients(indices=[0, 2])  # doctest: +NO_CHECK
+            >>> simulation_gradients.shape
+            (2, 1)
+        """
+        assert self.deformable_type == "volume", "Nodal gradients is only supported for volume deformable bodies"
+        assert self.valid, _MSG_PRIM_NOT_VALID
+        assert self.is_physics_tensor_entity_valid(), _MSG_PHYSICS_TENSOR_ENTITY_NOT_VALID
+        # Tensor API
+        simulation_indices = self._physics_deformable_body_view.get_simulation_element_indices()  # shape: (N, EpB, NpE)
+        simulation_positions = self._physics_deformable_body_view.get_simulation_nodal_positions()  # shape: (N, NpB, 3)
+        rest_positions = self._physics_deformable_body_view.get_rest_nodal_positions()  # shape: (N, NpB, 3)
+        indices = ops_utils.resolve_indices(indices, count=len(self), device=simulation_positions.device)
+        # - precompute rotations
+        precompute_rotations = self._simulation_rotations is None
+        if precompute_rotations:
+            device = simulation_indices.device
+            shape = simulation_indices.shape[:2]
+            self._simulation_stresses = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+            self._simulation_gradients = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+            self._simulation_rotations = wp.zeros(shape=shape + (4,), dtype=wp.float32, device=device)
+            self._rest_pose_inverse_matrices = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+        # - compute rotations and gradients
+        wp.launch(
+            kernel=_wk_compute_deformable_rotation,
+            dim=simulation_indices.shape[:2],
+            inputs=[
+                simulation_indices,
+                simulation_positions,
+                rest_positions,
+                self._rest_pose_inverse_matrices,
+                self._simulation_rotations,
+                precompute_rotations,
+            ],
+            device=simulation_indices.device,
+        )
+        wp.launch(
+            kernel=_wk_compute_deformable_gradient,
+            dim=simulation_indices.shape[:2],
+            inputs=[
+                simulation_indices,
+                simulation_positions,
+                self._rest_pose_inverse_matrices,
+                self._simulation_rotations,
+                self._simulation_gradients,
+            ],
+            device=simulation_indices.device,
+        )
+        wp.synchronize()
+        return self._simulation_gradients[indices].contiguous().to(self._device)
+
+    def get_nodal_stresses(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
+        """Get the nodal (tetrahedrons) stresses of the simulation mesh of the prims.
+
+        Backends: :guilabel:`tensor`. |br|
+        Deformable type: :guilabel:`volume`.
+
+        Args:
+            indices: Indices of prims to process (shape ``(N,)``). If not defined, all wrapped prims are processed.
+
+        Returns:
+            The simulation mesh's nodal stresses (shape ``(N, num_elements_per_body)``, where items are 3x3 matrices).
+
+        Raises:
+            AssertionError: When the deformable body is not a volume.
+            AssertionError: Wrapped prims are not valid.
+            AssertionError: Physics tensor entity is not valid.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get the nodal stresses of all prims
+            >>> simulation_stresses = prims.get_nodal_stresses()  # doctest: +SKIP
+            >>> simulation_stresses.shape  # doctest: +SKIP
+            (3, 1)
+            >>>
+            >>> # get the nodal stresses of the first and last prims
+            >>> simulation_stresses = prims.get_nodal_stresses(indices=[0, 2])  # doctest: +SKIP
+            >>> simulation_stresses.shape  # doctest: +SKIP
+            (2, 1)
+        """
+        assert self.deformable_type == "volume", "Nodal stresses is only supported for volume deformable bodies"
+        assert self.valid, _MSG_PRIM_NOT_VALID
+        assert self.is_physics_tensor_entity_valid(), _MSG_PHYSICS_TENSOR_ENTITY_NOT_VALID
+        # Tensor API
+        simulation_indices = self._physics_deformable_body_view.get_simulation_element_indices()  # shape: (N, EpB, NpE)
+        simulation_positions = self._physics_deformable_body_view.get_simulation_nodal_positions()  # shape: (N, NpB, 3)
+        rest_positions = self._physics_deformable_body_view.get_rest_nodal_positions()  # shape: (N, NpB, 3)
+        indices = ops_utils.resolve_indices(indices, count=len(self), device=simulation_positions.device)
+        # - get material properties
+        E = np.empty((0, 1))
+        nu = np.empty((0, 1))
+        for material in self.get_applied_physics_materials():
+            if material is not None:
+                E = np.append(E, material.get_youngs_moduli().numpy(), axis=0)
+                nu = np.append(nu, material.get_poissons_ratios().numpy(), axis=0)
+            else:
+                E = np.append(E, np.zeros((1, 1)), axis=0)
+                nu = np.append(nu, np.zeros((1, 1)), axis=0)
+        youngs_moduli = wp.from_numpy(E, dtype=wp.float32, device=simulation_indices.device)
+        poissons_ratios = wp.from_numpy(nu, dtype=wp.float32, device=simulation_indices.device)
+        # - precompute rotations
+        precompute_rotations = self._simulation_rotations is None
+        if precompute_rotations:
+            device = simulation_indices.device
+            shape = simulation_indices.shape[:2]
+            self._simulation_stresses = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+            self._simulation_gradients = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+            self._simulation_rotations = wp.zeros(shape=shape + (4,), dtype=wp.float32, device=device)
+            self._rest_pose_inverse_matrices = wp.zeros(shape=shape, dtype=wp.mat33, device=device)
+        # - compute rotations and stresses
+        wp.launch(
+            kernel=_wk_compute_deformable_rotation,
+            dim=simulation_indices.shape[:2],
+            inputs=[
+                simulation_indices,
+                simulation_positions,
+                rest_positions,
+                self._rest_pose_inverse_matrices,
+                self._simulation_rotations,
+                precompute_rotations,
+            ],
+            device=simulation_indices.device,
+        )
+        wp.launch(
+            kernel=_wk_compute_deformable_stress,
+            dim=simulation_indices.shape[:2],
+            inputs=[
+                simulation_indices,
+                simulation_positions,
+                self._rest_pose_inverse_matrices,
+                self._simulation_rotations,
+                youngs_moduli,
+                poissons_ratios,
+                self._simulation_stresses,
+            ],
+            device=simulation_indices.device,
+        )
+        wp.synchronize()
+        return self._simulation_stresses[indices].contiguous().to(self._device)
 
     """
     Internal methods.
@@ -1082,7 +1311,188 @@ class DeformablePrim(XformPrim):
             self._rest_nodes_per_body = self._physics_deformable_body_view.max_rest_nodes_per_body
             self._rest_elements_per_body = self._physics_deformable_body_view.max_simulation_elements_per_body
 
+        # precompute the rest pose inverse matrices for rotations
+        self._precompute_rotations = True
+
     def _on_timeline_stop(self, event) -> None:
         """Handle timeline stop event."""
         # invalidate deformable body view
         self._physics_deformable_body_view = None
+
+
+"""
+Warp kernels
+"""
+
+
+@wp.func
+def _wf_get_matrix_column(m: wp.mat33, i: int) -> wp.vec3:
+    return wp.vec3(m[0][i], m[1][i], m[2][i])
+
+
+@wp.func
+def _wf_quaternion_from_axis_angle(angle_radians: float, axis: wp.vec3) -> wp.quat:
+    half_angle = angle_radians * 0.5
+    s = wp.sin(half_angle)
+    w = wp.cos(half_angle)
+    x = s * axis[0]
+    y = s * axis[1]
+    z = s * axis[2]
+    return wp.quat(x, y, z, w)
+
+
+@wp.func
+def _wf_compute_deformation_gradient(
+    Q_inverse: wp.mat33,
+    rotation: wp.quat,
+    indices: wp.array3d(dtype=wp.uint32),
+    positions: wp.array3d(dtype=wp.float32),
+    body_index: int,
+    tetrahedron_index: int,
+) -> wp.mat33:
+    R = wp.quat_to_matrix(rotation)
+    P = _wf_compute_deformation_matrix(indices, positions, body_index, tetrahedron_index, False)
+    F = P * Q_inverse
+    return wp.transpose(R) * F
+
+
+@wp.func
+def _wf_compute_deformation_matrix(
+    indices: wp.array3d(dtype=wp.uint32),
+    positions: wp.array3d(dtype=wp.float32),
+    body_index: int,
+    tetrahedron_index: int,
+    inverse: bool,
+) -> wp.mat33:
+    tetrahedron_indices = indices[body_index][tetrahedron_index]
+    v0 = positions[body_index][tetrahedron_indices[0]]
+    v1 = positions[body_index][tetrahedron_indices[1]]
+    v2 = positions[body_index][tetrahedron_indices[2]]
+    v3 = positions[body_index][tetrahedron_indices[3]]
+    # compute displacement field
+    u1 = wp.vec3(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2])
+    u2 = wp.vec3(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2])
+    u3 = wp.vec3(v3[0] - v0[0], v3[1] - v0[1], v3[2] - v0[2])
+    # current configuration matrix
+    m = wp.matrix_from_cols(u1, u2, u3)
+    if inverse:
+        det = wp.determinant(m)
+        volume = det / 6.0
+        if volume < 1e-9:
+            m = wp.mat33(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
+        else:
+            m = wp.inverse(m)
+    return m
+
+
+@wp.func
+def _wf_extract_rotation(A: wp.mat33, q: wp.quat, max_iterations: int, eps: float = 1e-6) -> wp.quat:
+    for _ in range(max_iterations):
+        # convert quaternion q to rotation matrix R
+        R = wp.quat_to_matrix(q)
+        # compute omega vector as the sum of cross products of corresponding columns of R and A
+        R0 = _wf_get_matrix_column(R, 0)
+        R1 = _wf_get_matrix_column(R, 1)
+        R2 = _wf_get_matrix_column(R, 2)
+        A0 = _wf_get_matrix_column(A, 0)
+        A1 = _wf_get_matrix_column(A, 1)
+        A2 = _wf_get_matrix_column(A, 2)
+        omega = wp.cross(R0, A0) + wp.cross(R1, A1) + wp.cross(R2, A2)
+        # compute normalization denominator: sum of dot products plus epsilon
+        denominator = wp.abs(wp.dot(R0, A0) + wp.dot(R1, A1) + wp.dot(R2, A2)) + eps
+        # normalize omega
+        omega = omega * (1.0 / denominator)
+        # magnitude of omega
+        w = wp.length(omega)
+        # normalize omega vector to unit length if possible
+        omega = wp.normalize(omega)
+        # update current estimate quaternion
+        q = _wf_quaternion_from_axis_angle(w, omega) * q
+        # normalize quaternion to keep it a valid rotation quaternion
+        q = wp.normalize(q)
+        # early exit
+        if w < eps:
+            break
+    return q
+
+
+@wp.kernel
+def _wk_compute_deformable_rotation(
+    simulation_indices: wp.array3d(dtype=wp.uint32),
+    simulation_positions: wp.array3d(dtype=wp.float32),
+    rest_positions: wp.array3d(dtype=wp.float32),
+    rest_pose_inverse_matrices: wp.array2d(dtype=wp.mat33),
+    simulation_rotations: wp.array3d(dtype=wp.float32),
+    precompute: bool,
+):
+    body_index, tetrahedron_index = wp.tid()
+    if precompute:
+        rest_pose_inverse_matrices[body_index][tetrahedron_index] = _wf_compute_deformation_matrix(
+            simulation_indices, rest_positions, body_index, tetrahedron_index, True
+        )
+        simulation_rotations[body_index][tetrahedron_index][0] = 0.0
+        simulation_rotations[body_index][tetrahedron_index][1] = 0.0
+        simulation_rotations[body_index][tetrahedron_index][2] = 0.0
+        simulation_rotations[body_index][tetrahedron_index][3] = 1.0
+    # compute P and Q_inverse and deformation gradient
+    P = _wf_compute_deformation_matrix(simulation_indices, simulation_positions, body_index, tetrahedron_index, False)
+    Q_inverse = rest_pose_inverse_matrices[body_index][tetrahedron_index]
+    F = P * Q_inverse
+    # current rotation
+    tetrahedron_rotation = simulation_rotations[body_index][tetrahedron_index]
+    q = wp.quat(tetrahedron_rotation[0], tetrahedron_rotation[1], tetrahedron_rotation[2], tetrahedron_rotation[3])
+    # extract rotation
+    quaternion = _wf_extract_rotation(F, q, 100)
+    simulation_rotations[body_index][tetrahedron_index][0] = quaternion.x
+    simulation_rotations[body_index][tetrahedron_index][1] = quaternion.y
+    simulation_rotations[body_index][tetrahedron_index][2] = quaternion.z
+    simulation_rotations[body_index][tetrahedron_index][3] = quaternion.w
+
+
+@wp.kernel
+def _wk_compute_deformable_gradient(
+    simulation_indices: wp.array3d(dtype=wp.uint32),
+    simulation_positions: wp.array3d(dtype=wp.float32),
+    rest_pose_inverse_matrices: wp.array2d(dtype=wp.mat33),
+    simulation_rotations: wp.array3d(dtype=wp.float32),
+    simulation_gradients: wp.array2d(dtype=wp.mat33),
+):
+    body_index, tetrahedron_index = wp.tid()
+    rest_pose = rest_pose_inverse_matrices[body_index][tetrahedron_index]
+    tetrahedron_rotation = simulation_rotations[body_index][tetrahedron_index]
+    q = wp.quat(tetrahedron_rotation[0], tetrahedron_rotation[1], tetrahedron_rotation[2], tetrahedron_rotation[3])
+
+    simulation_gradients[body_index][tetrahedron_index] = _wf_compute_deformation_gradient(
+        rest_pose, q, simulation_indices, simulation_positions, body_index, tetrahedron_index
+    )
+
+
+@wp.kernel
+def _wk_compute_deformable_stress(
+    simulation_indices: wp.array3d(dtype=wp.uint32),
+    simulation_positions: wp.array3d(dtype=wp.float32),
+    rest_pose_inverse_matrices: wp.array2d(dtype=wp.mat33),
+    simulation_rotations: wp.array3d(dtype=wp.float32),
+    youngs_modulus: wp.array2d(dtype=wp.float32),
+    poissons_ratio: wp.array2d(dtype=wp.float32),
+    simulation_stresses: wp.array2d(dtype=wp.mat33),
+):
+    body_index, tetrahedron_index = wp.tid()
+    rest_pose = rest_pose_inverse_matrices[body_index][tetrahedron_index]
+    tetrahedron_rotation = simulation_rotations[body_index][tetrahedron_index]
+    q = wp.quat(tetrahedron_rotation[0], tetrahedron_rotation[1], tetrahedron_rotation[2], tetrahedron_rotation[3])
+
+    F = _wf_compute_deformation_gradient(
+        rest_pose, q, simulation_indices, simulation_positions, body_index, tetrahedron_index
+    )
+    E = youngs_modulus[body_index][0]
+    nu = poissons_ratio[body_index][0]
+    mu = E / (1.0 + nu) / 2.0
+    lmbda = E * nu / (1.0 + nu) / (1.0 - 2.0 * nu)
+    identity = wp.mat33(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    eps = (wp.transpose(F) + F) * 0.5 - identity
+    J = wp.determinant(F)
+    trace = eps[0][0] + eps[1][1] + eps[2][2]
+    P = wp.quat_to_matrix(q) * eps * (2.0 * mu) + identity * (lmbda * trace)
+
+    simulation_stresses[body_index][tetrahedron_index] = (1.0 / J) * P * wp.transpose(F)

@@ -261,6 +261,9 @@ for i in range(mesh_distactors_num):
 # Disable capturing every frame (capture will be triggered manually using the step function)
 rep.orchestrator.set_capture_on_play(False)
 
+# Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
 # Create the camera prims and their properties
 cameras = []
 num_cameras = config.get("num_cameras", 1)

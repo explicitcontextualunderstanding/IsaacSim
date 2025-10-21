@@ -19,10 +19,14 @@ simulation_app = SimulationApp(launch_config={"headless": False})
 
 import os
 
+import carb.settings
 import omni.replicator.core as rep
 import omni.usd
 
 omni.usd.get_context().new_stage()
+# Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
 distance_light = rep.create.light(rotation=(315, 0, 0), intensity=4000, light_type="distant")
 
 large_cube = rep.create.cube(scale=1.25, position=(1, 1, 0))

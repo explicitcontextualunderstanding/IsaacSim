@@ -1,5 +1,5 @@
 [package]
-version = "1.5.0"
+version = "1.6.0"
 category = "Setup"
 title = "Isaac Sim Setup"
 description = "This Extension does the setup of the Isaac Sim App"
@@ -33,10 +33,14 @@ isaac.startup.create_new_stage = true
 [settings."filter:platform"."windows-x86_64"]
 # Set this to specify the ROS bridge extension to use for windows, blank for no ROS bridge
 isaac.startup.ros_bridge_extension = ""
+# Set this to specify the sim control extension to use for windows, blank for no sim control
+isaac.startup.ros_sim_control_extension = false
 
 [settings."filter:platform"."linux-x86_64"]
 # Set this to specify the ROS bridge extension to use for linux, blank for no ROS bridge
 isaac.startup.ros_bridge_extension = ""
+# Set this to specify the sim control extension to use for linux, blank for no sim control
+isaac.startup.ros_sim_control_extension = false
 
 [[test]]
 dependencies = [

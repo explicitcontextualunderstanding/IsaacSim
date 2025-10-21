@@ -74,7 +74,7 @@ class DistantLight(Light):
         paths: str | list[str],
         *,
         # DistantLight
-        angles: list | np.ndarray | wp.array | None = None,
+        angles: float | list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -116,7 +116,7 @@ class DistantLight(Light):
     """
 
     def set_angles(
-        self, angles: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self, angles: float | list | np.ndarray | wp.array, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the angles (angular diameter of the light) of the prims.
 
@@ -148,7 +148,7 @@ class DistantLight(Light):
         for i, index in enumerate(indices.numpy()):
             self.lights[index].GetAngleAttr().Set(angles[0 if angles.shape[0] == 1 else i].item())
 
-    def get_angles(self, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_angles(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get the angles (angular diameter of the light) of the prims.
 
         Backends: :guilabel:`usd`.

@@ -17,6 +17,7 @@ import io
 import os
 from unittest.mock import patch
 
+import carb.settings
 import numpy as np
 import omni.kit
 import omni.usd
@@ -35,11 +36,13 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
+        self.original_dlss_exec_mode = carb.settings.get_settings().get("rtx/post/dlss/execMode")
 
     async def tearDown(self):
         await omni.kit.app.get_app().next_update_async()
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", self.original_dlss_exec_mode)
 
     # Compare PNG files with the specified prefix using mean pixel difference
     def compare_images_with_mean_diff(self, golden_dir, test_dir, prefix, tolerance):
@@ -193,6 +196,9 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         # Enable scripts
         carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
         # Illustrative augmentation switching red and blue channels in rgb data using numpy (CPU) and warp (GPU)
         def rgb_to_bgr_np(data_in):
             data_in[:, :, [0, 2]] = data_in[:, :, [2, 0]]
@@ -209,7 +215,8 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         # Gaussian noise augmentation on depth data in numpy (CPU) and warp (GPU)
         def gaussian_noise_depth_np(data_in, sigma: float, seed: int):
             np.random.seed(seed)
-            return data_in + np.random.randn(*data_in.shape) * sigma
+            result = data_in.astype(np.float32) + np.random.randn(*data_in.shape) * sigma
+            return np.clip(result, 0, None).astype(data_in.dtype)
 
         rep.AnnotatorRegistry.register_augmentation(
             "gn_depth_np", rep.annotators.Augmentation.from_function(gaussian_noise_depth_np, sigma=0.1, seed=seed)
@@ -346,12 +353,17 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         # Enable scripts
         carb.settings.get_settings().set_bool("/app/omni.graph.scriptnode/opt_in", True)
 
+        # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+        carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
+
         # Gaussian noise augmentation on rgba data in numpy (CPU) and warp (GPU)
         def gaussian_noise_rgb_np(data_in, sigma: float, seed: int):
             np.random.seed(seed)
+            data_in = data_in.astype(np.float32)
             data_in[:, :, 0] = data_in[:, :, 0] + np.random.randn(*data_in.shape[:-1]) * sigma
             data_in[:, :, 1] = data_in[:, :, 1] + np.random.randn(*data_in.shape[:-1]) * sigma
             data_in[:, :, 2] = data_in[:, :, 2] + np.random.randn(*data_in.shape[:-1]) * sigma
+            data_in = np.clip(data_in, 0, 255).astype(np.uint8)
             return data_in
 
         @wp.kernel
@@ -378,7 +390,8 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         # Gaussian noise augmentation on depth data in numpy (CPU) and warp (GPU)
         def gaussian_noise_depth_np(data_in, sigma: float, seed: int):
             np.random.seed(seed)
-            return data_in + np.random.randn(*data_in.shape) * sigma
+            result = data_in.astype(np.float32) + np.random.randn(*data_in.shape) * sigma
+            return np.clip(result, 0, None).astype(data_in.dtype)
 
         rep.AnnotatorRegistry.register_augmentation(
             "gn_depth_np", rep.annotators.Augmentation.from_function(gaussian_noise_depth_np, sigma=0.1, seed=seed)

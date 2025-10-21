@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 from typing import Any
 
@@ -10,6 +25,8 @@ async def capture_annotator_data_async(
     camera_look_at: tuple[float, float, float] = (0, 0, 0),
     resolution: tuple[int, int] = (1280, 720),
     camera_prim_path: str | None = None,
+    render_product: Any = None,
+    do_array_copy: bool = True,
 ) -> Any:
     """Capture annotator data from a virtual camera in the simulation.
 
@@ -17,10 +34,19 @@ async def capture_annotator_data_async(
         annotator_name: Name of the annotator to capture data from.
             See https://docs.omniverse.nvidia.com/py/replicator/1.11.35/source/extensions/omni.replicator.core/docs/API.html#default-annotators for available annotators.
         camera_position: 3D position coordinates for the camera placement (x, y, z).
+            Ignored if render_product is provided.
         camera_look_at: 3D coordinates of the target point the camera should look at.
+            Ignored if render_product is provided.
         resolution: Tuple specifying the image resolution (width, height).
+            Ignored if render_product is provided.
         camera_prim_path: USD path to an existing camera prim to use for capture.
             If provided, camera_position and camera_look_at are ignored.
+            Ignored if render_product is provided.
+        render_product: Existing render product to use for capture.
+            If provided, all other parameters are ignored and this render product
+            will be used directly without being destroyed afterwards.
+        do_array_copy: Whether to copy the array data when retrieving from the annotator.
+            Set to False for better performance if you don't need to modify the data.
 
     Returns:
         Annotator data. The exact type depends on the annotator:
@@ -52,25 +78,43 @@ async def capture_annotator_data_async(
         ... )
         >>> distance_data.shape
         (512, 512, 1)
+        >>>
+        >>> # Capture using existing render product
+        >>> import omni.replicator.core as rep
+        >>> existing_rp = rep.create.render_product("/World/Camera", (1920, 1080))
+        >>> rgb_data = await capture_annotator_data_async(
+        ...     "rgb",
+        ...     render_product=existing_rp
+        ... )
+        >>> rgb_data.shape
+        (1080, 1920, 4)
     """
     import omni.replicator.core as rep
 
     temp_cam = None
-    camera_path = camera_prim_path
-    if camera_path is None:
-        # Create new camera
-        temp_cam = rep.functional.create.camera(position=camera_position, look_at=camera_look_at)
-        camera_path = temp_cam.GetPath()
+    temp_render_product = None
 
-    # Create render product once using either existing or temporary camera
-    render_product = rep.create.render_product(camera_path, resolution)
+    if render_product is None:
+        # Create temporary camera if needed
+        camera_path = camera_prim_path
+        if camera_path is None:
+            # Create new camera
+            temp_cam = rep.functional.create.camera(position=camera_position, look_at=camera_look_at)
+            camera_path = temp_cam.GetPath()
+
+        # Create temporary render product using either existing or temporary camera
+        temp_render_product = rep.create.render_product(camera_path, resolution)
+        render_product = temp_render_product
 
     annot = rep.AnnotatorRegistry.get_annotator(annotator_name)
     annot.attach(render_product)
     await rep.orchestrator.step_async()
-    annot_data = annot.get_data(do_array_copy=True)
+    annot_data = annot.get_data(do_array_copy=do_array_copy)
     annot.detach()
-    render_product.destroy()
+
+    # Only destroy if we created a temporary render product
+    if temp_render_product is not None:
+        temp_render_product.destroy()
 
     # Cleanup temporary camera
     if temp_cam is not None:
@@ -87,15 +131,22 @@ async def capture_rgb_data_async(
     camera_look_at: tuple[float, float, float] = (0, 0, 0),
     resolution: tuple[int, int] = (1280, 720),
     camera_prim_path: str | None = None,
+    render_product: Any = None,
 ) -> np.ndarray:
     """Capture an RGB image from a virtual camera in the simulation.
 
     Args:
         camera_position: 3D position coordinates for the camera placement (x, y, z).
+            Ignored if render_product is provided.
         camera_look_at: 3D coordinates of the target point the camera should look at.
+            Ignored if render_product is provided.
         resolution: Tuple specifying the image resolution (width, height).
+            Ignored if render_product is provided.
         camera_prim_path: USD path to an existing camera prim to use for capture.
             If provided, camera_position and camera_look_at are ignored.
+            Ignored if render_product is provided.
+        render_product: Existing render product to use for capture.
+            If provided, all other parameters are ignored.
 
     Returns:
         RGB image data as a numpy array with shape (height, width, 4) and dtype uint8.
@@ -122,8 +173,17 @@ async def capture_rgb_data_async(
         ... )
         >>> rgb_data.shape
         (512, 512, 4)
+        >>>
+        >>> # Using existing render product
+        >>> import omni.replicator.core as rep
+        >>> existing_rp = rep.create.render_product("/World/Camera", (1920, 1080))
+        >>> rgb_data = await capture_rgb_data_async(render_product=existing_rp)
+        >>> rgb_data.shape
+        (1080, 1920, 4)
     """
-    return await capture_annotator_data_async("rgb", camera_position, camera_look_at, resolution, camera_prim_path)
+    return await capture_annotator_data_async(
+        "rgb", camera_position, camera_look_at, resolution, camera_prim_path, render_product
+    )
 
 
 async def capture_depth_data_async(
@@ -132,6 +192,7 @@ async def capture_depth_data_async(
     camera_look_at: tuple[float, float, float] = (0, 0, 0),
     resolution: tuple[int, int] = (1280, 720),
     camera_prim_path: str | None = None,
+    render_product: Any = None,
 ) -> np.ndarray:
     """Capture depth data from a virtual camera in the simulation.
 
@@ -142,10 +203,16 @@ async def capture_depth_data_async(
             - "distance_to_image_plane": Perpendicular distance from each point to the camera's image plane (Z-depth).
               This is the traditional depth buffer value used in computer graphics.
         camera_position: 3D position coordinates for the camera placement (x, y, z).
+            Ignored if render_product is provided.
         camera_look_at: 3D coordinates of the target point the camera should look at.
+            Ignored if render_product is provided.
         resolution: Tuple specifying the image resolution (width, height).
+            Ignored if render_product is provided.
         camera_prim_path: USD path to an existing camera prim to use for capture.
             If provided, camera_position and camera_look_at are ignored.
+            Ignored if render_product is provided.
+        render_product: Existing render product to use for capture.
+            If provided, all other parameters except depth_type are ignored.
 
     Returns:
         Depth data as a numpy array with shape (height, width) and dtype float32.
@@ -177,6 +244,16 @@ async def capture_depth_data_async(
         ... )
         >>> z_depth.shape
         (512, 512, 1)
+        >>>
+        >>> # Using existing render product
+        >>> import omni.replicator.core as rep
+        >>> existing_rp = rep.create.render_product("/World/Camera", (1920, 1080))
+        >>> depth_data = await capture_depth_data_async(
+        ...     depth_type="distance_to_camera",
+        ...     render_product=existing_rp
+        ... )
+        >>> depth_data.shape
+        (1080, 1920, 1)
     """
     valid_depth_types = ["distance_to_camera", "distance_to_image_plane"]
     if depth_type not in valid_depth_types:
@@ -186,189 +263,64 @@ async def capture_depth_data_async(
             f"'distance_to_image_plane' provides perpendicular distance to camera plane (Z-depth)."
         )
 
-    return await capture_annotator_data_async(depth_type, camera_position, camera_look_at, resolution, camera_prim_path)
+    return await capture_annotator_data_async(
+        depth_type, camera_position, camera_look_at, resolution, camera_prim_path, render_product
+    )
 
 
-def save_rgb_image(rgb_data: np.ndarray, out_dir: str, file_name: str) -> None:
-    """Save RGB image data to a file on disk.
+async def capture_viewport_annotator_data_async(viewport_api, annotator_name="rgb") -> Any:
+    """Capture annotator data from an existing viewport's render product.
 
-    This function converts numpy array RGB data to a PIL Image and saves it to the
-    specified directory with the given filename. For RGBA data (4 channels), the file
-    must be saved as PNG format since JPEG/JPG doesn't support transparency. The output
-    directory is created if it doesn't exist.
+    This function attaches a replicator annotator to an existing viewport's render product,
+    steps the orchestrator to generate the data, and returns the captured annotator output.
+    Unlike capture_annotator_data_async which creates temporary cameras, this function works
+    with existing viewports in the scene.
 
     Args:
-        rgb_data: RGB or RGBA image data as a numpy array with shape (height, width, channels).
-        out_dir: Output directory path where the image file will be saved.
-        file_name: Name of the output image file (including extension).
+        viewport_api: Viewport API object that provides access to the viewport's render product.
+            Must have a valid render_product_path attribute.
+        annotator_name: Name of the annotator to capture data from.
+            See https://docs.omniverse.nvidia.com/py/replicator/1.11.35/source/extensions/omni.replicator.core/docs/API.html#default-annotators for available annotators.
+            Common options include "rgb", "depth", "normals", "semantic_segmentation", etc.
+
+    Returns:
+        Annotator data with type depending on the specific annotator used.
+        For image-based annotators (rgb, depth, normals, etc.): numpy array.
+        For metadata annotators (camera_params, etc.): dict.
+        Mixed annotators may return dict with 'data' key containing array.
 
     Raises:
-        ValueError: If trying to save RGBA data (4 channels) in JPEG/JPG format.
+        ValueError: If render_product_path is None or empty.
 
     Example:
 
     .. code-block:: python
 
-        >>> import numpy as np
-        >>> from isaacsim.test.utils.image_capture import save_rgb_image
+        >>> from isaacsim.test.utils.image_capture import capture_viewport_annotator_data_async
+        >>> import omni.kit.viewport.utility as viewport_utils
         >>>
-        >>> # Save RGB image
-        >>> rgb_data = np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8)
-        >>> save_rgb_image(rgb_data, "/tmp/test_images", "test_image.png")
-        Saved image to /tmp/test_images/test_image.png with shape (512, 512, 3)
+        >>> # Get the default viewport
+        >>> viewport_api = viewport_utils.get_active_viewport()
         >>>
-        >>> # Save RGBA image (must use PNG format)
-        >>> rgba_data = np.random.randint(0, 255, (512, 512, 4), dtype=np.uint8)
-        >>> save_rgb_image(rgba_data, "/tmp/test_images", "test_rgba.png")
-        Saved image to /tmp/test_images/test_rgba.png with shape (512, 512, 4)
+        >>> # Capture RGB data from the viewport
+        >>> rgb_data = await capture_viewport_annotator_data_async(
+        ...     viewport_api,
+        ...     annotator_name="rgb"
+        ... )
+        >>> rgb_data.shape
+        (720, 1280, 4)
+        >>>
+        >>> # Capture depth data from the viewport
+        >>> depth_data = await capture_viewport_annotator_data_async(
+        ...     viewport_api,
+        ...     annotator_name="distance_to_camera"
+        ... )
+        >>> depth_data.shape
+        (720, 1280, 1)
     """
-    from PIL import Image
+    render_product_path = viewport_api.render_product_path
+    if not render_product_path:
+        raise ValueError("viewport_api.render_product_path is None or empty")
 
-    # Create output directory if it doesn't exist
-    os.makedirs(out_dir, exist_ok=True)
-
-    # Check if input has alpha channel or if we're dealing with RGBA data
-    has_alpha = len(rgb_data.shape) == 3 and rgb_data.shape[2] == 4
-
-    # Get file extension to check format
-    file_ext = os.path.splitext(file_name)[1].lower()
-
-    # Verify PNG format for RGBA data
-    if has_alpha and file_ext in [".jpg", ".jpeg"]:
-        raise ValueError(
-            f"Cannot save RGBA data (4 channels) as {file_ext.upper()} format. "
-            "JPEG format doesn't support transparency. Use PNG format instead."
-        )
-
-    # Convert to appropriate format based on input data
-    if has_alpha:
-        rgb_img = Image.fromarray(rgb_data, mode="RGBA")
-    else:
-        rgb_img = Image.fromarray(rgb_data)
-        if file_ext == ".png":
-            rgb_img = rgb_img.convert("RGBA")  # Convert to RGBA for PNG
-
-    file_path = os.path.join(out_dir, file_name)
-    rgb_img.save(file_path)
-    print(f"Saved image to {file_path} with shape {rgb_data.shape}")
-
-
-def save_depth_image(
-    depth_data: np.ndarray,
-    out_dir: str,
-    file_name: str,
-    normalize: bool = False,
-) -> None:
-    """Save depth data as TIFF (float32) or grayscale visualization.
-
-    This function supports two primary modes:
-    1. Metric (float32 TIFF): When extension is .tif/.tiff
-       - Always preserves exact depth values including NaN/Inf
-       - Uses 32-bit float TIFF format with lossless compression
-       - If normalize=True is passed, it will be ignored with a warning
-
-    2. Visualization (8-bit grayscale): For all other extensions
-       - Converts to 8-bit grayscale for viewing
-       - Optionally normalizes values to full 0-255 range based on normalize flag
-
-    Args:
-        depth_data: Depth array with shape (H, W) or (H, W, 1).
-        out_dir: Output directory path.
-        file_name: Output filename with extension.
-        normalize: If True, normalize valid values to 0-255 range for non-TIFF formats.
-            Ignored for TIFF format which always saves raw float32 data.
-
-    Raises:
-        ValueError: If depth_data has invalid shape.
-
-    Example:
-
-    .. code-block:: python
-
-        >>> import numpy as np
-        >>> from isaacsim.test.utils.image_capture import save_depth_image
-        >>>
-        >>> # Save lossless float32 depth (normalize parameter is ignored for TIFF)
-        >>> depth = np.random.rand(512, 512).astype(np.float32) * 10.0
-        >>> save_depth_image(depth, "/tmp", "depth.tiff", normalize=False)
-        Saved metric depth (float32 TIFF) to /tmp/depth.tiff
-        >>>
-        >>> # TIFF with normalize=True will ignore the normalize flag
-        >>> save_depth_image(depth, "/tmp", "depth2.tiff", normalize=True)
-        Warning: TIFF format requested with normalize=True. TIFF is intended for lossless float32 storage, ignoring normalize parameter.
-        Saved metric depth (float32 TIFF) to /tmp/depth2.tiff
-        >>>
-        >>> # Save normalized grayscale visualization as PNG
-        >>> save_depth_image(depth, "/tmp", "depth_viz.png", normalize=True)
-        Saved grayscale depth to /tmp/depth_viz.png
-    """
-    from PIL import Image
-
-    # Ensure output directory exists
-    os.makedirs(out_dir, exist_ok=True)
-
-    # Validate and convert to 2D array
-    if len(depth_data.shape) == 3 and depth_data.shape[2] == 1:
-        depth_data = depth_data.squeeze(axis=2)
-    elif len(depth_data.shape) != 2:
-        raise ValueError(f"Expected depth data with shape (H, W) or (H, W, 1), got {depth_data.shape}")
-
-    # Determine file path and extension
-    file_path = os.path.join(out_dir, file_name)
-    file_ext = os.path.splitext(file_name)[1].lower()
-
-    # Route to appropriate format based on extension
-    if file_ext in (".tif", ".tiff"):
-        # TIFF is always saved as lossless float32, regardless of normalize flag
-        if normalize:
-            print(
-                f"Warning: TIFF format requested with normalize=True. "
-                f"TIFF is intended for lossless float32 storage, ignoring normalize parameter."
-            )
-
-        # Save as lossless float32 TIFF
-        depth_f32 = depth_data.astype(np.float32, copy=False)
-        img = Image.fromarray(depth_f32, mode="F")
-
-        # Try compressed save first, fallback to uncompressed
-        try:
-            img.save(file_path, compression="tiff_deflate")
-        except Exception:
-            img.save(file_path)
-
-        print(f"Saved metric depth (float32 TIFF) to {file_path}")
-    else:
-        # Convert to 8-bit grayscale for visualization
-        if normalize:
-            # Normalize based on valid min/max values
-            valid_mask = np.isfinite(depth_data)
-
-            if not np.any(valid_mask):
-                # No valid values - use mid-gray
-                depth_u8 = np.full_like(depth_data, 128, dtype=np.uint8)
-            else:
-                # Get min/max of valid values
-                valid_values = depth_data[valid_mask]
-                vmin, vmax = np.min(valid_values), np.max(valid_values)
-
-                if vmax > vmin:
-                    # Replace invalid values with vmin, then normalize
-                    depth_clean = np.where(valid_mask, depth_data, vmin)
-                    normalized = (depth_clean - vmin) / (vmax - vmin)
-                    depth_u8 = (normalized * 255).astype(np.uint8)
-                else:
-                    # All values identical - use mid-gray
-                    depth_u8 = np.full_like(depth_data, 128, dtype=np.uint8)
-        else:
-            # No normalization - direct conversion
-            if depth_data.dtype in (np.float32, np.float64):
-                # Assume 0-1 range for floats
-                depth_u8 = (np.clip(depth_data, 0, 1) * 255).astype(np.uint8)
-            else:
-                # Direct conversion for integer types
-                depth_u8 = depth_data.astype(np.uint8)
-
-        # Save as grayscale image
-        img = Image.fromarray(depth_u8, mode="L")
-        img.save(file_path)
-        print(f"Saved image as grayscale depth to {file_path}")
+    # Use the existing capture_annotator_data_async with the viewport's render product
+    return await capture_annotator_data_async(annotator_name, render_product=render_product_path)

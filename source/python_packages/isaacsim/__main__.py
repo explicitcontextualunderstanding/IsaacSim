@@ -88,13 +88,27 @@ def generate_vscode_settings():
                         _mock_python_modules(folder_path, re.split(r"-\d+", folder)[0])
         return paths
 
-    try:
-        import omni.kit_app  # importing 'omni.kit_app' will bootstrap kernel
+    # isaac-sim path
+    isaacsim_path = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
 
-        kit_path = os.path.dirname(os.path.abspath(os.path.realpath(omni.kit_app.__file__)))
-    except ModuleNotFoundError:
-        print("Unable to find 'omniverse-kit' package")
-        exit()
+    # kit path (internal kernel)
+    if os.path.isdir(os.path.join(isaacsim_path, "kit", "extscore")):
+        kit_path = os.path.join(isaacsim_path, "kit")
+        if kit_path not in sys.path:
+            sys.path.append(kit_path)
+        try:
+            import kit_app  # importing 'kit_app' will bootstrap kernel
+
+        except Exception as e:
+            sys.exit(f"Unable to bootstrap inner kit kernel: {e}")
+    # kit path (omniverse-kit kernel package)
+    else:
+        try:
+            import omni.kit_app  # importing 'kit_app' will bootstrap kernel
+
+            kit_path = os.path.dirname(os.path.abspath(os.path.realpath(omni.kit_app.__file__)))
+        except ModuleNotFoundError:
+            sys.exit("Unable to find 'omniverse-kit' package")
 
     cwd = os.getcwd()
     vscode_settings_path = os.path.join(cwd, ".vscode", "settings.json")
@@ -114,7 +128,6 @@ def generate_vscode_settings():
     for folder in ["exts", "extscore"]:
         extensions_paths.extend(_get_paths(os.path.join(kit_path, folder), mock_python_modules=True))
     # - isaacsim
-    isaacsim_path = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
     for folder in ["exts", "extscache", "extsDeprecated", "extsUser"]:
         extensions_paths.extend(_get_paths(os.path.join(isaacsim_path, folder), mock_python_modules=True))
 

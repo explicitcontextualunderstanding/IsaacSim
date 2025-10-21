@@ -109,6 +109,7 @@ class UIBuilder:
 
         self.simulate_and_assemble_button.enabled = True
         self.end_simulation_and_continue_button.enabled = False
+        self._is_assembly_pending = False
 
         self._repopulate_all_dropdowns()
 
@@ -129,6 +130,10 @@ class UIBuilder:
             if self._timeline.is_stopped():
                 self._reselect_articulations()
                 self._articulation_options = []
+                if self._is_assembly_pending:
+                    stage = omni.usd.get_context().get_stage()
+                    stage.SetEditTarget(self._robot_assembler._assembly_layer)
+                    self._is_assembly_pending = False
 
     def cleanup(self):
         """
@@ -334,6 +339,15 @@ class UIBuilder:
 
             async def async_assemble():
                 self._robot_assembler.assemble()
+                # Mute and unmute the assembly layer to ensure that the assembly layer is updated in the scenegraph instance
+                stage = omni.usd.get_context().get_stage()
+                if self._robot_assembler._assembly_layer.identifier:
+                    stage.SetEditTarget(stage.GetRootLayer())
+                    stage.MuteLayer(self._robot_assembler._assembly_layer.identifier)
+                    stage.UnmuteLayer(self._robot_assembler._assembly_layer.identifier)
+                    stage.SetEditTarget(self._robot_assembler._assembly_layer)
+                stage.SetEditTarget(stage.GetRootLayer())
+                self._is_assembly_pending = True
                 await omni.kit.app.get_app().next_update_async()
                 self._timeline.play()
 

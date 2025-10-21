@@ -47,6 +47,55 @@ Software is furnished to do so, subject to the following conditions:""",
 ]
 
 
+def determine_license_type(file_path):
+    """Determine the license type from a license file content.
+
+    Args:
+        file_path: Path to the license file to analyze
+
+    Returns:
+        str: License type (e.g., "NVIDIA Proprietary", "MIT", "Apache-2.0", "Unknown")
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            content_normalized = content.replace("\n", " ").strip()
+
+            # Check for NVIDIA Proprietary
+            if any(text.replace("\n", " ").strip() in content_normalized for text in NVIDIA_PROPRIETARY_TEXT):
+                return "NVIDIA Proprietary"
+
+            # Check for MIT
+            if any(indicator.replace("\n", " ").strip() in content_normalized for indicator in MIT_LICENSE_TEXT):
+                return "MIT"
+
+            # Check for SPDX license identifier
+            if "SPDX-License-Identifier:" in content:
+                spdx_line = next(line for line in content.splitlines() if "SPDX-License-Identifier:" in line)
+                spdx_type = spdx_line.split("SPDX-License-Identifier:", 1)[1].strip()
+                return spdx_type
+
+            # Check for other common license patterns
+            content_lower = content.lower()
+            if "apache license" in content_lower and "version 2.0" in content_lower:
+                return "Apache-2.0"
+            elif "gnu general public license" in content_lower:
+                if "version 3" in content_lower:
+                    return "GPL-3.0"
+                elif "version 2" in content_lower:
+                    return "GPL-2.0"
+                else:
+                    return "GPL"
+            elif "bsd license" in content_lower:
+                return "BSD"
+            elif "mozilla public license" in content_lower:
+                return "MPL"
+
+            return "Unknown"
+    except Exception:
+        return "Unknown"
+
+
 def find_license_file(link_path, package_name, config_tags=None, full_details=False):
     """Search for license files in common locations.
 
@@ -60,6 +109,7 @@ def find_license_file(link_path, package_name, config_tags=None, full_details=Fa
     Returns:
         dict: License information found with keys:
             - main_license: Main license file path (LICENSE.md, LICENSE.txt, LICENSE) or None
+            - main_license_type: License type of the main license file (e.g., "MIT", "Apache-2.0", "NVIDIA Proprietary")
             - package_licenses_count: Number of PACKAGE-LICENSES files found
             - package_licenses_files: List of PACKAGE-LICENSES file paths (only if full_details=True)
             - other_licenses: List of other license files found
@@ -122,7 +172,7 @@ def find_license_file(link_path, package_name, config_tags=None, full_details=Fa
             # Categorize the file
             if package_name.lower() in os.path.basename(match).lower():
                 package_specific_matches.add(rel_path)
-            elif os.path.basename(match) == "LICENSE.txt":
+            elif os.path.basename(match) in ["LICENSE.txt", "LICENSE", "LICENSE.md"]:
                 # Check if this is directly in the package directory (not in a subdirectory)
                 match_dir = os.path.dirname(os.path.abspath(match))
                 package_dir = os.path.abspath(link_path)
@@ -158,6 +208,7 @@ def find_license_file(link_path, package_name, config_tags=None, full_details=Fa
     # Build the result dictionary
     result = {
         "main_license": None,
+        "main_license_type": "",
         "package_licenses_count": package_licenses_count,
         "package_licenses_files": sorted(package_licenses_files) if full_details else [],
         "other_licenses": [],
@@ -169,7 +220,14 @@ def find_license_file(link_path, package_name, config_tags=None, full_details=Fa
 
     # Set main license file if found
     if root_license_matches:
-        result["main_license"] = next(iter(sorted(root_license_matches)))
+        main_license_file = next(iter(sorted(root_license_matches)))
+        result["main_license"] = main_license_file
+        result["main_license_type"] = determine_license_type(main_license_file)
+    elif package_specific_matches:
+        # If no root license found, use the first package-specific license as main
+        main_license_file = next(iter(sorted(package_specific_matches)))
+        result["main_license"] = main_license_file
+        result["main_license_type"] = determine_license_type(main_license_file)
 
     # Add other license files (excluding PACKAGE-LICENSES when full_details=False)
     if package_specific_matches:

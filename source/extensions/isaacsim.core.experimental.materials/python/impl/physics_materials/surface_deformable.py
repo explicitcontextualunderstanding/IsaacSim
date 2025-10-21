@@ -81,11 +81,11 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
         self,
         paths: str | list[str],
         *,
-        static_frictions: list | np.ndarray | wp.array | None = None,
-        dynamic_frictions: list | np.ndarray | wp.array | None = None,
-        youngs_moduli: list | np.ndarray | wp.array | None = None,
-        poissons_ratios: list | np.ndarray | wp.array | None = None,
-        densities: list | np.ndarray | wp.array | None = None,
+        static_frictions: float | list | np.ndarray | wp.array | None = None,
+        dynamic_frictions: float | list | np.ndarray | wp.array | None = None,
+        youngs_moduli: float | list | np.ndarray | wp.array | None = None,
+        poissons_ratios: float | list | np.ndarray | wp.array | None = None,
+        densities: float | list | np.ndarray | wp.array | None = None,
     ) -> None:
         # check for deformable feature (beta)
         setting_name = physx_bindings.SETTING_ENABLE_DEFORMABLE_BETA
@@ -158,10 +158,10 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
 
     def set_friction_coefficients(
         self,
-        static_frictions: list | np.ndarray | wp.array = None,
-        dynamic_frictions: list | np.ndarray | wp.array = None,
+        static_frictions: float | list | np.ndarray | wp.array = None,
+        dynamic_frictions: float | list | np.ndarray | wp.array = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the friction coefficients of the prims.
 
@@ -212,7 +212,7 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
     def get_friction_coefficients(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> tuple[wp.array, wp.array]:
         """Get the friction coefficients of the prims.
 
@@ -258,9 +258,9 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
 
     def set_youngs_moduli(
         self,
-        youngs_moduli: list | np.ndarray | wp.array,
+        youngs_moduli: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the Young's modulus of the prims.
 
@@ -296,7 +296,7 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
     def get_youngs_moduli(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the Young's moduli of the prims.
 
@@ -335,9 +335,9 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
 
     def set_poissons_ratios(
         self,
-        poissons_ratios: list | np.ndarray | wp.array,
+        poissons_ratios: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the Poisson's ratio of the prims.
 
@@ -373,7 +373,7 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
     def get_poissons_ratios(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the Poisson's ratios of the prims.
 
@@ -412,9 +412,9 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
 
     def set_densities(
         self,
-        densities: list | np.ndarray | wp.array,
+        densities: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the densities of the prims.
 
@@ -450,7 +450,7 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
     def get_densities(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the densities of the prims.
 
@@ -489,9 +489,9 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
 
     def set_surface_thicknesses(
         self,
-        surface_thicknesses: list | np.ndarray | wp.array,
+        surface_thicknesses: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the surface thicknesses of the prims.
 
@@ -527,7 +527,7 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
     def get_surface_thicknesses(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the surface thicknesses of the prims.
 
@@ -566,11 +566,11 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
 
     def set_surface_stiffnesses(
         self,
-        stretch_stiffnesses: list | np.ndarray | wp.array | None = None,
-        shear_stiffnesses: list | np.ndarray | wp.array | None = None,
-        bend_stiffnesses: list | np.ndarray | wp.array | None = None,
+        stretch_stiffnesses: float | list | np.ndarray | wp.array | None = None,
+        shear_stiffnesses: float | list | np.ndarray | wp.array | None = None,
+        bend_stiffnesses: float | list | np.ndarray | wp.array | None = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the surface stretch, shear and bend stiffness of the prims.
 
@@ -629,7 +629,7 @@ class SurfaceDeformableMaterial(PhysicsMaterial):
                 )
 
     def get_surface_stiffnesses(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> tuple[wp.array, wp.array, wp.array]:
         """Get the surface stretch, shear and bend stiffnesses of the prims.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.9] - 2025-09-30
+### Fixed
+- Add dialog message for incorrect occupancy map paths
+
 ## [0.1.8] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 0.1.7)

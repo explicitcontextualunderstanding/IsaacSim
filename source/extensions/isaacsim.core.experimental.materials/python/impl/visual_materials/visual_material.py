@@ -88,7 +88,11 @@ class VisualMaterial(Prim, ABC):
     """
 
     def set_input_values(
-        self, name: str, values: list | np.ndarray | wp.array, *, indices: list | np.ndarray | wp.array | None = None
+        self,
+        name: str,
+        values: str | bool | int | float | list | np.ndarray | wp.array,
+        *,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set shaders' input values.
 
@@ -131,7 +135,7 @@ class VisualMaterial(Prim, ABC):
             raise ValueError(f"Invalid input name: {name}. Supported inputs: {', '.join(self._inputs.keys())}")
         self._set_input_values(name=name, values=values, type_name=type_name, indices=indices)
 
-    def get_input_values(self, name: str, *, indices: list | np.ndarray | wp.array | None = None) -> wp.array:
+    def get_input_values(self, name: str, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get shaders' input values.
 
         .. warning::
@@ -252,9 +256,9 @@ class VisualMaterial(Prim, ABC):
         self,
         *,
         name: str,
-        values: list | np.ndarray | wp.array,
+        values: str | bool | int | float | list | np.ndarray | wp.array,
         type_name: str | Sdf.ValueTypeName,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set shader input values."""
         sdf_type, sdf_type_class = self._parse_sdf_type(type_name)
@@ -269,7 +273,11 @@ class VisualMaterial(Prim, ABC):
             shader.GetInput(name).Set(set_func(values, i))
 
     def _get_input_values(
-        self, *, name: str, type_name: str | Sdf.ValueTypeName, indices: list | np.ndarray | wp.array | None = None
+        self,
+        *,
+        name: str,
+        type_name: str | Sdf.ValueTypeName,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> list | wp.array:
         """Get shader input values."""
         sdf_type, sdf_type_class = self._parse_sdf_type(type_name)

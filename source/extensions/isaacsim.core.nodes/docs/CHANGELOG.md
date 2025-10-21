@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.4.3] - 2025-10-02
+### Fixed
+- Fixed Isaac Read World Pose node bug for extracting translation and orientation on Spark
+
 ## [3.4.2] - 2025-08-29
 ### Changed
 - Renamed CARB profiling zones to include [IsaacSim] prefix

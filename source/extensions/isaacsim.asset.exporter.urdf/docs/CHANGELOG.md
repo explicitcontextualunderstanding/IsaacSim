@@ -1,6 +1,14 @@
 # Changelog
 
-## [1.3.2] - 2025-05-30
+## [1.3.4] - 2025-10-09
+### Changed
+- Switch UI element to remove duplicate code
+
+## [1.3.3] - 2025-10-07
+### Changed
+- Updated UI to handle local path for mesh
+
+## [1.3.2] - 2025-08-30
 ### Changed
 - Update nvidia-srl-usd-to-urdf==1.0.2
 - Update nvidia-srl-usd==2.0.0

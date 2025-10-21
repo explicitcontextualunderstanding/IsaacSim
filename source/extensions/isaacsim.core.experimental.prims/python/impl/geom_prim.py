@@ -143,10 +143,10 @@ class GeomPrim(XformPrim):
 
     def set_offsets(
         self,
-        contact_offsets: list | np.ndarray | wp.array = None,
-        rest_offsets: list | np.ndarray | wp.array = None,
+        contact_offsets: float | list | np.ndarray | wp.array = None,
+        rest_offsets: float | list | np.ndarray | wp.array = None,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set the contact and rest offsets for collision detection between prims.
 
@@ -200,7 +200,7 @@ class GeomPrim(XformPrim):
             if rest_offsets is not None:
                 physx_collision_api.GetRestOffsetAttr().Set(rest_offsets[0 if rest_offsets.shape[0] == 1 else i].item())
 
-    def get_offsets(self, *, indices: list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
+    def get_offsets(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> tuple[wp.array, wp.array]:
         """Get the contact and rest offsets for collision detection between prims.
 
         Backends: :guilabel:`usd`.
@@ -245,9 +245,9 @@ class GeomPrim(XformPrim):
 
     def set_torsional_patch_radii(
         self,
-        radii: list | np.ndarray | wp.array,
+        radii: float | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
         minimum: bool = False,
     ) -> None:
         """Set the torsional patch radii of the contact patches used to apply torsional frictions.
@@ -290,7 +290,7 @@ class GeomPrim(XformPrim):
     def get_torsional_patch_radii(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
         minimum: bool = False,
     ) -> wp.array:
         """Get the torsional patch radii of the contact patches used to apply torsional frictions.
@@ -336,7 +336,7 @@ class GeomPrim(XformPrim):
         return ops_utils.place(radii, device=self._device)
 
     def set_collision_approximations(
-        self, approximations: str | list[str], *, indices: list | np.ndarray | wp.array | None = None
+        self, approximations: str | list[str], *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> None:
         """Set the collision approximation types for mesh collision detection.
 
@@ -400,7 +400,7 @@ class GeomPrim(XformPrim):
             mesh_collision_api = GeomPrim.ensure_api([self.prims[index]], UsdPhysics.MeshCollisionAPI)[0]
             mesh_collision_api.GetApproximationAttr().Set(approximations[0 if broadcast else i])
 
-    def get_collision_approximations(self, *, indices: list | np.ndarray | wp.array | None = None) -> list[str]:
+    def get_collision_approximations(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> list[str]:
         """Get the collision approximation types for mesh collision detection.
 
         Backends: :guilabel:`usd`.
@@ -468,9 +468,9 @@ class GeomPrim(XformPrim):
 
     def set_enabled_collisions(
         self,
-        enabled: list | np.ndarray | wp.array,
+        enabled: bool | list | np.ndarray | wp.array,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Enable or disable the collision API of the prims.
 
@@ -516,7 +516,7 @@ class GeomPrim(XformPrim):
     def get_enabled_collisions(
         self,
         *,
-        indices: list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> wp.array:
         """Get the enabled state of the collision API of the prims.
 
@@ -553,7 +553,7 @@ class GeomPrim(XformPrim):
                 enabled[i] = collision_api.GetCollisionEnabledAttr().Get()
         return ops_utils.place(enabled, device=self._device)
 
-    def apply_collision_apis(self, *, indices: list | np.ndarray | wp.array | None = None) -> None:
+    def apply_collision_apis(self, *, indices: int | list | np.ndarray | wp.array | None = None) -> None:
         """Apply collision APIs to enable collision detection for prims.
 
         Backends: :guilabel:`usd`.
@@ -589,8 +589,8 @@ class GeomPrim(XformPrim):
         self,
         materials: type["PhysicsMaterial"] | list[type["PhysicsMaterial"]],
         *,
-        weaker_than_descendants: list | np.ndarray | wp.array | None = None,
-        indices: list | np.ndarray | wp.array | None = None,
+        weaker_than_descendants: bool | list | np.ndarray | wp.array | None = None,
+        indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Apply physics materials to the prims, and optionally, to their descendants.
 
@@ -652,7 +652,7 @@ class GeomPrim(XformPrim):
             )
 
     def get_applied_physics_materials(
-        self, *, indices: list | np.ndarray | wp.array | None = None
+        self, *, indices: int | list | np.ndarray | wp.array | None = None
     ) -> list[type["PhysicsMaterial"] | None]:
         """Get the applied physics materials.
 

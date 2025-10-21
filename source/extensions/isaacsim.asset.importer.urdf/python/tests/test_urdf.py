@@ -28,6 +28,8 @@ import omni.kit.test
 import pxr
 from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, UsdGeom, UsdPhysics, UsdShade
 
+TEST_OUT_PATH = "_tests_out"
+
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestUrdf(omni.kit.test.AsyncTestCase):
@@ -38,7 +40,7 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.asset.importer.urdf")
         self._extension_path = ext_manager.get_extension_path(ext_id)
-        self.dest_path = os.path.abspath(self._extension_path + "/tests_out")
+        self.dest_path = os.path.abspath(self._extension_path + "/" + TEST_OUT_PATH)
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()
         self._stage = omni.usd.get_context().get_stage()
@@ -302,7 +304,7 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
     async def test_urdf_overwrite_file(self):
 
         urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        dest_path = os.path.abspath(self._extension_path + "/data/urdf/tests/tests_out/test_basic.usd")
+        dest_path = os.path.abspath(self._extension_path + "/data/urdf/tests/" + TEST_OUT_PATH + "/test_basic.usd")
         status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
 
         import_config.import_inertia_tensor = True

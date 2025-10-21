@@ -107,10 +107,9 @@ echo "Removing empty folders"
 find _container_temp -type d -empty -delete
 
 
-echo "Copying data from tools/docker/data and tools/docker/oss"
+echo "Copying data from tools/docker/data"
 
 cp -r tools/docker/data/* _container_temp
-cp -r tools/docker/oss _container_temp
 
 
 find_chained_symlinks(){

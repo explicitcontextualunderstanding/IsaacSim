@@ -117,8 +117,8 @@ bool TimeSampleStorage::storeSampleAt(const omni::fabric::RationalTime& time,
         size_t latestIdx = (m_head + kBufferCapacity - 1) % kBufferCapacity;
         if (m_buffer[latestIdx].valid && m_buffer[latestIdx].time == time)
         {
-            CARB_LOG_INFO("Updating latest entry at time %s, simTime %f, simTimeMonotonic %f, systemTime %f",
-                          time.toString().c_str(), simTime, simTimeMonotonic, systemTime);
+            CARB_LOG_VERBOSE("Updating latest entry at time %s, simTime %f, simTimeMonotonic %f, systemTime %f",
+                             time.toString().c_str(), simTime, simTimeMonotonic, systemTime);
             // Update latest entry only
             m_buffer[latestIdx].data.simTime = simTime;
             m_buffer[latestIdx].data.simTimeMonotonic = simTimeMonotonic;
@@ -127,8 +127,8 @@ bool TimeSampleStorage::storeSampleAt(const omni::fabric::RationalTime& time,
         }
     }
 
-    CARB_LOG_INFO("Inserting new entry at time %s, simTime %f, simTimeMonotonic %f, systemTime %f",
-                  time.toString().c_str(), simTime, simTimeMonotonic, systemTime);
+    CARB_LOG_VERBOSE("Inserting new entry at time %s, simTime %f, simTimeMonotonic %f, systemTime %f",
+                     time.toString().c_str(), simTime, simTimeMonotonic, systemTime);
     // Insert new entry
     m_buffer[m_head] = { time, { simTime, simTimeMonotonic, systemTime }, true };
     m_head = (m_head + 1) % kBufferCapacity;
@@ -146,7 +146,7 @@ std::optional<double> TimeSampleStorage::getSimulationTimeAt(const omni::fabric:
     // Validate input
     if (!isValidTime(time))
     {
-        CARB_LOG_ERROR("getSimulationTimeAt: Invalid RationalTime - zero denominator");
+        CARB_LOG_WARN("getSimulationTimeAt: Invalid RationalTime - zero denominator");
         return std::nullopt;
     }
 

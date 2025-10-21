@@ -8,11 +8,7 @@
 [![Windows platform](https://img.shields.io/badge/platform-windows--64-orange.svg)](https://www.microsoft.com/en-us/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-yellow.svg)](https://opensource.org/license/apache-2-0)
 
-> **⚠️ PRE-RELEASE SOFTWARE NOTICE**
-> This is pre-release, currently in development. You may encounter bugs, incomplete features, and other issues that will be addressed in future releases. Please [report](#support) any issues you encounter. This will be finalized into a stable release in the future.
-
 NVIDIA Isaac Sim™ is a simulation platform built on NVIDIA Omniverse, designed to develop, test, train, and deploy AI-powered robots in realistic virtual environments. It supports importing robotic systems from common formats such as URDF, MJCF, and CAD. The simulator leverages high-fidelity, GPU-accelerated physics engines to simulate accurate dynamics and support multi-sensor RTX rendering at scale. It comes equipped with end-to-end workflows including synthetic data generation, reinforcement learning, ROS integration, and digital twin simulation. Isaac Sim provides the infrastructure needed to support robotics development at any stage.
-
 
 ## Key Features
 
@@ -92,7 +88,7 @@ Ensure your system is set up with the following before building Isaac Sim:
   > ```
 
   > **Compiler Version Check ⚠️**
-  > We have added a version checker to our build process. If you do not have the default versions you are still able to execute a build, add  `--skip-compiler-version-check` to `build.[sh/bat]` when building.  Proceed at your own risk, unsupported build environments may encounter build and runtime issues.  
+  > We have added a version checker to our build process. If you do not have the default versions you are still able to execute a build, add  `--skip-compiler-version-check` to `build.[sh/bat]` when building.  Proceed at your own risk, unsupported build environments may encounter build and runtime issues.
 
 ### Recommended Software
 
@@ -151,9 +147,15 @@ build.bat
 
 Navigate to the corresponding binary directory for your platform and run the executable.
 
-**Linux:**
+**Linux (x86_64):**
 ```bash
 cd _build/linux-x86_64/release
+./isaac-sim.sh
+```
+
+**Linux (aarch64):**
+```bash
+cd _build/linux-aarch64/release
 ./isaac-sim.sh
 ```
 
@@ -200,18 +202,20 @@ Isaac Sim uses a custom build system with the following key options:
 
 ## Usage
 Congratulations on installing Isaac Sim! To get started with using Isaac Sim, follow these [Quick Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html). For more information, visit our full [documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
-  
+
 
 ## Troubleshooting
 
 - Please see the [FAQ](https://docs.isaacsim.omniverse.nvidia.com/latest/overview/faq_index.html), [Troubleshooting](https://docs.isaacsim.omniverse.nvidia.com/latest/overview/troubleshooting.html), and [Known Issues](https://docs.isaacsim.omniverse.nvidia.com/latest/overview/known_issues.html) for common questions, fixes, and workarounds.
 
-- On linux, if you encounter network connectivity issues when building (such as corporate firewalls), run the following commands:
+- On Linux, if you encounter network connectivity issues when building (such as corporate firewalls), run the following commands:
 
   ```bash
   export http_proxy="http://{Your IP address}:7890"
   export https_proxy="http://{Your IP address}:7890"
   ```
+
+  - Note: The above command should be used only if you have enabled a proxy software or behind a corporate firewall. Port 7890 should be replaced with the proxy port set by the proxy software.
 
 
 ## Support

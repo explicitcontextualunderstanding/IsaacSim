@@ -271,8 +271,7 @@ class TestSDGRandomizerSnippets(omni.kit.test.AsyncTestCase):
         from isaacsim.storage.native import get_assets_root_path_async
         from pxr import Gf, Usd, UsdGeom, UsdLux
 
-        # https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
-        # https://arxiv.org/pdf/0912.4540.pdf
+        # Fibonacci sphere algorithm: https://arxiv.org/pdf/0912.4540
         def next_point_on_sphere(idx, num_points, radius=1, origin=(0, 0, 0)):
             offset = 2.0 / num_points
             inc = np.pi * (3.0 - np.sqrt(5.0))
