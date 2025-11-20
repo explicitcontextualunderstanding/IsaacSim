@@ -52,7 +52,6 @@ links {
     "isaacSensorSchema",
     "rangeSensorSchema",
     "omni.usd",
-    "isaacsim.util.debug_draw.primitive_drawing",
 }
 extra_usd_libs = { "usdGeom", "usdPhysics" }
 
@@ -65,10 +64,13 @@ includedirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include/boost",
     "%{root}/_build/target-deps/python/include/python3.11",
 }
+links { "isaacsim.util.debug_draw.plugin" }
+
 filter { "system:windows" }
 libdirs {
     "%{root}/_build/target-deps/tbb/lib/intel64/vc14",
 }
+links { "isaacsim.util.debug_draw.primitive_drawing" }
 filter {}
 
 filter { "configurations:debug" }
