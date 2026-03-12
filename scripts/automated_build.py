@@ -148,8 +148,67 @@ def push_to_ghcr(ssh, github_user):
     execute_command(ssh, f"docker push ghcr.io/{github_user}/isaac-sim-6-dev:latest")
 
 
+def dry_run():
+    """Verify credentials without spinning up a server."""
+    print("🔍 Running dry-run to verify credentials...\n")
+
+    errors = []
+
+    # Check RunPod API key
+    if not RUNPOD_API_KEY:
+        errors.append("RUNPOD_API_KEY not set")
+    else:
+        print(f"✅ RUNPOD_API_KEY: {'*' * len(RUNPOD_API_KEY)}")
+
+    # Check Network Volume ID
+    if not NETWORK_VOLUME_ID:
+        errors.append("NETWORK_VOLUME_ID not set")
+    else:
+        print(f"✅ NETWORK_VOLUME_ID: {NETWORK_VOLUME_ID}")
+
+    # Check GitHub token
+    if not GITHUB_TOKEN:
+        errors.append("GITHUB_TOKEN not set (needed for GHCR push)")
+    else:
+        print(f"✅ GITHUB_TOKEN: {'*' * len(GITHUB_TOKEN)}")
+
+    # Verify GitHub identity
+    try:
+        result = subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True,
+            text=True
+        )
+        user = result.stdout.strip()
+        if user != "explicitcontextualunderstanding":
+            errors.append(f"Wrong GitHub user: {user}. Expected: explicitcontextualunderstanding")
+        else:
+            print(f"✅ GitHub identity: {user}")
+    except Exception as e:
+        errors.append(f"Failed to verify GitHub identity: {e}")
+
+    print()
+    if errors:
+        print("❌ Dry-run failed:")
+        for err in errors:
+            print(f"   - {err}")
+        sys.exit(1)
+    else:
+        print("✅ All credentials verified!")
+        print("\nTo run the build:")
+        print("   export RUNPOD_API_KEY='your-key'")
+        print("   export NETWORK_VOLUME_ID='vol-xxx'")
+        print("   export PUSH_TO_GHCR=true  # optional")
+        print("   python scripts/automated_build.py")
+        sys.exit(0)
+
+
 def main():
     """Main entry point."""
+    # Check for dry-run flag
+    if "--dry-run" in sys.argv or "-n" in sys.argv:
+        dry_run()
+
     if not RUNPOD_API_KEY:
         print("❌ RUNPOD_API_KEY not set")
         sys.exit(1)
