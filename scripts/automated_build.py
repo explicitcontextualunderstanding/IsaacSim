@@ -33,7 +33,7 @@ def get_secret_from_1password(var_name):
             ["bash", "-c", f"source {OP_WRAPPER} --print-export {var_name}"],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=60
         )
         if result.returncode == 0 and result.stdout:
             # Parse: export VAR=VALUE
@@ -91,6 +91,47 @@ def verify_identity():
     return user
 
 
+def check_gpu_availability(api_key, gpu_id="NVIDIA L40S"):
+    """Check if GPU is available before creating pod."""
+    import requests
+
+    query = """
+    query {
+      gpuTypes(filter: {id: "%s"}) {
+        id
+        displayName
+        memoryInGb
+        lowestPrice {
+          minimumBidPrice
+          uninterruptablePrice
+        }
+      }
+    }
+    """ % gpu_id
+
+    response = requests.post(
+        "https://api.runpod.io/graphql",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={"query": query}
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        gpus = data.get("data", {}).get("gpuTypes", [])
+        if gpus:
+            gpu = gpus[0]
+            print(f"✅ GPU {gpu_id} available:")
+            print(f"   Memory: {gpu.get('memoryInGb', 'N/A')} GB")
+            print(f"   Price: ${gpu.get('lowestPrice', {}).get('uninterruptablePrice', 'N/A')}/hr")
+            return True
+        else:
+            print(f"❌ GPU {gpu_id} not available")
+            return False
+    else:
+        print(f"⚠️ Could not check GPU availability: {response.status_code}")
+        return True  # Continue anyway
+
+
 def create_pod(config):
     """Create RunPod pod with L40S GPUs and proper port configuration."""
     print("🚀 Deploying 3x L40S build worker...")
@@ -101,7 +142,7 @@ def create_pod(config):
         "gpu_type_id": "NVIDIA L40S",
         "gpu_count": 3,
         "container_disk_in_gb": 200,
-        "min_vcpu": 48,
+        "min_vcpu_count": 48,
         "memory": "300GB",
         "volume_mount_path": "/workspace",
         "enable_public_ip": True,
@@ -124,9 +165,14 @@ def create_pod(config):
 
 def wait_for_ssh(pod, timeout=120):
     """Wait for SSH to become available."""
-    print("⏳ Waiting for SSH...")
     address = pod.get('ip', pod.get('internalIp'))
+    public_ip = pod.get('publicIp', pod.get('ip'))
     port = 22
+
+    print("⏳ Waiting for SSH...")
+    print(f"   Internal IP: {address}")
+    print(f"   Public IP: {public_ip}")
+    print(f"   SSH: ssh root@{public_ip}")
 
     for attempt in range(timeout // 10):
         try:
@@ -134,6 +180,7 @@ def wait_for_ssh(pod, timeout=120):
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(address, port=port, username='root', timeout=10)
             print(f"✅ SSH available at {address}")
+            print(f"   Connect with: ssh root@{public_ip}")
             return ssh
         except Exception as e:
             print(f"  Attempt {attempt + 1}: {e}")
@@ -265,11 +312,81 @@ def dry_run():
         sys.exit(0)
 
 
+def preflight(config, github_user):
+    """Run preflight test with minimal GPU to validate infrastructure."""
+    print("🧪 Running preflight test with minimal GPU...")
+
+    # Set API key
+    runpod.api_key = config["RUNPOD_API_KEY"]
+
+    # Create minimal pod (RTX 4060)
+    print("🚀 Deploying preflight pod (RTX 4060, 8 vCPU, 16GB)...")
+
+    pod = runpod.create_pod(
+        name="isaac-preflight",
+        image_name="alpine:latest",
+        gpu_type_id="NVIDIA L40S",
+        gpu_count=1,
+        container_disk_in_gb=30,
+        min_vcpu_count=8,
+        min_memory_in_gb=16,
+        support_public_ip=True,
+        data_center_id=config.get("DATA_CENTER", "US-NC-1"),
+    )
+
+    print(f"📦 Preflight pod created: {pod['id']}")
+    print(f"   Internal IP: {pod.get('ip', 'N/A')}")
+    print(f"   Public IP: {pod.get('publicIp', 'N/A')}")
+    if pod.get('publicIp'):
+        print(f"   SSH: ssh root@{pod.get('publicIp')}")
+
+    try:
+        ssh = wait_for_ssh(pod)
+
+        # Build minimal alpine container
+        print("📦 Building minimal alpine container...")
+
+        # Create Dockerfile
+        dockerfile = """FROM alpine:latest
+RUN apk add --no-cache curl
+CMD ["echo", "preflight-success"]
+"""
+        execute_command(ssh, f"echo '{dockerfile}' > /tmp/Dockerfile")
+
+        # Build and tag
+        execute_command(ssh, "cd /tmp && docker build -t preflight-test:latest -f Dockerfile .")
+
+        # Login to GHCR
+        if config.get("GITHUB_TOKEN"):
+            execute_command(ssh, f"echo $GITHUB_TOKEN | docker login ghcr.io -u {github_user} --password-stdin")
+        else:
+            print("⚠️ No GITHUB_TOKEN, skipping GHCR push")
+            return
+
+        # Tag and push
+        execute_command(ssh, f"docker tag preflight-test:latest ghcr.io/{github_user}/preflight-test:latest")
+        execute_command(ssh, f"docker push ghcr.io/{github_user}/preflight-test:latest")
+
+        print("✅ Preflight complete!")
+
+    finally:
+        print("🧹 Terminating preflight pod...")
+        runpod.terminate_pod(pod['id'])
+
+
 def main():
     """Main entry point."""
     # Check for dry-run flag
     if "--dry-run" in sys.argv or "-n" in sys.argv:
         dry_run()
+        sys.exit(0)
+
+    # Check for preflight flag
+    if "--preflight" in sys.argv:
+        config = get_config()
+        github_user = verify_identity()
+        preflight(config, github_user)
+        sys.exit(0)
 
     # Fetch config from env or 1Password
     config = get_config()
@@ -283,6 +400,12 @@ def main():
 
     # Verify GitHub identity
     github_user = verify_identity()
+
+    # Check GPU availability
+    print("\n🔍 Checking GPU availability...")
+    if not check_gpu_availability(config["RUNPOD_API_KEY"], "NVIDIA L40S"):
+        print("❌ L40S not available. Try a different GPU or region.")
+        sys.exit(1)
 
     # Create pod
     pod = create_pod(config)
