@@ -22,9 +22,58 @@ except ImportError:
 
 
 # Configuration
-RUNPOD_API_KEY = os.environ.get("RUNPOD_API_KEY", "")
-NETWORK_VOLUME_ID = os.environ.get("NETWORK_VOLUME_ID", "")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+# Priority: 1) Environment variable, 2) 1Password via wrapper
+
+OP_WRAPPER = os.path.expanduser("~/workspace/nano2/scripts/op_api_key_wrapper.sh")
+
+def get_secret_from_1password(var_name):
+    """Fetch secret from 1Password using the wrapper script."""
+    try:
+        result = subprocess.run(
+            ["bash", "-c", f"source {OP_WRAPPER} --print-export {var_name}"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0 and result.stdout:
+            # Parse: export VAR=VALUE
+            line = result.stdout.strip()
+            if line.startswith("export "):
+                _, _, value = line.partition("=")
+                return value.strip().strip("'").strip('"')
+    except Exception as e:
+        print(f"⚠️ Failed to get {var_name} from 1Password: {e}")
+    return None
+
+
+def get_config():
+    """Get configuration from env or 1Password."""
+    config = {}
+
+    # RUNPOD_API_KEY
+    config["RUNPOD_API_KEY"] = os.environ.get("RUNPOD_API_KEY")
+    if not config["RUNPOD_API_KEY"]:
+        config["RUNPOD_API_KEY"] = get_secret_from_1password("RUNPOD_API_KEY")
+
+    # NETWORK_VOLUME_ID
+    config["NETWORK_VOLUME_ID"] = os.environ.get("NETWORK_VOLUME_ID")
+    if not config["NETWORK_VOLUME_ID"]:
+        config["NETWORK_VOLUME_ID"] = get_secret_from_1password("NETWORK_VOLUME_ID")
+
+    # GITHUB_TOKEN (for GHCR push)
+    config["GITHUB_TOKEN"] = os.environ.get("GITHUB_TOKEN")
+    if not config["GITHUB_TOKEN"]:
+        # Try GH_RUNNER_TOKEN as fallback
+        config["GITHUB_TOKEN"] = os.environ.get("GH_RUNNER_TOKEN")
+        if not config["GITHUB_TOKEN"]:
+            config["GITHUB_TOKEN"] = get_secret_from_1password("GH_RUNNER_TOKEN")
+
+    # DATA_CENTER
+    config["DATA_CENTER"] = os.environ.get("DATA_CENTER")
+    if not config["DATA_CENTER"]:
+        config["DATA_CENTER"] = get_secret_from_1password("DATA_CENTER")
+
+    return config
 
 
 def verify_identity():
@@ -42,27 +91,33 @@ def verify_identity():
     return user
 
 
-def create_pod():
-    """Create RunPod pod with RTX 5090 GPUs and proper port configuration."""
+def create_pod(config):
+    """Create RunPod pod with L40S GPUs and proper port configuration."""
     print("🚀 Deploying 3x L40S build worker...")
 
-    pod = runpod.create_pod(
-        name="Isaac6-Source-Build",
-        gpu_type_id="NVIDIA L40S",
-        gpu_count=3,
-        network_volume_id=NETWORK_VOLUME_ID,
-        container_disk_in_gb=200,
-        min_vcpu=48,
-        memory="300GB",
-        volume_mount_path="/workspace",
-        enable_public_ip=True,
-        exposed_ports=[
+    # Only include network_volume_id if provided
+    pod_args = {
+        "name": "Isaac6-Source-Build",
+        "gpu_type_id": "NVIDIA L40S",
+        "gpu_count": 3,
+        "container_disk_in_gb": 200,
+        "min_vcpu": 48,
+        "memory": "300GB",
+        "volume_mount_path": "/workspace",
+        "enable_public_ip": True,
+        "exposed_ports": [
             {"port": 6080, "protocol": "tcp"},   # noVNC
             {"port": 8000, "protocol": "tcp"},   # Isaac Sim streaming
             {"port": 49100, "protocol": "tcp"},  # WebRTC signaling
             {"port": 47998, "protocol": "udp"},  # WebRTC video - CRITICAL
         ]
-    )
+    }
+
+    # Add network volume if provided
+    if config.get("NETWORK_VOLUME_ID"):
+        pod_args["network_volume_id"] = config["NETWORK_VOLUME_ID"]
+
+    pod = runpod.create_pod(**pod_args)
 
     return pod
 
@@ -152,25 +207,32 @@ def dry_run():
     """Verify credentials without spinning up a server."""
     print("🔍 Running dry-run to verify credentials...\n")
 
+    # Fetch config from env or 1Password
+    config = get_config()
+
     errors = []
 
     # Check RunPod API key
-    if not RUNPOD_API_KEY:
+    if not config.get("RUNPOD_API_KEY"):
         errors.append("RUNPOD_API_KEY not set")
     else:
-        print(f"✅ RUNPOD_API_KEY: {'*' * len(RUNPOD_API_KEY)}")
+        print(f"✅ RUNPOD_API_KEY: {'*' * len(config['RUNPOD_API_KEY'])}")
 
     # Check Network Volume ID
-    if not NETWORK_VOLUME_ID:
+    if not config.get("NETWORK_VOLUME_ID"):
         errors.append("NETWORK_VOLUME_ID not set")
     else:
-        print(f"✅ NETWORK_VOLUME_ID: {NETWORK_VOLUME_ID}")
+        print(f"✅ NETWORK_VOLUME_ID: {config['NETWORK_VOLUME_ID']}")
 
     # Check GitHub token
-    if not GITHUB_TOKEN:
-        errors.append("GITHUB_TOKEN not set (needed for GHCR push)")
+    if not config.get("GITHUB_TOKEN"):
+        print("⚠️ GITHUB_TOKEN not set (GHCR push disabled)")
     else:
-        print(f"✅ GITHUB_TOKEN: {'*' * len(GITHUB_TOKEN)}")
+        print(f"✅ GITHUB_TOKEN: {'*' * len(config['GITHUB_TOKEN'])}")
+
+    # Check Data Center
+    if config.get("DATA_CENTER"):
+        print(f"✅ DATA_CENTER: {config['DATA_CENTER']}")
 
     # Verify GitHub identity
     try:
@@ -209,17 +271,21 @@ def main():
     if "--dry-run" in sys.argv or "-n" in sys.argv:
         dry_run()
 
-    if not RUNPOD_API_KEY:
+    # Fetch config from env or 1Password
+    config = get_config()
+
+    if not config.get("RUNPOD_API_KEY"):
         print("❌ RUNPOD_API_KEY not set")
+        print("   Set env var or configure in ~/.1password-secrets.env")
         sys.exit(1)
 
-    runpod.api_key = RUNPOD_API_KEY
+    runpod.api_key = config["RUNPOD_API_KEY"]
 
     # Verify GitHub identity
     github_user = verify_identity()
 
     # Create pod
-    pod = create_pod()
+    pod = create_pod(config)
     print(f"📦 Pod created: {pod['id']}")
 
     try:
