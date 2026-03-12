@@ -165,14 +165,22 @@ def create_pod(config):
 
 def wait_for_ssh(pod, timeout=120):
     """Wait for SSH to become available."""
-    address = pod.get('ip', pod.get('internalIp'))
-    public_ip = pod.get('publicIp', pod.get('ip'))
+    # Try multiple field names for IP address
+    ip_address = pod.get('ipAddress', {})
+    if isinstance(ip_address, dict):
+        address = ip_address.get('address', pod.get('ip', pod.get('clusterIp')))
+    else:
+        address = pod.get('ip', pod.get('clusterIp'))
+
+    # Public IP - check machine level
+    public_ip = pod.get('publicIp') or pod.get('runpodIp')
+
     port = 22
 
     print("⏳ Waiting for SSH...")
-    print(f"   Internal IP: {address}")
+    print(f"   Address: {address}")
     print(f"   Public IP: {public_ip}")
-    print(f"   SSH: ssh root@{public_ip}")
+    print(f"   SSH: ssh root@{public_ip or address}")
 
     for attempt in range(timeout // 10):
         try:
