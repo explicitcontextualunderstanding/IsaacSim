@@ -44,15 +44,15 @@ def verify_identity():
 
 def create_pod():
     """Create RunPod pod with RTX 5090 GPUs and proper port configuration."""
-    print("🚀 Deploying 3x RTX 5090 build worker...")
+    print("🚀 Deploying 3x L40S build worker...")
 
     pod = runpod.create_pod(
         name="Isaac6-Source-Build",
-        gpu_type_id="NVIDIA GeForce RTX 5090",
+        gpu_type_id="NVIDIA L40S",
         gpu_count=3,
         network_volume_id=NETWORK_VOLUME_ID,
         container_disk_in_gb=200,
-        min_vcpu=36,
+        min_vcpu=48,
         memory="300GB",
         volume_mount_path="/workspace",
         enable_public_ip=True,
