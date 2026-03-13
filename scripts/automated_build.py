@@ -241,6 +241,7 @@ def create_pod(config, gpu_info, data_center=None, cloud=None, spot=False):
         "min_memory_in_gb": min_ram_gb,
         "volume_mount_path": "/workspace",
         "support_public_ip": True,
+        "command": ["sleep", "infinity"],
     }
 
     # Add data center if provided
@@ -501,6 +502,7 @@ def preflight(config, github_user):
         min_memory_in_gb=16,
         support_public_ip=True,
         data_center_id=config.get("DATA_CENTER", "US-NC-1"),
+        command=["sleep", "infinity"],
     )
 
     print(f"📦 Preflight pod created: {pod['id']}")
