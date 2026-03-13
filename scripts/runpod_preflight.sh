@@ -68,8 +68,7 @@ apt-get install -y --no-install-recommends \
     git-lfs \
     ca-certificates \
     unzip \
-    7zip \
-    7z \
+    p7zip-full \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
