@@ -70,7 +70,18 @@ apt-get install -y --no-install-recommends \
     unzip \
     7zip \
     7z \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
+
+# Install GCC 11 for Ubuntu 24.04 (Isaac Sim requires GCC 11, not 12+)
+echo "   Setting up GCC 11..."
+if [ -f /etc/os-release ] && . /etc/os-release && [ "$VERSION_ID" = "24.04" ]; then
+    apt-get update -qq
+    apt-get install -y --no-install-recommends gcc-11 g++-11
+    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 110
+    echo "   GCC 11 configured as default"
+fi
 
 echo "   Dependencies installed"
 
