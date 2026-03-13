@@ -73,6 +73,14 @@ apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Install AWS CLI for S3 uploads
+echo "   Installing AWS CLI..."
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
+echo "   AWS CLI installed"
+
 # Install GCC 11 for Ubuntu 24.04 (Isaac Sim requires GCC 11, not 12+)
 echo "   Setting up GCC 11..."
 if [ -f /etc/os-release ] && . /etc/os-release && [ "$VERSION_ID" = "24.04" ]; then
