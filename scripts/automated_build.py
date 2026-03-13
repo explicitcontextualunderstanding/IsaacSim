@@ -68,10 +68,17 @@ def get_config():
         if not config["GITHUB_TOKEN"]:
             config["GITHUB_TOKEN"] = get_secret_from_1password("GH_RUNNER_TOKEN")
 
-    # DATA_CENTER
+    # DATA_CENTER - with fallback list
     config["DATA_CENTER"] = os.environ.get("DATA_CENTER")
     if not config["DATA_CENTER"]:
         config["DATA_CENTER"] = get_secret_from_1password("DATA_CENTER")
+
+    # Fallback data centers if primary is exhausted
+    # Fallback data centers - skip US-NC-1 if it's exhausted
+    config["FALLBACK_DCS"] = os.environ.get("RUNPOD_FALLBACK_DCS", "US-CA-1,CA-MTL-1,EU-CZ-1,EU-RO-1,AP-SE-1").split(",")
+
+    # CLOUD_TYPE (SECURE or COMMUNITY)
+    config["CLOUD_TYPE"] = os.environ.get("RUNPOD_CLOUD_TYPE", "SECURE")
 
     return config
 
@@ -91,76 +98,230 @@ def verify_identity():
     return user
 
 
-def check_gpu_availability(api_key, gpu_id="NVIDIA L40S"):
-    """Check if GPU is available before creating pod."""
+def find_available_regions(min_vram_gb=24):
+    """Query which regions have GPUs available using GraphQL."""
     import requests
 
+    # Query all GPUs and filter in Python
     query = """
     query {
-      gpuTypes(filter: {id: "%s"}) {
+      gpuTypes {
         id
         displayName
         memoryInGb
-        lowestPrice {
-          minimumBidPrice
-          uninterruptablePrice
+        stockStatus
+        nodeGroupDatacenters {
+          id
+          name
         }
       }
     }
-    """ % gpu_id
+    """
 
-    response = requests.post(
-        "https://api.runpod.io/graphql",
-        headers={"Authorization": f"Bearer {api_key}"},
-        json={"query": query}
-    )
+    try:
+        response = requests.post(
+            "https://api.runpod.io/graphql",
+            headers={"Authorization": f"Bearer {runpod.api_key}"},
+            json={"query": query},
+            timeout=30
+        )
 
-    if response.status_code == 200:
+        if response.status_code != 200:
+            print(f"⚠️ Region query failed: {response.status_code}")
+            return None
+
         data = response.json()
+        if "errors" in data:
+            print(f"⚠️ GraphQL error: {data['errors'][0]['message']}")
+            return None
+
         gpus = data.get("data", {}).get("gpuTypes", [])
-        if gpus:
-            gpu = gpus[0]
-            print(f"✅ GPU {gpu_id} available:")
-            print(f"   Memory: {gpu.get('memoryInGb', 'N/A')} GB")
-            print(f"   Price: ${gpu.get('lowestPrice', {}).get('uninterruptablePrice', 'N/A')}/hr")
-            return True
-        else:
-            print(f"❌ GPU {gpu_id} not available")
-            return False
-    else:
-        print(f"⚠️ Could not check GPU availability: {response.status_code}")
-        return True  # Continue anyway
+
+        # Collect all datacenter + GPU combinations
+        region_gpu_map = {}
+        for gpu in gpus:
+            vram = gpu.get("memoryInGb", 0)
+            stock = gpu.get("stockStatus", "Unknown")
+            if vram >= min_vram_gb and stock != "Out":
+                datacenters = gpu.get("nodeGroupDatacenters", [])
+                for dc in datacenters:
+                    dc_id = dc.get("id")
+                    if dc_id:
+                        if dc_id not in region_gpu_map:
+                            region_gpu_map[dc_id] = []
+                        region_gpu_map[dc_id].append({
+                            "gpu": gpu.get("displayName"),
+                            "vram": vram,
+                            "stock": stock
+                        })
+
+        return region_gpu_map
+
+    except Exception as e:
+        print(f"⚠️ Region query failed: {e}")
+        return None
 
 
-def create_pod(config):
-    """Create RunPod pod with L40S GPUs and proper port configuration."""
-    print("🚀 Deploying 3x L40S build worker...")
+def find_best_gpu(min_vram_gb=24, min_ram_gb=64):
+    """Find cheapest GPU meeting requirements, prioritizing regions with availability."""
+    # First, try to find which regions have GPUs
+    print("\n🌍 Scanning for available regions...")
+    region_map = find_available_regions(min_vram_gb)
 
-    # Only include network_volume_id if provided
+    if region_map:
+        print("📍 Regions with available GPUs:")
+        for dc, gpus in sorted(region_map.items(), key=lambda x: -len(x[1])):
+            best = max(gpus, key=lambda g: g["vram"])
+            print(f"   {dc}: {best['gpu']} ({best['vram']}GB) - stock: {best['stock']}")
+
+    # Get all GPUs from runpod SDK
+    all_gpus = runpod.get_gpus()
+
+    if not all_gpus:
+        print("❌ No GPUs available")
+        return None
+
+    # Filter by VRAM requirement
+    candidates = []
+    for gpu in all_gpus:
+        vram = gpu.get("memoryInGb", 0)
+        if vram >= min_vram_gb:
+            price = gpu.get("lowestPrice", {}).get("uninterruptablePrice") or 0
+            stock = gpu.get("stockStatus", "Unknown")
+            candidates.append({
+                "id": gpu.get("id"),
+                "display": gpu.get("displayName"),
+                "vram": vram,
+                "price": price,
+                "stock": stock,
+            })
+
+    if not candidates:
+        print(f"❌ No GPUs with {min_vram_gb}GB+ VRAM available")
+        return None
+
+    # Sort by price (cheapest first)
+    candidates.sort(key=lambda x: x["price"] if x["price"] else float('inf'))
+
+    print(f"\n📊 GPUs meeting requirements (VRAM >= {min_vram_gb}GB):")
+    for i, gpu in enumerate(candidates[:10]):  # Top 10
+        price_str = f"${gpu['price']}/hr" if gpu['price'] else "price unknown"
+        print(f"   {i+1}. {gpu['display']} - {gpu['vram']}GB VRAM @ {price_str} (stock: {gpu['stock']})")
+
+    # Attach region info if available
+    if region_map:
+        for gpu in candidates:
+            gpu["regions"] = region_map
+
+    return candidates
+
+
+def create_pod(config, gpu_info, data_center=None, cloud=None, spot=False):
+    """Create RunPod pod with resources based on GPU specs."""
+    gpu_type_id = gpu_info["id"]
+    vram = gpu_info.get("vram", 24)
+
+    # Scale CPU/RAM based on VRAM (compilation needs ~2x VRAM for temp space)
+    min_ram_gb = max(64, vram * 2)  # At least 64GB or 2x VRAM
+    min_vcpu = min(48, max(16, vram * 2))  # 2 vCPUs per GB VRAM, capped
+
+    dc = data_center or config.get("DATA_CENTER") or "US-NC-1"
+    instance_type = "SPOT" if spot else cloud or "SECURE"
+    print(f"🚀 Deploying {instance_type} worker with {gpu_type_id} ({vram}GB VRAM) in {dc}")
+    print(f"   Requesting: {min_ram_gb}GB RAM, {min_vcpu} vCPUs")
+
+    # CUDA 13.1 + Ubuntu 24.04 for Blackwell (sm_100) support
     pod_args = {
         "name": "Isaac6-Source-Build",
-        "gpu_type_id": "NVIDIA L40S",
-        "gpu_count": 3,
-        "container_disk_in_gb": 200,
-        "min_vcpu_count": 48,
-        "min_memory_in_gb": 300,
+        "image_name": "nvidia/cuda:13.1.1-devel-ubuntu24.04",
+        "gpu_type_id": gpu_type_id,
+        "gpu_count": 1,
+        "container_disk_in_gb": 100,
+        "min_vcpu_count": min_vcpu,
+        "min_memory_in_gb": min_ram_gb,
         "volume_mount_path": "/workspace",
-        "enable_public_ip": True,
-        "exposed_ports": [
-            {"port": 6080, "protocol": "tcp"},   # noVNC
-            {"port": 8000, "protocol": "tcp"},   # Isaac Sim streaming
-            {"port": 49100, "protocol": "tcp"},  # WebRTC signaling
-            {"port": 47998, "protocol": "udp"},  # WebRTC video - CRITICAL
-        ]
+        "support_public_ip": True,
     }
 
-    # Add network volume if provided
+    # Add data center if provided
+    if dc:
+        pod_args["data_center_id"] = dc
+
+    # Add network volume if provided (critical for spot - data persists on volume)
     if config.get("NETWORK_VOLUME_ID"):
         pod_args["network_volume_id"] = config["NETWORK_VOLUME_ID"]
 
-    pod = runpod.create_pod(**pod_args)
+    if spot:
+        # Spot instances - will use interruptable pricing if available
+        pod = runpod.create_pod(**pod_args)
+    elif cloud:
+        pod_args["cloud_type"] = cloud
+        pod = runpod.create_pod(**pod_args)
+    else:
+        pod = runpod.create_pod(**pod_args)
 
     return pod
+
+
+def create_pod_with_backoff(config, gpu, data_center=None, cloud=None, spot=False, max_retries=2):
+    """Create pod with exponential backoff on rate limit."""
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return create_pod(config, gpu, data_center=data_center, cloud=cloud, spot=spot)
+        except Exception as e:
+            last_error = str(e)
+            # Check if it's a retryable error
+            retryable = any(x in last_error.lower() for x in [
+                "no longer any instances available",
+                "something went wrong",
+                "try again later",
+                "rate limit",
+                "too many requests"
+            ])
+            if retryable and attempt < max_retries - 1:
+                wait_time = (2 ** attempt) * 2  # 2, 4 seconds
+                print(f"   ⏳ {last_error[:40]}... retry in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+
+    # All retries exhausted - return None so we continue to next GPU/region
+    if last_error:
+        print(f"   ❌ {gpu['id']} in {data_center}: {last_error[:40]}...")
+    return None
+
+
+def create_pod_with_fallback(config, available_gpus):
+    """Try creating pod with fallback: spot first, then on-demand, across regions."""
+    primary_dc = config.get("DATA_CENTER") or "US-NC-1"
+    fallback_dcs = config.get("FALLBACK_DCS", [])
+
+    # Prioritize non-NC regions, put US-NC-1 last
+    all_dcs = fallback_dcs + [primary_dc] if primary_dc not in fallback_dcs else fallback_dcs
+    data_centers = [d for d in all_dcs if d != "US-NC-1"] + ["US-NC-1"]
+
+    # Try SPOT instances first (cheaper, more available)
+    print("\n🔄 Trying SPOT instances (60% cheaper)...")
+    for dc in data_centers:
+        print(f"   Trying {dc}...")
+        for gpu in available_gpus:
+            pod = create_pod_with_backoff(config, gpu, data_center=dc, spot=True)
+            if pod:
+                return pod
+            # If None, continue to next GPU/region
+
+    # Fall back to on-demand
+    cloud_types = ["SECURE", "COMMUNITY"]
+    for cloud in cloud_types:
+        for dc in data_centers:
+            print(f"\n🔄 Trying {cloud} cloud in {dc} (on-demand)...")
+            for gpu in available_gpus:
+                pod = create_pod_with_backoff(config, gpu, data_center=dc, cloud=cloud)
+                if pod:
+                    return pod
+                # If None, continue to next GPU/region
+
+    raise RuntimeError("No GPUs available")
 
 
 def wait_for_ssh(pod, timeout=120):
@@ -409,14 +570,24 @@ def main():
     # Verify GitHub identity
     github_user = verify_identity()
 
-    # Check GPU availability
-    print("\n🔍 Checking GPU availability...")
-    if not check_gpu_availability(config["RUNPOD_API_KEY"], "NVIDIA L40S"):
-        print("❌ L40S not available. Try a different GPU or region.")
+    # Check if build-only mode (accept any GPU for building)
+    build_only = os.environ.get("BUILD_ONLY", "false").lower() == "true"
+    if build_only:
+        print("\n🔧 BUILD_ONLY mode: Accepting any available GPU for compilation")
+        print("   (Just need nvidia-container-toolkit, not Blackwell)")
+        min_vram = 8  # Any GPU will work for build
+    else:
+        min_vram = 24  # Need 24GB+ for runtime
+
+    # Check GPU availability and select best option
+    print(f"\n🔍 Checking GPU availability (min {min_vram}GB VRAM)...")
+    available_gpus = find_best_gpu(min_vram_gb=min_vram)
+    if not available_gpus:
+        print("❌ No suitable GPUs available. Try again later.")
         sys.exit(1)
 
-    # Create pod
-    pod = create_pod(config)
+    # Create pod with fallback
+    pod = create_pod_with_fallback(config, available_gpus)
     print(f"📦 Pod created: {pod['id']}")
 
     try:
