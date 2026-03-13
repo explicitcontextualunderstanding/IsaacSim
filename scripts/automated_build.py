@@ -143,7 +143,7 @@ def create_pod(config):
         "gpu_count": 3,
         "container_disk_in_gb": 200,
         "min_vcpu_count": 48,
-        "memory": "300GB",
+        "min_memory_in_gb": 300,
         "volume_mount_path": "/workspace",
         "enable_public_ip": True,
         "exposed_ports": [
@@ -328,7 +328,7 @@ def preflight(config, github_user):
     runpod.api_key = config["RUNPOD_API_KEY"]
 
     # Create minimal pod (RTX 4060)
-    print("🚀 Deploying preflight pod (RTX 4060, 8 vCPU, 16GB)...")
+    print("🚀 Deploying preflight pod (L40S, 8 vCPU, 16GB)...")
 
     pod = runpod.create_pod(
         name="isaac-preflight",
