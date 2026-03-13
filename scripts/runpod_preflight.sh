@@ -85,8 +85,9 @@ fi
 
 echo "   Dependencies installed"
 
-# Setup GH credentials if available
+# Setup GH credentials if available (RunPod injects secrets as RUNPOD_SECRET_*)
 echo "[4/5] Setting up GitHub access..."
+GH_TOKEN="${GH_TOKEN:-${RUNPOD_SECRET_GH_TOKEN}}"
 if [ -n "$GH_TOKEN" ]; then
     echo "   GH_TOKEN found in environment"
     git config --global credential.helper store
