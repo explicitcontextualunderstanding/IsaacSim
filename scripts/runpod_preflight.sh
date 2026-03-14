@@ -74,11 +74,14 @@ apt-get install -y --no-install-recommends \
 
 # Install AWS CLI for S3 uploads
 echo "   Installing AWS CLI..."
-curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-unzip -q /tmp/awscliv2.zip -d /tmp
-/tmp/aws/install
-rm -rf /tmp/awscliv2.zip /tmp/aws
+pip3 install awscli --break-system-packages || true
 echo "   AWS CLI installed"
+
+# Install buildah for container image building
+echo "   Installing buildah..."
+apt-get update -qq
+apt-get install -y --no-install-recommends buildah
+echo "   buildah installed"
 
 # Install GCC 11 for Ubuntu 24.04 (Isaac Sim requires GCC 11, not 12+)
 echo "   Setting up GCC 11..."
