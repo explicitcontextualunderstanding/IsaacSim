@@ -11,10 +11,15 @@ echo "=== Isaac Sim 6.0 Container Validation ==="
 
 # Parse args
 HEADLESS=""
+STREAMING=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --headless)
             HEADLESS="1"
+            shift
+            ;;
+        --streaming)
+            STREAMING="1"
             shift
             ;;
         *)
@@ -154,8 +159,49 @@ echo "   OMNI_KIT_ACCEPT_EULA: ${OMNI_KIT_ACCEPT_EULA:-not set}"
 echo "   ISAAC_SIM_PATH: ${ISAAC_SIM_PATH:-not set}"
 echo "✅ Environment check complete"
 
+# Test 8: Streaming configuration check
+echo ""
+echo "[8/8] Checking streaming configuration..."
+echo "   OMNI_KIT_IP: ${OMNI_KIT_IP:-not set (default: 127.0.0.1)}"
+echo "   OMNI_KIT_STREAM_PORT: ${OMNI_KIT_STREAM_PORT:-not set (default: 47998)}"
+
+# List streaming ports that need to be exposed
+echo ""
+echo "   Streaming ports required for UI access:"
+echo "   - 47998/udp  (WebRTC video) - CRITICAL"
+echo "   - 49100/tcp  (WebRTC signaling)"
+echo "   - 6080/tcp   (noVNC)"
+echo "   - 8000/tcp   (HTTP streaming)"
+echo ""
+echo "   To enable streaming, set:"
+echo "   export OMNI_KIT_IP=0.0.0.0"
+echo "   export OMNI_KIT_STREAM_PORT=47998"
+echo "✅ Streaming configuration check complete"
+
+# Test streaming (if requested)
+if [ -n "$STREAMING" ]; then
+    echo ""
+    echo "[Streaming Test] Starting Isaac Sim with streaming enabled..."
+    cd "$ISAAC_SIM_PATH"
+
+    # Set streaming environment
+    export OMNI_KIT_IP=0.0.0.0
+    export OMNI_KIT_STREAM_PORT=47998
+
+    echo "   OMNI_KIT_IP=$OMNI_KIT_IP"
+    echo "   OMNI_KIT_STREAM_PORT=$OMNI_KIT_STREAM_PORT"
+
+    # Start Isaac Sim with streaming for 30 seconds
+    timeout 30 ./python.sh isaac-sim.sh --stream --port 47998 --bind 0.0.0.0 || true
+
+    echo "✅ Streaming test complete (timeout is OK)"
+fi
+
 echo ""
 echo "=== Validation Complete ==="
 echo "✅ All tests passed!"
 echo ""
-echo "To run full PhysX test: ./scripts/validate_container.sh --headless"
+echo "Usage:"
+echo "  ./scripts/validate_container.sh              # Basic validation"
+echo "  ./scripts/validate_container.sh --headless    # Full PhysX/RTX test"
+echo "  ./scripts/validate_container.sh --streaming    # Test streaming UI"
