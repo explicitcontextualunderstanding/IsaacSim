@@ -181,13 +181,33 @@ EOF
 # --- 5. Golden MCAP Smoke Test ---
 echo ""
 echo "[5/5] Running Golden MCAP Smoke Test..."
+
+# Shader Cache Persistence Tip
+if [ ! -d "/root/.nv/ComputeCache" ]; then
+    echo "⚠️  Tip: Ensure /root/.nv/ComputeCache is mapped to a Network Volume to persist Vulkan shader cache and speed up warmup across pod restarts."
+fi
+
 echo "   Testing 10-second headless recording..."
 if [ -f "scripts/record_golden_mcap.py" ]; then
     ./python.sh scripts/record_golden_mcap.py \
         --output /workspace/IsaacSim/recordings/test_pulse.mcap \
         --headless \
         --max_frames 300 || echo "⚠️ Warning: Golden MCAP smoke test failed. Check scripts/record_golden_mcap.py."
-    echo "✅ Smoke test completed. Check size of /workspace/IsaacSim/recordings/test_pulse.mcap."
+    
+    MCAP_FILE="/workspace/IsaacSim/recordings/test_pulse.mcap"
+    if [ -f "$MCAP_FILE" ]; then
+        MCAP_SIZE=$(stat -c%s "$MCAP_FILE" 2>/dev/null || stat -f%z "$MCAP_FILE" 2>/dev/null || echo 0)
+        # 5MB = 5 * 1024 * 1024 = 5242880 bytes
+        if [ "$MCAP_SIZE" -gt 5242880 ]; then
+            echo "✅ Smoke test completed successfully. MCAP file is > 5MB (${MCAP_SIZE} bytes)."
+        else
+            echo "❌ Error: MCAP file relies on fastdds but is too small (${MCAP_SIZE} bytes). The ros2_bridge may be running but failing to publish sensor data."
+            exit 1
+        fi
+    else
+        echo "❌ Error: test_pulse.mcap was not created."
+        exit 1
+    fi
 else
     echo "⚠️ Warning: scripts/record_golden_mcap.py not found. Skipping smoke test."
 fi
