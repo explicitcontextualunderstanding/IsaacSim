@@ -1,6 +1,7 @@
 ![Isaac Sim](docs/readme/hero_shot_compressed.png)
 
 ---
+
 # Isaac Sim
 
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
@@ -31,7 +32,6 @@ Follow these links to get started:
 - [Tutorials](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/introduction/quickstart_index.html)
 - [Assets](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/assets/usd_assets_overview.html)
 
-
 ## Prerequisites and Environment Setup
 
 Ensure your system is set up with the following before building Isaac Sim:
@@ -61,8 +61,6 @@ Ensure your system is set up with the following before building Isaac Sim:
 
 - **Internet Access**: Required for downloading the Omniverse Kit SDK, extensions, and tools.
 
-
-
 ### Required Software Dependencies
 
 - [**Git**](https://git-scm.com/downloads): For version control and repository management
@@ -81,6 +79,7 @@ Ensure your system is set up with the following before building Isaac Sim:
 
   > **(Linux) ⚠️**
   > Please use GCC/G++ 11, higher versions are not supported yet. To install GCC/G++ 11, run the following commands:
+>
   > ```bash
   > sudo apt-get install gcc-11 g++-11
   > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200
@@ -103,7 +102,6 @@ Ensure your system is set up with the following before building Isaac Sim:
 This section guides you through building Isaac Sim from source code.
 
 ### 1. Clone the Repository
-
 
 ```bash
 git clone https://github.com/isaac-sim/IsaacSim.git isaacsim
@@ -143,57 +141,75 @@ build.bat
 > **⚠️ Startup Time**
 > The first time loading Isaac Sim may take up to several minutes as Extensions and Shader are loaded and cached. The subsequent startup time should be in the ranges of 10-30 seconds depending on hardware configuration.
 
-
-
 Navigate to the corresponding binary directory for your platform and run the executable.
 
 **Linux (x86_64):**
+
 ```bash
 cd _build/linux-x86_64/release
 ./isaac-sim.sh
 ```
 
 **Linux (aarch64):**
+
 ```bash
 cd _build/linux-aarch64/release
 ./isaac-sim.sh
 ```
 
 **Windows:**
+
 ```powershell
 cd _build/windows-x86_64/release
 isaac-sim.bat
 ```
 
+### ✅ Headless GPU Validation (Linux / Cloud Pods)
+
+For headless machines (cloud GPUs, containers, or CI), run the built-in validation script to confirm driver compatibility, RTX pipeline initialization, and headless rendering:
+
+```bash
+./scripts/validate_container.sh --headless
+```
+
+If you prefer to run just the GPU compatibility checker, use:
+
+```bash
+cd _build/linux-x86_64/release
+./isaac-sim.compatibility_check.sh --headless --/app/quitAfter=10
+```
+
+> Tip: For complete headless behavior, set:
+>
+> - `ENABLE_CAMERAS=1`
+> - `HEADLESS=1`
+
 > NOTE: If this is your first time building Isaac Sim, you will be prompted to accept the Omniverse Licensing Terms.
-
-
 
 ## Advanced Build Options
 
-
 Isaac Sim uses a custom build system with the following key options:
 
-
 ### Core Build Options
+
 - `-c, --clean`: Clean the repository and exit
 - `-x, --rebuild`: Clean the repository before building (full rebuild)
 - `-h, --help`: Show all available build options
 
-
 ### Configuration Options
+
 - `--config [debug|release]`: Specify build configuration (default: both)
 - `-d, --debug`: Build only debug configuration
 - `-r, --release`: Build only release configuration
 
-
 ### Advanced Options
+
 - `-j NUM_CORES, --jobs NUM_CORES`: Limit the number of parallel compilation jobs
 - `-v, --verbose`: Enable verbose build output
 - `-q, --quiet`: Suppress build output
 
-
 ### Build Steps Control
+
 - `--fetch-only`: Only fetch dependencies and stop
 - `-g, --generate`: Generate projects, stage files and stop
 - `-s, --stage`: Stage files, skip generation step
@@ -201,8 +217,8 @@ Isaac Sim uses a custom build system with the following key options:
 - `--post-build-only`: Only perform post-build step
 
 ## Usage
-Congratulations on installing Isaac Sim! To get started with using Isaac Sim, follow these [Quick Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html). For more information, visit our full [documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
 
+Congratulations on installing Isaac Sim! To get started with using Isaac Sim, follow these [Quick Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html). For more information, visit our full [documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
 
 ## Troubleshooting
 
@@ -217,16 +233,15 @@ Congratulations on installing Isaac Sim! To get started with using Isaac Sim, fo
 
   - Note: The above command should be used only if you have enabled a proxy software or behind a corporate firewall. Port 7890 should be replaced with the proxy port set by the proxy software.
 
-
 ## Support
 
-* Please use GitHub [Discussions](https://github.com/isaac-sim/IsaacSim/discussions) for discussing ideas, asking questions, and requests for new features.
-* Github [Issues](https://github.com/isaac-sim/IsaacSim/issues) should only be used to track executable pieces of work with a definite scope and a clear deliverable. These can be fixing bugs, documentation issues, new features, or general updates.
+- Please use GitHub [Discussions](https://github.com/isaac-sim/IsaacSim/discussions) for discussing ideas, asking questions, and requests for new features.
+- Github [Issues](https://github.com/isaac-sim/IsaacSim/issues) should only be used to track executable pieces of work with a definite scope and a clear deliverable. These can be fixing bugs, documentation issues, new features, or general updates.
 
 ## Connect with the NVIDIA Omniverse Community
 
 Have a project or resource you'd like to share more widely? We'd love to hear from you! Reach out to the
-NVIDIA Omniverse Community team at OmniverseCommunity@nvidia.com to discuss potential opportunities
+NVIDIA Omniverse Community team at <OmniverseCommunity@nvidia.com> to discuss potential opportunities
 for broader dissemination of your work.
 
 ## License
@@ -240,4 +255,3 @@ To cite Isaac Sim, click on "Cite this repository" in the right sidebar of the [
 ## Contributing
 
 We do not support direct community contributions at the moment.
-

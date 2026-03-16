@@ -77,16 +77,13 @@ echo "   Installing AWS CLI..."
 pip3 install awscli --break-system-packages || true
 echo "   AWS CLI installed"
 
-# Install Kaniko for container image building (works in userspace on any pod)
-echo "   Installing Kaniko..."
-KANO_VERSION="v1.22.0"
-curl -sL "https://github.com/GoogleContainerTools/kaniko/releases/download/${KANO_VERSION}/kaniko-${KANO_VERSION#v}-linux-amd64.tar.gz" -o /tmp/kaniko.tar.gz
-mkdir -p /tmp/kaniko
-tar -xzf /tmp/kaniko.tar.gz -C /tmp/kaniko
-cp /tmp/kaniko/${KANO_VERSION#v}-linux-amd64/kaniko /usr/local/bin/kaniko
-chmod +x /usr/local/bin/kaniko
-rm -rf /tmp/kaniko*
-echo "   Kaniko installed"
+# Install img for container image building (works in userspace on any pod)
+# Kaniko binaries no longer available on GitHub releases - using img instead
+echo "   Installing img..."
+IMG_VERSION="v0.5.11"
+curl -sL "https://github.com/genuinetools/img/releases/download/${IMG_VERSION}/img-linux-amd64" -o /usr/local/bin/img
+chmod +x /usr/local/bin/img
+echo "   img installed ($(img version 2>/dev/null || echo 'v0.5.11'))"
 
 # Install GCC 11 for Ubuntu 24.04 (Isaac Sim requires GCC 11, not 12+)
 echo "   Setting up GCC 11..."

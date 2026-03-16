@@ -31,19 +31,33 @@ done
 
 # Test 1: GPU detection
 echo ""
-echo "[1/7] Testing GPU detection..."
+echo "[1/8] Testing GPU detection..."
 nvidia-smi --query-gpu=name,driver_version,memory.total,m compute_cap --format=csv
 echo "✅ GPU detected"
 
-# Test 2: CUDA availability
+# Test 2: Compiler version (GCC 11 required on Ubuntu 24.04)
 echo ""
-echo "[2/7] Testing CUDA..."
+echo "[2/8] Checking GCC version..."
+if command -v gcc >/dev/null 2>&1; then
+    GCC_MAJOR=$(gcc -dumpversion | cut -d. -f1)
+    echo "   gcc: $(gcc --version | head -n1)"
+    if [[ "$GCC_MAJOR" != "11" ]]; then
+        echo "⚠️  Warning: Isaac Sim builds are known to fail at runtime when built with GCC ${GCC_MAJOR}."
+        echo "    On Ubuntu 24.04, install gcc-11/g++-11 and set them as default via update-alternatives."
+    fi
+else
+    echo "⚠️  Warning: gcc not found. Please install gcc-11/g++-11."
+fi
+
+# Test 3: CUDA availability
+echo ""
+echo "[3/8] Testing CUDA..."
 nvcc --version || echo "⚠️ nvcc not in PATH (OK for runtime)"
 echo "✅ CUDA environment available"
 
-# Test 3: Isaac Sim path
+# Test 4: Isaac Sim path
 echo ""
-echo "[3/7] Checking Isaac Sim installation..."
+echo "[4/8] Checking Isaac Sim installation..."
 if [ -z "$ISAAC_SIM_PATH" ]; then
     ISAAC_SIM_PATH="/workspace/IsaacSim/_build/linux-x86_64/release"
 fi
@@ -56,16 +70,16 @@ else
     exit 1
 fi
 
-# Test 4: Compatibility check
+# Test 5: Compatibility check
 echo ""
-echo "[4/7] Running Isaac Sim compatibility check..."
+echo "[5/8] Running Isaac Sim compatibility check..."
 cd "$ISAAC_SIM_PATH"
 ./isaac-sim.compatibility_check.sh --headless --/app/quitAfter=10 2>&1 || true
 echo "✅ Compatibility check complete"
 
-# Test 5: Python and omni imports
+# Test 6: Python and omni imports
 echo ""
-echo "[5/7] Testing Python and Isaac Sim imports..."
+echo "[6/8] Testing Python and Isaac Sim imports..."
 cd "$ISAAC_SIM_PATH"
 ./python.sh -c "
 import sys
@@ -95,10 +109,10 @@ print('✅ All imports successful')
 "
 echo "✅ Python imports OK"
 
-# Test 6: Full headless test with PhysX and RTX (if requested)
+# Test 7: Full headless test with PhysX and RTX (if requested)
 if [ -n "$HEADLESS" ]; then
     echo ""
-    echo "[6/7] Running PhysX GPU pipeline test..."
+    echo "[7/8] Running PhysX GPU pipeline test..."
     cd "$ISAAC_SIM_PATH"
 
     # Create validation script
@@ -148,20 +162,20 @@ PYEOF
     echo "✅ PhysX GPU pipeline test OK"
 else
     echo ""
-    echo "[6/7] Skipping PhysX test (use --headless to enable)"
+    echo "[7/8] Skipping PhysX test (use --headless to enable)"
 fi
 
-# Test 7: Environment check
+# Test 8: Environment check
 echo ""
-echo "[7/7] Checking environment variables..."
+echo "[8/8] Checking environment variables..."
 echo "   ACCEPT_EULA: ${ACCEPT_EULA:-not set}"
 echo "   OMNI_KIT_ACCEPT_EULA: ${OMNI_KIT_ACCEPT_EULA:-not set}"
 echo "   ISAAC_SIM_PATH: ${ISAAC_SIM_PATH:-not set}"
 echo "✅ Environment check complete"
 
-# Test 8: Streaming configuration check
+# Streaming configuration check
 echo ""
-echo "[8/8] Checking streaming configuration..."
+echo "[Optional] Checking streaming configuration..."
 echo "   OMNI_KIT_IP: ${OMNI_KIT_IP:-not set (default: 127.0.0.1)}"
 echo "   OMNI_KIT_STREAM_PORT: ${OMNI_KIT_STREAM_PORT:-not set (default: 47998)}"
 
