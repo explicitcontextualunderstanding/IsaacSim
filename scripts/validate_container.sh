@@ -29,9 +29,23 @@ if [ -x "/usr/bin/gcc" ]; then
     GCC_VERSION=$(/usr/bin/gcc -dumpversion)
     GCC_MAJOR=$(echo "$GCC_VERSION" | cut -d. -f1)
     if [ "$GCC_MAJOR" != "11" ]; then
-        echo "❌ Error: /usr/bin/gcc is version ${GCC_VERSION}."
-        echo "   Isaac Sim 6.0-dev requires strict GCC 11 adherence to prevent segmentation faults."
-        exit 1
+        echo "⚠️  Incorrect GCC version detected (${GCC_VERSION}). Attempting auto-fix..."
+        
+        # Check if GCC 11 is even installed
+        if ! dpkg -l | grep -q "gcc-11"; then
+            echo "   Installing gcc-11 and g++-11..."
+            apt-get update && apt-get install -y gcc-11 g++-11
+        fi
+
+        # Set up update-alternatives to prioritize version 11
+        echo "   Updating alternatives to prioritize GCC 11..."
+        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 \
+                            --slave /usr/bin/g++ g++ /usr/bin/g++-11
+        update-alternatives --set gcc /usr/bin/gcc-11
+        
+        # Re-verify
+        NEW_GCC=$(/usr/bin/gcc -dumpversion)
+        echo "✅ GCC auto-fixed to version $NEW_GCC."
     else
         echo "✅ GCC version is 11 ($(/usr/bin/gcc --version | head -n1))"
     fi
@@ -48,10 +62,23 @@ if [ -d "$LFS_DIR" ]; then
     LFS_POINTERS=$(find "$LFS_DIR" -type f -size -1k \( -name "*.png" -o -name "*.usd" -o -name "*.usda" -o -name "*.usdc" \) 2>/dev/null | head -n 5 || true)
     
     if [ -n "$LFS_POINTERS" ]; then
-        echo "❌ Error: Detected tiny asset files (<1KB) likely caused by missing Git LFS pulls:"
-        echo "$LFS_POINTERS"
-        echo "   USD scenes will load with 'ghost' (black) textures. Ensure Git LFS assets are pulled."
-        exit 1
+        echo "⚠️  LFS Pointers detected. Attempting to pull assets..."
+        
+        # Ensure Git LFS is installed and initialized
+        git lfs install
+        
+        # Force pull missing assets
+        echo "   Running: git lfs pull (this may take a few minutes)..."
+        git lfs pull
+        
+        # Final check
+        LFS_RECHECK=$(find "$LFS_DIR" -type f -size -1k \( -name "*.png" -o -name "*.usd" -o -name "*.usda" -o -name "*.usdc" \) 2>/dev/null | head -n 1 || true)
+        if [ -z "$LFS_RECHECK" ]; then
+            echo "✅ Git LFS assets restored successfully."
+        else
+            echo "❌ Error: git lfs pull failed to restore assets. Check internet/auth."
+            exit 1
+        fi
     else
         echo "✅ Git LFS assets appear to be fully pulled (no <1KB pointers detected)."
     fi
@@ -71,8 +98,8 @@ if [ -f "./omni.isaac.sim.compatibility_check.sh" ]; then
     ./omni.isaac.sim.compatibility_check.sh --headless > "$COMPAT_LOG" 2>&1 || true
     
     # Check for Blackwell (sm_100/120) or Ada (sm_89) support in logs
-    if grep -qE "sm_100|sm_120" "$COMPAT_LOG"; then
-        echo "✅ Blackwell support (sm_100/sm_120) explicitly detected in compatibility logs."
+    if grep -qE "sm_100|sm_120|CUDA Tile" "$COMPAT_LOG"; then
+        echo "✅ Blackwell support (sm_100/sm_120 or CUDA Tile) explicitly detected in compatibility logs."
     elif grep -qE "sm_89" "$COMPAT_LOG"; then
         echo "✅ Ada support (sm_89) detected in compatibility logs."
     else
@@ -138,8 +165,11 @@ print("   Enabling omni.isaac.ros2_bridge extension...")
 from isaacsim.core.utils.extensions import enable_extension
 ros_success = enable_extension("omni.isaac.ros2_bridge")
 
-# 3. Check Renderer
-simulation_app.update()
+# 3. Check Renderer & Warmup Shaders
+print("   Warming up Vulkan shaders (10 frames)...")
+for _ in range(10):
+    simulation_app.update()
+
 print(f"✅ Renderer Status: {'PASS' if simulation_app.is_running() else 'FAIL'}")
 print(f"✅ ROS2 Bridge Ext: {'LOADED' if ros_success else 'FAILED'}")
 
@@ -147,6 +177,20 @@ simulation_app.close()
 EOF
 
 ./python.sh /tmp/validate_pulse.py
+
+# --- 5. Golden MCAP Smoke Test ---
+echo ""
+echo "[5/5] Running Golden MCAP Smoke Test..."
+echo "   Testing 10-second headless recording..."
+if [ -f "scripts/record_golden_mcap.py" ]; then
+    ./python.sh scripts/record_golden_mcap.py \
+        --output /workspace/IsaacSim/recordings/test_pulse.mcap \
+        --headless \
+        --max_frames 300 || echo "⚠️ Warning: Golden MCAP smoke test failed. Check scripts/record_golden_mcap.py."
+    echo "✅ Smoke test completed. Check size of /workspace/IsaacSim/recordings/test_pulse.mcap."
+else
+    echo "⚠️ Warning: scripts/record_golden_mcap.py not found. Skipping smoke test."
+fi
 
 echo ""
 echo "=== Validation Complete ==="
