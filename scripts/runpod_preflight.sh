@@ -132,5 +132,13 @@ echo "To build Isaac Sim:"
 echo "  cd /workspace/IsaacSim"
 echo "  ./build.sh"
 echo ""
+echo "=== Running Self-Healing Validation Gate ==="
+if [ -f "/workspace/IsaacSim/scripts/validate_container.sh" ]; then
+    bash /workspace/IsaacSim/scripts/validate_container.sh
+else
+    echo "⚠️ Warning: validate_container.sh not found."
+fi
+
+echo ""
 echo "Keeping container alive..."
 sleep infinity

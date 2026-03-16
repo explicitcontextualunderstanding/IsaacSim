@@ -377,6 +377,31 @@ def execute_command(ssh, cmd):
     return exit_code
 
 
+def run_validation_gate(ssh_client):
+    """
+    Executes the self-healing validation script on the remote RunPod instance.
+    """
+    print("🚀 Triggering Phase 0: Self-Healing Validation Gate...")
+    
+    # Run the script with a generous timeout for potential Git LFS pulls
+    stdin, stdout, stderr = ssh_client.exec_command(
+        "/workspace/IsaacSim/scripts/validate_container.sh", 
+        timeout=900  # 15-minute window for LFS and shader warmup
+    )
+    
+    # Stream output in real-time for visibility
+    for line in stdout:
+        print(f"[Remote]: {line.strip()}")
+        
+    exit_status = stdout.channel.recv_exit_status()
+    if exit_status != 0:
+        error_msg = stderr.read().decode().strip()
+        print(f"❌ Validation Failed with exit code {exit_status}: {error_msg}")
+        raise RuntimeError("Pod failed validation gate. Terminating to save costs.")
+    
+    print("✅ Validation Passed. Proceeding to production task.")
+
+
 def run_build(ssh, github_user):
     """Run Isaac Sim build commands."""
     build_commands = [
@@ -599,6 +624,13 @@ def main():
         public_ip = pod.get('publicIp', pod.get('ip'))
         print(f"\n✅ Streaming access:")
         print(f"   noVNC: https://{public_ip}.runpod.io:6080/vnc.html?resize=scale")
+
+        # Phase 0: Self-Healing Validation Gate
+        try:
+            run_validation_gate(ssh)
+        except Exception as e:
+            print(f"\n❌ Validation Gate Error: {e}")
+            return  # Terminate pod immediately
 
         # Run build
         success = run_build(ssh, github_user)
