@@ -1,11 +1,11 @@
 [package]
-version = "1.1.0"
+version = "1.2.1"
 category = "Simulation"
 title = "UCX Bridge"
 description = "The UCX bridge extension provides high-performance communication capabilities using UCX (Unified Communication X) for distributed simulation scenarios with low-latency data transfer."
 keywords = ["isaac", "UCX", "communication", "core", "networking", "distributed"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -19,12 +19,19 @@ writeTarget.platform = true
 name = "isaacsim.ucx.bridge"
 
 [settings]
-# All UCX Bridge settings are centrally defined in the ucx.core extension
+# All UCX Bridge settings are centrally defined in the `ucx.core` extension.
 
 [[test]]
-dependencies = [
-    "omni.isaac.ml_archive",
+name = "startup"
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
 ]
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
 args = [
     "--enable",
     "omni.kit.loop-isaac",
@@ -33,7 +40,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -49,6 +56,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -74,15 +82,5 @@ stdoutFailPatterns.exclude = [
     '*The NumPy module was reloaded*',
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
-
-stdoutFailPatterns.exclude = [
-    '*The NumPy module was reloaded*',
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

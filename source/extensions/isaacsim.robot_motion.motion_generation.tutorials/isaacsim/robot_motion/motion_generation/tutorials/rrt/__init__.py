@@ -6,4 +6,10 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+
+"""Tutorial extension for robot motion generation using RRT path planning with a Franka robot in Isaac Sim."""
+
+
 from .extension import *
+
+__all__ = ["UIBuilder", "Extension"]

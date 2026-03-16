@@ -1,5 +1,5 @@
 [package]
-version = "2.4.1"
+version = "2.5.0"
 category = "Simulation"
 title = "UI components for the Isaac Sim Occupancy Map"
 description = "UI components for the Isaac Sim Occupancy Map provides UI for 2D Occupancy Map Generation"
@@ -21,3 +21,12 @@ name = "isaacsim.asset.gen.omap.ui"
 
 [[python.module]]
 name = "isaacsim.asset.gen.omap.ui.tests"
+
+[[test]]
+dependencies = [
+    "omni.kit.ui_test",
+]
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]

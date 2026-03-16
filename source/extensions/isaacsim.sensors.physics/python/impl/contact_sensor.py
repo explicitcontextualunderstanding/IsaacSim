@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides contact sensor functionality for detecting and measuring physical contact forces in simulations."""
+
+
 from typing import Optional
 
 import carb
@@ -27,6 +31,35 @@ from pxr import Gf, PhysxSchema, UsdPhysics
 
 
 class ContactSensor(BaseSensor):
+    """A sensor that detects physical contact and measures contact forces.
+
+    ContactSensor creates and manages a contact sensor that can detect when objects come into contact with
+    it and measure the magnitude of contact forces. The sensor must be attached to a prim that has the
+    UsdPhysics.CollisionAPI enabled. It provides real-time contact detection with configurable thresholds
+    and can report detailed contact information including positions, normals, and impulses.
+
+    The sensor can operate at a specified frequency or time step and includes filtering capabilities through
+    min/max thresholds to ignore contacts below or above certain force values. It supports both basic contact
+    detection (boolean in-contact state and force magnitude) and detailed contact data (individual contact
+    points with full physics information).
+
+    Args:
+        prim_path: USD path where the contact sensor will be created.
+        name: Name identifier for the sensor.
+        frequency: Sensor update frequency in Hz. Cannot be used with dt.
+        dt: Sensor update time step in seconds. Cannot be used with frequency.
+        translation: Local translation offset of the sensor relative to its parent prim.
+        position: World position where the sensor should be placed.
+        min_threshold: Minimum force threshold below which contacts are ignored.
+        max_threshold: Maximum force threshold above which contacts are clamped.
+        radius: Detection radius of the contact sensor. Negative values indicate unlimited radius.
+
+    Raises:
+        Exception: If both frequency and dt are specified simultaneously.
+        Exception: If the parent prim does not have UsdPhysics.CollisionAPI enabled.
+        Exception: If sensor creation fails.
+    """
+
     def __init__(
         self,
         prim_path: str,
@@ -38,7 +71,7 @@ class ContactSensor(BaseSensor):
         min_threshold: Optional[float] = None,
         max_threshold: Optional[float] = None,
         radius: Optional[float] = None,
-    ) -> None:
+    ):
         if frequency is not None and dt is not None:
             raise Exception("Sensor Frequency and Sensor dt can't be both specified")
 
@@ -98,11 +131,21 @@ class ContactSensor(BaseSensor):
         self._current_frame["physics_step"] = 0
         return
 
-    def initialize(self, physics_sim_view=None) -> None:
+    def initialize(self, physics_sim_view=None):
+        """Initialize the contact sensor.
+
+        Args:
+            physics_sim_view: Physics simulation view to initialize with.
+        """
         BaseSensor.initialize(self, physics_sim_view=physics_sim_view)
         return
 
-    def get_current_frame(self) -> None:
+    def get_current_frame(self):
+        """Get the current sensor frame data including contact information.
+
+        Returns:
+            Dictionary containing contact data with keys for time, physics step, contact status, force, and number of contacts.
+        """
         cs_sensor_reading = self._contact_sensor_interface.get_sensor_reading(self.prim_path)
         cs_raw_data = self._contact_sensor_interface.get_contact_sensor_raw_data(self.prim_path)
         if cs_sensor_reading.is_valid:
@@ -148,45 +191,84 @@ class ContactSensor(BaseSensor):
             self._current_frame["physics_step"] = float(SimulationManager.get_num_physics_steps())
         return self._current_frame
 
-    def add_raw_contact_data_to_frame(self) -> None:
+    def add_raw_contact_data_to_frame(self):
+        """Add raw contact data to the current frame for detailed contact information."""
         self._current_frame["contacts"] = []
         return
 
-    def remove_raw_contact_data_from_frame(self) -> None:
+    def remove_raw_contact_data_from_frame(self):
+        """Remove raw contact data from the current frame."""
         del self._current_frame["contacts"]
         return
 
-    def resume(self) -> None:
+    def resume(self):
+        """Resume sensor data collection by enabling the contact sensor."""
         self._isaac_sensor_prim.GetEnabledAttr().Set(True)
         return
 
-    def pause(self) -> None:
+    def pause(self):
+        """Pause sensor data collection by disabling the contact sensor."""
         self._isaac_sensor_prim.GetEnabledAttr().Set(False)
         return
 
     def is_paused(self) -> bool:
+        """Check if the contact sensor is currently paused.
+
+        Returns:
+            True if the sensor is paused, False otherwise.
+        """
         if not self._isaac_sensor_prim.GetEnabledAttr().Get():
             return True
         return False
 
-    def set_frequency(self, value: float) -> None:
+    def set_frequency(self, value: float):
+        """Set the sensor sampling frequency.
+
+        Args:
+            value: The frequency in Hz to set for the sensor.
+        """
         self._isaac_sensor_prim.GetSensorPeriodAttr().Set(1.0 / value)
         return
 
     def get_frequency(self) -> int:
+        """Get the current sensor sampling frequency.
+
+        Returns:
+            The sensor frequency in Hz.
+        """
         return int(1.0 / self._isaac_sensor_prim.GetSensorPeriodAttr().Get())
 
     def get_dt(self) -> float:
+        """Get the sensor sampling time interval.
+
+        Returns:
+            The time interval between sensor readings in seconds.
+        """
         return self._isaac_sensor_prim.GetSensorPeriodAttr().Get()
 
-    def set_dt(self, value: float) -> None:
+    def set_dt(self, value: float):
+        """Sets the sensor period (time step) for the contact sensor.
+
+        Args:
+            value: The sensor period in seconds.
+        """
         self._isaac_sensor_prim.GetSensorPeriodAttr().Set(value)
         return
 
     def get_radius(self) -> float:
+        """Radius of the contact sensor detection area.
+
+        Returns:
+            The radius value of the sensor detection area.
+        """
         return self.prim.GetAttribute("radius").Get()
 
-    def set_radius(self, value: float) -> None:
+    def set_radius(self, value: float):
+        """Sets the radius of the contact sensor detection area.
+
+        Args:
+            value: The radius value to set.
+        """
         if self.get_radius() is None:
             self._isaac_sensor_prim.CreateRadiusAttr().Set(value)
         else:
@@ -194,13 +276,23 @@ class ContactSensor(BaseSensor):
         return
 
     def get_min_threshold(self) -> float:
+        """Minimum force threshold for contact detection.
+
+        Returns:
+            The minimum force threshold value.
+        """
         threshold = self.prim.GetAttribute("threshold").Get()
         if threshold is not None:
             return threshold[0]
         else:
             return None
 
-    def set_min_threshold(self, value: float) -> None:
+    def set_min_threshold(self, value: float):
+        """Sets the minimum force threshold for contact detection.
+
+        Args:
+            value: The minimum threshold value.
+        """
         if self.get_min_threshold() is None:
             self._isaac_sensor_prim.CreateThresholdAttr().Set((value, 10000))
         else:
@@ -208,13 +300,23 @@ class ContactSensor(BaseSensor):
         return
 
     def get_max_threshold(self) -> float:
+        """Maximum force threshold for contact detection.
+
+        Returns:
+            The maximum force threshold value.
+        """
         threshold = self.prim.GetAttribute("threshold").Get()
         if threshold is not None:
             return threshold[1]
         else:
             return None
 
-    def set_max_threshold(self, value: float) -> None:
+    def set_max_threshold(self, value: float):
+        """Sets the maximum force threshold for contact detection.
+
+        Args:
+            value: The maximum threshold value.
+        """
         if self.get_max_threshold() is None:
             self._isaac_sensor_prim.CreateThresholdAttr().Set((0, value))
         else:

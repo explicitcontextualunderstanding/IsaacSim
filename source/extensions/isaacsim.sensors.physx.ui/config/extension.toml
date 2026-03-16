@@ -1,31 +1,43 @@
 [package]
-version = "2.3.1"
+version = "2.5.0"
 category = "Simulation"
 title = "Isaac Sim PhysX Sensor UI components"
 description = "Isaac Sim PhysX Sensor UI components extension provides UI components for Isaac Sim PhysX-raycast-based sensor simulation, eg. menu options."
 keywords = ["isaac", "physics", "sensor", "lidar", "ui"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
-"isaacsim.core.api" = {}
-"isaacsim.core.deprecation_manager" = {}
 "isaacsim.gui.components" = {}
-"isaacsim.robot.schema" = {}
 "isaacsim.sensors.physx" = {}
+"omni.kit.actions.core" = {}
 "omni.kit.context_menu" = {}
-"omni.kit.menu.utils" = {}
-"omni.kit.uiapp" = {}
 
 [[python.module]]
 name = "isaacsim.sensors.physx.ui"
 
 [[test]]
+name = "startup"
 dependencies = [
     "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+stdoutFailPatterns.exclude = [
+  '*The NumPy module was reloaded*',
+]
+
+[[test]]
+timeout = 900
+dependencies = [
+    "isaacsim.test.utils",
+    "omni.isaac.ml_archive",
+    "omni.kit.window.stage",
 ]
 args = [
     "--enable",
@@ -35,7 +47,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -51,6 +63,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -70,17 +83,10 @@ args = [
     "--/rtx/materialDb/syncLoads=1",
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
+    ### Extension specific args
+    "--/app/window/dpiScaleOverride=1.0",
+    "--/app/window/scaleToMonitor=false",
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
-
-stdoutFailPatterns.exclude = [
-  '*The NumPy module was reloaded*',
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

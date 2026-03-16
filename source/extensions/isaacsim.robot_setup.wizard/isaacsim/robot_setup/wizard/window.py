@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""A wizard window interface for setting up robots in Isaac Sim with step-by-step configuration pages and progress tracking."""
+
+
 import asyncio
 
 import carb
@@ -34,6 +38,25 @@ from .utils.ui_utils import create_combo_list_model
 
 
 class RobotWizardWindow:
+    """A wizard window for setting up robots in Isaac Sim.
+
+    Provides a step-by-step interface for configuring robots through multiple wizard pages including adding
+    robots, setting up hierarchy, adding colliders, configuring joints and drives, preparing files, and
+    saving the robot. The wizard guides users through the complete robot setup process with a visual
+    progress tracker and integrated tools.
+
+    The window includes:
+    - Six wizard steps with visual progress tracking
+    - Integration with additional robot setup tools (Joint Drive Gain Tuner, Robot Assembler, USD to URDF
+      Exporter)
+    - Automatic docking to the viewport
+    - Persistent launch-on-startup setting
+    - Help documentation access
+
+    Args:
+        window_title: Title displayed in the window header.
+    """
+
     def __init__(self, window_title):
         window_flags = ui.WINDOW_FLAGS_NO_SCROLLBAR
         self._launch_on_startup = carb.settings.get_settings().get_as_bool(
@@ -66,6 +89,10 @@ class RobotWizardWindow:
         self.sub = ProgressRegistry().subscribe_progress_changed(self._change_style)
 
     def reset_progress(self):
+        """Resets all wizard progress steps to their initial state.
+
+        Sets the first step as active and all subsequent steps as remaining.
+        """
         # progress steps, this should be changed to refect the data of the robot, to ProgressColorState.IN_PROGRESS or ProgressColorState.COMPLETE,
         self._progress = {
             self._add_robot_page_name: ProgressColorState.ACTIVE,
@@ -89,6 +116,10 @@ class RobotWizardWindow:
         self._window = None
 
     async def _dock_windows(self):
+        """Docks the robot wizard window to the viewport.
+
+        Asynchronously positions the wizard window to the right of the viewport window.
+        """
         viewport = ui.Workspace.get_window("Viewport")
         for _ in range(3):
             await omni.kit.app.get_app().next_update_async()
@@ -99,7 +130,7 @@ class RobotWizardWindow:
         """Set window visibility state.
 
         Args:
-            visible (bool): Visible state of the window.
+            visible: Visible state of the window.
         """
         if self._window:
             self._window.visible = visible
@@ -107,6 +138,13 @@ class RobotWizardWindow:
                 asyncio.ensure_future(self._dock_windows())
 
     def _visibility_changed_fn(self, visible):
+        """Handles window visibility changes.
+
+        Rebuilds the window frame when hidden and notifies registered listeners of visibility state changes.
+
+        Args:
+            visible: The new visibility state of the window.
+        """
         if not visible:
             # schedule a rebuild of window frame. _rebuild_window won't be actually called until the window is visible again.
             self._window.frame.rebuild()
@@ -118,7 +156,7 @@ class RobotWizardWindow:
         """Adds callback function for when window visibility is changed.
 
         Args:
-            listener (callable): visibility changed callback.
+            listener: visibility changed callback.
         """
         self._visibility_changed_listener = listener
 
@@ -133,18 +171,33 @@ class RobotWizardWindow:
             carb.log_warn(f"Could not open browswer with url: {doc_link}, {e}")
 
     def _on_launch_on_startup_clicked(self, model):
+        """Handles the launch on startup checkbox toggle.
+
+        Updates the application setting to reflect the user's preference for launching the wizard at startup.
+
+        Args:
+            model: The checkbox model containing the new boolean value.
+        """
         self._launch_on_startup = model.get_value_as_bool()
         carb.settings.get_settings().set_bool(
             "/persistent/exts/isaacsim.robot_setup.wizard/launch_on_startup", self._launch_on_startup
         )
 
     def _reset_wizard(self):
+        """Resets the wizard to its initial state.
+
+        Clears the robot registry, resets all progress steps, rebuilds the window interface, and navigates to the first page.
+        """
         RobotRegistry().reset()
         self.reset_progress()
         self._window.frame.rebuild()
         self.update_page("Add Robot")
 
     def __on_build_top(self):
+        """Builds the top section of the wizard window.
+
+        Creates the title header with launch on startup checkbox, help button, and start over button.
+        """
         with ui.ZStack(height=56):
             ui.Rectangle(name="title_background")
             with ui.HStack(style={"HStack": {"margin_width": 10}}):
@@ -312,7 +365,13 @@ class RobotWizardWindow:
         # Execute the action to open the USD to URDF exporter UI
         omni.kit.actions.core.get_action_registry().execute_action("omni.kit.tool.asset_exporter", "file_export")
 
-    def _change_style(self, name, state=ProgressColorState.REMAINING):
+    def _change_style(self, name: str, state: ProgressColorState = ProgressColorState.REMAINING):
+        """Updates the visual style of a wizard step based on its progress state.
+
+        Args:
+            name: Name of the wizard step to update.
+            state: Progress state that determines the visual style.
+        """
         if state == ProgressColorState.REMAINING:
             style = get_progress_none_style()
         elif state == ProgressColorState.IN_PROGRESS:
@@ -325,20 +384,47 @@ class RobotWizardWindow:
 
 
 class ProgressState(object):
+    """Represents the state of a progress step in the robot setup wizard.
+
+    Tracks the status, visibility, and completion state of individual wizard steps. Each progress step
+    has a name identifier, UI frame handle for display control, and visibility state that determines
+    whether the step is currently shown in the interface.
+
+    Args:
+        name: The display name of the progress step.
+        handle: UI frame handle for controlling the step's display.
+        visible: Initial visibility state of the progress step.
+    """
+
     def __init__(self, name, handle, visible):
         self.step_name = name
         self.step_frame_handle = handle
         self.step_visible = visible
         self.completed = False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """String representation of the progress step.
+
+        Returns:
+            A formatted string containing the step name, completion status, and visibility.
+        """
         return f"Progress Step: name:{self.step_name}, completed:{self.completed}, visibibility:{self.step_visible}"
 
     def set_frame_handle(self, frame_handle):
+        """Sets the frame handle for the progress step.
+
+        Args:
+            frame_handle: The UI frame handle to associate with this progress step.
+        """
         self.step_frame_handle = frame_handle
 
     @property
     def completion(self) -> bool:
+        """Completion status of the progress step.
+
+        Returns:
+            True if the step is completed, False otherwise.
+        """
         return self.completed
 
     @completion.setter
@@ -348,6 +434,11 @@ class ProgressState(object):
 
     @property
     def visibility(self) -> bool:
+        """Visibility status of the progress step.
+
+        Returns:
+            True if the step is visible, False otherwise.
+        """
         return self.step_visible
 
     @visibility.setter

@@ -28,22 +28,7 @@ from pxr import Gf, Sdf
 from .common import get_qos_profile
 
 
-# Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2LaserScan(ROS2TestCase):
-    # Before running each test
-    async def setUp(self):
-        await super().setUp()
-
-        await omni.usd.get_context().new_stage_async()
-
-        await omni.kit.app.get_app().next_update_async()
-
-        pass
-
-    # After running each test
-    async def tearDown(self):
-        await super().tearDown()
-
     async def test_physx_lidar(self):
         # Test Lidar buffer with replicator activated
         import omni.graph.core as og
@@ -128,37 +113,37 @@ class TestRos2LaserScan(ROS2TestCase):
 
         self._lidar_data = None
         self._lidar_data_prev = None
+        self._lidar_callback_count = 0
 
         def lidar_callback(data: LaserScan):
+            self._lidar_callback_count += 1
             self._lidar_data = data
+            self.assertGreater(data.angle_max, data.angle_min)
+            self.assertEqual(len(data.intensities), 900)
+            if self._lidar_data_prev is not None:
+                self.assertEqual(data.intensities, self._lidar_data_prev.intensities)
+                self.assertEqual(data.ranges, self._lidar_data_prev.ranges)
+            self._lidar_data_prev = copy.deepcopy(data)
 
         node = self.create_node("lidar_tester")
         subscriber = self.create_subscription(node, LaserScan, "scan", lidar_callback, get_qos_profile())
-
-        def standard_checks():
-            self.assertIsNotNone(self._lidar_data)
-            self.assertGreater(self._lidar_data.angle_max, self._lidar_data.angle_min)
-            self.assertEqual(len(self._lidar_data.intensities), 900)
 
         omni.kit.commands.execute(
             "ChangeProperty", prop_path=Sdf.Path(lidarPath + ".rotation_rate"), value=0.0, prev=None
         )
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         # 0.0 Hz Lidar rotation
+        self._lidar_callback_count = 0
         self._timeline.play()
         await simulate_async(0.5, 60, spin)
-
-        standard_checks()
+        self.assertGreater(self._lidar_callback_count, 0)
         self.assertEqual(self._lidar_data.time_increment, 0)
 
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
-
-        self._lidar_data_prev = copy.deepcopy(self._lidar_data)
-        self._lidar_data = None
 
         # 21.0 Hz Lidar rotation
         omni.kit.commands.execute(
@@ -168,24 +153,23 @@ class TestRos2LaserScan(ROS2TestCase):
             prev=None,
         )
 
+        # Clear previous messages
         await omni.kit.app.get_app().next_update_async()
+        spin()
+        self._lidar_callback_count = 0
+        self._lidar_data = None
+        self._lidar_data_prev = None
+        await omni.kit.app.get_app().next_update_async()
+
         self._timeline.play()
         await simulate_async(0.5, 60, spin)
-
-        standard_checks()
-
-        self.assertEqual(len(self._lidar_data.intensities), len(self._lidar_data_prev.intensities))
-        self.assertEqual(self._lidar_data.intensities, self._lidar_data_prev.intensities)
+        self.assertGreater(self._lidar_callback_count, 0)
         self.assertGreater(self._lidar_data.time_increment, 0.0)
-
-        self.assertEqual(len(self._lidar_data.ranges), len(self._lidar_data_prev.ranges))
-        self.assertEqual(self._lidar_data.ranges, self._lidar_data_prev.ranges)
 
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
 
-        self._lidar_data_prev = copy.deepcopy(self._lidar_data)
-        self._lidar_data = None
+        prev_time_increment = self._lidar_data.time_increment
 
         # 201.0 Hz Lidar rotation
         omni.kit.commands.execute(
@@ -195,18 +179,18 @@ class TestRos2LaserScan(ROS2TestCase):
             prev=None,
         )
 
+        # Clear previous messages
+        await omni.kit.app.get_app().next_update_async()
+        spin()
+        self._lidar_callback_count = 0
+        self._lidar_data = None
+        self._lidar_data_prev = None
+        await omni.kit.app.get_app().next_update_async()
+
         self._timeline.play()
         await simulate_async(0.5, 60, spin)
-
-        standard_checks()
-
-        self.assertEqual(len(self._lidar_data.intensities), len(self._lidar_data_prev.intensities))
-        self.assertEqual(self._lidar_data.intensities, self._lidar_data_prev.intensities)
-
-        self.assertGreater(self._lidar_data_prev.time_increment, self._lidar_data.time_increment)
-
-        self.assertEqual(len(self._lidar_data.ranges), len(self._lidar_data_prev.ranges))
-        self.assertEqual(self._lidar_data.ranges, self._lidar_data_prev.ranges)
+        self.assertGreater(self._lidar_callback_count, 0)
+        self.assertGreater(prev_time_increment, self._lidar_data.time_increment)
 
         self._timeline.stop()
         spin()

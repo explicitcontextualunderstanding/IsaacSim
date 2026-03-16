@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for integrating Jupyter Notebook functionality into Isaac Sim."""
+
+
 import asyncio
 import glob
 import json
@@ -31,7 +34,11 @@ from . import executor, ui_builder
 
 
 def _get_event_loop() -> asyncio.AbstractEventLoop:
-    """Backward compatible function for getting the event loop"""
+    """Backward compatible function for getting the event loop.
+
+    Returns:
+        The current event loop, falling back to the policy's event loop if no loop is running.
+    """
     try:
         return asyncio.get_event_loop()
     except RuntimeError:
@@ -39,7 +46,34 @@ def _get_event_loop() -> asyncio.AbstractEventLoop:
 
 
 class Extension(omni.ext.IExt):
+    """Extension for integrating Jupyter Notebook functionality into Isaac Sim.
+
+    This extension provides a complete Jupyter Notebook environment within Isaac Sim, enabling interactive
+    Python development and execution. It creates a socket server for code execution, completion, and
+    introspection, while launching a separate Jupyter Notebook process for the web interface.
+
+    The extension supports:
+
+    - Code execution with output capture and error handling
+    - Intelligent code completion using Jedi
+    - Code introspection for documentation and help
+    - Configurable host, port, and directory settings
+    - Automatic process cleanup and port management
+    - Cross-platform compatibility (Windows and Linux)
+
+    The extension automatically configures the Python environment with access to Isaac Sim's modules and
+    extensions, ensuring seamless integration between Jupyter notebooks and the simulation environment.
+    """
+
     def on_startup(self, ext_id):
+        """Initializes the Jupyter extension and starts all necessary components.
+
+        Sets up socket server for code execution, configures Jedi autocompletion, launches Jupyter notebook process,
+        and initializes the UI builder.
+
+        Args:
+            ext_id: Extension identifier used to get extension path and settings.
+        """
         self._globals = {**globals()}
 
         # get extension path
@@ -158,6 +192,10 @@ class Extension(omni.ext.IExt):
         self._launch_jupyter_process()
 
     def on_shutdown(self):
+        """Shuts down the Jupyter extension and cleans up all resources.
+
+        Closes socket server, terminates Jupyter notebook process, and shuts down UI components.
+        """
         self._shutdown_subscription = None
         self._ui_builder.shutdown()
         # close socket
@@ -187,9 +225,14 @@ class Extension(omni.ext.IExt):
             self._process = None
 
     def _on_shutdown_event(self, event):
+        """Handles shutdown event from the application.
+
+        Args:
+            event: The shutdown event from the event dispatcher.
+        """
         self.on_shutdown()
 
-    async def _create_socket(self) -> None:
+    async def _create_socket(self):
         """Create a socket server to listen for incoming connections"""
 
         class ServerProtocol(asyncio.Protocol):
@@ -238,8 +281,13 @@ class Extension(omni.ext.IExt):
             carb.log_error(str(e))
             self._server = None
 
-    async def _process_code(self, source: str, transport: asyncio.Transport) -> None:
-        """Execute the source code in the Kit Python scope and send the result back to the client"""
+    async def _process_code(self, source: str, transport: asyncio.Transport):
+        """Execute the source code in the Kit Python scope and send the result back to the client
+
+        Args:
+            source: Python source code to execute.
+            transport: Transport connection to send results back to the client.
+        """
         _executor = executor.Executor(self._globals, self._globals)
         output, exception, trace = await _executor.execute(source)
         if output.endswith("\n"):
@@ -256,8 +304,13 @@ class Extension(omni.ext.IExt):
         # close the connection
         transport.close()
 
-    async def _complete_code_async(self, source: str, transport: asyncio.Transport) -> None:
-        """Complete objects under the cursor and send the result back to the client"""
+    async def _complete_code_async(self, source: str, transport: asyncio.Transport):
+        """Complete objects under the cursor and send the result back to the client
+
+        Args:
+            source: Python source code for completion.
+            transport: Transport connection to send completion results back to the client.
+        """
         # generate completions
         script = jedi.Script(source, project=self._jedi_project)
         completions = script.complete()
@@ -270,8 +323,15 @@ class Extension(omni.ext.IExt):
         # close the connection
         transport.close()
 
-    async def _introspect_code_async(self, source: str, line: int, column: int, transport: asyncio.Transport) -> None:
-        """Introspect code under the cursor and send the result back to the client"""
+    async def _introspect_code_async(self, source: str, line: int, column: int, transport: asyncio.Transport):
+        """Introspect code under the cursor and send the result back to the client
+
+        Args:
+            source: Python source code for introspection.
+            line: Line number of cursor position.
+            column: Column number of cursor position.
+            transport: Transport connection to send introspection results back to the client.
+        """
         # generate introspection
         script = jedi.Script(source, project=self._jedi_project)
         definitions = script.infer(line=line, column=column)
@@ -288,7 +348,7 @@ class Extension(omni.ext.IExt):
 
     # Jupyter Notebook methods
 
-    def _launch_jupyter_process(self) -> None:
+    def _launch_jupyter_process(self):
         """Launch the Jupyter notebook in a separate process"""
         # get packages path
         paths = [p for p in sys.path if "pip3-envs" in p]
@@ -320,7 +380,11 @@ class Extension(omni.ext.IExt):
             self._process = None
 
     def _get_display_url(self) -> str:
-        """Get the Jupyter notebook app.display_url"""
+        """Get the Jupyter notebook app.display_url
+
+        Returns:
+            The display URL for the Jupyter notebook or empty string if not available.
+        """
         display_url = ""
         if self._process is not None:
             notebook_txt = os.path.join(self._extension_path, "data", "launchers", "notebook.txt")

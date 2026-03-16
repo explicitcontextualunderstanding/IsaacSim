@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Global variables for the robot setup assembler extension."""
+
+
 EXTENSION_TITLE = "Robot Assembler"
 
 EXTENSION_DESCRIPTION = "Assemble multiple Articulations together"

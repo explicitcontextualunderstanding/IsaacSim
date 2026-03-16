@@ -30,7 +30,7 @@ class PickPlaceController(manipulators_controllers.PickPlaceController):
         name: Name identifier for the controller.
         gripper: The surface gripper to use.
         robot_articulation: The robot articulation to control.
-        events_dt: Timesteps for pick/place events. Defaults to None.
+        events_dt: Timesteps for pick/place events.
     """
 
     def __init__(
@@ -39,7 +39,7 @@ class PickPlaceController(manipulators_controllers.PickPlaceController):
         gripper: SurfaceGripper,
         robot_articulation: SingleArticulation,
         events_dt: Optional[List[float]] = None,
-    ) -> None:
+    ):
         if events_dt is None:
             events_dt = [0.01, 0.0035, 0.01, 1.0, 0.008, 0.005, 0.005, 1, 0.01, 0.08]
         manipulators_controllers.PickPlaceController.__init__(
@@ -67,8 +67,8 @@ class PickPlaceController(manipulators_controllers.PickPlaceController):
             picking_position: Position to pick from.
             placing_position: Position to place at.
             current_joint_positions: Current robot joint positions.
-            end_effector_offset: Offset for end effector. Defaults to None.
-            end_effector_orientation: Orientation for end effector. Defaults to None.
+            end_effector_offset: Offset for end effector.
+            end_effector_orientation: Orientation for end effector.
 
         Returns:
             The articulation action to execute.

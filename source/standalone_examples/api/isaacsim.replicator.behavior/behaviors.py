@@ -45,7 +45,7 @@ SCRIPTS_PATH = os.path.join(EXTENSION_PATH, "isaacsim/replicator/behavior/behavi
 
 # Enable scripting extension in standalone mode
 ext_manager = omni.kit.app.get_app().get_extension_manager()
-ext_manager.set_extension_enabled_immediate("omni.kit.scripting", True)
+ext_manager.set_extension_enabled_immediate("omni.behavior.scripting.core", True)
 simulation_app.update()
 
 # Enable behavior scripts (running python scripts attached to USD assets)

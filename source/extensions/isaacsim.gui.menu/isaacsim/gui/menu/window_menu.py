@@ -12,12 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Window menu layout for Isaac Sim."""
 import omni.kit.menu.utils
 from omni.kit.menu.utils import LayoutSourceSearch, MenuItemDescription, MenuLayout, add_menu_items
 
 
 class WindowMenuExtension:
-    def __init__(self, ext_id):
+    """Build and manage the Window menu.
+
+    Args:
+        ext_id: Extension identifier provided by the extension manager.
+    """
+
+    def __init__(self, ext_id: str):
         self.__menu_layout = [
             MenuLayout.Menu(
                 "Window",
@@ -85,4 +92,12 @@ class WindowMenuExtension:
         add_menu_items([simulation_setting_window], "Window")
 
     def shutdown(self):
+        """Remove menu layouts.
+
+        Example:
+            .. code-block:: python
+
+                menu = WindowMenuExtension("ext.id")
+                menu.shutdown()
+        """
         omni.kit.menu.utils.remove_layout(self.__menu_layout)

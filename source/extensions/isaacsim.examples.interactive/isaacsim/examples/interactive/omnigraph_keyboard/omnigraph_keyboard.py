@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Interactive sample demonstrating keyboard control of a cube's size using Omni Graph."""
+
+
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.ext
 import omni.graph.core as og
@@ -25,7 +28,32 @@ from isaacsim.storage.native import get_assets_root_path
 
 
 class OmnigraphKeyboard(BaseSample):
-    def __init__(self) -> None:
+    """Interactive sample demonstrating keyboard control of a cube's size using Omni Graph.
+
+    This sample creates a cyan cube in the scene and sets up an Omni Graph that responds to keyboard input.
+    The cube's size can be dynamically modified during simulation using the 'A' and 'D' keys:
+
+    - 'A' key: Increases the cube's size
+    - 'D' key: Decreases the cube's size
+
+    The implementation showcases how to:
+    - Create geometric objects using the experimental API
+    - Apply materials to objects for visual customization
+    - Build an Omni Graph for real-time keyboard interaction
+    - Connect multiple graph nodes to process input and modify object properties
+    - Handle scene lifecycle events (reset, clear) to maintain object state
+
+    The graph architecture includes keyboard state readers, type converters, mathematical operations,
+    and prim attribute readers/writers that work together to translate key presses into size changes.
+    The cube is placed on a ground plane environment and the camera is positioned to provide an optimal
+    viewing angle for the interactive demonstration.
+
+    This example is useful for understanding how to create interactive simulations that respond to
+    user input through Omni Graph, demonstrating the integration between USD prims, materials,
+    and graph-based logic systems.
+    """
+
+    def __init__(self):
         super().__init__()
         self._gamepad_gains = (40.0, 40.0, 2.0)
         self._gamepad_deadzone = 0.15
@@ -34,6 +62,11 @@ class OmnigraphKeyboard(BaseSample):
         self._initial_size = 1.0
 
     def setup_scene(self):
+        """Sets up the scene with a controllable cube and keyboard input graph.
+
+        Creates a cyan cube that can be resized using A and D keys through an Omni Graph action graph.
+        Also adds a ground plane environment and configures the camera view.
+        """
         # Create cube using experimental API
         self._cube = Cube(
             "/Cube", positions=self._initial_position, sizes=[self._initial_size], reset_xform_op_properties=True

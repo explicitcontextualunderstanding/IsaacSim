@@ -251,12 +251,12 @@ def enable_extension(name: str, *, enabled: bool = True) -> bool:
 
         >>> import isaacsim.core.experimental.utils.app as app_utils
         >>>
-        >>> # enable the 'isaacsim.core.version' extension
-        >>> app_utils.enable_extension("isaacsim.core.version")
+        >>> # enable the 'omni.pip.cloud' extension
+        >>> app_utils.enable_extension("omni.pip.cloud")
         True
         >>>
-        >>> # disable the 'isaacsim.core.version' extension
-        >>> app_utils.enable_extension("isaacsim.core.version", enabled=False)
+        >>> # disable the 'omni.pip.cloud' extension
+        >>> app_utils.enable_extension("omni.pip.cloud", enabled=False)
         True
     """
     extension_manager = omni.kit.app.get_app().get_extension_manager()
@@ -278,9 +278,9 @@ def is_extension_enabled(name: str) -> bool:
 
         >>> import isaacsim.core.experimental.utils.app as app_utils
         >>>
-        >>> # check if the 'isaacsim.core.version' extension is enabled
-        >>> app_utils.enable_extension("isaacsim.core.version", enabled=False)  # doctest: +NO_CHECK
-        >>> app_utils.is_extension_enabled("isaacsim.core.version")
+        >>> # check if the 'omni.pip.cloud' extension is enabled
+        >>> app_utils.enable_extension("omni.pip.cloud", enabled=False)  # doctest: +NO_CHECK
+        >>> app_utils.is_extension_enabled("omni.pip.cloud")
         False
     """
     extension_manager = omni.kit.app.get_app().get_extension_manager()
@@ -302,10 +302,10 @@ def get_extension_path(name: str) -> str:
 
         >>> import isaacsim.core.experimental.utils.app as app_utils
         >>>
-        >>> # get the path of the 'isaacsim.core.version' extension
-        >>> app_utils.enable_extension("isaacsim.core.version")  # doctest: +NO_CHECK
-        >>> app_utils.get_extension_path("isaacsim.core.version")  # doctest: +NO_CHECK
-        '.../exts/isaacsim.core.version'
+        >>> # get the path of the 'omni.pip.cloud' extension
+        >>> app_utils.enable_extension("omni.pip.cloud")  # doctest: +NO_CHECK
+        >>> app_utils.get_extension_path("omni.pip.cloud")  # doctest: +NO_CHECK
+        '.../exts/omni.pip.cloud'
     """
     extension_manager = omni.kit.app.get_app().get_extension_manager()
     return extension_manager.get_extension_path(extension_manager.get_enabled_extension_id(name))
@@ -326,10 +326,10 @@ def get_extension_id(name: str) -> str | None:
 
         >>> import isaacsim.core.experimental.utils.app as app_utils
         >>>
-        >>> # get the id of the 'isaacsim.core.version' extension
-        >>> app_utils.enable_extension("isaacsim.core.version")  # doctest: +NO_CHECK
-        >>> app_utils.get_extension_id("isaacsim.core.version")  # doctest: +NO_CHECK
-        'isaacsim.core.version-4.2.0'
+        >>> # get the id of the 'omni.pip.cloud' extension
+        >>> app_utils.enable_extension("omni.pip.cloud")  # doctest: +NO_CHECK
+        >>> app_utils.get_extension_id("omni.pip.cloud")  # doctest: +NO_CHECK
+        'omni.pip.cloud-4.2.0'
     """
     extension_manager = omni.kit.app.get_app().get_extension_manager()
     return extension_manager.get_enabled_extension_id(name)
@@ -350,11 +350,11 @@ def get_extension_dict(name: str) -> dict | None:
 
         >>> import isaacsim.core.experimental.utils.app as app_utils
         >>>
-        >>> # get the configuration dictionary of the 'isaacsim.core.version' extension
-        >>> app_utils.enable_extension("isaacsim.core.version")  # doctest: +NO_CHECK
-        >>> app_utils.get_extension_dict("isaacsim.core.version")  # doctest: +NO_CHECK
+        >>> # get the configuration dictionary of the 'omni.pip.cloud' extension
+        >>> app_utils.enable_extension("omni.pip.cloud")  # doctest: +NO_CHECK
+        >>> app_utils.get_extension_dict("omni.pip.cloud")  # doctest: +NO_CHECK
         {
-            'name': 'isaacsim.core.version',
+            'name': 'omni.pip.cloud',
             'package': {
                 'version': '4.2.0',
                 'description': "...",

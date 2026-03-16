@@ -20,6 +20,38 @@ import os
 import platform
 import sys
 
+# Workaround for PyTorch >=2.9 c10.dll WinError 1114 (pytorch/pytorch#166628).
+# Kit's sitecustomize.py registers DLL directories via os.add_dll_directory()
+# before Python code runs. When torch's _load_dll_libraries() later calls
+# LoadLibraryExW with LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, conflicting DLLs from
+# Kit's directories can shadow torch's, causing c10.dll's DllMain to fail.
+# Fix: pre-load all torch DLLs using LoadLibraryW (which uses PATH instead of
+# the restricted search), so they are already in memory when torch imports.
+if platform.system() == "Windows":
+    try:
+        from importlib.util import find_spec
+
+        _torch_spec = find_spec("torch")
+        if _torch_spec and _torch_spec.origin:
+            _torch_lib = os.path.normpath(os.path.join(os.path.dirname(_torch_spec.origin), "lib"))
+            if os.path.isdir(_torch_lib):
+                os.environ["PATH"] = _torch_lib + os.pathsep + os.environ.get("PATH", "")
+                if hasattr(os, "add_dll_directory"):
+                    os.add_dll_directory(_torch_lib)
+
+                import ctypes
+
+                _kernel32 = ctypes.WinDLL("kernel32.dll", use_last_error=True)
+                _kernel32.LoadLibraryW.restype = ctypes.c_void_p
+                for _dll in sorted(os.listdir(_torch_lib)):
+                    if _dll.lower().endswith(".dll"):
+                        _kernel32.LoadLibraryW(os.path.join(_torch_lib, _dll))
+                del _kernel32, _dll
+        del _torch_spec, _torch_lib
+        import torch  # noqa: F401
+    except Exception:
+        pass
+
 
 def _aarch_preload_checking(queue):
     try:

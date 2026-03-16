@@ -1,4 +1,9 @@
 # Changelog
+
+## [1.0.13] - 2025-12-20
+### Changed
+- Add omni.isaac.ml_archive as a test dependency
+
 ## [1.0.12] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.0.11)

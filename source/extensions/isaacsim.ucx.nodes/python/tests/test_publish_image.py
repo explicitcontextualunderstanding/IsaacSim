@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
 import omni
 import omni.graph.core as og
@@ -99,7 +100,7 @@ class TestUCXPublishImage(UCXTestCase):
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
 
-        await omni.kit.app.get_app().next_update_async()
+        await app_utils.update_app_async()
 
         await self.setup_ucx_client_with_listener()
         timestamp, width, height, encoding, step, image_data = await self.receive_image_message()

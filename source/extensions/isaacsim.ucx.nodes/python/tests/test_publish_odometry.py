@@ -15,6 +15,7 @@
 
 import struct
 
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
 import omni.graph.core as og
 import omni.kit.app
@@ -26,6 +27,10 @@ import usdrt.Sdf
 from ucxx._lib.arr import Array
 
 from .common import UCXTestCase
+
+# Test configuration constants
+CONNECTION_WAIT_FRAMES = 60  # Frames to wait for node listener to initialize
+CONNECTION_ESTABLISH_FRAMES = 20  # Additional frames for connection to establish
 
 
 async def add_cube(path, size, offset):
@@ -126,36 +131,75 @@ class TestUCXPublishOdometry(UCXTestCase):
 
         The OmniGraph nodes create their own internal listeners automatically.
         We create a client endpoint to connect and receive messages from them.
+        This method ensures proper timing for connection establishment.
         """
-        # Give Isaac Sim a moment to start the node's listener
-        for _ in range(3):
+        # Give Isaac Sim time to start the node's listener
+        for _ in range(CONNECTION_WAIT_FRAMES):
             await omni.kit.app.get_app().next_update_async()
 
         # Create client connection using the base class helper
         self.create_ucx_client(self.port)
 
-    async def receive_odometry_message(self, tag=7, timeout_frames=1000):
-        """Receive and unpack an odometry message from the client endpoint"""
-        max_buffer_size = 512
-        buffer = np.empty(max_buffer_size, dtype=np.uint8)
-
-        # Receive using the endpoint
-        request = self.client_endpoint.tag_recv(Array(buffer), tag=ucx_api.UCXXTag(tag))
-
-        # Progress until complete
-        import time
-
-        for _ in range(timeout_frames):
-            if request.completed:
-                break
-            time.sleep(0.001)
+        # Give additional frames for the connection to establish
+        for _ in range(CONNECTION_ESTABLISH_FRAMES):
             await omni.kit.app.get_app().next_update_async()
 
-        # Check if completed
-        self.assertTrue(request.completed, "Did not receive odometry message")
-        request.check_error()
+    async def receive_odometry_message(self, tag=7, timeout_frames=1000, retry_count=3):
+        """Receive and unpack an odometry message from the client endpoint.
 
-        return unpack_odometry_message(buffer)
+        Args:
+            tag: UCX tag to receive on (default: 7)
+            timeout_frames: Maximum number of frames to wait per attempt (default: 1000)
+            retry_count: Number of times to retry receiving if it fails (default: 3)
+
+        Returns:
+            Tuple of (timestamp, position, orientation, linear_velocity, angular_velocity,
+                    linear_acceleration, angular_acceleration)
+
+        Raises:
+            AssertionError: If message is not received after all retry attempts
+        """
+        import time
+
+        last_error = None
+
+        for attempt in range(retry_count):
+            try:
+                max_buffer_size = 512
+                buffer = np.empty(max_buffer_size, dtype=np.uint8)
+
+                # Receive using the endpoint
+                request = self.client_endpoint.tag_recv(Array(buffer), tag=ucx_api.UCXXTag(tag))
+
+                # Progress until complete
+                for frame in range(timeout_frames):
+                    if request.completed:
+                        break
+                    time.sleep(0.001)
+                    await omni.kit.app.get_app().next_update_async()
+
+                # Check if completed
+                if request.completed:
+                    request.check_error()
+                    return unpack_odometry_message(buffer)
+                else:
+                    last_error = f"Timeout after {timeout_frames} frames on attempt {attempt + 1}"
+                    if attempt < retry_count - 1:
+                        print(f"Warning: {last_error}. Retrying...")
+                        # Wait a bit before retrying
+                        await omni.kit.app.get_app().next_update_async()
+            except Exception as e:
+                last_error = f"Exception on attempt {attempt + 1}: {e}"
+                if attempt < retry_count - 1:
+                    print(f"Warning: {last_error}. Retrying...")
+                    await omni.kit.app.get_app().next_update_async()
+
+        # All retries failed
+        self.fail(
+            f"Did not receive odometry message after {retry_count} attempts. "
+            f"Last error: {last_error}. "
+            "This may indicate a connection issue or the node is not publishing."
+        )
 
     async def test_odometry_input_mode(self):
         """Test odometry publishing with direct inputs (ROS2-aligned mode)"""

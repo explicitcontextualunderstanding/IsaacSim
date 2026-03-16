@@ -27,12 +27,29 @@
 using omni::graph::core::GraphInstanceID;
 using omni::graph::core::NodeObj;
 
+namespace isaacsim::ucx::nodes
+{
+
+/**
+ * @struct ClockData
+ * @brief Data structure for clock message payload.
+ * @details
+ * Contains the timestamp data to be published over UCX.
+ */
+struct ClockData
+{
+    double timestamp; //!< Timestamp value in seconds
+};
+
+} // namespace isaacsim::ucx::nodes
+
 /**
  * @class UCXPublishClockNodeBase
  * @brief Templated base class for UCX clock publishing nodes.
  * @details
- * This template provides common functionality for publishing data over UCX.
- * Derived classes implement message generation logic via generateMessage().
+ * This template provides common functionality for publishing clock data over UCX.
+ * Derived classes implement data extraction logic via extractData().
+ * The base class handles message serialization via generateMessage().
  *
  * @tparam DatabaseT The OGN database type for the node
  */
@@ -58,7 +75,7 @@ protected:
      * @brief Common compute logic for clock publishing nodes.
      * @details
      * Handles listener initialization, connection checking, and message publishing with timeout.
-     * Delegates to publishMessage() for actual message generation and sending.
+     * Extracts data using the derived class's extractData() and serializes using generateMessage().
      *
      * @param[in] db Database accessor for node inputs/outputs
      * @param[in] port Port number for UCX listener
@@ -78,43 +95,34 @@ protected:
             return true;
         }
 
-        return publishMessage(db, tag, timeoutMs);
+        isaacsim::ucx::nodes::ClockData data = extractData(db);
+        return this->publishMessage(db, generateMessage(data), tag, timeoutMs);
     }
 
     /**
-     * @brief Publishes a message over UCX with timeout.
+     * @brief Extract clock data from node inputs.
      * @details
-     * Generates the message by calling the derived class's virtual generateMessage(),
-     * then sends it using UCX tagged send and waits for completion with timeout.
-     *
-     * @param[in] db Database accessor for logging and inputs
-     * @param[in] tag UCX tag for message identification
-     * @param[in] timeoutMs Timeout in milliseconds for send request (0 = infinite)
-     * @return bool True if publish succeeded, false otherwise
-     */
-    bool publishMessage(DatabaseT& db, uint64_t tag, uint32_t timeoutMs)
-    {
-        std::vector<uint8_t> messageData = generateMessage(db);
-
-        if (messageData.empty())
-        {
-            db.logError("Failed to generate message");
-            return false;
-        }
-
-        return this->sendMessage(db, messageData, tag, timeoutMs);
-    }
-
-    /**
-     * @brief Generate message from node inputs.
-     * @details
-     * Pure virtual function that derived classes must implement to create
-     * and serialize their message data.
+     * Reads the timestamp from the database inputs. Can be overridden by
+     * derived classes if different extraction logic is needed.
      *
      * @param[in] db Database accessor for node inputs
+     * @return ClockData Extracted clock data
+     */
+    virtual isaacsim::ucx::nodes::ClockData extractData(DatabaseT& db)
+    {
+        return isaacsim::ucx::nodes::ClockData{ db.inputs.timeStamp() };
+    }
+
+    /**
+     * @brief Generate message from clock data.
+     * @details
+     * Pure virtual function that derived classes must implement to serialize
+     * clock data into the appropriate message format.
+     *
+     * @param[in] data Clock data to serialize
      * @return std::vector<uint8_t> Serialized message data
      */
-    virtual std::vector<uint8_t> generateMessage(DatabaseT& db) = 0;
+    virtual std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::ClockData& data) = 0;
 };
 
 // NOTE: To use this base class:
@@ -122,10 +130,11 @@ protected:
 // 2. Implement static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
 //    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
 //    - Call state.reset()
-// 3. Implement virtual std::vector<uint8_t> generateMessage(DatabaseT& db) override
-//    This protected function should read inputs from db and return the serialized message bytes
-// 4. Implement static bool compute(YourDatabase& db) that:
-//    - Extracts inputs from db
+// 3. Implement static bool compute(YourDatabase& db) that:
+//    - Extracts inputs from db (port, tag, timeoutMs)
 //    - Gets the per-instance state: auto& state = db.template perInstanceState<YourClass>()
-//    - Calls state.computeImpl(db, port, tag)
-// 5. See OgnUCXPublishClock.cpp and OgnUCXPublishClockOffset.cpp for examples
+//    - Calls state.computeImpl(db, port, tag, timeoutMs)
+// 4. Implement virtual std::vector<uint8_t> generateMessage(const ClockData& data) override
+//    - Serialize the clock data into the message format
+// 5. Optionally override extractData() if different extraction logic is needed
+// 6. See OgnUCXPublishClock.cpp for examples

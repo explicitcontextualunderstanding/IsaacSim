@@ -1,17 +1,17 @@
 [package]
-version = "3.4.0"
+version = "4.1.3"
 category = "Simulation"
 title = "Benchmark Services"
 description = "Provides a comprehensive framework for performance benchmarking including data collection, metrics recording, and report generation for CPU, GPU, memory, and frame time analysis."
 keywords = ["isaac", "benchmark", "analyze"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
-"isaacsim.core.api" = {}
+"isaacsim.core.rendering_manager" = {}
 "isaacsim.storage.native" = {}
 "omni.kit.test" = {} # we derrive from the base test class and need this dependency
 "omni.physics" = {}
@@ -27,15 +27,20 @@ name = "isaacsim.benchmark.services.tests"
 # Default test suite name.
 exts."isaacsim.benchmark.services".metrics.nvdataflow_default_test_suite_name = "Isaac Sim Benchmarks"
 
-# uncomment and set this to output metrics to a specific folder
+# Uncomment and set this to output metrics to a specific folder.
 # exts."isaacsim.benchmark.services".metrics.metrics_output_folder=""
 
 # Whether to add a randomly generated string as a prefix to the output filename to distinguish runs.
 exts."isaacsim.benchmark.services".metrics.randomize_filename_prefix = false
 
 [[test]]
+name = "startup"
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+[[test]]
 dependencies = [
-    "omni.isaac.ml_archive",
     "omni.physx.ui",
 ]
 args = [
@@ -46,7 +51,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -62,6 +67,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -83,11 +89,5 @@ args = [
     "--/rtx/reservedDescriptors=900000",
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

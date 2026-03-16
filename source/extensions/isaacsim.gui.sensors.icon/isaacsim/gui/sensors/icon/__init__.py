@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides GUI components for displaying and managing sensor icons in Isaac Sim's viewport and interface."""
+
+
 from .impl import *
+
+__all__ = ["IconModel", "IconScene", "get_instance"]

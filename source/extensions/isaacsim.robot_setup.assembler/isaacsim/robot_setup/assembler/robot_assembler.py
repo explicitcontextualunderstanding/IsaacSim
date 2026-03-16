@@ -12,25 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Robot assembler module that provides functionality for assembling and managing robot components with USD physics joints."""
+
+
 import asyncio
 from enum import IntEnum
 from typing import List, Tuple
 
 import carb
+import isaacsim.core.experimental.utils.prim as prim_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.kit.commands
 import omni.timeline
 import usd.schema.isaac.robot_schema as robot_schema
-from isaacsim.core.prims import SingleXFormPrim
-from isaacsim.core.utils.numpy.rotations import quats_to_rot_matrices, rot_matrices_to_quats
-from isaacsim.core.utils.prims import (
-    get_articulation_root_api_prim_path,
-    get_prim_at_path,
-    get_prim_object_type,
-    is_prim_path_valid,
-)
-from isaacsim.core.utils.stage import get_current_stage
-from isaacsim.core.utils.string import find_unique_string_name
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics
 
 from .session_layer_util import start_assembly_session_sublayer, stop_assembly_session_sublayer
@@ -41,6 +37,19 @@ AXES_INDICES = {"X": 0, "Y": 1, "Z": 2}
 
 
 def set_opposite_body_transform(stage, cache, prim, body0base, fixpos, fixrot):
+    """Set the transform of one joint body to align with the opposite body.
+
+    This function updates the local position and rotation attributes of a joint body to match the
+    relative transform calculated from the opposite body connection.
+
+    Args:
+        stage: USD stage containing the joint prim.
+        cache: UsdGeom.XformCache for efficient transform computations.
+        prim: Joint prim whose body transform should be updated.
+        body0base: Whether to use body0 as the reference frame.
+        fixpos: Whether to update the local position attributes.
+        fixrot: Whether to update the local rotation attributes.
+    """
     joint = UsdPhysics.Joint(prim)
     rel_tm = get_aligned_body_transform(stage, cache, joint, body0base)
 
@@ -81,6 +90,20 @@ def set_opposite_body_transform(stage, cache, prim, body0base, fixpos, fixrot):
 
 
 def get_aligned_body_transform(stage, cache, joint, body0base):
+    """Calculate the relative transform between two bodies connected by a joint.
+
+    This function computes the transform needed to align one body frame with another based on their world
+    positions and the joint's local transformations.
+
+    Args:
+        stage: USD stage containing the joint and body prims.
+        cache: UsdGeom.XformCache for efficient transform computations.
+        joint: UsdPhysics.Joint connecting the two bodies.
+        body0base: Whether to use body0 as the reference frame for alignment.
+
+    Returns:
+        The relative transform between the two bodies.
+    """
     # get both bodies if available
     b0paths = joint.GetBody0Rel().GetTargets()
     b1paths = joint.GetBody1Rel().GetTargets()
@@ -145,6 +168,14 @@ class AssembledBodies:
 
     This class maintains references to the base and attach bodies, the fixed joint connecting them,
     and provides methods to manipulate their relative transform.
+
+    Args:
+        base_path: Prim path of the base body.
+        attach_path: Prim path of the attach body.
+        fixed_joint: Fixed joint connecting the bodies.
+        root_joints: Root joints of the attach body.
+        attach_body_articulation_root: Articulation root of attach body.
+        collision_mask: Collision mask between bodies.
     """
 
     def __init__(
@@ -178,70 +209,76 @@ class AssembledBodies:
 
     @property
     def base_path(self) -> str:
-        """Prim path of the base body
+        """Prim path of the base body.
 
         Returns:
-            str: Prim path of the base body
+            Prim path of the base body.
         """
         return self._base_path
 
     @property
     def attach_path(self) -> str:
-        """Prim path of the floating (attach) body
+        """Prim path of the floating (attach) body.
 
         Returns:
-            str: Prim path of the floating (attach) body
+            Prim path of the floating (attach) body.
         """
         return self._attach_path
 
     @property
     def fixed_joint(self) -> UsdPhysics.FixedJoint:
-        """USD fixed joint linking base and floating body together
+        """USD fixed joint linking base and floating body together.
 
         Returns:
-            UsdPhysics.FixedJoint: USD fixed joint linking base and floating body together
+            USD fixed joint linking base and floating body together.
         """
         return self._fixed_joint
 
     @property
     def attach_body_articulation_root(self) -> Usd.Prim:
-        """USD articulation root of the floating body
+        """USD articulation root of the floating body.
 
         Returns:
-            Usd.Prim: USD articulation root of the floating body
+            USD articulation root of the floating body.
         """
         return self._articulation_root
 
     @property
     def root_joints(self) -> List[UsdPhysics.Joint]:
-        """Root joints that tie the floating body to the USD stage.  These are disabled in an assembled body,
-        and will be re-enabled by the disassemble() function.
+        """Root joints that tie the floating body to the USD stage. These are disabled in an assembled body,
+            and will be re-enabled by the disassemble() function.
 
         Returns:
-            List[UsdPhysics.Joint]: Root joints that tie the floating body to the USD stage.
+            Root joints that tie the floating body to the USD stage.
         """
         return self._root_joints
 
     @property
     def collision_mask(self) -> Usd.Relationship:
-        """A Usd Relationship masking collisions between the two assembled bodies
+        """A Usd Relationship masking collisions between the two assembled bodies.
 
         Returns:
-            Usd.Relationship: A Usd Relationship masking collisions between the two assembled bodies
+            A Usd Relationship masking collisions between the two assembled bodies.
         """
         return self._collision_mask
 
     def _unmask_collisions(self):
+        """Remove collision masking between the assembled bodies."""
         if self._collision_mask is not None:
             [self._collision_mask.RemoveTarget(target) for target in self._collision_mask.GetTargets()]
             self._collision_mask = None
 
-    def _refresh_asset(self, prim_path):
+    def _refresh_asset(self, prim_path: str):
+        """Refresh payloads and references to update articulation immediately during timeline playback.
+
+        Args:
+            prim_path: Path to the prim whose payloads and references should be refreshed.
+        """
         # Refreshing payloads manually is a way to get the Articulation to update immediately while the timeline is
         # still playing.  Usd Physics should be doing this automatically, but there is currently a bug.  This function
         # will eventually become unnecessary.
-        stage = get_current_stage()
-        prim = get_prim_at_path(prim_path)
+        stage = stage_utils.get_current_stage()
+        prim = prim_utils.get_prim_at_path(prim_path)
 
         composed_payloads = omni.usd.get_composed_payloads_from_prim(prim)
         if len(composed_payloads) != 0:
@@ -259,6 +296,20 @@ class AssembledBodies:
 
 
 class AssembledRobot:
+    """A wrapper class providing convenient access to assembled robot body information.
+
+    This class serves as a high-level interface for interacting with assembled robots, encapsulating
+    the underlying AssembledBodies instance and exposing its key properties through a simplified API.
+    It provides direct access to robot paths, joint information, and collision masking relationships
+    for assembled robot configurations.
+
+    The class acts as a facade over AssembledBodies, making it easier to work with assembled robot
+    data without needing to interact directly with the lower-level assembly implementation.
+
+    Args:
+        assembled_robots: The AssembledBodies instance containing the robot assembly data.
+    """
+
     def __init__(self, assembled_robots: AssembledBodies):
         self.assembled_robots = assembled_robots
 
@@ -267,7 +318,7 @@ class AssembledRobot:
         """Prim path of the base body
 
         Returns:
-            str: Prim path of the base body
+            Prim path of the base body.
         """
         return self.assembled_robots.base_path
 
@@ -276,7 +327,7 @@ class AssembledRobot:
         """Prim path of the floating (attach) body
 
         Returns:
-            str: Prim path of the floating (attach) body
+            Prim path of the floating (attach) body.
         """
         return self.assembled_robots.attach_path
 
@@ -285,7 +336,7 @@ class AssembledRobot:
         """USD fixed joint linking base and floating body together
 
         Returns:
-            UsdPhysics.FixedJoint: USD fixed joint linking base and floating body together
+            USD fixed joint linking base and floating body together.
         """
         return self.assembled_robots.fixed_joint
 
@@ -295,7 +346,7 @@ class AssembledRobot:
         and will be re-enabled by the disassemble() function.
 
         Returns:
-            List[UsdPhysics.Joint]: Root joints that tie the floating body to the USD stage.
+            Root joints that tie the floating body to the USD stage.
         """
         return self.assembled_robots.root_joints
 
@@ -304,7 +355,7 @@ class AssembledRobot:
         """A Usd Relationship masking collisions between the two assembled robots
 
         Returns:
-            Usd.Relationship: A Usd Relationship masking collisions between the two assembled robots
+            A Usd Relationship masking collisions between the two assembled robots.
         """
         return self.assembled_robots.collision_mask
 
@@ -313,13 +364,15 @@ class AssemblyStatus(IntEnum):
     """Enum representing the current status of the robot assembly process."""
 
     ASSEMBLING = 0  # Assembly in progress
+    """Assembly operation is currently in progress."""
     DISASSEMBLING = 1  # Disassembly in progress
+    """Disassembly operation is currently in progress."""
     IDLE = 2  # No assembly operation active
+    """No assembly operation is currently active."""
 
 
 class RobotAssembler:
-    """
-    RobotAssembler is a class to assemble robots from a base robot and an attachment robot. It will create a new USD stage with the assembly and configure a variant selection to enable the attachment robot to be selected.
+    """RobotAssembler is a class to assemble robots from a base robot and an attachment robot. It will create a new USD stage with the assembly and configure a variant selection to enable the attachment robot to be selected.
     If the variant set already exists in the source asset, it creates a new entry to it, otherwise it creates a new variant set.
     """
 
@@ -340,6 +393,7 @@ class RobotAssembler:
         self.reset()
 
     def reset(self):
+        """Reset the assembler to its initial state and cancel any active assembly operations."""
         if self._status == AssemblyStatus.ASSEMBLING:
             self.cancel_assembly()
         self._assembly_session = None
@@ -362,23 +416,36 @@ class RobotAssembler:
         """Check if a prim is a root joint (has no body0 or body1 target).
 
         Args:
-            prim (Usd.Prim): Prim to check
+            prim: Prim to check
 
         Returns:
-            bool: True if prim is a root joint, False otherwise
+            True if prim is a root joint, False otherwise
         """
         return UsdPhysics.Joint(prim) and (
             len(UsdPhysics.Joint(prim).GetBody0Rel().GetTargets()) == 0
             or len(UsdPhysics.Joint(prim).GetBody1Rel().GetTargets()) == 0
         )
 
+    def get_articulation_root_api_path(self, prim_path: str) -> str:
+        """Get the prim path that has the Articulation Root API applied.
+
+        Args:
+            prim_path: Path to a prim
+
+        Returns:
+            Path to the prim that has the Articulation Root API applied
+        """
+        predicate = lambda prim, path: prim.HasAPI(UsdPhysics.ArticulationRootAPI)
+        prim = prim_utils.get_first_matching_child_prim(prim_path, predicate=predicate, include_self=True)
+        return prim_utils.get_prim_path(prim) if prim is not None else ""
+
     def _set_joint_states_to_zero(self, prim_path: str):
         """Set all joint state values to zero for a prim and its children.
 
         Args:
-            prim_path (str): Path to prim whose joint states should be zeroed
+            prim_path: Path to prim whose joint states should be zeroed
         """
-        p = get_prim_at_path(prim_path)
+        p = prim_utils.get_prim_at_path(prim_path)
         for prim in Usd.PrimRange(p):
             if not UsdPhysics.Joint(prim):
                 continue
@@ -388,21 +455,22 @@ class RobotAssembler:
                 prim.GetProperty("state:angular:physics:velocity").Set(0.0)
 
     def mask_collisions(self, prim_path_a: str, prim_path_b: str) -> Usd.Relationship:
-        """Mask collisions between two prims.  All nested prims will also be included.
+        """Mask collisions between two prims. All nested prims will also be included.
 
         Args:
-            prim_path_a (str): Path to a prim
-            prim_path_b (str): Path to a prim
+            prim_path_a: Path to a prim
+            prim_path_b: Path to a prim
 
         Returns:
-            Usd.Relationship: A relationship filtering collisions between prim_path_a and prim_path_b
+            A relationship filtering collisions between prim_path_a and prim_path_b
         """
-        filteringPairsAPI = UsdPhysics.FilteredPairsAPI.Apply(get_prim_at_path(prim_path_a))
+        filteringPairsAPI = UsdPhysics.FilteredPairsAPI.Apply(prim_utils.get_prim_at_path(prim_path_a))
         rel = filteringPairsAPI.CreateFilteredPairsRel()
         rel.AddTarget(Sdf.Path(prim_path_b))
         return rel
 
     def __del__(self):
+        """Cleanup the assembler when the instance is destroyed."""
         self.reset()
 
     def begin_assembly(
@@ -420,13 +488,13 @@ class RobotAssembler:
         Places the attachment robot relative to the base robot but does not compose them yet.
 
         Args:
-            stage (Usd.Stage): USD stage for assembly
-            base_prim_path (str): Path to base robot prim
-            base_mount_path (str): Path to mount frame on base robot
-            attachment_prim_path (str): Path to attachment robot prim
-            attachment_mount_path (str): Path to mount frame on attachment robot
-            variant_set (str): Name of variant set to create/modify
-            variant_name (str): Name of variant to create
+            stage: USD stage for assembly
+            base_prim_path: Path to base robot prim
+            base_mount_path: Path to mount frame on base robot
+            attachment_prim_path: Path to attachment robot prim
+            attachment_mount_path: Path to mount frame on attachment robot
+            variant_set: Name of variant set to create/modify
+            variant_name: Name of variant to create
         """
         self._stage = stage
         self._base_robot_prim = base_prim_path
@@ -493,9 +561,7 @@ class RobotAssembler:
         asyncio.ensure_future(_end_assembly())
 
     def assemble(self):
-        """
-        Composes the attachment robot onto the base robot, so that the attachment robot is a child of the base robot, and ready to simulate
-        """
+        """Composes the attachment robot onto the base robot, so that the attachment robot is a child of the base robot, and ready to simulate."""
         attachment_prim = self._stage.GetPrimAtPath(self._attachment_robot_prim)
         attachment_mount_frame_prim = self._stage.GetPrimAtPath(self._attachment_mount_frame_prim)
 
@@ -511,6 +577,7 @@ class RobotAssembler:
         )
 
     def finish_assemble(self):
+        """Finalize the assembly process by configuring variant sets and saving the assembly to a USD file."""
 
         if self._direct_edit:
 
@@ -581,33 +648,39 @@ class RobotAssembler:
         """Assemble two rigid bodies into one physical structure
 
         Args:
-            base_robot_path (str): Path to base robot.
-            attach_robot_path (str): Path to attach robot.  The attach robot will be unrooted from the stage and attached only to the base robot
-            base_robot_mount_frame (str): Relative path to frame in base robot where there is the desired attach point.
-            attach_robot_mount_frame (str): Relative path to frame in the attach robot where there is the desired attach point.
-            mask_all_collisions (bool, optional): Mask all collisions between attach robot and base robot.  This is necessary when setting single_robot=False to prevent Physics constraint
-                violations from the new fixed joint.  Advanced users may set this flag to False and use the mask_collisions() function separately for more customizable behavior.  Defaults to True.
+            base_path: Path to base robot.
+            attach_path: Path to attach robot. The attach robot will be unrooted from the stage and attached only
+                to the base robot.
+            base_mount_frame: Relative path to frame in base robot where there is the desired attach point.
+            attach_mount_frame: Relative path to frame in the attach robot where there is the desired attach
+                point.
+            mask_all_collisions: Mask all collisions between attach robot and base robot. This is necessary
+                when setting single_robot=False to prevent Physics constraint violations from the new fixed joint.
+                Advanced users may set this flag to False and use the mask_collisions() function separately for
+                more customizable behavior.
+            refresh_asset_paths: Whether to refresh asset paths after assembly.
 
         Returns:
-            AssembledBodies: An object representing the assembled bodies. This object can detach the composed robots and edit the fixed joint transform.
+            An object representing the assembled bodies. This object can detach the composed robots and edit
+            the fixed joint transform.
         """
 
         # Make mount_frames if they are not specified
         if base_mount_frame == "":
             base_mount_path = base_path + "/assembler_mount_frame"
-            base_mount_path = find_unique_string_name(base_mount_path, lambda x: not is_prim_path_valid(x))
+            base_mount_path = stage_utils.generate_next_free_path(base_mount_path)
             # SingleXFormPrim(base_mount_path, translation=np.array([0, 0, 0]))
         else:
             base_mount_path = base_mount_frame
 
         if attach_mount_frame == "":
             attach_mount_path = attach_path + "/assembler_mount_frame"
-            attach_mount_path = find_unique_string_name(attach_mount_path, lambda x: not is_prim_path_valid(x))
+            attach_mount_path = stage_utils.generate_next_free_path(attach_mount_path)
             # SingleXFormPrim(attach_mount_path, translation=np.array([0, 0, 0]))
         else:
             attach_mount_path = attach_mount_frame
 
-        articulation_root = get_prim_at_path(get_articulation_root_api_prim_path(attach_path))
+        articulation_root = prim_utils.get_prim_at_path(self.get_articulation_root_api_path(attach_path))
         if self.is_root_joint(articulation_root):
             articulation_root.SetActive(False)
         else:
@@ -619,7 +692,7 @@ class RobotAssembler:
         for root_joint in root_joints:
             root_joint.SetActive(False)
 
-        attach_prim = get_prim_at_path(attach_path)
+        attach_prim = prim_utils.get_prim_at_path(attach_path)
 
         # Find and Disable Fixed Joints that Tie Object B to the Stage
         root_joints = [p for p in Usd.PrimRange(attach_prim) if self.is_root_joint(p)]
@@ -638,7 +711,7 @@ class RobotAssembler:
 
         collision_mask = None
         if mask_all_collisions:
-            base_path_art_root = get_articulation_root_api_prim_path(base_path)
+            base_path_art_root = self.get_articulation_root_api_path(base_path)
             collision_mask = self.mask_collisions(base_path_art_root, attach_path)
 
         # Strange values can be written into the JointStateAPIs when nesting robots through the UI
@@ -662,18 +735,18 @@ class RobotAssembler:
         """Create a fixed joint between two bodies
 
         Args:
-            prim_path (str): Prim path at which to place new fixed joint.
-            target0 (str, optional): Prim path of frame at which to attach fixed joint. Defaults to None.
-            target1 (str, optional): Prim path of frame at which to attach fixed joint. Defaults to None.
+            prim_path: Prim path at which to place new fixed joint.
+            target0: Prim path of frame at which to attach fixed joint.
+            target1: Prim path of frame at which to attach fixed joint.
 
         Returns:
-            UsdPhysics.FixedJoint: A USD fixed joint
+            A USD fixed joint
         """
 
-        stage = get_current_stage()
+        stage = stage_utils.get_current_stage()
 
         fixed_joint_path = prim_path + "/AssemblerFixedJoint"
-        fixed_joint_path = find_unique_string_name(fixed_joint_path, lambda x: not is_prim_path_valid(x))
+        fixed_joint_path = stage_utils.generate_next_free_path(fixed_joint_path)
         fixed_joint = UsdPhysics.FixedJoint.Define(stage, fixed_joint_path)
 
         fixed_joint_prim = fixed_joint.GetPrim()
@@ -689,11 +762,20 @@ class RobotAssembler:
         return fixed_joint
 
     def _refresh_asset(self, prim_path):
+        """Refresh asset payloads and references to update the articulation immediately.
+
+        This manually refreshes payloads to get the articulation to update while the timeline is still
+        playing. This function will eventually become unnecessary when USD Physics fixes the automatic
+        update bug.
+
+        Args:
+            prim_path: Path to the prim whose asset should be refreshed.
+        """
         # Refreshing payloads manually is a way to get the Articulation to update immediately while the timeline is
         # still playing.  Usd Physics should be doing this automatically, but there is currently a bug.  This function
         # will eventually become unnecessary.
-        stage = get_current_stage()
-        prim = get_prim_at_path(prim_path)
+        stage = stage_utils.get_current_stage()
+        prim = prim_utils.get_prim_at_path(prim_path)
 
         composed_payloads = omni.usd.get_composed_payloads_from_prim(prim)
         if len(composed_payloads) != 0:

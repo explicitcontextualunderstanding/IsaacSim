@@ -28,6 +28,7 @@
 #include <carb/PluginUtils.h>
 #include <carb/dictionary/DictionaryUtils.h>
 #include <carb/logging/Log.h>
+#include <carb/settings/ISettings.h>
 #include <carb/tasking/ITasking.h>
 #include <carb/tokens/ITokens.h>
 #include <carb/tokens/TokensUtils.h>
@@ -184,59 +185,90 @@ CARB_EXPORT void carbOnPluginStartup()
 
     char* rosDistro = getenv("ROS_DISTRO");
 
-    if (isaacsim::ros2::core::stringToRos2Distro(rosDistro).value() == isaacsim::ros2::core::Ros2Distro::eHumble)
+    // Humble-specific extra libraries (safe check for unknown distros)
+    auto knownDistro = isaacsim::ros2::core::stringToRos2Distro(rosDistro ? rosDistro : "");
+    if (knownDistro.has_value() && *knownDistro == isaacsim::ros2::core::Ros2Distro::eHumble)
     {
         libraryList.insert(libraryList.begin() + 5, std::string("ament_index_cpp"));
         libraryList.insert(libraryList.begin() + 8, std::string("rcl_logging_interface"));
         libraryList.insert(libraryList.end(), std::string("rcl_lifecycle"));
     }
 
-    // Attempt to load a ROS 2 library. If it fails, force load internal Distro
+    // ROS_DISTRO must be set (either by user or by Python auto-detection)
     if (!rosDistro || !isaacsim::ros2::core::isRos2DistroSupported(rosDistro))
     {
-        CARB_LOG_ERROR("Unsupported ROS_DISTRO or ROS_DISTRO env var not specified: %s", rosDistro);
+        CARB_LOG_ERROR("ROS_DISTRO env var not specified or empty: %s", rosDistro ? rosDistro : "null");
         return;
     }
-    else
+
+    // Check if internal lib fallback is allowed (set by Python when no user ROS was sourced)
+    bool allowInternalFallback = carb::getCachedInterface<carb::settings::ISettings>()->getAsBool(
+        "/exts/isaacsim.ros2.bridge/internal_lib_fallback");
+
+    // Attempt to load a ROS 2 library from the system
+    auto tempLoader = std::make_shared<isaacsim::core::includes::LibraryLoader>("rosidl_runtime_c", "", false);
+    if (!tempLoader->isValid())
     {
-        // Load test library, print error if it fails
-        auto tempLoader = std::make_shared<isaacsim::core::includes::LibraryLoader>("rosidl_runtime_c", "", false);
-        if (!tempLoader->isValid())
+        if (!allowInternalFallback)
         {
-#ifdef _WIN32
-            app->printAndLog(
-                "Loading rosidl_runtime_c.dll from sourced ROS_DISTRO failed, falling back to internal libraries.");
-#else
-            app->printAndLog(
-                "Loading librosidl_runtime_c.so from sourced ROS_DISTRO failed, falling back to internal libraries.");
-#endif
-
-            carb::tokens::ITokens* tokens = carb::getCachedInterface<carb::tokens::ITokens>();
-#if defined(_WIN32)
-            std::filesystem::path p = carb::tokens::resolveString(tokens, "${isaacsim.ros2.core}");
-#else
-            std::experimental::filesystem::path p = carb::tokens::resolveString(tokens, "${isaacsim.ros2.core}");
-#endif
-
-            g_extensionPath = (p / std::string(rosDistro) / "lib").string();
-
-            // Try and load internal lib, this will fail if ENV vars are not set correctly due to dependency tree.
-            // Do not print lib specific errors
-            auto tempLoader =
-                std::make_shared<isaacsim::core::includes::LibraryLoader>("rosidl_runtime_c", g_extensionPath, false);
-            if (!tempLoader->isValid())
-            {
-                CARB_LOG_WARN(
-                    "Could not load ROS2 Bridge due to missing library dependencies, please make sure your sourced ROS2 workspace has the correct packages/libraries installed");
-                return;
-            }
-            for (std::string lib : libraryList)
-            {
-                g_backupLibraryLoader.loadLibrary(lib, g_extensionPath);
-            }
+            // User sourced ROS but system libs failed to load -- hard fail, no fallback
+            CARB_LOG_ERROR(
+                "Failed to load system ROS 2 libraries for ROS_DISTRO='%s'. "
+                "Ensure your ROS 2 workspace is properly sourced.",
+                rosDistro);
+            return;
         }
-        g_factoryLoader =
-            std::make_shared<isaacsim::core::includes::LibraryLoader>("isaacsim.ros2.core." + std::string(rosDistro));
+
+        // Internal lib fallback path (unchanged behavior for auto-detected distros)
+#if defined(_WIN32)
+        app->printAndLog(
+            "Loading rosidl_runtime_c.dll from sourced ROS_DISTRO failed, falling back to internal libraries.");
+#else
+        app->printAndLog(
+            "Loading librosidl_runtime_c.so from sourced ROS_DISTRO failed, falling back to internal libraries.");
+#endif
+
+        carb::tokens::ITokens* tokens = carb::getCachedInterface<carb::tokens::ITokens>();
+#if defined(_WIN32)
+        std::filesystem::path p = carb::tokens::resolveString(tokens, "${isaacsim.ros2.core}");
+#else
+        std::experimental::filesystem::path p = carb::tokens::resolveString(tokens, "${isaacsim.ros2.core}");
+#endif
+
+        g_extensionPath = (p / std::string(rosDistro) / "lib").string();
+
+        // Try and load internal lib, this will fail if ENV vars are not set correctly due to dependency tree.
+        // Do not print lib specific errors
+        auto internalLoader =
+            std::make_shared<isaacsim::core::includes::LibraryLoader>("rosidl_runtime_c", g_extensionPath, false);
+        if (!internalLoader->isValid())
+        {
+            CARB_LOG_WARN(
+                "Could not load ROS2 Bridge due to missing library dependencies, please make sure your sourced "
+                "ROS2 workspace has the correct packages/libraries installed");
+            return;
+        }
+        for (const std::string& lib : libraryList)
+        {
+            g_backupLibraryLoader.loadLibrary(lib, g_extensionPath);
+        }
+    }
+
+    // Load the factory library for the current distro.
+    // For known distros (humble, jazzy) this loads the matching factory.
+    // For unknown distros, fall back to the jazzy factory since the factory source code
+    // is usually identical across distros (only the linked ROS 2 C API libs differ, and those
+    // resolve from the system LD_LIBRARY_PATH at runtime).
+    g_factoryLoader =
+        std::make_shared<isaacsim::core::includes::LibraryLoader>("isaacsim.ros2.core." + std::string(rosDistro));
+    if (!g_factoryLoader->isValid())
+    {
+        std::string fallbackMsg = "[Experimental] ROS 2 '" + std::string(rosDistro) +
+                                  "' sourced successfully. Isaac Sim's ROS 2 Bridge does not yet have a dedicated build "
+                                  "for this distro. The existing bridge backend will be used, which is expected to work "
+                                  "due to ROS 2 C API compatibility across distributions, but is currently untested.";
+        app->printAndLog(fallbackMsg.c_str());
+        g_factoryLoader = std::make_shared<isaacsim::core::includes::LibraryLoader>("isaacsim.ros2.core.jazzy");
     }
 
     g_stageUpdate = carb::getCachedInterface<omni::kit::IStageUpdate>()->getStageUpdate();

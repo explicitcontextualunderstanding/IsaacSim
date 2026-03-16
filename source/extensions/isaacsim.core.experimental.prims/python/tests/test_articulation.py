@@ -15,6 +15,7 @@
 
 from typing import Literal
 
+import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.kit.test
@@ -103,10 +104,10 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
         self.assertEqual(prim.num_dofs, 2, f"Invalid num_dofs")
         self.assertEqual(prim.num_joints, 2, f"Invalid num_joints")
         self.assertEqual(prim.num_links, 3, f"Invalid num_links")
-        # - names
-        self.assertEqual(prim.dof_names, ["RevoluteJoint", "PrismaticJoint"], f"Invalid dof_names")
-        self.assertEqual(prim.joint_names, ["RevoluteJoint", "PrismaticJoint"], f"Invalid joint_names")
-        self.assertEqual(prim.link_names, ["CenterPivot", "Arm", "Slider"], f"Invalid link_names")
+        # - names (engine-agnostic: check presence, not order)
+        self.assertEqual(sorted(prim.dof_names), sorted(["RevoluteJoint", "PrismaticJoint"]), f"Invalid dof_names")
+        self.assertEqual(sorted(prim.joint_names), sorted(["RevoluteJoint", "PrismaticJoint"]), f"Invalid joint_names")
+        self.assertEqual(sorted(prim.link_names), sorted(["CenterPivot", "Arm", "Slider"]), f"Invalid link_names")
         # - paths
         self.assertEqual(len(prim.dof_paths), len(prim), f"Invalid dof_paths")
         for i, dof_paths in enumerate(prim.dof_paths):
@@ -123,39 +124,55 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
             for link_path, link_name in zip(link_paths, prim.link_names):
                 self.assertTrue(link_path.startswith(f"/World/A_{i}/"), f"Invalid link_path: {link_path}")
                 self.assertTrue(link_path.endswith(f"/{link_name}"), f"Invalid link_path: {link_path}")
-        # - types
+        # - types (engine-agnostic: check presence, not order)
         self.assertEqual(
-            prim.dof_types,
-            [omni.physics.tensors.DofType.Rotation, omni.physics.tensors.DofType.Translation],
+            sorted(prim.dof_types, key=lambda x: x.value),
+            sorted(
+                [omni.physics.tensors.DofType.Rotation, omni.physics.tensors.DofType.Translation], key=lambda x: x.value
+            ),
             f"Invalid dof_types",
         )
-        # test cases (getters)
-        self.assertEqual(prim.get_dof_indices("RevoluteJoint").numpy().tolist(), [0], f"Invalid get_dof_indices")
+        # test cases (getters) - engine-agnostic: check indices are valid and consistent
+        revolute_idx = prim.get_dof_indices("RevoluteJoint").numpy().tolist()
+        prismatic_idx = prim.get_dof_indices("PrismaticJoint").numpy().tolist()
+        self.assertEqual(len(revolute_idx), 1, f"Should have one RevoluteJoint dof index")
+        self.assertEqual(len(prismatic_idx), 1, f"Should have one PrismaticJoint dof index")
+        self.assertIn(revolute_idx[0], [0, 1], f"RevoluteJoint index should be 0 or 1")
+        self.assertIn(prismatic_idx[0], [0, 1], f"PrismaticJoint index should be 0 or 1")
+        self.assertNotEqual(revolute_idx[0], prismatic_idx[0], f"Indices should be different")
+        # Check multi-name query returns correct indices
+        multi_idx = prim.get_dof_indices(["PrismaticJoint", "RevoluteJoint"]).numpy().tolist()
+        self.assertEqual(multi_idx, [prismatic_idx[0], revolute_idx[0]], f"Invalid multi get_dof_indices")
+        # - joint indices
+        revolute_joint_idx = prim.get_joint_indices("RevoluteJoint").numpy().tolist()
+        prismatic_joint_idx = prim.get_joint_indices("PrismaticJoint").numpy().tolist()
+        self.assertEqual(len(revolute_joint_idx), 1, f"Should have one RevoluteJoint joint index")
+        self.assertEqual(len(prismatic_joint_idx), 1, f"Should have one PrismaticJoint joint index")
+        multi_joint_idx = prim.get_joint_indices(["PrismaticJoint", "RevoluteJoint"]).numpy().tolist()
         self.assertEqual(
-            prim.get_dof_indices(["PrismaticJoint", "RevoluteJoint"]).numpy().tolist(),
-            [1, 0],
-            f"Invalid get_dof_indices",
+            multi_joint_idx, [prismatic_joint_idx[0], revolute_joint_idx[0]], f"Invalid multi get_joint_indices"
         )
-        self.assertEqual(prim.get_joint_indices("RevoluteJoint").numpy().tolist(), [0], f"Invalid get_joint_indices")
-        self.assertEqual(
-            prim.get_joint_indices(["PrismaticJoint", "RevoluteJoint"]).numpy().tolist(),
-            [1, 0],
-            f"Invalid get_joint_indices",
-        )
-        self.assertEqual(prim.get_link_indices("CenterPivot").numpy().tolist(), [0], f"Invalid get_link_indices")
-        self.assertEqual(
-            prim.get_link_indices(["Arm", "Slider", "CenterPivot"]).numpy().tolist(),
-            [1, 2, 0],
-            f"Invalid get_link_indices",
-        )
+        # - link indices
+        center_idx = prim.get_link_indices("CenterPivot").numpy().tolist()
+        arm_idx = prim.get_link_indices("Arm").numpy().tolist()
+        slider_idx = prim.get_link_indices("Slider").numpy().tolist()
+        self.assertEqual(len(center_idx), 1, f"Should have one CenterPivot link index")
+        self.assertEqual(len(arm_idx), 1, f"Should have one Arm link index")
+        self.assertEqual(len(slider_idx), 1, f"Should have one Slider link index")
+        self.assertEqual(len({center_idx[0], arm_idx[0], slider_idx[0]}), 3, f"Link indices should be unique")
+        multi_link_idx = prim.get_link_indices(["Arm", "Slider", "CenterPivot"]).numpy().tolist()
+        self.assertEqual(multi_link_idx, [arm_idx[0], slider_idx[0], center_idx[0]], f"Invalid multi get_link_indices")
         # test cases (Physics tensor initialization requirement for USD backend)
         if backend == "usd":
             await play_stop_timeline()  # ensure the articulation tensor API is initialized
             assert prim.is_physics_tensor_entity_initialized(), "Tensor API should be initialized"
-        # - properties
+        # - properties (engine-agnostic: check presence, not order)
         self.assertEqual(
-            prim.joint_types,
-            [omni.physics.tensors.JointType.Revolute, omni.physics.tensors.JointType.Prismatic],
+            sorted(prim.joint_types, key=lambda x: x.value),
+            sorted(
+                [omni.physics.tensors.JointType.Revolute, omni.physics.tensors.JointType.Prismatic],
+                key=lambda x: x.value,
+            ),
             f"Invalid joint_types",
         )
         self.assertEqual(prim.num_shapes, 3, f"Invalid num_shapes")
@@ -260,7 +277,13 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                 check_array(output, shape=(expected_count, 1), dtype=wp.int32, device=device)
                 check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
-    @parametrize(backends=["tensor"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage)
+    @parametrize(
+        backends=["tensor"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
+    )
     async def test_jacobians_and_mass_matrices(self, prim, num_prims, device, backend):
         # check backend
         self.check_backend(backend, prim)
@@ -362,7 +385,13 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                     )
                     check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
-    @parametrize(backends=["tensor"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage)
+    @parametrize(
+        backends=["tensor"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
+    )
     async def test_dof_compensation_forces(self, prim, num_prims, device, backend):
         # check backend
         self.check_backend(backend, prim)
@@ -386,7 +415,11 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                 check_array(forces, shape=(expected_count, expected_dof_count), dtype=wp.float32, device=device)
 
     @parametrize(
-        backends=["tensor", "usd"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage
+        backends=["tensor", "usd"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
     )
     async def test_link_enabled_gravities(self, prim, num_prims, device, backend):
         # check backend
@@ -402,24 +435,6 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                         output = prim.get_link_enabled_gravities(indices=indices, link_indices=link_indices)
                     check_array(output, shape=(expected_count, expected_link_count), dtype=wp.bool, device=device)
                     check_allclose(expected_v0, output, given=(v0,))
-
-    @parametrize(
-        backends=["tensor", "usd"],
-        operations=["wrap"],
-        prim_class=Articulation,
-        prim_class_kwargs={"enable_residual_reports": True},
-        populate_stage_func=populate_stage,
-    )
-    async def test_solver_residual_reports(self, prim, num_prims, device, backend):
-        # check backend
-        self.check_backend(backend, prim)
-        # test cases
-        for indices, expected_count in draw_indices(count=num_prims, step=2):
-            cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
-            with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
-                position_residuals, velocity_residuals = prim.get_solver_residual_reports(indices=indices)
-            check_array(position_residuals, shape=(expected_count, 1), dtype=wp.float32, device=device)
-            check_array(velocity_residuals, shape=(expected_count, 1), dtype=wp.float32, device=device)
 
     @parametrize(
         backends=["tensor", "usd"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage
@@ -522,7 +537,13 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                     check_array(output, shape=(expected_count, expected_dof_count), dtype=wp.float32, device=device)
                     check_allclose(expected_v0, output, given=(v0,))
 
-    @parametrize(backends=["tensor"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage)
+    @parametrize(
+        backends=["tensor"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
+    )
     async def test_dof_states(self, prim, num_prims, device, backend):
         # check backend
         self.check_backend(backend, prim)
@@ -574,7 +595,11 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                 check_array(output, shape=(expected_count, expected_link_count, 3), dtype=wp.float32, device=device)
 
     @parametrize(
-        backends=["tensor", "usd"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage
+        backends=["tensor", "usd"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
     )
     async def test_dof_drive_types(self, prim, num_prims, device, backend):
         # check backend
@@ -592,7 +617,11 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                     check_lists(expected_v0, output)
 
     @parametrize(
-        backends=["tensor", "usd"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage
+        backends=["tensor", "usd"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
     )
     async def test_dof_limits(self, prim, num_prims, device, backend):
         # check backend
@@ -619,7 +648,11 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                             check_allclose((expected_v0, expected_v1), output, given=(v0, v1))
 
     @parametrize(
-        backends=["tensor", "usd"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage
+        backends=["tensor", "usd"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
     )
     async def test_dof_friction_properties(self, prim, num_prims, device, backend):
         # check backend
@@ -641,7 +674,11 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                     check_allclose((expected_v0, expected_v1, expected_v2), output, given=(v0, v1, v2))
 
     @parametrize(
-        backends=["tensor", "usd"], operations=["wrap"], prim_class=Articulation, populate_stage_func=populate_stage
+        backends=["tensor", "usd"],
+        operations=["wrap"],
+        supported_engines=["physx"],
+        prim_class=Articulation,
+        populate_stage_func=populate_stage,
     )
     async def test_dof_drive_model_properties(self, prim, num_prims, device, backend):
         # check backend
@@ -656,6 +693,23 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
                     draw_sample(shape=(expected_count, expected_dof_count), dtype=wp.float32),
                     draw_sample(shape=(expected_count, expected_dof_count), dtype=wp.float32),
                 ):
+                    # apply mask to DOFs that do not have the PhysxDrivePerformanceEnvelopeAPI applied (tensor API only)
+                    _dof_indices = dof_indices.numpy() if isinstance(dof_indices, wp.array) else dof_indices
+                    mask = [
+                        i
+                        for i, index in enumerate(range(prim.num_dofs) if _dof_indices is None else _dof_indices)
+                        if not prim_utils.get_prim_at_path(prim.dof_paths[0][index]).HasAPI(
+                            "PhysxDrivePerformanceEnvelopeAPI"
+                        )
+                    ]
+                    if backend == "tensor":
+                        expected_v0 = np.copy(expected_v0)
+                        expected_v1 = np.copy(expected_v1)
+                        expected_v2 = np.copy(expected_v2)
+                        expected_v0[:, mask] = 0
+                        expected_v1[:, mask] = 0
+                        expected_v2[:, mask] = 0
+                    # test
                     with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
                         prim.set_dof_drive_model_properties(v0, v1, v2, indices=indices, dof_indices=dof_indices)
                         output = prim.get_dof_drive_model_properties(indices=indices, dof_indices=dof_indices)
@@ -666,6 +720,7 @@ class TestArticulation(omni.kit.test.AsyncTestCase):
         backends=["tensor"],
         operations=["wrap"],
         instances=["many"],
+        supported_engines=["physx"],
         prim_class=Articulation,
         prim_class_kwargs={"positions": [[x, 0, 0] for x in range(5)], "reset_xform_op_properties": True},
         populate_stage_func=populate_stage,

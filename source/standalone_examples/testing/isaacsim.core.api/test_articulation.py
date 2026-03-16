@@ -25,14 +25,24 @@ import omni.physics.core
 from isaacsim.core.api import World
 from isaacsim.core.api.robots import Robot
 from isaacsim.core.prims import Articulation
-from isaacsim.core.utils.stage import add_reference_to_stage, open_stage
+from isaacsim.core.utils.stage import add_reference_to_stage, create_new_stage, is_stage_loading
 from isaacsim.core.utils.types import ArticulationAction
 from isaacsim.storage.native import get_assets_root_path
+
+
+def setup_clean_stage() -> None:
+    """Create a fresh stage for each test body."""
+    World.clear_instance()
+    create_new_stage()
+    simulation_app.update()
+    while is_stage_loading():
+        simulation_app.update()
 
 
 def test_articulation_root():
     """Test articulation root orientation bug fix."""
     print("Running test_articulation_root...")
+    setup_clean_stage()
 
     asset_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/orientation_bug.usd")
     my_world = World(stage_units_in_meters=1.0)
@@ -63,8 +73,11 @@ def test_articulation_determinism():
     assets_root_path = get_assets_root_path()
 
     def test_franka_slow_convergence():
-        open_stage(get_assets_root_path() + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
+        setup_clean_stage()
         robot_prim_path = "/panda"
+        add_reference_to_stage(
+            usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd", prim_path=robot_prim_path
+        )
 
         # Start Simulation and wait
         my_world = World(stage_units_in_meters=1.0)
@@ -136,6 +149,7 @@ def test_articulation_determinism():
 def test_tensor_api_handles():
     """Test tensor API handles with physics callbacks."""
     print("Running test_tensor_api_handles...")
+    setup_clean_stage()
 
     my_world = World(stage_units_in_meters=1.0)
     my_world.scene.add_default_ground_plane()

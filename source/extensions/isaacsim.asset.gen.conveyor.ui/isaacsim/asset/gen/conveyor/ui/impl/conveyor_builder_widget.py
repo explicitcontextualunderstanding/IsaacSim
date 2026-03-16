@@ -153,8 +153,8 @@ class ConveyorBuilderWidget:
         self._on_kit_selection_changed()
 
     def shutdown(self):
-        del self._stage_event_subscription
         self._stage_event_subscription = None
+        self._stage_event_sub_closed = None
         stage = omni.usd.get_context().get_stage()
         self.builder.clear_system(stage)
         if stage:

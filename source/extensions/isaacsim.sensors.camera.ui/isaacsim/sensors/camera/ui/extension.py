@@ -12,21 +12,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Extension for the isaacsim.sensors.camera.ui extension that provides UI integration for camera and depth sensor creation."""
+
+
 import gc
-import weakref
 from pathlib import Path
 
 import omni.ext
+import omni.kit.actions.core
 import omni.kit.commands
 from isaacsim.core.utils.prims import create_prim
 from isaacsim.core.utils.stage import get_next_free_path
-from isaacsim.gui.components.menu import make_menu_item_description
+from isaacsim.gui.components.menu import create_submenu
 from isaacsim.sensors.camera import SingleViewDepthSensorAsset
 from isaacsim.storage.native import get_assets_root_path
-from omni.kit.menu.utils import MenuItemDescription, add_menu_items, remove_menu_items
+from omni.kit.menu.utils import add_menu_items, remove_menu_items
 
 
 class Extension(omni.ext.IExt):
+    """Extension for the isaacsim.sensors.camera.ui extension that provides UI integration for camera and depth sensor creation.
+
+    This extension adds menu items to the Create menu and context menus that allow users to create various camera and depth sensor prims in the USD stage. It supports sensors from multiple vendors including Orbbec, Leopard Imaging, RealSense, Sensing, SICK, and Stereolabs.
+
+    The extension automatically registers actions for each supported sensor type and creates a hierarchical menu structure organized by vendor. For depth sensors, it creates specialized SingleViewDepthSensorAsset instances with proper initialization. For regular camera sensors, it creates standard Xform prims with the appropriate USD reference.
+
+    Supported sensor vendors and models include:
+    - Orbbec: Gemini 2, FemtoMega, Gemini 335, Gemini 335L (all depth sensors)
+    - Leopard Imaging: Hawk, Owl
+    - RealSense: D455, D457, D555 (all depth sensors)
+    - Sensing: Multiple SG series models with various configurations
+    - SICK: Inspector83x
+    - Stereolabs: ZED_X (depth sensor)
+
+    The extension provides both main menu integration under Create > Sensors > Camera and Depth Sensors and context menu integration accessible via right-click in the viewport under Isaac > Sensors.
+    """
+
     # Define sensors data organized by vendor and sensor name
     SENSORS = {
         "Orbbec": {
@@ -62,7 +83,7 @@ class Extension(omni.ext.IExt):
                 "is_depth_sensor": True,
             },
             "Realsense D457": {
-                "prim_prefix": "/RealsenseD455",
+                "prim_prefix": "/RealsenseD457",
                 "usd_path": "/Isaac/Sensors/RealSense/D457/rsd457.usd",
                 "is_depth_sensor": True,
             },
@@ -116,19 +137,25 @@ class Extension(omni.ext.IExt):
             }
         },
     }
+    """Dictionary containing sensor configurations organized by vendor and sensor name.
 
-    def on_startup(self, ext_id: str) -> None:
+The structure maps vendor names to their sensor models, where each sensor model contains
+configuration data including prim prefix, USD asset path, and optional depth sensor flag.
+Used to dynamically generate menu items and actions for creating sensor prims in the scene."""
+
+    def on_startup(self, ext_id: str):
+        """Initializes the extension by setting up sensor creation actions and menu items.
+
+        Args:
+            ext_id: The extension identifier.
+        """
+        self._ext_id = ext_id
+        self._ext_name = omni.ext.get_extension_name(ext_id)
+        self._registered_actions = []
 
         icon_dir = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__)
-        sensor_icon_path = str(Path(icon_dir).joinpath("data/sensor.svg"))
 
-        # Helper function to create a sensor prim
-        def _add_sensor(prim_prefix, usd_path):
-            return lambda *_: create_prim(
-                prim_path=get_next_free_path(prim_prefix, None),
-                prim_type="Xform",
-                usd_path=get_assets_root_path() + usd_path,
-            )
+        action_registry = omni.kit.actions.core.get_action_registry()
 
         # Build menu structure based on SENSORS dictionary
         vendor_dicts = {}
@@ -137,13 +164,26 @@ class Extension(omni.ext.IExt):
             for sensor_name, sensor_data in sensors.items():
                 prim_prefix = sensor_data["prim_prefix"]
                 usd_path = sensor_data["usd_path"]
+
+                # Register an action for this camera sensor.
+                action_id = "create_camera_" + sensor_name.lower().replace(" ", "_").replace("-", "_")
                 if sensor_data.get("is_depth_sensor", False):
-                    on_click_fn = lambda *_, prim_prefix=prim_prefix, usd_path=usd_path: self._create_depth_sensor(
-                        prim_prefix, usd_path
-                    )
+                    action_fn = lambda *_, pp=prim_prefix, up=usd_path: self._create_depth_sensor(pp, up)
                 else:
-                    on_click_fn = _add_sensor(prim_prefix, usd_path)
-                sensor_items.append({"name": sensor_name, "onclick_fn": on_click_fn})
+                    action_fn = lambda *_, pp=prim_prefix, up=usd_path: create_prim(
+                        prim_path=get_next_free_path(pp, None),
+                        prim_type="Xform",
+                        usd_path=get_assets_root_path() + up,
+                    )
+                action_registry.register_action(
+                    self._ext_name,
+                    action_id,
+                    action_fn,
+                    description=f"Create {sensor_name} camera sensor",
+                )
+                self._registered_actions.append(action_id)
+
+                sensor_items.append({"name": sensor_name, "onclick_action": (self._ext_name, action_id)})
 
             vendor_dicts[vendor] = {"name": {vendor: sensor_items}}
 
@@ -170,38 +210,8 @@ class Extension(omni.ext.IExt):
             "glyph": str(Path(icon_dir).joinpath("data/sensor.svg")),
         }
 
-        def create_submenu(menu_dict):
-            # Handle non-nested menu items
-            if "name" in menu_dict and isinstance(menu_dict["name"], str):
-                return MenuItemDescription(
-                    name=menu_dict["name"],
-                    onclick_fn=menu_dict.get("onclick_fn"),
-                    onclick_action=menu_dict.get("onclick_action"),
-                    glyph=menu_dict.get("glyph"),
-                )
-
-            # Handle nested submenus recursively
-            submenu_name = next(iter(menu_dict["name"]))
-            items = menu_dict["name"][submenu_name]
-            sub_menu_items = []
-            for item in items:
-                if isinstance(item.get("name"), dict):
-                    # Recursively handle nested submenu
-                    sub_menu_items.append(create_submenu(item))
-                else:
-                    # Handle leaf menu item
-                    sub_menu_items.append(
-                        MenuItemDescription(
-                            name=item["name"],
-                            onclick_fn=item.get("onclick_fn"),
-                            onclick_action=item.get("onclick_action"),
-                        )
-                    )
-
-            return MenuItemDescription(name=submenu_name, sub_menu=sub_menu_items, glyph=menu_dict.get("glyph"))
-
         self._menu_items = create_submenu(sensors_menu_dict)
-        add_menu_items([self._menu_items], "Create")
+        add_menu_items(self._menu_items, "Create")
 
         # add sensor to context menu
         context_menu_dict = {
@@ -216,11 +226,24 @@ class Extension(omni.ext.IExt):
         self._viewport_create_menu = omni.kit.context_menu.add_menu(context_menu_dict, "CREATE")
 
     def on_shutdown(self):
+        """Cleans up the extension by removing menu items and deregistering actions."""
         remove_menu_items(self._menu_items, "Create")
         self._viewport_create_menu = None
+
+        # Deregister all registered actions.
+        action_registry = omni.kit.actions.core.get_action_registry()
+        for action_id in self._registered_actions:
+            action_registry.deregister_action(self._ext_name, action_id)
+        self._registered_actions.clear()
+
         gc.collect()
 
     def _get_stage_and_path(self):
+        """Gets the currently selected prim path from the USD stage.
+
+        Returns:
+            The path of the last selected prim, or None if no prims are selected.
+        """
         selectedPrims = omni.usd.get_context().get_selection().get_selected_prim_paths()
 
         if len(selectedPrims) > 0:
@@ -229,7 +252,13 @@ class Extension(omni.ext.IExt):
             curr_prim = None
         return curr_prim
 
-    def _create_depth_sensor(self, prim_prefix, usd_path):
+    def _create_depth_sensor(self, prim_prefix: str, usd_path: str):
+        """Creates and initializes a depth sensor asset at the next available path.
+
+        Args:
+            prim_prefix: The prefix for the prim path.
+            usd_path: The USD asset path for the depth sensor.
+        """
         depth_sensor = SingleViewDepthSensorAsset(
             prim_path=get_next_free_path(prim_prefix, None),
             asset_path=get_assets_root_path() + usd_path,

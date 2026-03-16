@@ -22,35 +22,41 @@ Backend of "Save Robot"
 
 import os
 
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.usd
 import usd.schema.isaac.robot_schema as rs
-from isaacsim.core.utils.articulations import add_articulation_root, remove_articulation_root
-from pxr import Sdf, Usd, UsdGeom
+from isaacsim.core.experimental.objects import DistantLight, GroundPlane
+from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
 
 from ..utils.utils import apply_standard_stage_settings
 from .robot_templates import RobotRegistry
 
 
-def create_variant_usd(add_ground=False, add_lights=False, add_physics_scene=False):
+def create_variant_usd(add_ground: bool = False, add_lights: bool = False, add_physics_scene: bool = False):
+    """Creates a variant USD file with multiple physics configurations for the registered robot.
+
+    Generates a master USD file with variant sets containing three physics levels: None, PhysX, and Robot.
+    Each variant references separate configuration files (_base.usd, _physics.usd, _robot.usd) and
+    optionally adds environment components like ground plane, lighting, and physics scene.
+
+    Args:
+        add_ground: Whether to add a ground plane to the environment.
+        add_lights: Whether to add a distant light to the environment.
+        add_physics_scene: Whether to add a physics scene to the environment.
+    """
 
     def _add_ground(stage):
         print("Adding ground plane")
-        from isaacsim.core.api.objects.ground_plane import GroundPlane
-
-        GroundPlane(prim_path="/Environment/groundPlane", z_position=0)
+        GroundPlane("/Environment/groundPlane")
 
     def _add_light(stage):
         print("Adding light")
-        from pxr import UsdLux
-
-        light = UsdLux.DistantLight.Define(stage, "/Environment/defaultLight")
-        light.CreateIntensityAttr().Set(1000.0)
+        light = DistantLight("/Environment/defaultLight")
+        light.set_intensities(1000.0)
 
     def _add_physics_scene(stage):
         print("Adding physics scene")
-        from pxr import UsdPhysics
-
-        UsdPhysics.Scene.Define(stage, "/Environment/physicsScene")
+        stage_utils.define_prim("/Environment/physicsScene", type_name="PhysicsScene")
 
     robot = RobotRegistry().get()
     # start a new stage for the variant usd
@@ -107,7 +113,18 @@ def create_variant_usd(add_ground=False, add_lights=False, add_physics_scene=Fal
         _add_physics_scene(stage)
 
 
-def apply_articulation_apis(robot_path, articulation_root_path):
+def apply_articulation_apis(robot_path: str, articulation_root_path: str):
+    """Applies articulation APIs to the specified robot prim for physics simulation.
+
+    Removes any existing articulation root APIs from the robot hierarchy and applies
+    UsdPhysics.ArticulationRootAPI and PhysxSchema.PhysxArticulationAPI to the specified
+    articulation root prim.
+
+    Args:
+        robot_path: Path to the robot prim in the stage.
+        articulation_root_path: Path to the prim that should become the articulation root.
+            Use "Pick from the Robot" to automatically use the robot prim as root.
+    """
     stage = omni.usd.get_context().get_stage()
     robot_prim = stage.GetPrimAtPath(robot_path)
     robot_name = robot_prim.GetName()
@@ -119,16 +136,32 @@ def apply_articulation_apis(robot_path, articulation_root_path):
     # make sure there isn't already an articulation root on stage, if there is, delete it if it's not on the prim desired
 
     def remove_articulation_root_recursive(prim):
-        remove_articulation_root(prim)
+        if prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+            prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+        if prim.HasAPI(PhysxSchema.PhysxArticulationAPI):
+            prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
         for child in prim.GetChildren():
             remove_articulation_root_recursive(child)
 
     # delete any previous articulation root prim that might be on the robot
     remove_articulation_root_recursive(robot_prim)
-    add_articulation_root(articulation_prim)
+    articulation_prim.ApplyAPI(UsdPhysics.ArticulationRootAPI)
+    articulation_prim.ApplyAPI(PhysxSchema.PhysxArticulationAPI)
 
 
-def apply_robot_schema(robot_path):
+def apply_robot_schema(robot_path: str):
+    """Applies Isaac Robot Schema to the robot prim and its components.
+
+    Applies RobotAPI to the main robot prim, LinkAPI to all robot links, and JointAPI
+    to all joints. Creates relationships between the robot and its links/joints as
+    defined by the Isaac Robot Schema.
+
+    Args:
+        robot_path: Path to the robot prim in the stage.
+
+    Raises:
+        ValueError: If the robot prim does not exist or no robot is found in the registry.
+    """
     stage = omni.usd.get_context().get_stage()
     robot_prim = stage.GetPrimAtPath(robot_path)
     robot = RobotRegistry().get()

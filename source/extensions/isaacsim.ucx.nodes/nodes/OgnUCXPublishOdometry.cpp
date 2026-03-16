@@ -75,26 +75,18 @@ public:
 
 protected:
     /**
-     * @brief Generate message from node inputs.
+     * @brief Extract odometry data from node inputs.
      * @details
      * Takes position, orientation, and velocity inputs, computes odometry relative
-     * to starting pose, and serializes it.
-     *
-     * Message format:
-     * - timestamp (double, 8 bytes)
-     * - position (3 doubles, 24 bytes) - relative position in body frame
-     * - orientation (4 doubles, 32 bytes) - relative quaternion (w, x, y, z)
-     * - linear_velocity (3 doubles, 24 bytes) - body frame
-     * - angular_velocity (3 doubles, 24 bytes) - body frame
-     * - linear_acceleration (3 doubles, 24 bytes) - body frame
-     * - angular_acceleration (3 doubles, 24 bytes) - body frame
+     * to starting pose, and returns the computed data.
      *
      * @param[in] db Database accessor for node inputs
-     * @return std::vector<uint8_t> Serialized message data
+     * @return OdometryData Computed odometry data
      */
-    std::vector<uint8_t> generateMessage(OgnUCXPublishOdometryDatabase& db) override
+    isaacsim::ucx::nodes::OdometryData extractData(OgnUCXPublishOdometryDatabase& db) override
     {
-        const double timestamp = db.inputs.timeStamp();
+        isaacsim::ucx::nodes::OdometryData data;
+        data.timestamp = db.inputs.timeStamp();
 
         // Get direct inputs from node
         auto& position = db.inputs.position();
@@ -183,6 +175,43 @@ protected:
         m_prevLinearVelocity = linearVelocityBody;
         m_prevAngularVelocity = angularVelocityBody;
 
+        // Fill output data structure
+        data.position = { static_cast<double>(relativePosition.x), static_cast<double>(relativePosition.y),
+                          static_cast<double>(relativePosition.z) };
+        data.orientation = { static_cast<double>(relativeQuat.w), static_cast<double>(relativeQuat.x),
+                             static_cast<double>(relativeQuat.y), static_cast<double>(relativeQuat.z) };
+        data.linearVelocity = { static_cast<double>(linearVelocityBody.x), static_cast<double>(linearVelocityBody.y),
+                                static_cast<double>(linearVelocityBody.z) };
+        data.angularVelocity = { static_cast<double>(angularVelocityBody.x), static_cast<double>(angularVelocityBody.y),
+                                 static_cast<double>(angularVelocityBody.z) };
+        data.linearAcceleration = { static_cast<double>(linearAcceleration.x), static_cast<double>(linearAcceleration.y),
+                                    static_cast<double>(linearAcceleration.z) };
+        data.angularAcceleration = { static_cast<double>(angularAcceleration.x),
+                                     static_cast<double>(angularAcceleration.y),
+                                     static_cast<double>(angularAcceleration.z) };
+
+        return data;
+    }
+
+    /**
+     * @brief Generate message from odometry data.
+     * @details
+     * Serializes odometry data into message format.
+     *
+     * Message format:
+     * - timestamp (double, 8 bytes)
+     * - position (3 doubles, 24 bytes) - relative position in body frame
+     * - orientation (4 doubles, 32 bytes) - relative quaternion (w, x, y, z)
+     * - linear_velocity (3 doubles, 24 bytes) - body frame
+     * - angular_velocity (3 doubles, 24 bytes) - body frame
+     * - linear_acceleration (3 doubles, 24 bytes) - body frame
+     * - angular_acceleration (3 doubles, 24 bytes) - body frame
+     *
+     * @param[in] data Odometry data to serialize
+     * @return std::vector<uint8_t> Serialized message data
+     */
+    std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::OdometryData& data) override
+    {
         // Calculate message size
         const size_t messageSize = sizeof(double) + // timestamp
                                    sizeof(double) * 3 + // position
@@ -196,46 +225,31 @@ protected:
         size_t offset = 0;
 
         // Write timestamp
-        std::memcpy(messageData.data() + offset, &timestamp, sizeof(double));
+        std::memcpy(messageData.data() + offset, &data.timestamp, sizeof(double));
         offset += sizeof(double);
 
         // Write relative position
-        double positionData[3] = { static_cast<double>(relativePosition.x), static_cast<double>(relativePosition.y),
-                                   static_cast<double>(relativePosition.z) };
-        std::memcpy(messageData.data() + offset, positionData, sizeof(double) * 3);
+        std::memcpy(messageData.data() + offset, data.position.data(), sizeof(double) * 3);
         offset += sizeof(double) * 3;
 
         // Write relative orientation (w, x, y, z)
-        double orientationData[4] = { static_cast<double>(relativeQuat.w), static_cast<double>(relativeQuat.x),
-                                      static_cast<double>(relativeQuat.y), static_cast<double>(relativeQuat.z) };
-        std::memcpy(messageData.data() + offset, orientationData, sizeof(double) * 4);
+        std::memcpy(messageData.data() + offset, data.orientation.data(), sizeof(double) * 4);
         offset += sizeof(double) * 4;
 
         // Write linear velocity (body frame)
-        double linearVelData[3] = { static_cast<double>(linearVelocityBody.x), static_cast<double>(linearVelocityBody.y),
-                                    static_cast<double>(linearVelocityBody.z) };
-        std::memcpy(messageData.data() + offset, linearVelData, sizeof(double) * 3);
+        std::memcpy(messageData.data() + offset, data.linearVelocity.data(), sizeof(double) * 3);
         offset += sizeof(double) * 3;
 
         // Write angular velocity (body frame)
-        double angularVelData[3] = { static_cast<double>(angularVelocityBody.x),
-                                     static_cast<double>(angularVelocityBody.y),
-                                     static_cast<double>(angularVelocityBody.z) };
-        std::memcpy(messageData.data() + offset, angularVelData, sizeof(double) * 3);
+        std::memcpy(messageData.data() + offset, data.angularVelocity.data(), sizeof(double) * 3);
         offset += sizeof(double) * 3;
 
         // Write linear acceleration (body frame)
-        double linearAccelData[3] = { static_cast<double>(linearAcceleration.x),
-                                      static_cast<double>(linearAcceleration.y),
-                                      static_cast<double>(linearAcceleration.z) };
-        std::memcpy(messageData.data() + offset, linearAccelData, sizeof(double) * 3);
+        std::memcpy(messageData.data() + offset, data.linearAcceleration.data(), sizeof(double) * 3);
         offset += sizeof(double) * 3;
 
         // Write angular acceleration (body frame)
-        double angularAccelData[3] = { static_cast<double>(angularAcceleration.x),
-                                       static_cast<double>(angularAcceleration.y),
-                                       static_cast<double>(angularAcceleration.z) };
-        std::memcpy(messageData.data() + offset, angularAccelData, sizeof(double) * 3);
+        std::memcpy(messageData.data() + offset, data.angularAcceleration.data(), sizeof(double) * 3);
         offset += sizeof(double) * 3;
 
         return messageData;

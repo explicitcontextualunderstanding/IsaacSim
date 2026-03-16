@@ -12,7 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""A state machine controller that manages pick and place operations for robotic manipulators through a sequence of 10 predefined phases."""
+
+
 import typing
+from typing import List, Optional
 
 import numpy as np
 from isaacsim.core.api.controllers.base_controller import BaseController
@@ -23,8 +28,7 @@ from isaacsim.robot.manipulators.grippers.gripper import Gripper
 
 
 class PickPlaceController(BaseController):
-    """
-    A simple pick and place state machine for tutorials
+    """A simple pick and place state machine for tutorials.
 
     Each phase runs for 1 second, which is the internal time of the state machine
 
@@ -42,11 +46,12 @@ class PickPlaceController(BaseController):
     - Phase 9: Move end_effector towards the old xy position.
 
     Args:
-        name (str): Name id of the controller
-        cspace_controller (BaseController): a cartesian space controller that returns an ArticulationAction type
-        gripper (Gripper): a gripper controller for open/ close actions.
-        end_effector_initial_height (typing.Optional[float], optional): end effector initial picking height to start from (more info in phases above). If not defined, set to 0.3 meters. Defaults to None.
-        events_dt (typing.Optional[typing.List[float]], optional): Dt of each phase/ event step. 10 phases dt has to be defined. Defaults to None.
+        name: Name id of the controller.
+        cspace_controller: A cartesian space controller that returns an ArticulationAction type.
+        gripper: A gripper controller for open/ close actions.
+        end_effector_initial_height: End effector initial picking height to start from (more info in phases above).
+            If not defined, set to 0.3 meters.
+        events_dt: Dt of each phase/ event step. 10 phases dt has to be defined.
 
     Raises:
         Exception: events dt need to be list or numpy array
@@ -60,7 +65,7 @@ class PickPlaceController(BaseController):
         gripper: Gripper,
         end_effector_initial_height: typing.Optional[float] = None,
         events_dt: typing.Optional[typing.List[float]] = None,
-    ) -> None:
+    ):
         BaseController.__init__(self, name=name)
         self._event = 0
         self._t = 0
@@ -84,18 +89,18 @@ class PickPlaceController(BaseController):
         return
 
     def is_paused(self) -> bool:
-        """
+        """True if the state machine is paused. Otherwise False.
 
         Returns:
-            bool: True if the state machine is paused. Otherwise False.
+            True if the state machine is paused. Otherwise False.
         """
         return self._pause
 
     def get_current_event(self) -> int:
-        """
+        """Current event/ phase of the state machine.
 
         Returns:
-            int: Current event/ phase of the state machine
+            Current event/ phase of the state machine.
         """
         return self._event
 
@@ -110,14 +115,14 @@ class PickPlaceController(BaseController):
         """Runs the controller one step.
 
         Args:
-            picking_position (np.ndarray): The object's position to be picked in local frame.
-            placing_position (np.ndarray):  The object's position to be placed in local frame.
-            current_joint_positions (np.ndarray): Current joint positions of the robot.
-            end_effector_offset (typing.Optional[np.ndarray], optional): offset of the end effector target. Defaults to None.
-            end_effector_orientation (typing.Optional[np.ndarray], optional): end effector orientation while picking and placing. Defaults to None.
+            picking_position: The object's position to be picked in local frame.
+            placing_position: The object's position to be placed in local frame.
+            current_joint_positions: Current joint positions of the robot.
+            end_effector_offset: Offset of the end effector target.
+            end_effector_orientation: End effector orientation while picking and placing.
 
         Returns:
-            ArticulationAction: action to be executed by the ArticulationController
+            Action to be executed by the ArticulationController.
         """
         if end_effector_offset is None:
             end_effector_offset = np.array([0, 0, 0])
@@ -159,11 +164,27 @@ class PickPlaceController(BaseController):
         return target_joint_positions
 
     def _get_interpolated_xy(self, target_x, target_y, current_x, current_y):
+        """Interpolates between current and target XY positions based on the current phase.
+
+        Args:
+            target_x: Target X position.
+            target_y: Target Y position.
+            current_x: Current X position.
+            current_y: Current Y position.
+
+        Returns:
+            Interpolated XY position array.
+        """
         alpha = self._get_alpha()
         xy_target = (1 - alpha) * np.array([current_x, current_y]) + alpha * np.array([target_x, target_y])
         return xy_target
 
     def _get_alpha(self):
+        """Calculates the interpolation alpha value based on the current event and time.
+
+        Returns:
+            Alpha value for interpolation.
+        """
         if self._event < 5:
             return 0
         elif self._event == 5:
@@ -176,6 +197,14 @@ class PickPlaceController(BaseController):
             raise ValueError()
 
     def _get_target_hs(self, target_height):
+        """Calculates the target height based on the current event and interpolation.
+
+        Args:
+            target_height: The target height for placing.
+
+        Returns:
+            The interpolated target height for the current phase.
+        """
         if self._event == 0:
             h = self._h1
         elif self._event == 1:
@@ -201,25 +230,44 @@ class PickPlaceController(BaseController):
         return h
 
     def _mix_sin(self, t):
+        """Applies a sinusoidal mixing function for smooth interpolation.
+
+        Args:
+            t: Time parameter for interpolation.
+
+        Returns:
+            Smoothed interpolation value using cosine function.
+        """
         return 0.5 * (1 - np.cos(t * np.pi))
 
     def _combine_convex(self, a, b, alpha):
+        """Performs convex combination of two values.
+
+        Args:
+            a: First value.
+            b: Second value.
+            alpha: Interpolation factor.
+
+        Returns:
+            Convex combination result.
+        """
         return (1 - alpha) * a + alpha * b
 
     def reset(
         self,
         end_effector_initial_height: typing.Optional[float] = None,
         events_dt: typing.Optional[typing.List[float]] = None,
-    ) -> None:
+    ):
         """Resets the state machine to start from the first phase/ event
 
         Args:
-            end_effector_initial_height (typing.Optional[float], optional): end effector initial picking height to start from. If not defined, set to 0.3 meters. Defaults to None.
-            events_dt (typing.Optional[typing.List[float]], optional):  Dt of each phase/ event step. 10 phases dt has to be defined. Defaults to None.
+            end_effector_initial_height: End effector initial picking height to start from.
+                If not defined, set to 0.3 meters.
+            events_dt: Dt of each phase/ event step. 10 phases dt has to be defined.
 
         Raises:
-            Exception: events dt need to be list or numpy array
-            Exception: events dt need have length of 10
+            Exception: Events dt need to be list or numpy array
+            Exception: Events dt need have length of 10
         """
         BaseController.reset(self)
         self._cspace_controller.reset()
@@ -239,21 +287,22 @@ class PickPlaceController(BaseController):
         return
 
     def is_done(self) -> bool:
-        """
+        """True if the state machine reached the last phase. Otherwise False.
+
         Returns:
-            bool: True if the state machine reached the last phase. Otherwise False.
+            True if the state machine reached the last phase. Otherwise False.
         """
         if self._event >= len(self._events_dt):
             return True
         else:
             return False
 
-    def pause(self) -> None:
+    def pause(self):
         """Pauses the state machine's time and phase."""
         self._pause = True
         return
 
-    def resume(self) -> None:
+    def resume(self):
         """Resumes the state machine's time and phase."""
         self._pause = False
         return

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test suite for validating kinematics solvers in the isaacsim.robot_motion.motion_generation extension."""
+
+
 import asyncio
 import json
 import os
@@ -46,8 +49,29 @@ from pxr import Sdf, UsdLux
 # Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of module will
 # make it auto-discoverable by omni.kit.test
 class TestKinematics(omni.kit.test.AsyncTestCase):
+    """Test suite for validating kinematics solvers in the isaacsim.robot_motion.motion_generation extension.
+
+    This test class validates forward kinematics (FK) and inverse kinematics (IK) functionality for supported
+    robot configurations including UR10 and Franka robots. It compares Lula kinematics solver results against
+    USD robot frame transformations to ensure accuracy and consistency.
+
+    The test suite covers:
+    - Forward kinematics validation by comparing Lula solver results with USD robot frame poses
+    - Inverse kinematics validation by verifying convergence to target positions and orientations
+    - Property getter/setter functionality for kinematics solver configuration
+    - Cross-validation between different kinematics computation methods
+
+    Tests are performed with various robot configurations, base poses, and target configurations to ensure
+    robust validation across different scenarios. The validation includes both translational and rotational
+    accuracy checks with configurable tolerance thresholds.
+    """
+
     # Before running each test
     async def setUp(self):
+        """Set up test environment before each test.
+
+        Initializes physics settings, timeline interface, extension manager, and loads policy configurations.
+        """
         self._physics_fps = 60
         self._physics_dt = 1 / self._physics_fps  # duration of physics frame in seconds
 
@@ -66,6 +90,10 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
 
     # After running each test
     async def tearDown(self):
+        """Clean up test environment after each test.
+
+        Stops timeline, waits for asset loading to complete, clears motion generation instance, and clears world instance.
+        """
         self._timeline.stop()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             print("tearDown, assets still loading, waiting to finish...")
@@ -77,12 +105,24 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         pass
 
     async def _create_light(self):
+        """Create a sphere light in the scene.
+
+        Adds a sphere light with radius 2 and intensity 100000 at position [6.5, 0, 12].
+        """
         sphereLight = UsdLux.SphereLight.Define(get_current_stage(), Sdf.Path("/World/SphereLight"))
         sphereLight.CreateRadiusAttr(2)
         sphereLight.CreateIntensityAttr(100000)
         SingleXFormPrim(str(sphereLight.GetPath().pathString)).set_world_pose([6.5, 0, 12])
 
     async def _prepare_stage(self, robot):
+        """Prepare the stage for testing with the given robot.
+
+        Stops timeline, initializes world and simulation context, creates lighting, starts timeline,
+        and configures robot with disabled gravity and solver iteration counts.
+
+        Args:
+            robot: The robot instance to initialize and configure.
+        """
         # Set settings to ensure deterministic behavior
         # Initialize the robot
         # Play the timeline
@@ -105,6 +145,11 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         await update_stage_async()
 
     async def test_lula_fk_ur10(self):
+        """Test forward kinematics for UR10 robot.
+
+        Loads UR10 robot, performs forward kinematics test with specific joint targets,
+        and verifies translational distance is less than 0.001 and rotational distance is less than 0.005.
+        """
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
         robot_name = "UR10"
@@ -121,6 +166,11 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         self.assertTrue(np.all(rot_dist < 0.005))
 
     async def test_lula_fk_franka(self):
+        """Test forward kinematics for Franka robot.
+
+        Loads Franka Panda robot, performs forward kinematics test with specific base pose and orientation,
+        and verifies accuracy excluding known issues with finger frames and frame 0.
+        """
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         robot_name = "Franka"
@@ -148,6 +198,24 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         base_pose=np.zeros(3),
         base_orient=np.array([1, 0, 0, 0]),
     ):
+        """Test forward kinematics by comparing Lula solver results with USD frame poses.
+
+        Loads robot from USD file, initializes kinematics solver, moves robot to target position,
+        and compares frame positions and orientations between Lula solver and USD representation.
+
+        Args:
+            usd_path: Path to the USD file containing the robot.
+            robot_name: Name of the robot for loading kinematics configuration.
+            robot_prim_path: USD prim path where the robot is referenced.
+            robot_root_path: USD prim path to the robot root joint.
+            joint_target: Target joint positions for the robot.
+            base_pose: Base position of the robot in world coordinates.
+            base_orient: Base orientation of the robot as a quaternion.
+
+        Returns:
+            A tuple containing (translational_distances, rotational_distances) arrays comparing
+            Lula solver results with USD frame poses.
+        """
         await create_new_stage_async()
         add_reference_to_stage(usd_path, robot_prim_path)
 
@@ -197,6 +265,11 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         return np.array(trans_dists), np.array(rot_dist)
 
     async def test_lula_ik_ur10(self):
+        """Test inverse kinematics for UR10 robot.
+
+        Loads UR10 robot and performs inverse kinematics tests with position-only and
+        position-orientation targets to verify solver convergence and accuracy.
+        """
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
         robot_name = "UR10"
@@ -230,6 +303,11 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         )
 
     async def test_lula_ik_franka(self):
+        """Test inverse kinematics for Franka robot.
+
+        Loads Franka Panda robot and performs inverse kinematics tests on different end-effector frames
+        with various target poses to verify solver convergence and accuracy.
+        """
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         robot_name = "Franka"
@@ -276,6 +354,23 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         base_pose=np.zeros(3),
         base_orient=np.array([0, 0, 0, 1]),
     ):
+        """Test inverse kinematics by solving for target pose and verifying solution accuracy.
+
+        Loads robot, initializes kinematics solver, computes inverse kinematics solution for target pose,
+        and verifies consistency between IK solution, forward kinematics, and USD robot frame poses.
+
+        Args:
+            usd_path: Path to the USD file containing the robot.
+            robot_name: Name of the robot for loading kinematics configuration.
+            robot_prim_path: USD prim path where the robot is referenced.
+            frame: Name of the end-effector frame to solve for.
+            position_target: Target position in world coordinates.
+            orientation_target: Target orientation as a quaternion.
+            position_tolerance: Tolerance for position accuracy.
+            orientation_tolerance: Tolerance for orientation accuracy.
+            base_pose: Base position of the robot in world coordinates.
+            base_orient: Base orientation of the robot as a quaternion.
+        """
         await create_new_stage_async()
         add_reference_to_stage(usd_path, robot_prim_path)
         omni.usd.get_context().get_stage().SetTimeCodesPerSecond(self._physics_fps)
@@ -331,6 +426,11 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
             carb.log_warn("Frame " + frame + " does not exist on USD robot")
 
     async def test_lula_ik_properties(self):
+        """Test property assignment and retrieval for LulaKinematicsSolver inverse kinematics configuration.
+
+        Verifies that BFGS and CCD algorithm parameters, sampling settings, and tolerance values
+        can be correctly assigned and retrieved from the kinematics solver.
+        """
         robot_name = "UR10"
 
         kinematics_config = interface_config_loader.load_supported_lula_kinematics_solver_config(robot_name)
@@ -396,6 +496,12 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         self.assertTrue(lk.sampling_seed == 16)
 
     async def test_getters_and_setters(self):
+        """Test getter and setter methods of LulaKinematicsSolver.
+
+        Verifies that tolerance and cspace seed values can be set and retrieved correctly.
+        Also validates that configuration limits loaded from Robot Description files match expected values
+        for UR10 and Franka robots.
+        """
         await create_new_stage_async()
 
         robot_name = "UR10"
@@ -438,7 +544,19 @@ class TestKinematics(omni.kit.test.AsyncTestCase):
         jerk_lim = lk.get_cspace_jerk_limits()
         self.assertTrue(np.allclose(jerk_lim, [7500, 3750, 5000, 6250, 7500, 10000, 10000], 0.0001))
 
-    async def move_until_still(self, robot, timeout=500):
+    async def move_until_still(self, robot, timeout=500) -> int:
+        """Move the robot until it reaches a stable position.
+
+        Waits for the robot to stop moving by monitoring joint position stability across multiple frames.
+        Returns early if the robot becomes still before the timeout.
+
+        Args:
+            robot: The robot to monitor for stability.
+            timeout: Maximum number of frames to wait for stability.
+
+        Returns:
+            Number of frames elapsed when stability was reached, or timeout value if stability was not achieved.
+        """
         h = 10
         positions = np.zeros((h, robot.num_dof))
         for i in range(timeout):

@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .extension import Extension
+"""Physics sensors UI module for Isaac Sim."""
+
+
+from .extension import Extension as Extension
+
+__all__ = []

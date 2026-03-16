@@ -78,7 +78,7 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                 num_faces = np.random.randint(low=5, high=10)
                 # draw random values
                 counts = np.random.randint(low=2, high=5, size=num_faces).astype(np.int32)
-                indices = np.random.randint(low=0, high=num_points, size=np.sum(counts)).astype(np.int32)
+                indices = np.random.randint(low=0, high=num_points, size=int(np.sum(counts))).astype(np.int32)
                 h_indices = np.random.randint(
                     low=0, high=num_faces, size=np.random.randint(low=0, high=num_faces)
                 ).astype(np.int32)
@@ -116,11 +116,11 @@ class TestMesh(omni.kit.test.AsyncTestCase):
                 num_creases = np.random.randint(low=5, high=10)
                 # draw random values
                 lengths = np.random.randint(low=2, high=5, size=num_creases).astype(np.int32)
-                indices = np.random.randint(low=0, high=num_points, size=np.sum(lengths)).astype(np.int32)
+                indices = np.random.randint(low=0, high=num_points, size=int(np.sum(lengths))).astype(np.int32)
                 if np.random.rand() < 0.5:
                     sharpnesses = np.random.rand(num_creases).astype(np.float32)
                 else:
-                    sharpnesses = np.random.rand(np.sum(lengths - 1)).astype(np.float32)
+                    sharpnesses = np.random.rand(int(np.sum(lengths - 1))).astype(np.float32)
                 # convert to expected type
                 if _type == list:
                     crease_indices.append(indices.tolist())

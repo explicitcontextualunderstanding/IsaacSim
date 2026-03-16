@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Demonstrates the LightBeam sensor functionality in Isaac Sim with an interactive example showing real-time object detection and distance measurement using physics-based ray casting."""
+
+
 import asyncio
 import weakref
 
@@ -37,7 +41,32 @@ EXTENSION_NAME = "LightBeam Sensor Example"
 
 
 class LightBeamSensorDemo(omni.ext.IExt):
+    """A demonstration extension for the LightBeam sensor functionality in Isaac Sim.
+
+    This extension provides an interactive example showing how to use the LightBeam sensor to detect
+    objects and measure distances using physics-based ray casting. The demo creates a scene with a
+    moveable cube and a LightBeam sensor that continuously scans for hits, displaying real-time data
+    including beam hit status, linear depth measurements, and hit positions.
+
+    The extension integrates with the Isaac Sim examples browser and provides a user interface that
+    visualizes sensor output data. When activated, it creates a physics scene with a cube that can be
+    dragged around, allowing users to observe how the sensor responds to object movement and positioning.
+
+    Key features:
+    - Real-time visualization of 5 light beam rays with color-coded display
+    - Live updates of beam hit detection, linear depth, and hit position data
+    - Interactive cube manipulation for testing sensor behavior
+    - Integration with Isaac Sim's physics simulation system
+    - Automatic scene setup with proper lighting and camera positioning
+    - Action graph configuration for sensor data processing and visualization
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the LightBeam sensor extension.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         self._ext_id = ext_id
         self._extension_path = ext_manager.get_extension_path(ext_id)
@@ -51,13 +80,23 @@ class LightBeamSensorDemo(omni.ext.IExt):
         )
 
     def build_window(self):
+        """Placeholder method for building the extension window."""
         pass
 
     def _on_stage_closed(self, event):
-        """Stage closed event callback."""
+        """Stage closed event callback.
+
+        Args:
+            event: The stage closed event.
+        """
         self.on_closed()
 
     def build_ui(self):
+        """Builds the user interface for the LightBeam sensor example.
+
+        Creates the main UI with header information, documentation links, and a button to load
+        the sensor demonstration scene.
+        """
         with ui.VStack(spacing=5, height=0):
 
             title = "LightBeam Sensor Example"
@@ -72,6 +111,11 @@ class LightBeamSensorDemo(omni.ext.IExt):
             ui.Button("Load Scene", clicked_fn=lambda: self._load_scene())
 
     def _load_scene(self):
+        """Loads and initializes the LightBeam sensor demonstration scene.
+
+        Sets up the sensor interface, physics simulation subscription, UI window with real-time
+        data display labels for beam hits, linear depth, and hit positions for each of the 5 rays.
+        """
         if self._window:
             # clear existing window
             self.on_closed()
@@ -154,15 +198,29 @@ class LightBeamSensorDemo(omni.ext.IExt):
         asyncio.ensure_future(self.create_scenario())
 
     def on_shutdown(self):
+        """Cleans up resources when the extension is shut down.
+
+        Closes any open windows and deregisters the example from the browser.
+        """
         self.on_closed()
         # remove_menu_items(self._menu_items, "Isaac Examples")
         get_browser_instance().deregister_example(name="LightBeam Sensor", category="Sensors")
 
-    def _on_visibility_changed(self, visible):
+    def _on_visibility_changed(self, visible: bool):
+        """Handles window visibility changes.
+
+        Args:
+            visible: Whether the window is visible.
+        """
         if not visible:
             self.on_closed()
 
     def on_closed(self):
+        """Cleans up resources when the demonstration window is closed.
+
+        Destroys the window, unsubscribes from physics events, and clears timeline and stage
+        event subscriptions.
+        """
         if self._window:
             self.sub = None
             self._timeline = None
@@ -170,7 +228,16 @@ class LightBeamSensorDemo(omni.ext.IExt):
             self._window.destroy()
             self._window = None
 
-    def _on_update(self, dt, context):
+    def _on_update(self, dt: float, context):
+        """Updates the UI with real-time LightBeam sensor data during simulation.
+
+        Retrieves linear depth, hit position, and beam hit data from the sensor and updates
+        the corresponding UI labels for each ray.
+
+        Args:
+            dt: Delta time since last update.
+            context: The physics simulation context.
+        """
         if self._timeline.is_playing():
             lin_depth = self._ls.get_linear_depth_data(self.sensor_path)
             hit_pos = self._ls.get_hit_pos_data(self.sensor_path)
@@ -187,6 +254,12 @@ class LightBeamSensorDemo(omni.ext.IExt):
                 )
 
     async def create_scenario(self):
+        """Creates the demonstration scenario with a cube target and LightBeam sensor.
+
+        Sets up a new USD stage with physics scene, creates a cube with collision properties,
+        configures a LightBeam sensor with 5 rays, positions the camera for optimal viewing,
+        and creates an action graph for real-time ray visualization.
+        """
         self._assets_root_path = get_assets_root_path()
         if self._assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
@@ -276,3 +349,6 @@ class LightBeamSensorDemo(omni.ext.IExt):
         )
 
         await og.Controller.evaluate(action_graph)
+
+
+__all__ = []

@@ -17,7 +17,6 @@ import asyncio
 
 import carb
 import omni.kit.test
-import omni.physics.core
 import omni.usd
 import usdrt
 from isaacsim.core.utils.prims import create_prim, define_prim, get_prim_at_path
@@ -91,8 +90,6 @@ class TestStage(omni.kit.test.AsyncTestCase):
         stage_id = get_current_stage_id()
 
         omni.usd.get_context().attach_stage_with_callback(stage_id)
-        physics_sim_interface = omni.physics.core.get_physics_simulation_interface()
-        physics_sim_interface.attach_stage(stage_id)
 
     async def test_clear_stage(self):
         await create_new_stage_async()

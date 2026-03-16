@@ -55,9 +55,21 @@ public:
     {
         m_firstFrame = true;
         m_isInitialized = false;
-        CUDA_CHECK(cudaFreeHost(m_intensityBuffer));
-        CUDA_CHECK(cudaFreeHost(m_distanceBuffer));
-        CUDA_CHECK(cudaFreeHost(m_azimuthBuffer));
+        if (m_intensityBuffer)
+        {
+            CUDA_CHECK(cudaFreeHost(m_intensityBuffer));
+            m_intensityBuffer = nullptr;
+        }
+        if (m_distanceBuffer)
+        {
+            CUDA_CHECK(cudaFreeHost(m_distanceBuffer));
+            m_distanceBuffer = nullptr;
+        }
+        if (m_azimuthBuffer)
+        {
+            CUDA_CHECK(cudaFreeHost(m_azimuthBuffer));
+            m_azimuthBuffer = nullptr;
+        }
     }
     bool initialize(OgnIsaacComputeRTXLidarFlatScanDatabase& db)
     {
@@ -247,21 +259,10 @@ public:
             return false;
         }
 
-        // Asynchronously copy input elements into the state buffers on host
-        isaacsim::core::includes::ScopedDevice scopedDevice(db.inputs.cudaDeviceIndex());
-        cudaStream_t cudaStream;
-        CUDA_CHECK(cudaStreamCreate(&cudaStream));
-        CUDA_CHECK(cudaMemcpyAsync(state.m_intensityBuffer, reinterpret_cast<void*>(db.inputs.intensityPtr()),
-                                   db.inputs.intensityBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
-        CUDA_CHECK(cudaMemcpyAsync(state.m_distanceBuffer, reinterpret_cast<void*>(db.inputs.distancePtr()),
-                                   db.inputs.distanceBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
-        CUDA_CHECK(cudaMemcpyAsync(state.m_azimuthBuffer, reinterpret_cast<void*>(db.inputs.azimuthPtr()),
-                                   db.inputs.azimuthBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
-
         // Number of elements in the input buffers
         size_t numInputElements = db.inputs.intensityBufferSize() / sizeof(float);
 
-        // Simultaneously reset output attributes on host
+        // Reset output attributes on host
         size_t numOutputElements = static_cast<size_t>(state.m_horizontalFov / state.m_horizontalResolution);
         db.outputs.numCols() = static_cast<int>(numOutputElements);
         db.outputs.intensitiesData().resize(numOutputElements);
@@ -272,15 +273,42 @@ public:
             db.outputs.intensitiesData()[i] = 0;
         }
 
-        // Synchronize the stream to ensure the input buffers on host are populated
-        CUDA_CHECK(cudaStreamSynchronize(cudaStream));
-        CUDA_CHECK(cudaStreamDestroy(cudaStream));
+        const float* intensityData;
+        const float* distanceData;
+        const float* azimuthData;
+
+        if (db.inputs.cudaDeviceIndex() == -1)
+        {
+            // Data is already on host — use input pointers directly (no D2H copy needed)
+            intensityData = reinterpret_cast<const float*>(db.inputs.intensityPtr());
+            distanceData = reinterpret_cast<const float*>(db.inputs.distancePtr());
+            azimuthData = reinterpret_cast<const float*>(db.inputs.azimuthPtr());
+        }
+        else
+        {
+            // Asynchronously copy input elements from device into the state buffers on host
+            isaacsim::core::includes::ScopedDevice scopedDevice(db.inputs.cudaDeviceIndex());
+            cudaStream_t cudaStream;
+            CUDA_CHECK(cudaStreamCreate(&cudaStream));
+            CUDA_CHECK(cudaMemcpyAsync(state.m_intensityBuffer, reinterpret_cast<void*>(db.inputs.intensityPtr()),
+                                       db.inputs.intensityBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
+            CUDA_CHECK(cudaMemcpyAsync(state.m_distanceBuffer, reinterpret_cast<void*>(db.inputs.distancePtr()),
+                                       db.inputs.distanceBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
+            CUDA_CHECK(cudaMemcpyAsync(state.m_azimuthBuffer, reinterpret_cast<void*>(db.inputs.azimuthPtr()),
+                                       db.inputs.azimuthBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
+            CUDA_CHECK(cudaStreamSynchronize(cudaStream));
+            CUDA_CHECK(cudaStreamDestroy(cudaStream));
+
+            intensityData = state.m_intensityBuffer;
+            distanceData = state.m_distanceBuffer;
+            azimuthData = state.m_azimuthBuffer;
+        }
 
         for (size_t inIdx = 0; inIdx < numInputElements; inIdx++)
         {
-            float azimuth = state.m_azimuthBuffer[inIdx];
-            float distance = state.m_distanceBuffer[inIdx];
-            uint8_t intensity = static_cast<uint8_t>(state.m_intensityBuffer[inIdx] * 255.0f);
+            float azimuth = azimuthData[inIdx];
+            float distance = distanceData[inIdx];
+            uint8_t intensity = static_cast<uint8_t>(intensityData[inIdx] * 255.0f);
             // Compute index of buffer in which measurements will be placed, based on beam azimuth
             size_t outIdx = static_cast<size_t>((azimuth - state.m_azimuthRangeStart) / state.m_horizontalResolution);
             if (outIdx >= numOutputElements)
@@ -297,6 +325,13 @@ public:
 
         return true;
     }
+
+    // static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+    // {
+    //     auto& state = OgnIsaacComputeRTXLidarFlatScanDatabase::sPerInstanceState<OgnIsaacComputeRTXLidarFlatScan>(
+    //         nodeObj, instanceId);
+    //     state.reset();
+    // }
 };
 
 REGISTER_OGN_NODE()

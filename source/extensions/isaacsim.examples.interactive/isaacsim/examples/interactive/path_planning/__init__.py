@@ -13,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive path planning demonstration module for robotic manipulation using RRT algorithms in Isaac Sim."""
+
+
 from isaacsim.examples.interactive.path_planning.path_planning import PathPlanning
 from isaacsim.examples.interactive.path_planning.path_planning_controller import PathPlannerController
 from isaacsim.examples.interactive.path_planning.path_planning_extension import PathPlanningExtension
 from isaacsim.examples.interactive.path_planning.path_planning_task import PathPlanningTask
+
+__all__ = ["PathPlanning", "PathPlannerController", "PathPlanningTask"]

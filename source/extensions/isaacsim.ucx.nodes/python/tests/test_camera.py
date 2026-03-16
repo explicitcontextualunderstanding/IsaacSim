@@ -15,20 +15,19 @@
 
 import time
 
+# UCX imports
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.semantics as semantics_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni
 import omni.graph.core as og
 import omni.kit.commands
 import omni.kit.viewport.utility
-
-# UCX imports
 import ucxx._lib.libucxx as ucx_api
 import usdrt.Sdf
-from isaacsim.core.api.objects import VisualCuboid
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.semantics import add_labels
-from isaacsim.core.utils.stage import open_stage_async
-from isaacsim.core.utils.viewports import set_camera_view
+from isaacsim.core.experimental.objects import Cube
+from isaacsim.core.rendering_manager import ViewportManager
 from isaacsim.ucx.nodes.tests.common import UCXTestCase, find_available_port, unpack_image_message
 from pxr import Sdf
 from ucxx._lib.arr import Array
@@ -100,7 +99,7 @@ class TestUCXCamera(UCXTestCase):
 
             if not request.completed:
                 if retry < retry_count - 1:
-                    await simulate_async(1.0)
+                    await app_utils.update_app_async(steps=60)
                     continue
                 else:
                     self.fail("Did not receive image message after retries")
@@ -112,7 +111,7 @@ class TestUCXCamera(UCXTestCase):
             except ValueError:
                 # Invalid data received, might be timing issue - retry after waiting
                 if retry < retry_count - 1:
-                    await simulate_async(1.0)
+                    await app_utils.update_app_async(steps=60)
                     continue
                 else:
                     raise
@@ -122,10 +121,10 @@ class TestUCXCamera(UCXTestCase):
     async def test_camera_rgb(self):
         """Test RGB camera publishing from render product."""
         scene_path = "/Isaac/Environments/Grid/default_environment.usd"
-        await open_stage_async(self._assets_root_path + scene_path)
+        await stage_utils.open_stage_async(self._assets_root_path + scene_path)
 
-        cube_1 = VisualCuboid("/cube_1", position=[0, 0, 0], scale=[1.5, 1, 1])
-        add_labels(cube_1.prim, labels=["Cube0"], instance_name="class")
+        cube_1 = Cube("/cube_1", positions=[0, 0, 0], scales=[1.5, 1, 1])
+        semantics_utils.add_labels(cube_1.prims[0], labels=["Cube0"], taxonomy="class")
 
         try:
             og.Controller.edit(
@@ -182,10 +181,10 @@ class TestUCXCamera(UCXTestCase):
     async def test_camera_system_time(self):
         """Test camera publishing with system time."""
         scene_path = "/Isaac/Environments/Grid/default_environment.usd"
-        await open_stage_async(self._assets_root_path + scene_path)
+        await stage_utils.open_stage_async(self._assets_root_path + scene_path)
 
-        cube_1 = VisualCuboid("/cube_1", position=[0, 0, 0], scale=[1.5, 1, 1])
-        add_labels(cube_1.prim, labels=["Cube0"], instance_name="class")
+        cube_1 = Cube("/cube_1", positions=[0, 0, 0], scales=[1.5, 1, 1])
+        semantics_utils.add_labels(cube_1.prims[0], labels=["Cube0"], taxonomy="class")
 
         try:
             og.Controller.edit(
@@ -229,7 +228,7 @@ class TestUCXCamera(UCXTestCase):
         system_time = time.time()
 
         # Wait significantly longer for replicator pipeline to stabilize
-        await simulate_async(3.0)
+        await app_utils.update_app_async(steps=180)
 
         # Receive RGB image
         timestamp, width, height, encoding, step, image_data = await self.receive_image_message(tag=10)
@@ -251,9 +250,9 @@ class TestUCXCamera(UCXTestCase):
     async def test_camera_frame_skip(self):
         """Test camera publishing with frame skip."""
         scene_path = "/Isaac/Environments/Grid/default_environment.usd"
-        await open_stage_async(self._assets_root_path + scene_path)
+        await stage_utils.open_stage_async(self._assets_root_path + scene_path)
 
-        cube_1 = VisualCuboid("/cube_1", position=[0, 0, 0], scale=[1.5, 1, 1])
+        Cube("/cube_1", positions=[0, 0, 0], scales=[1.5, 1, 1])
 
         try:
             og.Controller.edit(
@@ -305,10 +304,10 @@ class TestUCXCamera(UCXTestCase):
     async def test_camera_multiple_resolutions(self):
         """Test camera publishing with different resolutions."""
         scene_path = "/Isaac/Environments/Grid/default_environment.usd"
-        await open_stage_async(self._assets_root_path + scene_path)
+        await stage_utils.open_stage_async(self._assets_root_path + scene_path)
 
-        cube_1 = VisualCuboid("/cube_1", position=[0, 0, 0], scale=[1.5, 1, 1])
-        set_camera_view(eye=[0, -6, 0.5], target=[0, 0, 0.5], camera_prim_path="/OmniverseKit_Persp")
+        Cube("/cube_1", positions=[0, 0, 0], scales=[1.5, 1, 1])
+        ViewportManager.set_camera_view(camera="/OmniverseKit_Persp", eye=[0, -6, 0.5], target=[0, 0, 0.5])
 
         # Test with different resolutions
         resolutions = [(320, 240), (640, 480), (1280, 720)]

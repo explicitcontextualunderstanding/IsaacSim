@@ -21,6 +21,7 @@
 
 #include <carb/Framework.h>
 #include <carb/Types.h>
+#include <carb/logging/Log.h>
 
 #include <isaacsim/ros2/core/Ros2Node.h>
 #include <omni/fabric/FabricUSD.h>
@@ -29,6 +30,10 @@
 #include <omni/physics/tensors/TensorApi.h>
 
 #include <OgnROS2PublishJointStateDatabase.h>
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <vector>
 
 using namespace isaacsim::ros2::core;
 
@@ -50,17 +55,18 @@ public:
     {
         const GraphContextObj& context = db.abi_context();
         auto& state = db.perInstanceState<OgnROS2PublishJointState>();
-
-
-        // Spin once calls reset automatically if it was not successful
         const auto& nodeObj = db.abi_node();
+
         if (!state.isInitialized())
         {
-            // Find our stage
             long stageId = context.iContext->getStageId(context);
             auto stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
+            if (!stage)
+            {
+                db.logError("Could not find USD stage %ld", stageId);
+                return false;
+            }
             state.m_simView = state.m_tensorInterface->createSimulationView(stageId);
-
             if (!state.initializeNodeHandle(
                     std::string(nodeObj.iNode->getPrimPath(nodeObj)),
                     collectNamespace(db.inputs.nodeNamespace(),
@@ -72,96 +78,223 @@ public:
             }
         }
 
-        // Publisher was not valid, create a new one
-        if (!state.m_publisher)
+        const bool hasSensorInputs = useSensorInputs(db);
+        const auto& prim = db.inputs.targetPrim();
+        const bool hasTargetPrim = !prim.empty();
+
+        if (hasSensorInputs)
         {
-            // Find our stage
-            long stageId = context.iContext->getStageId(context);
-            auto stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
-            if (!stage)
+            std::vector<std::string> jointNames;
+            std::vector<double> positions, velocities, efforts;
+            std::vector<uint8_t> dofTypes;
+            double stageMetersPerUnit = 0.0;
+            if (!validateAndGatherSensorInputs(
+                    db, jointNames, positions, velocities, efforts, dofTypes, stageMetersPerUnit))
             {
-                db.logError("Could not find USD stage %ld", stageId);
                 return false;
             }
-
-            const auto& prim = db.inputs.targetPrim();
-            const char* primPath;
-            if (!prim.empty())
+            if (!state.m_publisher && !createPublisherForSensorPath(db, state))
             {
-                if (!stage->GetPrimAtPath(omni::fabric::toSdfPath(prim[0])))
-                {
-                    db.logError("The prim %s is not valid. Please specify at least one valid chassis prim",
-                                omni::fabric::toSdfPath(prim[0]).GetText());
-                    return false;
-                }
-                primPath = omni::fabric::toSdfPath(prim[0]).GetText();
-            }
-            else
-            {
-                db.logError("Could not find target prim");
                 return false;
             }
-
-            state.m_unitScale = UsdGeomGetStageMetersPerUnit(stage);
-
-            // Verify we have a valid articulation prim
-            if (state.m_articulation)
-                state.m_articulation->release();
-            state.m_articulation = state.m_simView->createArticulationView(std::vector<std::string>{ primPath });
-            if (!state.m_articulation)
-            {
-                db.logError("Prim %s is not an articulation", primPath);
-                return false;
-            }
-
-            // Setup ROS publisher
-            const std::string& topicName = db.inputs.topicName();
-            std::string fullTopicName = addTopicPrefix(state.m_namespaceName, topicName);
-            if (!state.m_factory->validateTopicName(fullTopicName))
-            {
-                db.logError("Unable to create ROS2 publisher, invalid topic name");
-                return false;
-            }
-
-            state.m_message = state.m_factory->createJointStateMessage();
-
-            Ros2QoSProfile qos;
-            const std::string& qosProfile = db.inputs.qosProfile();
-            if (qosProfile.empty())
-            {
-                qos.depth = db.inputs.queueSize();
-            }
-            else
-            {
-                if (!jsonToRos2QoSProfile(qos, qosProfile))
-                {
-                    return false;
-                }
-            }
-
-            state.m_publisher = state.m_factory->createPublisher(
-                state.m_nodeHandle.get(), fullTopicName.c_str(), state.m_message->getTypeSupportHandle(), qos);
-            return true;
+            return publishFromSensorInputs(
+                db, state, jointNames, positions, velocities, efforts, dofTypes, stageMetersPerUnit);
         }
 
-        return state.publishJointStates(db, context);
+        if (hasTargetPrim)
+        {
+            if (!state.m_deprecationWarningLogged)
+            {
+                CARB_LOG_WARN(
+                    "[ROS2 Publish Joint State] Reading from targetPrim is deprecated. Connect an Isaac Read Joint "
+                    "State node and use its outputs instead.");
+                state.m_deprecationWarningLogged = true;
+            }
+            if (!state.m_publisher && !createPublisherForLegacyPath(db, state, context))
+            {
+                return false;
+            }
+            return state.publishJointStates(db, context);
+        }
+
+        db.logError("Specify targetPrim or connect Isaac Read Joint State node outputs (jointNames, positions, etc.).");
+        return false;
+    }
+
+    static bool useSensorInputs(OgnROS2PublishJointStateDatabase& db)
+    {
+        const size_t nNames = db.inputs.jointNames().size();
+        const size_t nPos = db.inputs.jointPositions().size();
+        const size_t nVel = db.inputs.jointVelocities().size();
+        const size_t nEff = db.inputs.jointEfforts().size();
+        const size_t nTypes = db.inputs.jointDofTypes().size();
+        return (nNames > 0 || nPos > 0 || nVel > 0 || nEff > 0 || nTypes > 0);
+    }
+
+    static bool validateAndGatherSensorInputs(OgnROS2PublishJointStateDatabase& db,
+                                              std::vector<std::string>& jointNames,
+                                              std::vector<double>& positions,
+                                              std::vector<double>& velocities,
+                                              std::vector<double>& efforts,
+                                              std::vector<uint8_t>& dofTypes,
+                                              double& stageMetersPerUnit)
+    {
+        const size_t n = db.inputs.jointNames().size();
+        if (n == 0)
+        {
+            db.logError(
+                "Joint state from sensor: jointNames is empty. Connect all required outputs from Isaac Read Joint State.");
+            return false;
+        }
+        if (db.inputs.jointPositions().size() != n || db.inputs.jointVelocities().size() != n ||
+            db.inputs.jointEfforts().size() != n || db.inputs.jointDofTypes().size() != n)
+        {
+            db.logError(
+                "Joint state from sensor: jointNames, jointPositions, jointVelocities, jointEfforts, and jointDofTypes "
+                "must have the same length.");
+            return false;
+        }
+        stageMetersPerUnit = static_cast<double>(db.inputs.stageMetersPerUnit());
+        if (stageMetersPerUnit <= 0.0 || !std::isfinite(stageMetersPerUnit))
+        {
+            db.logError("Joint state from sensor: stageMetersPerUnit must be a positive finite value.");
+            return false;
+        }
+        jointNames.resize(n);
+        positions.resize(n);
+        velocities.resize(n);
+        efforts.resize(n);
+        dofTypes.resize(n);
+        for (size_t i = 0; i < n; i++)
+        {
+            jointNames[i] = db.tokenToString(db.inputs.jointNames()[i]);
+            positions[i] = db.inputs.jointPositions()[i];
+            velocities[i] = db.inputs.jointVelocities()[i];
+            efforts[i] = db.inputs.jointEfforts()[i];
+            dofTypes[i] = db.inputs.jointDofTypes()[i];
+        }
+        return true;
+    }
+
+    static bool createPublisherForSensorPath(OgnROS2PublishJointStateDatabase& db, OgnROS2PublishJointState& state)
+    {
+        const std::string& topicName = db.inputs.topicName();
+        std::string fullTopicName = addTopicPrefix(state.m_namespaceName, topicName);
+        if (!state.m_factory->validateTopicName(fullTopicName))
+        {
+            db.logError("Unable to create ROS2 publisher, invalid topic name");
+            return false;
+        }
+        state.m_message = state.m_factory->createJointStateMessage();
+        Ros2QoSProfile qos;
+        const std::string& qosProfile = db.inputs.qosProfile();
+        if (qosProfile.empty())
+        {
+            qos.depth = db.inputs.queueSize();
+        }
+        else
+        {
+            if (!jsonToRos2QoSProfile(qos, qosProfile))
+            {
+                return false;
+            }
+        }
+        state.m_publisher = state.m_factory->createPublisher(
+            state.m_nodeHandle.get(), fullTopicName.c_str(), state.m_message->getTypeSupportHandle(), qos);
+        return true;
+    }
+
+    static bool createPublisherForLegacyPath(OgnROS2PublishJointStateDatabase& db,
+                                             OgnROS2PublishJointState& state,
+                                             const GraphContextObj& context)
+    {
+        long stageId = context.iContext->getStageId(context);
+        auto stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
+        if (!stage)
+        {
+            db.logError("Could not find USD stage %ld", stageId);
+            return false;
+        }
+        const auto& prim = db.inputs.targetPrim();
+        if (prim.empty())
+        {
+            db.logError("Could not find target prim");
+            return false;
+        }
+        if (!stage->GetPrimAtPath(omni::fabric::toSdfPath(prim[0])))
+        {
+            db.logError("The prim %s is not valid. Please specify at least one valid chassis prim",
+                        omni::fabric::toSdfPath(prim[0]).GetText());
+            return false;
+        }
+        const char* primPath = omni::fabric::toSdfPath(prim[0]).GetText();
+        state.m_unitScale = UsdGeomGetStageMetersPerUnit(stage);
+        if (state.m_articulation)
+        {
+            state.m_articulation->release();
+        }
+        state.m_articulation = state.m_simView->createArticulationView(std::vector<std::string>{ primPath });
+        if (!state.m_articulation)
+        {
+            db.logError("Prim %s is not an articulation", primPath);
+            return false;
+        }
+        const std::string& topicName = db.inputs.topicName();
+        std::string fullTopicName = addTopicPrefix(state.m_namespaceName, topicName);
+        if (!state.m_factory->validateTopicName(fullTopicName))
+        {
+            db.logError("Unable to create ROS2 publisher, invalid topic name");
+            return false;
+        }
+        state.m_message = state.m_factory->createJointStateMessage();
+        Ros2QoSProfile qos;
+        const std::string& qosProfile = db.inputs.qosProfile();
+        if (qosProfile.empty())
+        {
+            qos.depth = db.inputs.queueSize();
+        }
+        else
+        {
+            if (!jsonToRos2QoSProfile(qos, qosProfile))
+            {
+                return false;
+            }
+        }
+        state.m_publisher = state.m_factory->createPublisher(
+            state.m_nodeHandle.get(), fullTopicName.c_str(), state.m_message->getTypeSupportHandle(), qos);
+        return true;
+    }
+
+    static bool publishFromSensorInputs(OgnROS2PublishJointStateDatabase& db,
+                                        OgnROS2PublishJointState& state,
+                                        const std::vector<std::string>& jointNames,
+                                        const std::vector<double>& positions,
+                                        const std::vector<double>& velocities,
+                                        const std::vector<double>& efforts,
+                                        const std::vector<uint8_t>& dofTypes,
+                                        double stageMetersPerUnit)
+    {
+        if (!state.m_publishWithoutVerification && !state.m_publisher.get()->getSubscriptionCount())
+        {
+            return false;
+        }
+        const double timeStamp =
+            (db.inputs.sensorTime() > 0.0f) ? static_cast<double>(db.inputs.sensorTime()) : db.inputs.timeStamp();
+        state.m_message->writeData(timeStamp, jointNames, positions, velocities, efforts, dofTypes, stageMetersPerUnit);
+        state.m_publisher.get()->publish(state.m_message->getPtr());
+        return true;
     }
 
     bool publishJointStates(OgnROS2PublishJointStateDatabase& db, const GraphContextObj& context)
     {
         auto& state = db.perInstanceState<OgnROS2PublishJointState>();
-
-        // Check if subscription count is 0
         if (!m_publishWithoutVerification && !state.m_publisher.get()->getSubscriptionCount())
         {
             return false;
         }
-
-        double stageUnits = 1.0 / m_unitScale;
-
+        const double stageUnits = 1.0 / m_unitScale;
         long stageId = context.iContext->getStageId(context);
         m_stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
-
         state.m_message->writeData(db.inputs.timeStamp(), m_articulation, m_stage, m_jointPositions, m_jointVelocities,
                                    m_jointEfforts, m_dofTypes, stageUnits);
         state.m_publisher.get()->publish(state.m_message->getPtr());
@@ -210,6 +343,7 @@ private:
     std::vector<uint8_t> m_dofTypes;
 
     double m_unitScale = 1;
+    bool m_deprecationWarningLogged = false;
 };
 
 REGISTER_OGN_NODE()

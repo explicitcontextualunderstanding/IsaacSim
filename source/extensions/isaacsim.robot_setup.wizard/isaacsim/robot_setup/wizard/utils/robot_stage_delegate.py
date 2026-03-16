@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Stage delegate and context menu for robot setup operations within the Isaac Sim robot setup wizard."""
+
+
 import carb
 import omni.kit.commands
 from omni.kit.widget.stage import ContextMenu
@@ -21,7 +25,32 @@ from ..builders.robot_templates import RobotRegistry
 
 
 class RobotContextMenu(ContextMenu):
+    """A context menu for robot setup operations in the stage window.
+
+    This class extends the standard stage context menu to provide robot-specific functionality,
+    including marking reference meshes for parent link alignment and deleting robot components.
+    It handles mouse events to display contextual menu options based on the selected prims
+    in the stage hierarchy.
+
+    The context menu provides the following operations:
+
+    - **Mark as Reference to Align Parent Link**: Marks a selected prim as a reference mesh
+      for aligning the parent link's origin. This is useful for establishing reference points
+      during robot setup and configuration.
+    - **Delete**: Removes selected prims from the robot temporary stage and marks them for
+      deletion during reorganization.
+
+    Menu items are dynamically shown based on the current selection and prim properties.
+    The class integrates with the RobotRegistry to store reference mesh information and
+    track prims marked for deletion.
+    """
+
     def on_mouse_event(self, event):
+        """Handles mouse events to display context menu for robot prims.
+
+        Args:
+            event: Mouse event containing stage, prim path, and other context data.
+        """
         import omni.kit.menu.core
 
         # check its expected event
@@ -99,7 +128,15 @@ class RobotContextMenu(ContextMenu):
         except Exception as e:
             print(f"Error showing context menu: {str(e)}")
 
-    def _can_align_parent_link_origin(self, objects):
+    def _can_align_parent_link_origin(self, objects) -> bool:
+        """Checks if the selected prim can be aligned to parent link origin.
+
+        Args:
+            objects: Context menu data containing prim information.
+
+        Returns:
+            True if prim path has at least 4 parts (robot/link/link_name/component).
+        """
         if not "prim_list" in objects:
             return False
         prim_list = objects["prim_list"][0]  # only process one prim at a time
@@ -110,7 +147,15 @@ class RobotContextMenu(ContextMenu):
         else:
             return True
 
-    def _align_parent_link_origin(self, objects):
+    def _align_parent_link_origin(self, objects) -> bool:
+        """Marks the selected prim as reference mesh for aligning parent link origin.
+
+        Args:
+            objects: Context menu data containing the selected prim.
+
+        Returns:
+            True if reference mesh was successfully registered.
+        """
         registered_robot = RobotRegistry().get()
         if registered_robot is None:
             return False
@@ -127,39 +172,40 @@ class RobotContextMenu(ContextMenu):
 
         return True
 
-    def _is_prim_selected(self, objects: dict):
-        """
-        Checks if any prims are selected
+    def _is_prim_selected(self, objects: dict) -> bool:
+        """Checks if any prims are selected.
 
         Args:
-            objects (dict): context_menu data
+            objects: Context menu data.
+
         Returns:
-            (bool): True if one or more prim is selected otherwise False.
+            True if one or more prim is selected otherwise False.
         """
         if not any(item in objects for item in ["prim", "prim_list"]):
             return False
         return True
 
-    def is_one_prim_selected(self, objects: dict):
-        """
-        Checks if one prim is selected.
+    def is_one_prim_selected(self, objects: dict) -> bool:
+        """Checks if one prim is selected.
 
         Args:
-            objects (dict): context_menu data
+            objects: Context menu data.
+
         Returns:
-            (bool): True if one prim is selected otherwise False.
+            True if one prim is selected otherwise False.
         """
         if not "prim_list" in objects:
             return False
         return len(objects["prim_list"]) == 1
 
-    def _can_delete(self, objects: dict):
-        """
-        Checks if prims can be deleted
+    def _can_delete(self, objects: dict) -> bool:
+        """Checks if prims can be deleted.
+
         Args:
-            objects (dict): context_menu data
+            objects: Context menu data.
+
         Returns:
-            (bool): True if prim can be deleted otherwise False.
+            True if prim can be deleted otherwise False.
         """
         if not any(item in objects for item in ["prim", "prim_list"]):
             return False
@@ -173,12 +219,15 @@ class RobotContextMenu(ContextMenu):
                 return False
         return True
 
-    def _delete_prims(self, objects: dict, destructive=True):
-        """
-        Delete prims
+    def _delete_prims(self, objects: dict, destructive=True) -> bool:
+        """Removes prims from the robot stage and marks them for deletion during reorg.
 
         Args:
-            remove the prim from the robot_temp_stage, and mark the prim to delete during reorg
+            objects: Context menu data containing prims to delete.
+            destructive: Whether to perform destructive deletion.
+
+        Returns:
+            True if prims were successfully processed for deletion.
         """
         # remove the prim from the robot_temp_stage
         prims = objects.get("prim_list", [])
@@ -205,6 +254,17 @@ class RobotContextMenu(ContextMenu):
 
 
 class RobotStageDelegate(StageDelegate):
+    """Stage delegate for robot setup and management within the Isaac Sim robot setup wizard.
+
+    This class extends the standard stage delegate functionality with robot-specific context menu operations
+    and behaviors. It integrates with the robot setup wizard to provide specialized stage interactions
+    for robot configuration, including marking reference meshes for link alignment and managing prim
+    deletion within the robot context.
+
+    The delegate uses a custom RobotContextMenu that provides robot-specific operations such as marking
+    prims as reference points for parent link origin alignment and handling deletion of robot components
+    with proper cleanup through the RobotRegistry system.
+    """
 
     def __init__(self):
         super().__init__(context_menu=RobotContextMenu())

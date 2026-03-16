@@ -121,7 +121,6 @@
 #include <pxr/usd/usd/relationship.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/stageCache.h>
-#include <pxr/usd/usd/usdFileFormat.h>
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/capsule.h>
 #include <pxr/usd/usdGeom/cone.h>

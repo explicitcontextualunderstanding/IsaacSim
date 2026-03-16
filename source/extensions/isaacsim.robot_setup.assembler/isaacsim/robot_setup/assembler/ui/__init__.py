@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""User interface components for the Robot Setup assembler."""
+
+
 from .style import *
 from .ui_builder import *
 from .widget import *

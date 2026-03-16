@@ -16,23 +16,46 @@
 # NOTE:
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
+
+"""Tests for the isaacsim.examples.ui extension startup and basic functionality."""
+
+
 import omni.kit.test
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestUITemplate(omni.kit.test.AsyncTestCase):
+    """Test class for the isaacsim.examples.ui extension.
+
+    This class provides automated testing functionality to verify the extension loads and operates correctly.
+    It runs asynchronous tests to ensure the UI components function properly within the Isaac Sim environment.
+    The test validates extension stability by running multiple update cycles and checking for errors.
+    """
+
     # Before running each test
     async def setUp(self):
+        """Sets up the test environment before each test case.
+
+        Waits for the next application update to ensure proper initialization.
+        """
         await omni.kit.app.get_app().next_update_async()
         pass
 
     # After running each test
     async def tearDown(self):
+        """Cleans up the test environment after each test case.
+
+        Waits for the next application update to ensure proper cleanup.
+        """
         await omni.kit.app.get_app().next_update_async()
         pass
 
     # Run for 60 frames and make sure there were no errors loading
     async def test_template(self):
+        """Tests the UI template by running for 60 frames.
+
+        Verifies that no errors occur during loading and rendering over 60 application update cycles.
+        """
         for frame in range(60):
             await omni.kit.app.get_app().next_update_async()
         pass

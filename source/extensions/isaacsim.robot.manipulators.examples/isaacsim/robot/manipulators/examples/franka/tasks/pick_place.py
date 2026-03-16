@@ -25,12 +25,12 @@ class PickPlace(tasks.PickPlace):
     """Franka robot pick and place task.
 
     Args:
-        name: Task name. Defaults to "franka_pick_place".
-        cube_initial_position: Initial cube position. Defaults to None.
-        cube_initial_orientation: Initial cube orientation. Defaults to None.
-        target_position: Target position for placing. Defaults to None.
-        cube_size: Size of the cube. Defaults to None.
-        offset: Task offset. Defaults to None.
+        name: Task name.
+        cube_initial_position: Initial cube position.
+        cube_initial_orientation: Initial cube orientation.
+        target_position: Target position for placing.
+        cube_size: Size of the cube.
+        offset: Task offset.
     """
 
     def __init__(
@@ -41,7 +41,7 @@ class PickPlace(tasks.PickPlace):
         target_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         tasks.PickPlace.__init__(
             self,
             name=name,

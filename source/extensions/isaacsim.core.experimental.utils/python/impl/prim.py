@@ -20,7 +20,7 @@ Functions for working with USD/USDRT prims.
 from __future__ import annotations
 
 import re
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 import usdrt
 from pxr import Sdf, Usd, UsdPhysics
@@ -487,6 +487,39 @@ def has_api(
         raise ValueError(f"Invalid test operation: '{test}'")
 
 
+def ensure_api(prim: str | Usd.Prim, api: type, *args, **kwargs) -> type["UsdAPISchemaBase"]:
+    """Ensure that a prim has the specified API schema applied.
+
+    Backends: :guilabel:`usd`.
+
+    If a prim doesn't have the API schema, it will be applied.
+    If it already has it, the existing API schema will be returned.
+
+    Args:
+        prim: Prim path or prim instance.
+        api: The API schema type to ensure.
+        *args: Additional positional arguments passed to API schema when applying it.
+        **kwargs: Additional keyword arguments passed to API schema when applying it.
+
+    Returns:
+        API schema object.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>> from pxr import UsdLux
+        >>>
+        >>> prim = stage_utils.define_prim("/World/Light", "Xform")
+        >>> prim_utils.ensure_api(prim, UsdLux.LightAPI)
+        UsdLux.LightAPI(Usd.Prim(</World/Light>))
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    return api(prim, *args, **kwargs) if prim.HasAPI(api) else api.Apply(prim, *args, **kwargs)
+
+
 def create_prim_attribute(
     prim: str | Usd.Prim | usdrt.Usd.Prim,
     *,
@@ -532,6 +565,70 @@ def create_prim_attribute(
         )
         attribute = prim.CreateAttribute(name, type_name, custom=True)
     return attribute
+
+
+def get_prim_attribute_value(prim: str | Usd.Prim | usdrt.Usd.Prim, attribute_name: str) -> Any:
+    """Get the value of a prim attribute.
+
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
+
+    For vector and matrix types (e.g., float3, matrix4d, quatf), the value is returned as a Python list.
+    For scalar and other types, the raw attribute value is returned.
+
+    Args:
+        prim: Prim path or prim instance.
+        attribute_name: Name of the attribute to get.
+
+    Returns:
+        The attribute value. Vector and matrix types are returned as lists.
+
+    Raises:
+        ValueError: If the prim does not have the specified attribute.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.define_prim("/World/Cube", "Cube")  # doctest: +NO_CHECK
+        >>>
+        >>> prim_utils.get_prim_attribute_value("/World/Cube", "size")
+        2.0
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    if not prim.HasAttribute(attribute_name):
+        raise ValueError(f"Prim at path '{prim.GetPath()}' does not have attribute '{attribute_name}'")
+    attr = prim.GetAttribute(attribute_name)
+    return attr.Get()
+
+
+def get_prim_attribute_names(prim: str | Usd.Prim | usdrt.Usd.Prim) -> list[str]:
+    """Get all valid attribute names for a prim.
+
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
+
+    Args:
+        prim: Prim path or prim instance.
+
+    Returns:
+        Attribute names authored on the prim.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.define_prim("/World/Cube", "Cube")  # doctest: +NO_CHECK
+        >>>
+        >>> prim_utils.get_prim_attribute_names("/World/Cube")
+        ['doubleSided', 'extent', 'orientation', 'primvars:displayColor', 'primvars:displayOpacity', 'purpose', 'size', 'visibility', 'xformOpOrder']
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    return [attr.GetName() for attr in prim.GetAttributes()]
 
 
 def is_prim_non_root_articulation_link(prim: str | Usd.Prim | usdrt.Usd.Prim) -> bool:

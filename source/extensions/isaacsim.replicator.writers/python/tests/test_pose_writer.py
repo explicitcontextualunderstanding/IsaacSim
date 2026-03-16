@@ -99,8 +99,67 @@ class TestPoseWriter(omni.kit.test.AsyncTestCase):
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
 
-    async def test_pose_writer(self):
-        # Setup stage
+    def _validate_and_compare_output(self, out_dir, golden_dir):
+        """Validate folder contents and compare images/JSON with golden data."""
+        test_dir_rp1 = os.path.join(out_dir, "rp1")
+        test_dir_rp2 = os.path.join(out_dir, "rp2")
+        golden_dir_rp1 = os.path.join(golden_dir, "rp1")
+        golden_dir_rp2 = os.path.join(golden_dir, "rp2")
+
+        # Check folder contents
+        folder_contents_success_rp1 = validate_folder_contents(path=test_dir_rp1, expected_counts={"json": 1, "png": 2})
+        self.assertTrue(folder_contents_success_rp1, f"Output directory contents validation failed for {test_dir_rp1}")
+        folder_contents_success_rp2 = validate_folder_contents(path=test_dir_rp2, expected_counts={"json": 1, "png": 2})
+        self.assertTrue(folder_contents_success_rp2, f"Output directory contents validation failed for {test_dir_rp2}")
+
+        # Compare images for rp1
+        result_rp1 = compare_images_in_directories(
+            golden_dir=golden_dir_rp1,
+            test_dir=test_dir_rp1,
+            path_pattern=r"\.png$",
+            allclose_rtol=None,
+            allclose_atol=None,
+            mean_tolerance=self.RGB_MEAN_DIFF_TOLERANCE,
+            print_all_stats=True,
+            print_per_file_results=True,
+        )
+        self.assertTrue(result_rp1["all_passed"], f"Image comparison failed for rp1: {result_rp1}")
+
+        # Compare images for rp2
+        result_rp2 = compare_images_in_directories(
+            golden_dir=golden_dir_rp2,
+            test_dir=test_dir_rp2,
+            path_pattern=r"\.png$",
+            allclose_rtol=None,
+            allclose_atol=None,
+            mean_tolerance=self.RGB_MEAN_DIFF_TOLERANCE,
+            print_all_stats=True,
+            print_per_file_results=True,
+        )
+        self.assertTrue(result_rp2["all_passed"], f"Image comparison failed for rp2: {result_rp2}")
+
+        # Compare JSON for rp1
+        golden_rp1_json = os.path.join(golden_dir_rp1, "000000.json")
+        test_rp1_json = os.path.join(test_dir_rp1, "000000.json")
+        with open(golden_rp1_json, "r") as f:
+            golden_rp1_data = json.load(f)
+        with open(test_rp1_json, "r") as f:
+            test_rp1_data = json.load(f)
+        error = compare_nested_structures_with_tolerance(test_rp1_data, golden_rp1_data, rtol=1e-5, atol=1e-5)
+        self.assertIsNone(error, f"'/rp1' comparison failed:\n{error}")
+
+        # Compare JSON for rp2
+        golden_rp2_json = os.path.join(golden_dir_rp2, "000000.json")
+        test_rp2_json = os.path.join(test_dir_rp2, "000000.json")
+        with open(golden_rp2_json, "r") as f:
+            golden_rp2_data = json.load(f)
+        with open(test_rp2_json, "r") as f:
+            test_rp2_data = json.load(f)
+        error = compare_nested_structures_with_tolerance(test_rp2_data, golden_rp2_data, rtol=1e-5, atol=1e-5)
+        self.assertIsNone(error, f"'/rp2' comparison failed:\n{error}")
+
+    async def _setup_stage(self):
+        """Setup stage with world xform, dome light, and test cubes."""
         await omni.usd.get_context().new_stage_async()
         rep.functional.create.xform(name="World")
         rep.functional.create.dome_light(intensity=500, parent="/World", name="DomeLight")
@@ -129,89 +188,184 @@ class TestPoseWriter(omni.kit.test.AsyncTestCase):
             semantics=[("class", "cube_scaled")],
         )
 
-        # Create render products
-        cam1 = rep.functional.create.camera(position=(0, 0, 10), look_at=(0, 0, 0), name="cam1")
-        cam2 = rep.functional.create.camera(position=(-4, -4, 8), look_at=(0, 0, 0), name="cam2")
-        rp1 = rep.create.render_product(cam1, (512, 512), name="rp1")
-        rp2 = rep.create.render_product(cam2, (512, 512), name="rp2")
+    async def test_pose_writer_with_pinhole_camera(self):
+        """Test PoseWriter with pinhole camera projection."""
+        await self._setup_stage()
+
+        width, height = 512, 512
+
+        cam1 = rep.functional.create.camera(
+            position=(0, 0, 10), look_at=(0, 0, 0), name="PinholeCamera1", parent="/World"
+        )
+        cam2 = rep.functional.create.camera(
+            position=(-4, -4, 8), look_at=(0, 0, 0), name="PinholeCamera2", parent="/World"
+        )
+
+        rp1 = rep.create.render_product(cam1, (width, height), name="rp1")
+        rp2 = rep.create.render_product(cam2, (width, height), name="rp2")
         render_products = [rp1, rp2]
 
-        # Setup writer
-        out_dir = os.path.join(os.getcwd(), "_out_test_pose_writer")
+        out_dir = os.path.join(os.getcwd(), "_out_test_pose_writer_pinhole")
+        print(f"Output directory: {out_dir}")
         backend = rep.backends.get("DiskBackend")
         backend.initialize(output_dir=out_dir)
-        print(f"Output directory: {out_dir}")
         writer = rep.writers.get("PoseWriter")
         writer.initialize(backend=backend, use_subfolders=True, write_debug_images=True)
         writer.attach(render_products)
 
-        # Capture data
         await rep.orchestrator.step_async(rt_subframes=16)
         await rep.orchestrator.wait_until_complete_async()
 
-        # Clean up writer and render products
         writer.detach()
         for rp in render_products:
             rp.destroy()
-            rp = None
-        render_products = None
 
-        # Test and golden directory paths
-        test_dir_rp1 = os.path.join(out_dir, "rp1")
-        test_dir_rp2 = os.path.join(out_dir, "rp2")
         golden_dir = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_test_pose_writer"
+            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_test_pose_writer_pinhole"
         )
-        golden_dir_rp1 = os.path.join(golden_dir, "rp1")
-        golden_dir_rp2 = os.path.join(golden_dir, "rp2")
+        self._validate_and_compare_output(out_dir, golden_dir)
 
-        # Check if all the expected data has been written
-        folder_contents_success_rp1 = validate_folder_contents(path=test_dir_rp1, expected_counts={"json": 1, "png": 2})
-        self.assertTrue(folder_contents_success_rp1, f"Output directory contents validation failed for {test_dir_rp1}")
-        folder_contents_success_rp2 = validate_folder_contents(path=test_dir_rp2, expected_counts={"json": 1, "png": 2})
-        self.assertTrue(folder_contents_success_rp2, f"Output directory contents validation failed for {test_dir_rp2}")
+    async def test_pose_writer_with_fisheye_camera(self):
+        """Test PoseWriter with fisheye polynomial camera projection."""
+        await self._setup_stage()
 
-        # Compare all PNG images (RGB and overlay) with the golden images for rp1
-        result_rp1 = compare_images_in_directories(
-            golden_dir=golden_dir_rp1,
-            test_dir=test_dir_rp1,
-            path_pattern=r"\.png$",
-            allclose_rtol=None,  # Disable allclose for this test to rely only on mean tolerance
-            allclose_atol=None,
-            mean_tolerance=self.RGB_MEAN_DIFF_TOLERANCE,
-            print_all_stats=True,
-            print_per_file_results=True,
+        width, height = 512, 512
+        camera_kwargs = {
+            "parent": "/World",
+            "projection_type": "fisheyePolynomial",
+            "focal_length": 24.0,
+            "horizontal_aperture": 20.955,
+            "clipping_range": (0.1, 100.0),
+            "fisheye_nominal_width": float(width),
+            "fisheye_nominal_height": float(height),
+            "fisheye_optical_centre_x": width / 2.0,
+            "fisheye_optical_centre_y": height / 2.0,
+            "fisheye_max_fov": 180.0,
+            "fisheye_polynomial_a": 0.0,
+            "fisheye_polynomial_b": 0.00245,
+        }
+
+        cam1 = rep.functional.create.camera(
+            position=(0, 0, 10), look_at=(0, 0, 0), name="FisheyeCamera1", **camera_kwargs
         )
-        self.assertTrue(result_rp1["all_passed"], f"Image comparison failed for rp1: {result_rp1}")
-
-        # Compare all PNG images (RGB and overlay) with the golden images for rp2
-        result_rp2 = compare_images_in_directories(
-            golden_dir=golden_dir_rp2,
-            test_dir=test_dir_rp2,
-            path_pattern=r"\.png$",
-            allclose_rtol=None,  # Disable allclose for this test to rely only on mean tolerance
-            allclose_atol=None,
-            mean_tolerance=self.RGB_MEAN_DIFF_TOLERANCE,
-            print_all_stats=True,
-            print_per_file_results=True,
+        cam2 = rep.functional.create.camera(
+            position=(-4, -4, 8), look_at=(0, 0, 0), name="FisheyeCamera2", **camera_kwargs
         )
-        self.assertTrue(result_rp2["all_passed"], f"Image comparison failed for rp2: {result_rp2}")
 
-        # Compare the json golden output with the output for the two render products
-        golden_rp1_json = os.path.join(golden_dir_rp1, "000000.json")
-        test_rp1_json = os.path.join(test_dir_rp1, "000000.json")
-        with open(golden_rp1_json, "r") as f:
-            golden_rp1_data = json.load(f)
-        with open(test_rp1_json, "r") as f:
-            test_rp1_data = json.load(f)
-        error = compare_nested_structures_with_tolerance(test_rp1_data, golden_rp1_data, rtol=1e-5, atol=1e-5)
-        self.assertIsNone(error, f"'/rp1' comparison failed:\n{error}")
+        rp1 = rep.create.render_product(cam1, (width, height), name="rp1")
+        rp2 = rep.create.render_product(cam2, (width, height), name="rp2")
+        render_products = [rp1, rp2]
 
-        golden_rp2_json = os.path.join(golden_dir, "rp2", "000000.json")
-        test_rp2_json = os.path.join(test_dir_rp2, "000000.json")
-        with open(golden_rp2_json, "r") as f:
-            golden_rp2_data = json.load(f)
-        with open(test_rp2_json, "r") as f:
-            test_rp2_data = json.load(f)
-        error = compare_nested_structures_with_tolerance(test_rp2_data, golden_rp2_data, rtol=1e-5, atol=1e-5)
-        self.assertIsNone(error, f"'/rp2' comparison failed:\n{error}")
+        out_dir = os.path.join(os.getcwd(), "_out_test_pose_writer_fisheyePolynomial")
+        print(f"Output directory: {out_dir}")
+        backend = rep.backends.get("DiskBackend")
+        backend.initialize(output_dir=out_dir)
+        writer = rep.writers.get("PoseWriter")
+        writer.initialize(backend=backend, use_subfolders=True, write_debug_images=True)
+        writer.attach(render_products)
+
+        await rep.orchestrator.step_async(rt_subframes=16)
+        await rep.orchestrator.wait_until_complete_async()
+
+        writer.detach()
+        for rp in render_products:
+            rp.destroy()
+
+        golden_dir = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_test_pose_writer_fisheyePolynomial"
+        )
+        self._validate_and_compare_output(out_dir, golden_dir)
+
+    async def test_pose_writer_with_pinhole_opencv_camera(self):
+        """Test PoseWriter with pinholeOpenCV camera projection."""
+        await self._setup_stage()
+
+        width, height = 512, 512
+        camera_kwargs = {
+            "parent": "/World",
+            "projection_type": "pinholeOpenCV",
+            "focal_length": 24.0,
+            "horizontal_aperture": 20.955,
+            "clipping_range": (0.1, 100.0),
+            "fisheye_nominal_width": float(width),
+            "fisheye_nominal_height": float(height),
+            "fisheye_optical_centre_x": width / 2.0,
+            "fisheye_optical_centre_y": height / 2.0,
+            "openCV_focal_x": 400.0,
+            "openCV_focal_y": 400.0,
+        }
+
+        cam1 = rep.functional.create.camera(
+            position=(0, 0, 10), look_at=(0, 0, 0), name="PinholeOpenCVCamera1", **camera_kwargs
+        )
+        cam2 = rep.functional.create.camera(
+            position=(-4, -4, 8), look_at=(0, 0, 0), name="PinholeOpenCVCamera2", **camera_kwargs
+        )
+
+        rp1 = rep.create.render_product(cam1, (width, height), name="rp1")
+        rp2 = rep.create.render_product(cam2, (width, height), name="rp2")
+        render_products = [rp1, rp2]
+
+        out_dir = os.path.join(os.getcwd(), "_out_test_pose_writer_pinholeOpenCV")
+        print(f"Output directory: {out_dir}")
+        backend = rep.backends.get("DiskBackend")
+        backend.initialize(output_dir=out_dir)
+        writer = rep.writers.get("PoseWriter")
+        writer.initialize(backend=backend, use_subfolders=True, write_debug_images=True)
+        writer.attach(render_products)
+
+        await rep.orchestrator.step_async(rt_subframes=16)
+        await rep.orchestrator.wait_until_complete_async()
+
+        writer.detach()
+        for rp in render_products:
+            rp.destroy()
+
+        golden_dir = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_test_pose_writer_pinholeOpenCV"
+        )
+        self._validate_and_compare_output(out_dir, golden_dir)
+
+    async def test_pose_writer_with_generalized_projection_camera(self):
+        """Test PoseWriter with generalizedProjection camera projection."""
+        await self._setup_stage()
+
+        width, height = 512, 512
+        camera_kwargs = {
+            "parent": "/World",
+            "projection_type": "generalizedProjection",
+            "focal_length": 24.0,
+            "horizontal_aperture": 20.955,
+            "clipping_range": (0.1, 100.0),
+        }
+
+        cam1 = rep.functional.create.camera(
+            position=(0, 0, 10), look_at=(0, 0, 0), name="GeneralizedProjectionCamera1", **camera_kwargs
+        )
+        cam2 = rep.functional.create.camera(
+            position=(-4, -4, 8), look_at=(0, 0, 0), name="GeneralizedProjectionCamera2", **camera_kwargs
+        )
+
+        rp1 = rep.create.render_product(cam1, (width, height), name="rp1")
+        rp2 = rep.create.render_product(cam2, (width, height), name="rp2")
+        render_products = [rp1, rp2]
+
+        out_dir = os.path.join(os.getcwd(), "_out_test_pose_writer_generalizedProjection")
+        print(f"Output directory: {out_dir}")
+        backend = rep.backends.get("DiskBackend")
+        backend.initialize(output_dir=out_dir)
+        writer = rep.writers.get("PoseWriter")
+        writer.initialize(backend=backend, use_subfolders=True, write_debug_images=True)
+        writer.attach(render_products)
+
+        await rep.orchestrator.step_async(rt_subframes=16)
+        await rep.orchestrator.wait_until_complete_async()
+
+        writer.detach()
+        for rp in render_products:
+            rp.destroy()
+
+        golden_dir = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_test_pose_writer_generalizedProjection"
+        )
+        self._validate_and_compare_output(out_dir, golden_dir)

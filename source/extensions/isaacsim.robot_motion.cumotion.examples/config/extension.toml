@@ -1,0 +1,59 @@
+# Extension configuration file.
+# Visit the "Extension configuration file (extension.toml)" section for more details:
+# https://docs.omniverse.nvidia.com/kit/docs/kit-manual/latest/guide/extensions_advanced.html
+#
+
+[package]
+version = "0.1.1"
+category = "Simulation"
+title = "cuMotion Examples"
+description = "Examples for using the cuMotion planning library under motion generation."
+keywords = ["cumotion","motion","generation","rmp","rmpflow","rrt","trajectory"]
+changelog = "docs/CHANGELOG.md"
+readme = "docs/README.md"
+preview_image = "data/preview.png"
+icon = "data/icon.png"
+
+[dependencies]
+"isaacsim.core.experimental.objects" = {}
+"isaacsim.core.experimental.prims" = {}
+"isaacsim.core.experimental.utils" = {}
+"isaacsim.core.rendering_manager" = {}
+"isaacsim.core.simulation_manager" = {}
+"isaacsim.gui.components" = {}
+"isaacsim.robot_motion.cumotion" = {}
+"isaacsim.robot_motion.experimental.motion_generation" = {}
+"isaacsim.storage.native" = {}
+"omni.timeline" = {}
+"omni.ui" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "isaacsim.robot_motion.cumotion.examples.rmp_flow"
+
+[[python.module]]
+name = "isaacsim.robot_motion.cumotion.examples.trajectory_generator"
+
+[[python.module]]
+name = "isaacsim.robot_motion.cumotion.examples.graph_planner"
+
+[[python.module]]
+name = "isaacsim.robot_motion.cumotion.examples.trajectory_optimizer"
+
+[[python.module]]
+name = "isaacsim.robot_motion.cumotion.examples.world_interface"
+
+[[test]]
+name = "startup"
+dependencies = []
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
+dependencies = []
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]

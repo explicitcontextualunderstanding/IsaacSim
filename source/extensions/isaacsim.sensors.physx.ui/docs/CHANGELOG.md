@@ -1,4 +1,24 @@
 # Changelog
+## [2.5.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [2.4.3] - 2026-02-18
+### Fixed
+- Replaced deprecated `onclick_fn` with `onclick_action` in menu items to eliminate deprecation warnings
+- Registered proper actions for PhysX Lidar and LightBeam sensor creation menu items
+
+## [2.4.2] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [2.4.1] - 2026-01-22
+### Changed
+- Move menu dictionary to initialize when tests are run rather than at module load time
+
+## [2.4.0] - 2025-12-22
+### Added
+- Add unit tests.
 
 ## [2.3.1] - 2025-10-27
 ### Changed

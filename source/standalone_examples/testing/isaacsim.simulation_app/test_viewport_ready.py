@@ -71,4 +71,5 @@ try:
 
 finally:
     # Cleanup
+    data_callback = None
     kit.close()

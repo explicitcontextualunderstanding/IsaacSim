@@ -21,6 +21,7 @@ on:
   pull_request:
     branches: [ main, public-main, develop, public-develop ]
 
+
 # Concurrency control to prevent parallel runs on the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,12 +31,17 @@ permissions:
   contents: read
   pull-requests: write
 
+# ==============================================================================================================
+# Build Job - Compiles Isaac Sim, packages it, and uploads artifacts
+# ==============================================================================================================
 jobs:
-  build-and-test:
-    runs-on: [self-hosted, gpu]
-    timeout-minutes: 240
+  build:
+    runs-on: [self-hosted, cpu]
+    timeout-minutes: 300
     env:
       OMNI_KIT_ALLOW_ROOT: 1
+      PM_PACKAGES_ROOT: /mnt/data/cache/packman-cache
+      CCACHE_DIR: /mnt/data/cache/ccache
 
     steps:
     - name: Checkout repository
@@ -53,42 +59,125 @@ jobs:
       run: |
         chmod -R u+w .
 
-    - name: Build and Test Isaac Sim
+
+
+    - name: Create Packman Cache
       run: |
-        set -euo pipefail  # Exit on error, undefined vars, pipe failures
-        set -x  # Print commands being executed
+ 
+        echo "Creating new packman cache"
+        mkdir -p /mnt/data/cache/packman-cache
 
-        echo "::group::Clear Caches"
-        rm -rf ~/.local/share/ov
-        rm -rf ~/.cache/ov
-        rm -rf ~/.cache/packman
-        # rm -rf /tmp/*
-        # chmod -R u+w /tmp
-        echo "::endgroup::"
+        echo "Creating new ccache cache"
+        mkdir -p /mnt/data/cache/ccache
 
-        echo "::group::Build Isaac Sim"
-        # Build Isaac Sim
+
+    - name: Build and Package Isaac Sim
+      run: |
+        set -euo pipefail
+        set -x
+
         touch .eula_accepted
         find . -type f -iname "*.sh" -exec chmod +x {} +
         chmod +x build.sh
         chmod +x repo.sh
-        ./build.sh
-        if [ $? -ne 0 ]; then
-          echo 'BUILD FAILED with exit code ' $?
-          exit 1
-        fi
-        echo "::endgroup::"
 
-        # echo "::group::Test Isaac Sim"
-        # # Test Isaac Sim
-        # cd _build/linux-x86_64/release
-        # touch .eula_accepted
-        # find . -type f -iname "*.sh" -exec chmod +x {} +
-        # chmod +x exts/isaacsim.ros2.bridge/bin/isaacsim.ros2.bridge.check
-        # chmod +x post_install.sh
-        # chmod +x warmup.sh
-        # chmod +x isaac-sim.sh
-        # ./post_install.sh
-        # # ./warmup.sh
-        # ./isaac-sim.sh --no-window --/app/quitAfter=500 --/app/file/ignoreUnsavedOnExit=1
-        # echo "::endgroup::"
+        mkdir -p /mnt/data/cache/package_temp/${{ github.run_id }}
+
+
+        echo "Starting build at $(date)"
+        
+        ./build.sh -r
+
+        echo "Starting package at $(date)"
+        ./repo.sh package -c release -m isaac-sim-standalone --temp-dir /mnt/data/cache/package_temp/${{ github.run_id }}
+
+
+        echo "Finished package at $(date)"
+        echo "Cleaning up package temp"
+        rm -rf /mnt/data/cache/package_temp/${{ github.run_id }}
+
+    - name: List packaged artifacts
+      run: |
+        echo "=== Packages created ==="
+        ls -lah _build/packages/ || echo "No packages directory found"
+
+    - name: Upload packaged artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: isaac-sim-packages
+        path: |
+          _build/packages/
+        retention-days: 7
+      if: success()
+
+    - name: Upload build logs (on failure)
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          _build/**/*.log
+          _repo/repo.log
+          _repo/repolog*.txt
+        retention-days: 7
+      if: failure()
+
+# ==============================================================================================================
+# Test Job - Downloads packaged artifacts and runs the built-in test suite
+# ==============================================================================================================
+  test:
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 120
+    needs: build
+    env:
+      OMNI_KIT_ALLOW_ROOT: 1
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+      CUDA_HOME: /usr/local/cuda
+      LD_LIBRARY_PATH: /usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64
+      DISPLAY: ':0'
+      GITLAB_CI: gitlab
+
+    steps:
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: true
+
+
+    - name: Make repo scripts executable
+      run: |
+        chmod -R u+w .
+        find . -type f -iname "*.sh" -exec chmod +x {} +
+
+    - name: Download packaged artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: isaac-sim-packages
+        path: _build/packages/
+
+
+    - name: Run startup tests
+      run: |
+        set -euo pipefail
+        set -x
+
+        # xhost +
+
+        touch .eula_accepted
+        echo "Current directory: $(pwd)"
+        echo "Running tests at $(date)"
+        ./repo.sh --ci-env gitlab test -c release -s startuptests --from-package
+        echo "Finished tests at $(date)"
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          _build/packages/*/_testoutput/**
+          _build/packages/*/kit/logs/**
+        retention-days: 7
+      if: always()
+

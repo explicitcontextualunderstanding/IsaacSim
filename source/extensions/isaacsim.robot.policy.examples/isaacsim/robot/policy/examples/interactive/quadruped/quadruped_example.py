@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive quadruped robot control example using reinforcement learning policies and keyboard input."""
+
+
 import carb
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni
@@ -28,7 +31,30 @@ torch = import_module("torch")
 
 
 class QuadrupedExample(BaseSample):
-    def __init__(self) -> None:
+    """Interactive example demonstrating quadruped robot control using reinforcement learning policies.
+
+    This example creates a Spot quadruped robot in a physics simulation environment and demonstrates
+    how to control it using keyboard input. The robot uses a reinforcement learning policy trained for
+    flat terrain locomotion and runs on GPU for high-performance physics simulation.
+
+    The simulation is configured with 500 Hz physics updates and 50 Hz rendering for smooth real-time
+    interaction. Users can control the robot's movement using keyboard inputs:
+
+    - Arrow keys or Numpad 8/2/4/6: Forward/backward and left/right movement
+    - N/M or Numpad 7/9: Yaw rotation commands
+
+    The example sets up a complete simulation environment including ground plane, robot initialization,
+    physics callbacks, and keyboard event handling. It demonstrates integration between Isaac Sim's
+    physics simulation, reinforcement learning policies, and interactive control systems.
+
+    Key features:
+    - GPU-accelerated physics simulation using PyTorch backend
+    - Real-time keyboard control interface
+    - Automatic robot policy execution and state management
+    - Proper simulation lifecycle management with setup and cleanup phases
+    """
+
+    def __init__(self):
         super().__init__()
         # Configure simulation settings for GPU dynamics with high-frequency physics
         self._world_settings["stage_units_in_meters"] = 1.0
@@ -65,7 +91,7 @@ class QuadrupedExample(BaseSample):
             "M": [0.0, 0.0, -2.0],
         }
 
-    def setup_scene(self) -> None:
+    def setup_scene(self):
         """Set up the scene with robot and environment."""
         # Set device and backend BEFORE creating robot so it uses GPU
         SimulationManager.set_backend(self._world_settings["backend"])
@@ -87,7 +113,7 @@ class QuadrupedExample(BaseSample):
         )
         print("Scene setup complete with Spot quadruped robot")
 
-    async def setup_post_load(self) -> None:
+    async def setup_post_load(self):
         """Setup keyboard input and physics callback after initial load."""
         self._appwindow = omni.appwindow.get_default_app_window()
         self._input = carb.input.acquire_input_interface()
@@ -103,15 +129,15 @@ class QuadrupedExample(BaseSample):
             )
         print("Spot quadruped scene loaded successfully")
 
-    async def setup_pre_reset(self) -> None:
+    async def setup_pre_reset(self):
         """Called before world reset."""
         self._physics_ready = False
 
-    async def setup_post_reset(self) -> None:
+    async def setup_post_reset(self):
         """Called after world reset."""
         self._physics_ready = False
 
-    async def setup_post_clear(self) -> None:
+    async def setup_post_clear(self):
         """Called after clearing the scene."""
         # Deregister physics callback
         if self._physics_callback_id is not None:
@@ -126,8 +152,13 @@ class QuadrupedExample(BaseSample):
         self.spot = None
         self._physics_ready = False
 
-    def on_physics_step(self, dt, context) -> None:
-        """Physics step callback - initialize on first step, then run policy."""
+    def on_physics_step(self, dt, context):
+        """Physics step callback - initialize on first step, then run policy.
+
+        Args:
+            dt: Time delta for the physics step.
+            context: Physics step context.
+        """
         if not self.spot:
             return
 
@@ -144,7 +175,16 @@ class QuadrupedExample(BaseSample):
             self.spot.post_reset()
 
     def _sub_keyboard_event(self, event, *args, **kwargs) -> bool:
-        """Handle keyboard input for robot control."""
+        """Handle keyboard input for robot control.
+
+        Args:
+            event: Keyboard event containing input information.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            True to indicate the event was handled.
+        """
         if event.type == carb.input.KeyboardEventType.KEY_PRESS:
             # On pressing, the command is incremented
             if event.input.name in self._input_keyboard_mapping:

@@ -25,7 +25,6 @@
 #include <isaacsim/ucx/core/UcxUtils.h>
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -217,29 +216,29 @@ protected:
     }
 
     /**
-     * @brief Publishes a message over UCX with optional timeout.
+     * @brief Publishes a message over UCX with validation and timeout.
      * @details
+     * Validates that message data is not empty, then sends using UCX tagged send.
      * Wrapper for UCXListener::tagSend() that adds logging for OmniGraph nodes.
-     * Sends message data using UCX tagged send.
-     * - If timeout is not specified (std::nullopt), returns immediately without waiting (async).
-     * - If timeout is g_kUcxInfiniteTimeout, waits indefinitely until completion or failure.
-     * - Otherwise, waits up to the specified timeout in milliseconds.
      *
      * @tparam DatabaseT The database type for logging
      * @param[in] db Database accessor for logging
      * @param[in] messageData Serialized message data to send
      * @param[in] tag UCX tag for message identification
-     * @param[in] timeout Optional timeout in milliseconds (nullopt = async, g_kUcxInfiniteTimeout = infinite wait)
+     * @param[in] timeoutMs Timeout in milliseconds for send request (0 = infinite)
      * @return bool True if send completed successfully, false on error or timeout
      */
     template <typename DatabaseT>
-    bool sendMessage(DatabaseT& db,
-                     const std::vector<uint8_t>& messageData,
-                     uint64_t tag,
-                     std::optional<uint32_t> timeout = std::nullopt)
+    bool publishMessage(DatabaseT& db, const std::vector<uint8_t>& messageData, uint64_t tag, uint32_t timeoutMs)
     {
+        if (messageData.empty())
+        {
+            db.logError("Failed to generate message");
+            return false;
+        }
+
         std::string errorMessage;
-        auto result = m_listener->tagSend(messageData.data(), messageData.size(), tag, errorMessage, timeout);
+        auto result = m_listener->tagSend(messageData.data(), messageData.size(), tag, errorMessage, timeoutMs);
 
         switch (result)
         {
@@ -252,14 +251,7 @@ protected:
             db.logError("Failed to send message - tagSend returned null: %s", errorMessage.c_str());
             return false;
         case isaacsim::ucx::core::UcxSendResult::eTimedOut:
-            if (timeout.has_value())
-            {
-                db.logError("Send request timed out after %u ms: %s", timeout.value(), errorMessage.c_str());
-            }
-            else
-            {
-                db.logError("Send request timed out: %s", errorMessage.c_str());
-            }
+            db.logError("Send request timed out after %u ms: %s", timeoutMs, errorMessage.c_str());
             return false;
         case isaacsim::ucx::core::UcxSendResult::eFailed:
             db.logError("Send request failed with UCX error: %s", errorMessage.c_str());

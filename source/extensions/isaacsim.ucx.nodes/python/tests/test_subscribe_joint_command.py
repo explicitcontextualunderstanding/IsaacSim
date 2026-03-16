@@ -15,11 +15,11 @@
 
 import struct
 
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
 import omni
 import omni.graph.core as og
 import ucxx._lib.libucxx as ucx_api
-from isaacsim.core.utils.physics import simulate_async
 from isaacsim.ucx.nodes.tests.common import UCXTestCase
 from ucxx._lib.arr import Array
 
@@ -122,7 +122,7 @@ class TestUCXSubscribeJointCommand(UCXTestCase):
         await self.send_joint_command(test_timestamp, test_positions, test_velocities, test_efforts)
 
         # Wait for message to be processed
-        await simulate_async(0.5)
+        await app_utils.update_app_async(steps=30)
 
         # Read outputs from the subscriber node
         timestamp_attr = og.Controller.attribute("/ActionGraph/SubscribeJointCommand.outputs:timeStamp")
@@ -189,7 +189,7 @@ class TestUCXSubscribeJointCommand(UCXTestCase):
             test_efforts = [0.0, 0.0, 0.0]
 
             await self.send_joint_command(float(i), test_positions, test_velocities, test_efforts)
-            await simulate_async(0.2)
+            await app_utils.update_app_async(steps=12)
 
             positions = position_attr.get()
             print(f"Command {i}: received positions = {positions}")

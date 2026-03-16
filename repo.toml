@@ -39,9 +39,13 @@ version_file = "${root}/VERSION"
 linux_x86_64_cxx_abi=true
 
 [repo_build.stage_files]
+# Allowed destinations for prebuild_copy (e.g. GMO docs -> docs/source/generic_model_output).
+# Paths are resolved from repo root; include parent dirs so "p in resolved_dst.parents" can match.
 allowed_paths=[
   "${root}/_build",
+  "${root}/docs/api/source",
   "${root}/docs/source",
+  "docs/source",
 ]
 
 
@@ -51,6 +55,11 @@ enabled = false
 # List of packman projects to pull (in order)
 
 fetch.packman_target_files_to_pull = [
+  "${root}/deps/msvc.packman.xml",
+  "${root}/deps/msvc.packman.xml",
+  "${root}/deps/msvc.packman.xml",
+  "${root}/deps/msvc.packman.xml",
+  "${root}/deps/msvc.packman.xml",
   "${root}/deps/kit-sdk.packman.xml",
   "${root}/deps/omni-physics.packman.xml",
   "${root}/deps/kit-sdk-deps.packman.xml",
@@ -63,10 +72,13 @@ fetch.pip.files_to_pull = [
   "${root}/deps/pip.toml",
   "${root}/deps/pip_ml.toml",
   "${root}/deps/pip_lula.toml",
+  "${root}/deps/pip_cumotion.toml",
   "${root}/deps/pip_compute.toml",
   "${root}/deps/pip_usd_to_urdf.toml",
+  "${root}/deps/pip_urdf_usd.toml",
   "${root}/deps/pip_cloud.toml",
   "${root}/deps/pip_ucx.toml",
+  "${root}/deps/pip_newton.toml",
 ]
 fetch.pip.licensing_enabled = false
 fetch.pip.publish_pip_cache = false
@@ -98,6 +110,7 @@ vscode.python_env.PYTHONPATH = [
   "$root/_build/$platform/$config/kit/kernel/py",
   "$root/_build/$platform/$config/kit/plugins/bindings-python/",
   "$root/_build/$platform/$config/exts/isaacsim.robot_motion.lula/pip_prebundle",
+  "$root/_build/$platform/$config/exts/isaacsim.robot_motion.cumotion/pip_prebundle",
   "$root/_build/$platform/$config/exts/isaacsim.asset.exporter.urdf/pip_prebundle",
   "$root/_build/$platform/$config/extscache/omni.kit.pip_archive*/pip_prebundle",
   "$root/_build/$platform/$config/kit/exts/omni.kit.pip_archive*/pip_prebundle",
@@ -112,6 +125,7 @@ vscode.python_env.PATH = [
   "$root/_build/$platform/$config",
   "$root/_build/$platform/$config/exts/isaacsim.robot.schema/plugins/lib",
   "$root/_build/$platform/$config/exts/isaacsim.robot_motion.lula/pip_prebundle",
+  "$root/_build/$platform/$config/exts/isaacsim.robot_motion.cumotion/pip_prebundle",
   "$root/_build/$platform/$config/exts/isaacsim.asset.exporter.urdf/pip_prebundle",
   "$root/_build/$platform/$config/kit",
   "$root/_build/$platform/$config/kit/kernel/plugins",
@@ -203,15 +217,21 @@ sln_file = "isaac-sim.sln"
 link_host_toolchain = true   # This requires Microsoft Visual Studio BuildTools installed.
 
 # Filter on Visual Studio version e.g.: Visual Studio 2022. Empty string will match all years and prioritize the newest.
-vs_version = "vs2022"
+vs_version = "18"
+
+"env:USE_VS_2026==true".vs_version = "18"
+"env:USE_VS_2026==true".msvc_version = "v145"
+"env:USE_VS_2026==true".link_host_toolchain = false
+"env:USE_VS_2026==true".winsdk_version = "10.0.17763.0"
+
 
 
 # Visual Studio path; This will be used if the user would like to point to a specific VS installation rather than rely on heuristic locating.
 # vs_path = "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\"
 
-"token:in_ci==false".version_check_vs_version = "2022"
-"token:in_ci==false".version_check_msvc_version = "v143"
-"token:in_ci==false".version_check_msbuild_version = "17"
+"token:in_ci==false".version_check_vs_version = "18"
+"token:in_ci==false".version_check_msvc_version = "v145"
+"token:in_ci==false".version_check_msbuild_version = "18"
 "token:in_ci==false".version_check_winsdk_version = "10.0.26100.0"
 
 # Filter specifically to "Enterprise", "Professional", or "Community" editions of Visual Studio
@@ -254,6 +274,10 @@ ext_folders = [
 # Apps to run and precache
 apps = [
     "${root}/_build/$platform/$config/apps/isaacsim.exp.extscache.kit"
+]
+
+registries = [
+    { name = "isaacsim/prod/6.0", url = "https://ovextensionsprod.blob.core.windows.net/exts/isaacsim/prod/6.0/shared" },
 ]
 
 # Link selected extensions into a separate folder without a version. Used for build-time referencing extensions.
@@ -445,6 +469,12 @@ tests_per_process = 1
 stdout_fail_patterns.include = ["*[error]*", "*[fatal]*", "*[fail]*"]
 
 
+generate_report_cmd = [
+]
+
+"platform:windows-x86_64".generate_report_cmd = [
+]
+
 #-----------------------------------------------------------------------------------------------------------------------
 # Test Suite: 	Startup Tests
 # Description: 	Just run and exit big app configuration for both smoke testing and compiling shaders.
@@ -452,19 +482,45 @@ stdout_fail_patterns.include = ["*[error]*", "*[fatal]*", "*[fail]*"]
 
 [[repo_test.suites.startuptests.group]]
 # Run Kit App Full.
-args = [
+"platform:linux-x86_64".args = [
   "--/app/settings/persistent=0",
   "--/app/settings/loadUserConfig=0",
   "--/app/content/emptyStageOnStart=1",
   "--/exts/omni.kit.registry.nucleus/registries/0/name=0",
-  "--portable-root ${test_root}/portable_root",
+  "--portable-root",
+  "${test_root}/portable_root",
   "--portable",
   "--/log/flushStandardStreamOutput=1",                    # Prevents mixed up piped stdout
   "--reset-user",
   "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
-  "--/exts/omni.kit.test/pyCoverageEnabled=False",
+  "--/exts/omni.kit.test/pyCoverageEnabled=True",
+  "--/app/extensions/fsWatcherEnabled=0",
 ]
-exclude = []
+"platform:linux-aarch64".args = [
+  "--/app/settings/persistent=0",
+  "--/app/settings/loadUserConfig=0",
+  "--/app/content/emptyStageOnStart=1",
+  "--/exts/omni.kit.registry.nucleus/registries/0/name=0",
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--portable",
+  "--/log/flushStandardStreamOutput=1",                    # Prevents mixed up piped stdout
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+]
+"platform:windows-x86_64".args = [
+  "--/app/settings/persistent=0",
+  "--/app/settings/loadUserConfig=0",
+  "--/app/content/emptyStageOnStart=1",
+  "--/exts/omni.kit.registry.nucleus/registries/0/name=0",
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--portable",
+  "--/log/flushStandardStreamOutput=1",                    # Prevents mixed up piped stdout
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+]
+exclude = ["tests-startup.xr*${shell_ext}"]
 include = ["tests-startup*${shell_ext}"]
 timeout = 500
 
@@ -472,6 +528,24 @@ timeout = 500
 kind = "glob_and_exec"
 path = "${test_root}"
 tests_per_process = 1
+
+generate_report_cmd = [
+  "./repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "postinstalltests",
+]
+
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "postinstalltests",
+]
 
 [[repo_test.suites.postinstalltests.group]]
 include = ["post_install${shell_ext}"]
@@ -481,6 +555,24 @@ timeout = 1500
 kind = "glob_and_exec"
 path = "${test_root}"
 tests_per_process = 1
+
+generate_report_cmd = [
+  "./repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "warmuptests",
+]
+
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "warmuptests",
+]
 
 [[repo_test.suites.warmuptests.group]]
 include = ["warmup${shell_ext}"]
@@ -501,13 +593,34 @@ generate_report_cmd = [
   "pythontests",
 ]
 
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "pythontests",
+]
 
 [[repo_test.suites.pythontests.group]]
-args = [
-  "--portable-root ${test_root}/portable_root",
+"platform:linux-x86_64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
   "--reset-user",
   "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
-  "--/exts/omni.kit.test/pyCoverageEnabled=False",
+  "--/exts/omni.kit.test/pyCoverageEnabled=True",
+]
+"platform:linux-aarch64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+]
+"platform:windows-x86_64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
 ]
 exclude = [
   "tests-startup*${shell_ext}",
@@ -589,12 +702,37 @@ generate_report_cmd = [
   "benchmarks",
 ]
 
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "benchmarks",
+]
+
 [[repo_test.suites.benchmarks.group]]
-args = [
-  "--portable-root ${test_root}/portable_root",
+"platform:linux-x86_64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
   "--reset-user",
   "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
-  "--/exts/omni.kit.test/pyCoverageEnabled=False",
+  "--/exts/omni.kit.test/pyCoverageEnabled=True",
+  "--/crashreporter/skipOldDumpUpload=1",
+]
+"platform:linux-aarch64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+  "--/crashreporter/skipOldDumpUpload=1",
+]
+"platform:windows-x86_64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+  "--/crashreporter/skipOldDumpUpload=1",
 ]
 exclude = []
 include = [
@@ -620,11 +758,22 @@ generate_report_cmd = [
   "nativepythontests",
 ]
 
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "nativepythontests",
+]
+
 [[repo_test.suites.nativepythontests.group]]
 args = [
-  "--portable-root ${test_root}/portable_root",
+  "--portable-root",
+  "${test_root}/portable_root",
   "--reset-user",
   "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+  "--/crashreporter/skipOldDumpUpload=1",
 ]
 exclude = []
 include = ["tests-nativepython*${shell_ext}"]
@@ -644,6 +793,66 @@ name = "testing"
 include = ["*"]
 name = "api"
 
+[repo_test.suites.doc_snippets]
+kind = "glob_and_exec"
+path = "${test_root}/tests/doc_snippets"
+stdout_fail_patterns.include = ["*[error]*", "*[fatal]*", "*[fail]*"]
+tc_report_enabled = false
+
+generate_report_cmd = [
+  "./repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "doc_snippets",
+]
+
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "doc_snippets",
+]
+
+[[repo_test.suites.doc_snippets.group]]
+include = ["tests-nativepython*${shell_ext}"]
+exclude = ["*test_snippets_async*"]
+timeout = 300
+
+[repo_test.suites.doc_snippets_async]
+kind = "glob_and_exec"
+path = "${test_root}/tests/doc_snippets"
+stdout_fail_patterns.include = ["*[error]*", "*[fatal]*", "*[fail]*"]
+tc_report_enabled = false
+
+generate_report_cmd = [
+  "./repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "doc_snippets_async",
+]
+
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "doc_snippets_async",
+]
+
+[[repo_test.suites.doc_snippets_async.group]]
+include = ["*test_snippets_async*"]
+args = [
+  "--experience-csv experiences.csv",
+]
+timeout = 1800
+
 [repo_test.suites.external]
 kind = "glob_and_exec"
 path = "${test_root}/tests"
@@ -657,12 +866,33 @@ generate_report_cmd = [
   "external",
 ]
 
+"platform:windows-x86_64".generate_report_cmd = [
+  "repo${shell_ext}",
+  "ci",
+  "standalone_report",
+  "--",
+  "${test_root}/_testoutput",
+  "external",
+]
+
 [[repo_test.suites.external.group]]
-args = [
+"platform:linux-x86_64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+  "--/exts/omni.kit.test/pyCoverageEnabled=True",
+]
+"platform:linux-aarch64".args = [
+  "--portable-root",
+  "${test_root}/portable_root",
+  "--reset-user",
+  "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
+]
+"platform:windows-x86_64".args = [
   "--portable-root ${test_root}/portable_root",
   "--reset-user",
   "--/exts/omni.kit.test/testExtOutputPath='${test_root}/_testoutput'",
-  "--/exts/omni.kit.test/pyCoverageEnabled=False",
 ]
 exclude = []
 include = [
@@ -770,15 +1000,6 @@ limitations under the License.
 
 
 ########################################################################################################################
-# Repo Docs (see: repo docs --help)
-########################################################################################################################
-
-[repo_docs]
-"platform:linux-aarch64".enabled = false # Disable docs generation for aarch64 platforms, as it is not supported.
-"platform:windows-x86_64".enabled = false # Disable docs generation for windows64 platforms, as it is not supported.
-"platform:linux-x86_64".enabled = true
-
-########################################################################################################################
 # Extension documentation building (see: repo extension_docs --help)
 ########################################################################################################################
 
@@ -838,16 +1059,18 @@ build_path = "${root}/_build/${platform}/release/exts"
 home_path = "${root}/source/extensions"
 ogn_exts_includes = [
   "isaacsim.replicator.domain_randomization",
+  "isaacsim.replicator.experimental.domain_randomization",
   "isaacsim.replicator.examples",
   "isaacsim.replicator.writers",
   "isaacsim.asset.gen.conveyor",
   "isaacsim.ros2.bridge",
-  "isaacsim.sensors.physics",
+  "isaacsim.sensors.physics.nodes",
   "isaacsim.sensors.physx",
   "isaacsim.sensors.rtx",
   "isaacsim.core.nodes",
   "isaacsim.examples.interactive_nodes",
   "isaacsim.robot.wheeled_robots",
+  "isaacsim.robot.experimental.wheeled_robots",
   # "isaacsim.util.debug_draw",
 
 ]
@@ -910,11 +1133,11 @@ precache_exts_enabled = false
 
 
 [[repo_kit_pull_extensions.environment]]
-name = "integ"
+name = "prod"
 app_version_regex = ""
 "tokens.registry_url" = "https://ovextensionsprod.blob.core.windows.net"
 "tokens.registry_shared_name" = "shared"
-"tokens.registry_name" = "kit/prod"
+"tokens.registry_name" = "isaacsim/prod/6.0"
 
 
 ########################################################################################################################
@@ -925,7 +1148,7 @@ app_version_regex = ""
 # Path to the examples directory (relative to workspace root or absolute)
 examples_dir = "${root}/source/standalone_examples"
 # Output RST file path (relative to workspace root or absolute)
-output_file = "${root}/docs/source/standalone_examples_list.rst"
+output_file = "${root}/docs/api/source/standalone_examples_list.rst"
 
 
 ########################################################################################################################

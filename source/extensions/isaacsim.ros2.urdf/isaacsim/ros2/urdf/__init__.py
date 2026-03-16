@@ -13,4 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from .commands import *
-from .RobotDescription import *
+from .extension import *
+from .robot_definition_reader import *
+from .robot_description import *

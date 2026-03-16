@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Robot setup wizard builder components for constructing and configuring robots in Isaac Sim."""
+
+
 from .collider_helper import *
 from .hierarchy_helper import *
 from .joint_helper import *

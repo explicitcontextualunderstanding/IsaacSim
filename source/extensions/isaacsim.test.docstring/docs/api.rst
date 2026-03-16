@@ -25,13 +25,11 @@ Test Cases
 .. autoclass:: isaacsim.test.docstring.AsyncDocTestCase
     :members:
     :undoc-members:
-    :inherited-members:
     :show-inheritance:
 
 .. autoclass:: isaacsim.test.docstring.StandaloneDocTestCase
     :members:
     :undoc-members:
-    :inherited-members:
     :show-inheritance:
 
 

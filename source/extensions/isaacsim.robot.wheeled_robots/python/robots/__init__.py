@@ -13,5 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Defines setup classes and base implementations for wheeled robots in Isaac Sim simulations."""
+
+
 from .holonomic_robot_usd_setup import HolonomicRobotUsdSetup
 from .wheeled_robot import WheeledRobot

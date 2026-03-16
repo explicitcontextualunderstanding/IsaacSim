@@ -23,6 +23,7 @@
 #else
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wunused-variable"
+#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #    include <usdrt/scenegraph/usd/usd/stage.h>
 #    pragma GCC diagnostic pop
 #endif

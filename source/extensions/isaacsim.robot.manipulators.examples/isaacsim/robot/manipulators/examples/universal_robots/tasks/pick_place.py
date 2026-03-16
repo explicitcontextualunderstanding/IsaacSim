@@ -26,12 +26,12 @@ class PickPlace(tasks.PickPlace):
     """UR10 robot pick and place task.
 
     Args:
-        name: Task name. Defaults to "ur10_pick_place".
-        cube_initial_position: Initial cube position. Defaults to None.
-        cube_initial_orientation: Initial cube orientation. Defaults to None.
-        target_position: Target position for placing. Defaults to None.
-        cube_size: Size of the cube. Defaults to None.
-        offset: Task offset. Defaults to None.
+        name: Task name.
+        cube_initial_position: Initial cube position.
+        cube_initial_orientation: Initial cube orientation.
+        target_position: Target position for placing.
+        cube_size: Size of the cube.
+        offset: Task offset.
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class PickPlace(tasks.PickPlace):
         target_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         if cube_size is None:
             cube_size = np.array([0.0515, 0.0515, 0.0515]) / get_stage_units()
         if target_position is None:
@@ -78,7 +78,7 @@ class PickPlace(tasks.PickPlace):
         )
         return self._ur10_robot
 
-    def pre_step(self, time_step_index: int, simulation_time: float) -> None:
+    def pre_step(self, time_step_index: int, simulation_time: float):
         """Called before each physics step to update gripper.
 
         Args:

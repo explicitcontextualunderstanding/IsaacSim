@@ -1,11 +1,11 @@
 [package]
-version = "2.4.8"
+version = "2.10.2"
 category = "Simulation"
 title = "Isaac Sim Menus"
 description = "Provides Isaac Sim-specific menu bar functionality including File, Edit, Create, Window, Tools, Utilities, Layouts, and Help menus with robotics-focused operations."
 keywords = ["isaac", "menu"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -15,6 +15,7 @@ writeTarget.kit = true
 "isaacsim.core.utils" = {}
 "isaacsim.gui.components" = {}
 "isaacsim.robot.schema" = {}
+"isaacsim.storage.native" = {}
 "omni.kit.context_menu" = {}
 "omni.kit.menu.utils" = {}
 "omni.kit.selection" = {}
@@ -27,11 +28,17 @@ name = "isaacsim.gui.menu"
 name = "isaacsim.gui.menu.tests"
 
 [[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+[[test]]
 timeout = 900
 dependencies = [
-    "isaacsim.sensors.camera.ui",
-    "isaacsim.sensors.physics.ui",
-    "isaacsim.sensors.physx.ui",
     "isaacsim.test.utils",
     "omni.isaac.ml_archive",
 ]
@@ -43,7 +50,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -59,6 +66,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -80,27 +88,11 @@ args = [
     "--/rtx/reservedDescriptors=900000",
 ]
 stdoutFailPatterns.exclude = [
-    '*[Error] [isaacsim.sensors.physics.plugin] *** error, No valid parent*',
-    '*[Error] [isaacsim.sensors.physics.plugin] Imu Sensor does not exist*',
-    '*[Error] [isaacsim.sensors.physics.plugin] Contact Sensor does not exist*',
-    '*[isaacsim.sensors.physics.plugin] Failed to create contact sensor, parent prim is not found or invalid*',
-    '*[Error] [isaacsim.sensors.physx.plugin] Lidar Sensor does not exist*',
-    '*[Error] [isaacsim.sensors.physx.plugin] Generic Sensor does not exist*',
+    '*The NumPy module was reloaded*',
     '*[Error] [omni.kit.commands.command] Failed to execute a command: ChangeProperty*',
     '*[Error] [asyncio] Task exception was never retrieved*',
-    '*[Error] [carb] [Plugin: omni.sensors.nv.lidar.ext.plugin] Dependency: [omni::sensors::lidar::IGenericModelOutputIOFactory v0.1] failed to be resolved.*', # feature not included in Windows
-    '*[Error] [isaacsim.sensors.physics.plugin] *** error: /Cube/Contact_Sensor parent prim is missing contact report API, automatically adding contact report API, stop and play the simulation for this change to take effect*',
-    '*[Error] [isaacsim.sensors.physx.plugin] isLightBeamSensor: Light Beam Sensor does not exist*',
     '*[Error] [omni.hydra] Unsupported data type 0 on primvar *doNotCastShadows*',
-    '*[Error] [rtx.postprocessing.plugin] DepthSensor: Texture sizes do not match:*',
-    '*[Error] [rtx.postprocessing.plugin] DepthSensor: Failed to allocate view resources*'
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

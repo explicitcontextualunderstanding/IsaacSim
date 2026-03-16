@@ -24,7 +24,7 @@ from isaacsim.replicator.behavior.utils.behavior_utils import (
     get_exposed_variable,
     remove_exposed_variables,
 )
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Sdf, Usd
 
 
@@ -84,8 +84,6 @@ class ExampleCustomEventBehavior(BehaviorScript):
         """Called when the script is unassigned from a prim."""
         # Unsubscribe from the event stream
         self._reset()
-
-        self._event_sub.reset()
         self._event_sub = None
 
         # Exposed variables should be removed if the script is no longer assigned to the prim

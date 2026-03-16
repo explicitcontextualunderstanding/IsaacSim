@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""An Isaac Sim extension that provides a user interface for generating different types of extension templates to help users create custom extensions."""
+
+
 import asyncio
 import gc
 import os
-import weakref
 
 import carb
 import omni
+import omni.kit.actions.core
 import omni.kit.commands
 import omni.timeline
 import omni.ui as ui
 import omni.usd
 from isaacsim.gui.components.element_wrappers import CollapsableFrame, ScrollingWindow, TextBlock
-from isaacsim.gui.components.menu import make_menu_item_description
 from isaacsim.gui.components.ui_utils import btn_builder, get_style, setup_ui_headers, str_builder
-from omni.kit.menu.utils import add_menu_items, remove_menu_items
+from omni.kit.menu.utils import MenuItemDescription, add_menu_items, refresh_menu_items, remove_menu_items
 
 from .template_generator import TemplateGenerator
 
@@ -35,8 +37,28 @@ EXTENSION_NAME = "Generate Extension Templates"
 
 
 class Extension(omni.ext.IExt):
+    """An Isaac Sim extension for generating code templates to help users create custom extensions.
+
+    This extension provides a user interface for generating different types of extension templates,
+    including configuration tooling, loaded scenario, scripting, and UI component library templates.
+    Users can specify the extension path, title, and description to create starter code for building
+    standalone UI-based extensions in Isaac Sim.
+
+    The extension creates a dockable window with forms for each template type, allowing users to:
+    - Select the target directory for the generated extension
+    - Provide an extension title and description
+    - Generate the template files with proper structure and boilerplate code
+
+    The generated templates serve as starting points for extension development, providing the necessary
+    file structure, imports, and basic functionality patterns commonly used in Isaac Sim extensions.
+    """
+
     def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+        """Initialize extension and UI elements
+
+        Args:
+            ext_id: The extension identifier.
+        """
 
         # Events
         self._usd_context = omni.usd.get_context()
@@ -50,29 +72,57 @@ class Extension(omni.ext.IExt):
         # UI
         self._models = {}
         self._ext_id = ext_id
+        self._action_id = "show_generate_extension_templates"
+
+        action_registry = omni.kit.actions.core.get_action_registry()
+        action_registry.register_action(
+            ext_id,
+            self._action_id,
+            lambda *_: self._menu_callback(),
+            description=f"Open {EXTENSION_NAME} window",
+        )
+
         self._menu_items = [
-            make_menu_item_description(ext_id, EXTENSION_NAME, lambda a=weakref.proxy(self): a._menu_callback())
+            MenuItemDescription(
+                name=EXTENSION_NAME,
+                onclick_action=(ext_id, self._action_id),
+                ticked=True,
+                ticked_fn=self._is_visible,
+            )
         ]
-        # self._menu_items = [MenuItemDescription(name="Workflows", sub_menu=menu_items)]
         add_menu_items(self._menu_items, "Utilities")
 
         self._template_generator = TemplateGenerator()
 
     def on_shutdown(self):
+        """Clean up extension resources and UI components."""
         self._models = {}
+        action_registry = omni.kit.actions.core.get_action_registry()
+        action_registry.deregister_action(self._ext_id, self._action_id)
         remove_menu_items(self._menu_items, "Utilities")
         if self._window:
             self._window = None
         gc.collect()
 
+    def _is_visible(self) -> bool:
+        return self._window.visible if self._window else False
+
     def _on_window(self, visible):
+        """Handle window visibility changes.
+
+        Args:
+            visible: The visibility state of the window.
+        """
+        refresh_menu_items("Utilities")
         if self._window.visible:
             self._build_ui()
 
     def _menu_callback(self):
+        """Toggle the extension window visibility when menu item is clicked."""
         self._window.visible = not self._window.visible
 
     def _build_ui(self):
+        """Build the main user interface for the extension template generator."""
         # if not self._window:
         with self._window.frame:
             with ui.VStack(spacing=5, height=0):
@@ -111,6 +161,7 @@ class Extension(omni.ext.IExt):
         self._task = asyncio.ensure_future(dock_window())
 
     def _build_info_ui(self):
+        """Build the information section of the UI with title, documentation link, and overview."""
         title = EXTENSION_NAME
         doc_link = "https://docs.isaacsim.omniverse.nvidia.com/latest/utilities/extension_template_generator.html"
 
@@ -122,11 +173,18 @@ class Extension(omni.ext.IExt):
         setup_ui_headers(self._ext_id, __file__, title, doc_link, overview)
 
     def _build_status_panel(self):
+        """Build the status panel UI component for displaying generation status messages."""
         self._status_frame = CollapsableFrame("Status Frame", collapsed=True, visible=False)
         with self._status_frame:
             self._status_block = TextBlock("Status", "", num_lines=3, include_copy_button=False)
 
     def _build_template_ui(self, template_name, generate_fun):
+        """Build the UI for a specific extension template with input fields and generation controls.
+
+        Args:
+            template_name: Name of the extension template.
+            generate_fun: Function to call for generating the template.
+        """
         frame = ui.CollapsableFrame(
             title=template_name,
             height=0,
@@ -196,6 +254,13 @@ class Extension(omni.ext.IExt):
                 self._models[generate_btn].enabled = False
 
     def write_status(self, status, collapsed=False, visible=True):
+        """Update the status panel with a message and control its visibility.
+
+        Args:
+            status: The status message to display.
+            collapsed: Whether the status frame should be collapsed.
+            visible: Whether the status frame should be visible.
+        """
         self._status_block.set_text(status)
         self._status_frame.collapsed = collapsed
         self._status_frame.visible = visible

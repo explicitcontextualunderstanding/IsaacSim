@@ -1,10 +1,50 @@
 # Changelog
 
+## [2.16.1] - 2026-03-07
+### Changed
+- Automatically close the application during interpreter shutdown if close() was not called
+
+## [2.16.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [2.15.3] - 2026-02-20
+### Changed
+- Close stage in simulation app close() method to avoid errors
+
+## [2.15.2] - 2026-02-16
+### Changed
+- Update error message when application fails to start and exit before proceeding to make debugging easier.
+
+## [2.15.1] - 2026-02-13
+### Changed
+- Fix issue where simulation app close() method would hang if the app was already stopped
+
+## [2.15.0] - 2026-02-11
+### Added
+- Added separate default render settings for PathTracing and RealTimePathTracing modes
+
+## [2.14.5] - 2026-01-29
+### Changed
+- Skip explicit stage close in simulation app close() method to avoid crashes
+
+## [2.14.4] - 2026-01-22
+### Changed
+- is_running method does not require an active USD stage
+
+## [2.14.3] - 2026-01-19
+### Changed
+- Use close_stage_async method when closing stage to avoid blocking the main thread if available
+
+## [2.14.2] - 2026-01-15
+### Changed
+- Simulation app close() method now waits for replicator workflows to complete even when using replicator step()
+
 ## [2.14.1] - 2025-12-11
 ### Changed
 - Increased MAX_FRAMES in _wait_for_viewport for Windows so NEW_FRAME event fires when expected (again)
 
-## [2.14.0] - 2025-12-08
+## [2.14.0] - 2025-12-10
 ### Changed
 - Change startup behavior so that app ready status is delayed until after the app has started
 

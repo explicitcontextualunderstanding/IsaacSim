@@ -29,6 +29,9 @@ dependencies = [
     "omni.kit.material.library",
     "omni.kit.primitive.mesh",
 ]
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
 args = [
     "--enable",
     "omni.kit.loop-isaac",
@@ -37,7 +40,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",

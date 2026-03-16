@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive humanoid robot simulation example using H1 robot with GPU-accelerated physics and keyboard control."""
+
+
 import carb
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni
@@ -27,7 +30,28 @@ torch = import_module("torch")
 
 
 class HumanoidExample(BaseSample):
-    def __init__(self) -> None:
+    """A humanoid robot simulation example using H1 robot with GPU-accelerated physics.
+
+    This class demonstrates a complete humanoid robot simulation setup with real-time control capabilities.
+    It configures a high-frequency physics simulation (200 Hz) with GPU acceleration and provides keyboard-based
+    control for the H1 humanoid robot. The example includes proper scene setup, physics callbacks, and cleanup
+    management.
+
+    The simulation uses optimized settings with 200 Hz physics timestep and 25 Hz rendering to ensure smooth
+    real-time performance. The H1 robot is controlled through a policy-based system that processes movement
+    commands and maintains balance during locomotion.
+
+    Keyboard controls:
+        - NUMPAD_8 or UP: Move forward
+        - NUMPAD_4 or LEFT: Turn left
+        - NUMPAD_6 or RIGHT: Turn right
+
+    The example automatically handles robot initialization after scene reset and manages GPU memory resources
+    through proper cleanup routines. Physics tensors are validated each step to ensure robust simulation
+    restart capabilities.
+    """
+
+    def __init__(self):
         super().__init__()
         # Configure simulation settings for GPU dynamics with high-frequency physics
         self._world_settings["stage_units_in_meters"] = 1.0
@@ -55,7 +79,7 @@ class HumanoidExample(BaseSample):
             "RIGHT": [0.0, 0.0, -0.75],
         }
 
-    def setup_scene(self) -> None:
+    def setup_scene(self):
         """Set up the scene with robot and environment."""
         # Set device and backend BEFORE creating robot so it uses GPU
         SimulationManager.set_backend(self._world_settings["backend"])
@@ -74,7 +98,7 @@ class HumanoidExample(BaseSample):
         )
         print("Scene setup complete with H1 humanoid robot")
 
-    async def setup_post_load(self) -> None:
+    async def setup_post_load(self):
         """Setup keyboard input and physics callback after initial load."""
         self._appwindow = omni.appwindow.get_default_app_window()
         self._input = carb.input.acquire_input_interface()
@@ -92,17 +116,17 @@ class HumanoidExample(BaseSample):
             )
         print("H1 humanoid scene loaded successfully")
 
-    async def setup_pre_reset(self) -> None:
+    async def setup_pre_reset(self):
         """Called before world reset."""
         # Reset physics ready flag before reset
         self._physics_ready = False
 
-    async def setup_post_reset(self) -> None:
+    async def setup_post_reset(self):
         """Called after world reset."""
         # Reset physics ready flag after reset so robot reinitializes on next play
         self._physics_ready = False
 
-    async def setup_post_clear(self) -> None:
+    async def setup_post_clear(self):
         """Called after clearing the scene."""
         # Deregister physics callback
         if self._physics_callback_id is not None:
@@ -117,8 +141,13 @@ class HumanoidExample(BaseSample):
         self.h1 = None
         self._physics_ready = False
 
-    def on_physics_step(self, dt, context) -> None:
-        """Physics step callback - initialize on first step, then run policy."""
+    def on_physics_step(self, dt, context):
+        """Physics step callback - initialize on first step, then run policy.
+
+        Args:
+            dt: Delta time for the physics step.
+            context: Physics step context.
+        """
         if not self.h1:
             return
 
@@ -136,7 +165,16 @@ class HumanoidExample(BaseSample):
             self.h1.post_reset()
 
     def _sub_keyboard_event(self, event, *args, **kwargs) -> bool:
-        """Handle keyboard input for robot control."""
+        """Handle keyboard input for robot control.
+
+        Args:
+            event: The keyboard event.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            True to indicate the event was handled.
+        """
         if event.type == carb.input.KeyboardEventType.KEY_PRESS:
             # On pressing, the command is incremented
             if event.input.name in self._input_keyboard_mapping:

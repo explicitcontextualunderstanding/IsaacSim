@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
 ## [0.2.2] - 2025-11-10
 ### Fixed
 - Replaced deprecated `onclick_fn` with `onclick_action` in "Robotics Examples" menu item to eliminate deprecation warnings

@@ -13,14 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension providing camera sensor functionality for Isaac Sim simulation environment."""
+
+
 import omni.ext
 
 EXTENSION_NAME = "Isaac Sensor"
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the isaacsim.sensors.camera extension.
+
+    This extension provides camera sensor functionality for Isaac Sim, enabling the creation and management
+    of camera sensors within the simulation environment.
+    """
+
     def on_startup(self, ext_id: str):
+        """Called when the Isaac Sensor extension starts up.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         pass
 
     def on_shutdown(self):
+        """Called when the Isaac Sensor extension shuts down."""
         pass

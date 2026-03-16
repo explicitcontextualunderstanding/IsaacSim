@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.10.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, SETTINGS.md and update docstrings
+
+## [1.9.4] - 2026-02-24
+### Fixed
+- Rename "Robot Hierarchy" window to "Robot Inspector" in default and sdg layouts
+
+## [1.9.3] - 2026-02-23
+### Changed
+- Add logging to await_viewport to help debug viewport handle not being available
+
+## [1.9.2] - 2026-02-16
+### Changed
+- Add missing dependency for Robot Hierarchy window
+
+## [1.9.1] - 2026-02-05
+### Changed
+- Added dock info for Robot Hierarchy window
+
+## [1.9.0] - 2026-01-26
+### Changed
+- Update deprecated onclick_fn to on_click_action
+- Added missing docstrings and cleanup code
+
+## [1.8.1] - 2026-01-22
+### Changed
+- Refactor enable_ros_extensions to properly wait for viewport to be ready before enabling ROS2 extensions
+
+## [1.8.0] - 2026-01-08
+### Changed
+- Restructured extension into modular components
+
 ## [1.7.1] - 2025-12-10
 ### Changed
 - Add wait for viewport to be ready before printing app ready status

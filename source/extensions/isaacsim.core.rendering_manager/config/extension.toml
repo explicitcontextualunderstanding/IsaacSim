@@ -1,5 +1,5 @@
 [package]
-version = "0.2.2"
+version = "0.2.3"
 category = "rendering"
 title = "Isaac Sim Core Rendering Manager"
 description = "Core class that provides APIs for managing viewports and controlling rendering."
@@ -25,9 +25,8 @@ name = "isaacsim.core.rendering_manager.tests"
 
 # split the tests so one test does not affect the other
 [[test]]
-enabled = true
-timeout = 900
 name = "rendering_manager"
+timeout = 900
 dependencies = [
     "isaacsim.test.docstring",
 ]
@@ -39,7 +38,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -55,6 +54,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -75,12 +75,12 @@ args = [
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
 ]
+enabled = true
 pythonTests.include = ["isaacsim.core.rendering_manager.tests.test_rendering_manager.*"]
 
 [[test]]
-enabled = true
-timeout = 900
 name = "viewport_manager"
+timeout = 900
 dependencies = [
     "isaacsim.test.docstring",
 ]
@@ -92,7 +92,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -108,6 +108,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -128,12 +129,12 @@ args = [
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
 ]
+enabled = true
 pythonTests.include = ["isaacsim.core.rendering_manager.tests.test_viewport_manager.*"]
 
 [[test]]
-enabled = true
-timeout = 900
 name = "docstrings"
+timeout = 900
 dependencies = [
     "isaacsim.test.docstring",
 ]
@@ -145,7 +146,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -161,6 +162,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -181,4 +183,5 @@ args = [
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
 ]
+enabled = true
 pythonTests.include = ["isaacsim.core.rendering_manager.tests.test_docstrings.*"]

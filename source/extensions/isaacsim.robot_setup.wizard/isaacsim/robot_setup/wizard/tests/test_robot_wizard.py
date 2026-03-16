@@ -25,15 +25,25 @@ import omni.kit.test
 
 
 class TestExtension(omni.kit.test.AsyncTestCase):
+    """Test case class for the isaacsim.robot_setup.wizard extension.
+
+    This class provides a testing framework for the Robot Setup Wizard extension using the Omniverse Kit SDK's
+    asynchronous test capabilities. It inherits from omni.kit.test.AsyncTestCase to support async/await test
+    methods and automatic test discovery.
+
+    The class includes setUp and tearDown methods for test fixture preparation and cleanup, allowing for
+    customized test environment initialization before each test and proper resource cleanup afterward.
+    """
+
     async def setUp(self):
-        """Method called to prepare the test fixture"""
+        """Method called to prepare the test fixture."""
         super().setUp()
         # ---------------
         # Do custom setUp
         # ---------------
 
     async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+        """Method called immediately after the test method has been called."""
         # ------------------
         # Do custom tearDown
         # ------------------

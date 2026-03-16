@@ -24,6 +24,7 @@
 #include <rcl/rcl.h>
 #include <sensor_msgs/msg/camera_info.h>
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <cuda_runtime.h>
@@ -548,6 +549,78 @@ Ros2ImageMessageImpl::~Ros2ImageMessageImpl()
     imageMsg->data.capacity = 0;
     imageMsg->data.data = nullptr;
     sensor_msgs__msg__Image__destroy(imageMsg);
+}
+
+// CompressedImage message
+Ros2CompressedImageMessageImpl::Ros2CompressedImageMessageImpl()
+    : Ros2MessageInterfaceImpl("sensor_msgs", "msg", "CompressedImage")
+{
+    m_msg = sensor_msgs__msg__CompressedImage__create();
+}
+
+const void* Ros2CompressedImageMessageImpl::getTypeSupportHandle()
+{
+    return ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage);
+}
+
+void Ros2CompressedImageMessageImpl::writeHeader(const double timeStamp, const std::string& frameId)
+{
+    if (!m_msg)
+    {
+        return;
+    }
+    sensor_msgs__msg__CompressedImage* compressedMsg = static_cast<sensor_msgs__msg__CompressedImage*>(m_msg);
+    Ros2MessageInterfaceImpl::writeRosHeader(frameId, static_cast<int64_t>(timeStamp * 1e9), compressedMsg->header);
+}
+
+void Ros2CompressedImageMessageImpl::writeData(const uint8_t* data, size_t dataSize, const std::string& format)
+{
+    if (!m_msg)
+    {
+        return;
+    }
+    if (data == nullptr && dataSize > 0)
+    {
+        fprintf(stderr, "[Ros2CompressedImageMessage] data is null for dataSize=%zu\n", dataSize);
+        return;
+    }
+    sensor_msgs__msg__CompressedImage* compressedMsg = static_cast<sensor_msgs__msg__CompressedImage*>(m_msg);
+
+    // Set the format string
+    Ros2MessageInterfaceImpl::writeRosString(format, compressedMsg->format);
+
+    // Copy data to our internal buffer and point the message to it
+    if (dataSize > 0)
+    {
+        m_dataBuffer.resize(dataSize);
+        std::memcpy(m_dataBuffer.data(), data, dataSize);
+
+        compressedMsg->data.data = m_dataBuffer.data();
+        compressedMsg->data.size = dataSize;
+        compressedMsg->data.capacity = dataSize;
+    }
+    else
+    {
+        // Clear the data if size is 0
+        m_dataBuffer.clear();
+        compressedMsg->data.data = nullptr;
+        compressedMsg->data.size = 0;
+        compressedMsg->data.capacity = 0;
+    }
+}
+
+Ros2CompressedImageMessageImpl::~Ros2CompressedImageMessageImpl()
+{
+    if (!m_msg)
+    {
+        return;
+    }
+    sensor_msgs__msg__CompressedImage* compressedMsg = static_cast<sensor_msgs__msg__CompressedImage*>(m_msg);
+    // Lifetime of memory is managed by m_dataBuffer, clear the message pointers
+    compressedMsg->data.size = 0;
+    compressedMsg->data.capacity = 0;
+    compressedMsg->data.data = nullptr;
+    sensor_msgs__msg__CompressedImage__destroy(compressedMsg);
 }
 
 // NitrosBridgeImage message
@@ -1142,6 +1215,66 @@ void Ros2JointStateMessageImpl::writeData(const double& timeStamp,
                 jointStateMsg->effort.data[j] = isaacsim::core::includes::math::roundNearest(
                     jointEfforts[j] * stageUnits * stageUnits, 10000.0); // N*m
             }
+        }
+    }
+}
+
+void Ros2JointStateMessageImpl::writeData(const double& timeStamp,
+                                          const std::vector<std::string>& jointNames,
+                                          const std::vector<double>& jointPositions,
+                                          const std::vector<double>& jointVelocities,
+                                          const std::vector<double>& jointEfforts,
+                                          const std::vector<uint8_t>& dofTypes,
+                                          double stageMetersPerUnit)
+{
+    if (!m_msg)
+    {
+        return;
+    }
+    const size_t numDofs = jointNames.size();
+    if (numDofs == 0 || jointPositions.size() != numDofs || jointVelocities.size() != numDofs ||
+        jointEfforts.size() != numDofs || dofTypes.size() != numDofs)
+    {
+        return;
+    }
+    if (stageMetersPerUnit <= 0.0 || !std::isfinite(stageMetersPerUnit))
+    {
+        return;
+    }
+
+    sensor_msgs__msg__JointState* jointStateMsg = static_cast<sensor_msgs__msg__JointState*>(m_msg);
+    Ros2MessageInterfaceImpl::writeRosHeader("", static_cast<int64_t>(timeStamp * 1e9), jointStateMsg->header);
+
+    const double stageUnits = 1.0 / stageMetersPerUnit;
+
+    if (!ensureSeqSize(jointStateMsg->name, numDofs) || !ensureSeqSize(jointStateMsg->position, numDofs) ||
+        !ensureSeqSize(jointStateMsg->velocity, numDofs) || !ensureSeqSize(jointStateMsg->effort, numDofs))
+    {
+        fprintf(stderr, "[Ros2JointStateMessage] Failed to ensure sequence capacities\n");
+        return;
+    }
+
+    for (size_t j = 0; j < numDofs; j++)
+    {
+        Ros2MessageInterfaceImpl::writeRosString(jointNames[j], jointStateMsg->name.data[j]);
+        const bool isTranslation = (dofTypes[j] == 1); // 1 = prismatic (translation)
+        if (isTranslation)
+        {
+            jointStateMsg->position.data[j] =
+                isaacsim::core::includes::math::roundNearest(jointPositions[j] * stageUnits, 10000.0); // m
+            jointStateMsg->velocity.data[j] =
+                isaacsim::core::includes::math::roundNearest(jointVelocities[j] * stageUnits, 10000.0); // m/s
+            jointStateMsg->effort.data[j] =
+                isaacsim::core::includes::math::roundNearest(jointEfforts[j] * stageUnits, 10000.0); // N
+        }
+        else
+        {
+            jointStateMsg->position.data[j] =
+                isaacsim::core::includes::math::roundNearest(jointPositions[j], 10000.0); // rad
+            jointStateMsg->velocity.data[j] =
+                isaacsim::core::includes::math::roundNearest(jointVelocities[j], 10000.0); // rad/s
+            jointStateMsg->effort.data[j] =
+                isaacsim::core::includes::math::roundNearest(jointEfforts[j] * stageUnits * stageUnits, 10000.0); // N*m
         }
     }
 }

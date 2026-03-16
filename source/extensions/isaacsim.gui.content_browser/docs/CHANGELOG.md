@@ -1,4 +1,27 @@
 # Changelog
+## [0.3.2] - 2026-03-06
+### Changed
+- Update omni.simready.content.browser settings
+
+## [0.3.1] - 2026-03-04
+### Changed
+- Add SimReady folder
+
+## [0.3.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, SETTINGS.md and update docstrings
+
+## [0.2.1] - 2026-03-02
+### Changed
+- Update assets path to 6.0 staging
+
+## [0.2.0] - 2026-02-18
+### Added
+- New `omni.simready.content.browser` extension for Simready asset search
+
+## [0.1.19] - 2026-01-09
+### Changed
+- Update assets path to development
 
 ## [0.1.18] - 2025-12-12
 ### Fixed

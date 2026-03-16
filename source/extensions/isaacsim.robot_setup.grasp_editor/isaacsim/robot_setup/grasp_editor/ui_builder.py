@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""User interface builder module for the Isaac Sim grasp editor extension."""
+
+
 import asyncio
 import os
 from functools import partial
@@ -54,11 +57,28 @@ from .util import (
 )
 
 
-def is_yaml(file_path):
+def is_yaml(file_path: str) -> bool:
+    """Check if a file path has a YAML extension.
+
+    Args:
+        file_path: The file path to check.
+
+    Returns:
+        True if the file path ends with '.yaml' or '.yml', False otherwise.
+    """
     return file_path.lower()[-5:] == ".yaml" or file_path.lower()[-4:] == ".yml"
 
 
 class UIBuilder:
+    """User interface builder for the grasp editor extension.
+
+    This class creates and manages the complete UI for authoring, testing, and exporting robotic grasps.
+    It provides tools for selecting articulated robots and rigid bodies, configuring joint settings,
+    simulating grasp physics, and exporting/importing grasp data to YAML files. The UI is organized into
+    collapsible frames that guide users through the grasp authoring workflow: selection, reference frame
+    configuration, joint settings, grasp simulation, and data export/import.
+    """
+
     def __init__(self):
         # Frames are sub-windows that can contain multiple UI elements
         self.frames = []
@@ -98,7 +118,7 @@ class UIBuilder:
         """Callback for Timeline events (Play, Pause, Stop)
 
         Args:
-            event (omni.timeline.TimelineEventType): Event Type
+            event: Event Type
         """
         pass
 
@@ -107,7 +127,7 @@ class UIBuilder:
         Physics steps only occur when the timeline is playing
 
         Args:
-            step (float): Size of physics step
+            step: Size of physics step
         """
         pass
 
@@ -121,8 +141,7 @@ class UIBuilder:
             self.reset_extension()
 
     def cleanup(self):
-        """
-        Called when the stage is closed or the extension is hot reloaded.
+        """Called when the stage is closed or the extension is hot reloaded.
         Perform any necessary cleanup such as removing active callback functions
         Buttons imported from isaacsim.gui.components.element_wrappers implement a cleanup function that should be called
         """
@@ -130,8 +149,7 @@ class UIBuilder:
             ui_elem.cleanup()
 
     def build_ui(self):
-        """
-        Build a custom UI tool to run your extension.
+        """Build a custom UI tool to run your extension.
         This function will be called any time the UI window is closed and reopened.
         """
         self._selection_frame = CollapsableFrame(
@@ -162,6 +180,11 @@ class UIBuilder:
     ############################### Frame Builder Functions #####################################
 
     def build_selection_frame(self):
+        """Builds the UI frame for selecting gripper articulation and rigid body objects.
+
+        Includes dropdowns for gripper selection, rigid body selection, export path configuration,
+        and validation controls for proceeding to the next stage of grasp authoring.
+        """
         with ui.VStack(style=get_style(), spacing=5, height=0):
             self._gripper_selection_dropdown = DropDown(
                 "Select Gripper",
@@ -208,6 +231,12 @@ class UIBuilder:
             self._warning_box.visible = False
 
     def build_reference_frame(self):
+        """Builds the UI frame for selecting gripper and rigid body reference frames.
+
+        Provides dropdowns with filtering capabilities for selecting specific subframes within
+        the articulation and rigid body that will serve as coordinate system origins for grasp
+        pose calculations.
+        """
         if self._articulation is None:
             return
 
@@ -318,6 +347,12 @@ class UIBuilder:
                 )
 
     def build_settings_frame(self):
+        """Builds the UI frame for configuring grasp test parameters.
+
+        Creates joint configuration controls for each DOF, collision masking utilities,
+        physics collider visualization, and external force/torque settings for testing
+        grasp robustness under external disturbances.
+        """
         if self._articulation is None or self._rigid_body is None or self._timeline.is_stopped():
             # This is for aesthetics only.
             CollapsableFrame("Grasp Test Configuration", collapsed=True, enabled=False)
@@ -556,6 +591,11 @@ class UIBuilder:
                     )
 
     def build_test_frame(self):
+        """Builds the UI frame for testing grasps.
+
+        Creates controls for simulating grasps with physics or exporting the current gripper state as-is.
+        Requires at least one DOF to be marked as part of the gripper.
+        """
         if self._articulation is None:
             return
 
@@ -590,6 +630,10 @@ class UIBuilder:
         self.wrapped_ui_elements.append(self._test_state_btn)
 
     def build_export_frame(self):
+        """Builds the UI frame for exporting grasps to file.
+
+        Creates controls for setting grasp confidence and exporting the tested grasp to a YAML file.
+        """
         with ui.VStack(style=get_style(), spacing=5, height=0):
             self._suggest_confidence_cb = CheckBox(
                 "Auto Compute Confidence",
@@ -611,6 +655,12 @@ class UIBuilder:
             self._export_txt = TextBlock("README", "Ready To Export Grasp", num_lines=1)
 
     def build_import_frame(self):
+        """Builds the UI frame for importing grasps from file.
+
+        Creates controls for loading grasp configurations from YAML files and applying them to the current
+        articulation and rigid body setup.
+        """
+
         def on_import_grasps():
             if not is_yaml(self._import_path.get_value()):
                 return
@@ -735,6 +785,10 @@ class UIBuilder:
 
     ############################# UI Control Functions ########################################
     def _on_reset_selection_frame(self):
+        """Handles the reset button click in the selection frame.
+
+        Re-enables the selection UI elements and resets the extension state.
+        """
         self._gripper_selection_dropdown.enabled = True
         self._rb_conversion_stringfield.enabled = True
         self._export_path.enabled = True
@@ -742,6 +796,11 @@ class UIBuilder:
         self.reset_extension()
 
     def _on_finished_selection_frame(self):
+        """Handles the completion of the selection frame.
+
+        Validates selections, converts the selected prim to a collidable rigid body, initializes the articulation
+        and rigid body objects, and enables the reference frame for further configuration.
+        """
         if self._gripper_selection_dropdown.get_selection() == "":
             self._selection_frame_helper_text.visible = True
             self._selection_frame_helper_text.set_text("An Articulation must be present on the stage to continue.")
@@ -800,6 +859,11 @@ class UIBuilder:
         asyncio.ensure_future(initialize_objects())
 
     def _finalize_reference_frame_selection(self):
+        """Finalizes the reference frame selection and advances to settings configuration.
+
+        Creates the data writer with selected frames, initializes joint UI state, and enables the settings
+        and test frames.
+        """
         self._data_writer = DataWriter(self._gripper_subframe.get_selection(), self._rb_subframe.get_selection())
 
         self._joint_settings_ui_state = JointFrameUIState(self._articulation)
@@ -811,6 +875,11 @@ class UIBuilder:
         self._test_frame.rebuild()
 
     def _populate_settings_frame(self):
+        """Populates and enables the settings frame after reference frame selection.
+
+        Enables the settings frame for joint configuration and the test frame for grasp simulation,
+        while disabling the export frame and enabling the import frame.
+        """
         self._settings_frame.enabled = True
         self._settings_frame.collapsed = False
         self._settings_frame.rebuild()
@@ -825,6 +894,10 @@ class UIBuilder:
         self._import_frame.enabled = True
 
     def reset_extension(self):
+        """Resets the extension to its initial state.
+
+        Clears all objects, resets UI states, re-enables selection controls, and unmasks any active collision masks.
+        """
         if not self._timeline.is_stopped() and self._rigid_body is not None:
             self.stop_rigid_body()
 
@@ -869,6 +942,12 @@ class UIBuilder:
 
     ##################################### Grasp Test ###############################################
     def get_current_grasp_test_settings(self):
+        """Retrieves the current grasp test configuration from the UI.
+
+        Returns:
+            GraspTestSettings containing all joint settings, articulation and rigid body information,
+            and external force parameters for grasp testing.
+        """
         active_joint_names = []
         active_joint_open_positions = []
         active_joint_closed_positions = []
@@ -901,6 +980,15 @@ class UIBuilder:
         return grasp_test_settings
 
     def _update_test(self, step: float, context):
+        """Updates the grasp test simulation during physics steps.
+
+        Processes test results and updates the status display. When the test completes, prepares the export frame
+        with the final results.
+
+        Args:
+            step: Physics step size.
+            context: Physics step context.
+        """
         result = self._grasp_tester.update_grasp_test(step)
 
         # The grasp test generates status messages until a final result.
@@ -915,6 +1003,11 @@ class UIBuilder:
             self.ready_to_export_grasp(result.suggested_confidence, "Ready To Export Grasp")
 
     def _on_run_test_a_text(self):
+        """Handle the simulate action for the grasp test button.
+
+        Stores the initial rigid body pose, ensures collisions are enabled, and initializes
+        the grasp test simulation.
+        """
         self._pre_test_rb_pose = self._rigid_body.get_world_poses()
 
         # Simulating a grasp is always done with collisions turned on.
@@ -928,6 +1021,12 @@ class UIBuilder:
         self._export_frame.enabled = False
 
     def _on_run_test_b_text(self):
+        """Handle the reset action for the grasp test button.
+
+        Opens the gripper, stops the rigid body motion, and resets the UI state to allow for
+        a new test.
+        """
+
         # Open the gripper and make sure that the object is not moved while this happens from
         # the contact forces.
         async def open_gripper():
@@ -957,6 +1056,11 @@ class UIBuilder:
         asyncio.ensure_future(open_gripper())
 
     def _export_without_simulating(self):
+        """Export the current gripper state as a grasp without running physics simulation.
+
+        Sets up the grasp test results using the current joint positions as both open and closed
+        positions, then prepares the grasp for export with maximum confidence.
+        """
         x = self.get_current_grasp_test_settings()
         rel_trans, rel_quat = self._grasp_tester.compute_relative_pose(
             x.rigid_body_pose_frame, x.articulation_pose_frame
@@ -989,6 +1093,15 @@ class UIBuilder:
     #################################### Export To File ###########################################
 
     def ready_to_export_grasp(self, suggested_confidence, export_txt):
+        """Prepare the export frame for grasp export.
+
+        Enables the export frame, updates the status text, and sets the suggested confidence
+        value if auto-computation is enabled.
+
+        Args:
+            suggested_confidence: The confidence value suggested by the grasp test.
+            export_txt: Status message to display in the export frame.
+        """
         self._export_frame.collapsed = False
         self._export_frame.enabled = True
         self._export_txt.set_text(export_txt)
@@ -998,6 +1111,11 @@ class UIBuilder:
             self._confidence_field.set_value(suggested_confidence)
 
     def export_to_file(self):
+        """Export the last grasp test results to the specified file path.
+
+        Writes the grasp data with the configured confidence value to the YAML file and
+        updates the export status message.
+        """
         # Export self._last_grasp_test_results
         export_path = self._export_path.get_value()
         self._data_writer.write_grasp_to_file(
@@ -1010,19 +1128,24 @@ class UIBuilder:
     #################################### Shared Util ##############################################
 
     def stop_rigid_body(self):
+        """Stop the rigid body by setting its velocities to zero and removing applied forces."""
         self._rigid_body.set_velocities(np.zeros((1, 6)))
         self._rigid_body.apply_forces_and_torques_at_pos(np.zeros((1, 3)), np.zeros((1, 3)))
 
 
 class JointFrameUIState:
-    """This class stores the UI state of joint frames.  The natural thing to do is to rely on the
-    UI itself in order to store values for joint settings.  But this runs into complications when
-    you want to programmatically switch a joint from inactive to active.  Only the frames that
+    """This class stores the UI state of joint frames. The natural thing to do is to rely on the
+    UI itself in order to store values for joint settings. But this runs into complications when
+    you want to programmatically switch a joint from inactive to active. Only the frames that
     are visible on the screen will update when you rebuild the joint frames, and so UI state cannot
     be relied upon as up to date in this case.
 
     This class makes sure that when the UI gets around to updating because the user scrolled or
-    expanded the joint settings window, the latest settings are used in the building."""
+    expanded the joint settings window, the latest settings are used in the building.
+
+    Args:
+        articulation: The articulation to store joint frame UI state for.
+    """
 
     def __init__(self, articulation):
         self._fixed_dof_settings = {}
@@ -1032,75 +1155,171 @@ class JointFrameUIState:
             self.set_fixed_dof(articulation, dof_name)
 
     def _get_default_close_position(self, upper_limit, lower_limit, open_position):
+        """Calculate the default close position for a joint based on its limits and open position.
+
+        Args:
+            upper_limit: The upper limit of the joint.
+            lower_limit: The lower limit of the joint.
+            open_position: The open position of the joint.
+
+        Returns:
+            The default close position (opposite limit from the open position).
+        """
         if np.abs(open_position - upper_limit) < np.abs(open_position - lower_limit):
             return lower_limit
         else:
             return upper_limit
 
     def is_active(self, dof_name):
+        """Whether the degree of freedom is part of the active gripper.
+
+        Args:
+            dof_name: Name of the degree of freedom to check.
+
+        Returns:
+            True if the DOF is active (part of the gripper), False if fixed.
+        """
         return dof_name in self._active_dof_settings
 
     def get_fixed_position(self, dof_name):
+        """Fixed position of the degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+
+        Returns:
+            The fixed position value for the DOF.
+        """
         if dof_name in self._fixed_dof_settings:
             return self._fixed_dof_settings[dof_name]["fixed_position"]
         else:
             carb.log_error("Attempted to access fixed joint setting for an active dof")
 
     def get_open_position(self, dof_name):
+        """Open position of the active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+
+        Returns:
+            The open position value for the DOF.
+        """
         if dof_name in self._active_dof_settings:
             return self._active_dof_settings[dof_name]["open_position"]
         else:
             carb.log_error("Attempted to access active joint setting for a fixed dof")
 
     def get_close_position(self, dof_name):
+        """Close position of the active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+
+        Returns:
+            The close position value for the DOF.
+        """
         if dof_name in self._active_dof_settings:
             return self._active_dof_settings[dof_name]["close_position"]
         else:
             carb.log_error("Attempted to access active joint setting for a fixed dof")
 
     def get_max_speed(self, dof_name):
+        """Maximum speed of the active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+
+        Returns:
+            The maximum speed value for the DOF.
+        """
         if dof_name in self._active_dof_settings:
             return self._active_dof_settings[dof_name]["max_speed"]
         else:
             carb.log_error("Attempted to access active joint setting for a fixed dof")
 
     def get_max_effort(self, dof_name):
+        """Maximum effort of the active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+
+        Returns:
+            The maximum effort value for the DOF.
+        """
         if dof_name in self._active_dof_settings:
             return self._active_dof_settings[dof_name]["max_effort"]
         else:
             carb.log_error("Attempted to access active joint setting for a fixed dof")
 
     def get_joint_position(self, dof_name):
+        """Current joint position of the degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+
+        Returns:
+            The open position if active, or the fixed position if fixed.
+        """
         if self.is_active(dof_name):
             return self.get_open_position(dof_name)
         else:
             return self.get_fixed_position(dof_name)
 
     def set_fixed_position(self, dof_name, position):
+        """Set the fixed position for a fixed degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+            position: The fixed position value to set.
+        """
         if dof_name in self._fixed_dof_settings:
             self._fixed_dof_settings[dof_name]["fixed_position"] = position
         else:
             carb.log_error("Attempted to set fixed joint setting for an active dof")
 
     def set_open_position(self, dof_name, position):
+        """Set the open position for an active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+            position: The open position value to set.
+        """
         if dof_name in self._active_dof_settings:
             self._active_dof_settings[dof_name]["open_position"] = position
         else:
             carb.log_error("Attempted to set active joint setting for a fixed dof")
 
     def set_close_position(self, dof_name, position):
+        """Sets the close position for an active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+            position: Position value for when the joint is closed.
+        """
         if dof_name in self._active_dof_settings:
             self._active_dof_settings[dof_name]["close_position"] = position
         else:
             carb.log_error("Attempted to set active joint setting for a fixed dof")
 
     def set_max_speed(self, dof_name, max_speed):
+        """Sets the maximum speed for an active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+            max_speed: Maximum speed value for the joint movement.
+        """
         if dof_name in self._active_dof_settings:
             self._active_dof_settings[dof_name]["max_speed"] = max_speed
         else:
             carb.log_error("Attempted to set active joint setting for a fixed dof")
 
     def set_max_effort(self, dof_name, max_effort):
+        """Sets the maximum effort for an active degree of freedom.
+
+        Args:
+            dof_name: Name of the degree of freedom.
+            max_effort: Maximum effort value for the joint.
+        """
         if dof_name in self._active_dof_settings:
             self._active_dof_settings[dof_name]["max_effort"] = max_effort
         else:
@@ -1109,6 +1328,16 @@ class JointFrameUIState:
     def set_active_dof(
         self, articulation, dof_name, open_position=None, close_position=None, max_speed=None, max_effort=None
     ):
+        """Configures a degree of freedom as active with specified parameters.
+
+        Args:
+            articulation: The articulation containing the degree of freedom.
+            dof_name: Name of the degree of freedom to make active.
+            open_position: Position value for when the joint is open.
+            close_position: Position value for when the joint is closed.
+            max_speed: Maximum speed value for joint movement.
+            max_effort: Maximum effort value for the joint.
+        """
         if dof_name in self._fixed_dof_settings:
             del self._fixed_dof_settings[dof_name]
         d = {}
@@ -1139,6 +1368,13 @@ class JointFrameUIState:
         d["max_effort"] = max_effort
 
     def set_fixed_dof(self, articulation, dof_name, fixed_position=None):
+        """Configures a degree of freedom as fixed at a specified position.
+
+        Args:
+            articulation: The articulation containing the degree of freedom.
+            dof_name: Name of the degree of freedom to make fixed.
+            fixed_position: Position value to fix the joint at.
+        """
         if dof_name in self._active_dof_settings:
             del self._active_dof_settings[dof_name]
         d = {}

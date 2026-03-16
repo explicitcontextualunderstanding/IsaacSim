@@ -68,7 +68,7 @@ public:
 
 protected:
     /**
-     * @brief Generate message from node inputs.
+     * @brief Generate message from image metadata and pixel data.
      * @details
      * Serializes image metadata and data, handling both CPU and GPU memory sources.
      * Message format (ROS2-compatible):
@@ -80,38 +80,25 @@ protected:
      * - step (uint32_t, 4 bytes) - row length in bytes
      * - image_data (variable length)
      *
-     * @param[in] db Database accessor for node inputs
+     * @param[in] metadata Image metadata
+     * @param[in] db Database accessor for pixel data access
      * @return std::vector<uint8_t> Serialized message data
      */
-    std::vector<uint8_t> generateMessage(OgnUCXPublishImageDatabase& db) override
+    std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::ImageMetadata& metadata,
+                                         OgnUCXPublishImageDatabase& db) override
     {
-        const double timestamp = db.inputs.timeStamp();
-        const uint32_t width = db.inputs.width();
-        const uint32_t height = db.inputs.height();
-        const std::string encoding = db.tokenToString(db.inputs.encoding());
         const int cudaDeviceIndex = db.inputs.cudaDeviceIndex();
-
-        // Determine data size from inputs
-        size_t dataSize = 0;
         const size_t bufferSize = db.inputs.bufferSize();
 
-        if (bufferSize > 0)
-        {
-            // Data from pointer (CPU or GPU buffer)
-            dataSize = bufferSize;
-        }
-        else if (db.inputs.data.size() > 0)
-        {
-            // Data from OGN array
-            dataSize = db.inputs.data.size();
-        }
-        else if (cudaDeviceIndex != -1)
+        // Determine data size - may need to calculate for GPU textures
+        size_t dataSize = metadata.dataSize;
+        if (dataSize == 0 && cudaDeviceIndex != -1)
         {
             // GPU texture - calculate size based on format
             const carb::Format resourceFormat = static_cast<carb::Format>(db.inputs.format());
             if (resourceFormat == carb::Format::eR32_SFLOAT)
             {
-                dataSize = width * height * sizeof(float);
+                dataSize = metadata.width * metadata.height * sizeof(float);
             }
             else
             {
@@ -119,19 +106,22 @@ protected:
                 return {};
             }
         }
-        else
+
+        if (dataSize == 0)
         {
             db.logError("Cannot determine image data size - no valid data source");
             return {};
         }
 
-        // Calculate step (bytes per row) - ROS2 format
-        const uint32_t step = static_cast<uint32_t>(dataSize / height);
+        // Calculate step if not set
+        uint32_t step = metadata.step;
+        if (step == 0 && metadata.height > 0)
+        {
+            step = static_cast<uint32_t>(dataSize / metadata.height);
+        }
 
-        // Calculate message size with 4-byte alignment after encoding:
-        // timestamp (8) + width (4) + height (4) + encoding_length (4) + encoding (variable, padded) + step (4) + data
-        // (variable)
-        const size_t encodingLength = encoding.length();
+        // Calculate message size with 4-byte alignment after encoding
+        const size_t encodingLength = metadata.encoding.length();
         const size_t encodingPadded = (encodingLength + 3) & ~3; // Round up to 4-byte boundary
         const size_t messageSize = sizeof(double) + sizeof(uint32_t) * 4 + encodingPadded + dataSize;
 
@@ -140,20 +130,20 @@ protected:
         size_t offset = 0;
 
         // Write header
-        std::memcpy(messageData.data() + offset, &timestamp, sizeof(double));
+        std::memcpy(messageData.data() + offset, &metadata.timestamp, sizeof(double));
         offset += sizeof(double);
 
-        std::memcpy(messageData.data() + offset, &width, sizeof(uint32_t));
+        std::memcpy(messageData.data() + offset, &metadata.width, sizeof(uint32_t));
         offset += sizeof(uint32_t);
 
-        std::memcpy(messageData.data() + offset, &height, sizeof(uint32_t));
+        std::memcpy(messageData.data() + offset, &metadata.height, sizeof(uint32_t));
         offset += sizeof(uint32_t);
 
         const uint32_t encLen = static_cast<uint32_t>(encodingLength);
         std::memcpy(messageData.data() + offset, &encLen, sizeof(uint32_t));
         offset += sizeof(uint32_t);
 
-        std::memcpy(messageData.data() + offset, encoding.c_str(), encodingLength);
+        std::memcpy(messageData.data() + offset, metadata.encoding.c_str(), encodingLength);
         offset += encodingLength;
 
         // Pad to 4-byte boundary (fill with zeros)
@@ -209,14 +199,14 @@ protected:
                 switch (resourceFormat)
                 {
                 case carb::Format::eR32_SFLOAT:
-                    if (width * height * sizeof(float) != dataSize)
+                    if (metadata.width * metadata.height * sizeof(float) != dataSize)
                     {
                         db.logError("Data size mismatch for eR32_SFLOAT format");
                         return {};
                     }
-                    CUDA_CHECK(cudaMemcpy2DFromArrayAsync(imageDataDest, width * sizeof(float), levelArray, 0, 0,
-                                                          width * sizeof(float), height, cudaMemcpyDeviceToHost,
-                                                          getCudaStream()));
+                    CUDA_CHECK(cudaMemcpy2DFromArrayAsync(imageDataDest, metadata.width * sizeof(float), levelArray, 0,
+                                                          0, metadata.width * sizeof(float), metadata.height,
+                                                          cudaMemcpyDeviceToHost, getCudaStream()));
                     CUDA_CHECK(cudaStreamSynchronize(getCudaStream()));
                     break;
                 default:

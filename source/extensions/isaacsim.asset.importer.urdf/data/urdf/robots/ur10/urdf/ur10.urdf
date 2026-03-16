@@ -14,7 +14,9 @@
             </geometry>
         </visual>
         <inertial>
-            <mass value="200.0"/>
+            <mass value="4.0"/>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <inertia ixx="0.0061063308908" ixy="0.0" ixz="0.0" iyy="0.0061063308908" iyz="0.0" izz="0.01125"/>
         </inertial>
     </link>
     <link name="shoulder_link">
@@ -25,7 +27,7 @@
             </geometry>
         </visual>
         <collision>
-            <origin xyz="0 0.0 0.0027000046)" rpy="0 0 0"/>
+            <origin xyz="0 0.0 0.0027000046" rpy="0 0 0"/>
             <geometry>
                 <cylinder radius="0.075" length="0.17"/>
             </geometry>
@@ -37,7 +39,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="7.1"/>
+            <mass value="7.778"/>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <inertia ixx="0.03147431257693659" ixy="0.0" ixz="0.0" iyy="0.03147431257693659" iyz="0.0" izz="0.021875624999999996"/>
         </inertial>
     </link>
     <link name="upper_arm_link">
@@ -66,7 +70,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="12.7"/>
+            <mass value="12.93"/>
+            <origin rpy="0 1.5707963267948966 0" xyz="-0.306 0.0 0.175"/>
+            <inertia ixx="0.42175380379841093" ixy="0.0" ixz="0.0" iyy="0.42175380379841093" iyz="0.0" izz="0.03636562499999999"/>
         </inertial>
     </link>
     <link name="forearm_link">
@@ -95,7 +101,11 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="4.27"/>
+            <mass value="3.87"/>
+            <origin rpy="0 1.5707963267948966 0" xyz="-0.28615 0.0 0.049042"/>
+            <inertia ixx="0.11106969409710458" ixy="0.0" ixz="0.0" iyy="0.11106969409710458" iyz="0.0" izz="0.010884375"/>
+      <origin rpy="0 1.5707963267948966 0" xyz="-0.28615 0.0 0.049042"/>
+      <inertia ixx="0.11106969409710458" ixy="0.0" ixz="0.0" iyy="0.11106969409710458" iyz="0.0" izz="0.010884375"/>
         </inertial>
     </link>
     <link name="wrist_1_link">
@@ -118,7 +128,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="1.0"/>
+            <mass value="1.96"/>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <inertia ixx="0.005108247956699999" ixy="0.0" ixz="0.0" iyy="0.005108247956699999" iyz="0.0" izz="0.005512499999999999"/>
         </inertial>
     </link>
     <link name="wrist_2_link">
@@ -141,7 +153,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="1.0"/>
+            <mass value="1.96"/>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+            <inertia ixx="0.0040792483683" ixy="0.0" ixz="0.0" iyy="0.0040792483683" iyz="0.0" izz="0.005512499999999999"/>
         </inertial>
     </link>
     <link name="wrist_3_link">
@@ -158,7 +172,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.365"/>
+            <mass value="0.202"/>
+            <origin rpy="0 0 0" xyz="0.0 0.0 -0.01525"/>
+            <inertia ixx="0.00011792166116465" ixy="0.0" ixz="0.0" iyy="0.00011792166116465" iyz="0.0" izz="0.00020452500000000002"/>
         </inertial>
     </link>
     <joint name="shoulder_pan_joint" type="revolute">

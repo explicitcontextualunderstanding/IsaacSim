@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Camera interface module for the mobility generation system that provides various rendering outputs."""
+
+
 import os
 from typing import Tuple
 
@@ -26,6 +29,31 @@ from .utils.prim_utils import prim_get_world_transform
 
 
 class MobilityGenCamera(Module):
+    """A camera interface for the mobility generation system that provides various rendering outputs.
+
+    This class wraps a USD camera prim to enable different types of rendering including RGB images, semantic
+    segmentation, instance segmentation, depth maps, and surface normals. It manages render products and annotators
+    through omni.replicator.core to capture data from the camera's perspective.
+
+    The camera provides access to rendered data through buffer objects that can be accessed after calling
+    ``update_state()``. Each rendering type can be enabled independently using the corresponding enable methods.
+
+    Buffers available after enabling respective rendering modes:
+
+    - ``rgb_image``: RGB color data when RGB rendering is enabled
+    - ``segmentation_image``: Semantic segmentation mask when segmentation rendering is enabled
+    - ``segmentation_info``: Metadata for semantic segmentation labels
+    - ``instance_id_segmentation_image``: Instance segmentation mask when instance ID rendering is enabled
+    - ``instance_id_segmentation_info``: Metadata for instance segmentation labels
+    - ``depth_image``: Depth values from camera when depth rendering is enabled
+    - ``normals_image``: Surface normals when normals rendering is enabled
+    - ``position``: World position of the camera
+    - ``orientation``: World orientation quaternion of the camera
+
+    Args:
+        prim_path: USD path to the camera prim in the stage.
+        resolution: Image resolution as (width, height) tuple for all rendering outputs.
+    """
 
     def __init__(self, prim_path: str, resolution: Tuple[int, int]):
 
@@ -50,10 +78,12 @@ class MobilityGenCamera(Module):
         self.orientation = Buffer()
 
     def enable_rendering(self):
+        """Creates a render product for the camera to enable rendering capabilities."""
 
         self._render_product = rep.create.render_product(self._prim_path, self._resolution, force_new=False)
 
     def disable_rendering(self):
+        """Disables rendering by detaching all annotators and destroying the render product."""
         if self._render_product is None:
             return
 
@@ -73,6 +103,7 @@ class MobilityGenCamera(Module):
         self._render_product = None
 
     def enable_rgb_rendering(self):
+        """Enables RGB rendering by attaching the LdrColor annotator to the render product."""
         if self._render_product is None:
             self.enable_rendering()
         if self._rgb_annotator is not None:
@@ -81,6 +112,7 @@ class MobilityGenCamera(Module):
         self._rgb_annotator.attach(self._render_product)
 
     def enable_segmentation_rendering(self):
+        """Enables semantic segmentation rendering by attaching the semantic_segmentation annotator."""
         if self._render_product is None:
             self.enable_rendering()
         if self._segmentation_annotator is not None:
@@ -91,6 +123,7 @@ class MobilityGenCamera(Module):
         self._segmentation_annotator.attach(self._render_product)
 
     def enable_instance_id_segmentation_rendering(self):
+        """Enables instance ID segmentation rendering by attaching the instance_id_segmentation annotator."""
         if self._render_product is None:
             self.enable_rendering()
         if self._instance_id_segmentation_annotator is not None:
@@ -101,6 +134,7 @@ class MobilityGenCamera(Module):
         self._instance_id_segmentation_annotator.attach(self._render_product)
 
     def enable_depth_rendering(self):
+        """Enables depth rendering by attaching the distance_to_camera annotator."""
         if self._render_product is None:
             self.enable_rendering()
         if self._depth_annotator is not None:
@@ -109,6 +143,7 @@ class MobilityGenCamera(Module):
         self._depth_annotator.attach(self._render_product)
 
     def enable_normals_rendering(self):
+        """Enables surface normals rendering by attaching the normals annotator."""
         if self._render_product is None:
             self.enable_rendering()
         if self._normals_annotator is not None:
@@ -117,6 +152,7 @@ class MobilityGenCamera(Module):
         self._normals_annotator.attach(self._render_product)
 
     def update_state(self):
+        """Updates the camera state by retrieving data from active annotators and camera transform."""
         if self._rgb_annotator is not None:
             self.rgb_image.set_value(self._rgb_annotator.get_data()[:, :, :3])
         if self._segmentation_annotator is not None:

@@ -469,15 +469,6 @@ CUDA_CALLABLE inline Matrix33 Skew(const Vec3& v)
     return Matrix33(Vec3(0.0f, v.z, -v.y), Vec3(-v.z, 0.0f, v.x), Vec3(v.y, -v.x, 0.0f));
 }
 
-/**
- * @brief Constructor creating a quaternion from a rotation matrix.
- * @tparam T Template type parameter for the quaternion components
- * @param[in] m Rotation matrix to convert to quaternion
- * @details
- * Converts a 3x3 rotation matrix to a quaternion using Shepperd's method.
- * The algorithm selects the most numerically stable computation path based
- * on the trace and diagonal elements of the matrix.
- */
 template <typename T>
 CUDA_CALLABLE inline XQuat<T>::XQuat(const Matrix33& m)
 {

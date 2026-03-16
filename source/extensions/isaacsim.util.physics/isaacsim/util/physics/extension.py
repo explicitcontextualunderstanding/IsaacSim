@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Isaac Sim physics utilities extension that provides a UI for applying and removing physics APIs on USD prims."""
+
+
 import asyncio
 import gc
 import weakref
@@ -190,7 +193,7 @@ class Extension(omni.ext.IExt):
 
         pass
 
-    def traverse_prims(self, selection, include_xform=False, ignore_rigid=True, visible_only=True):
+    def traverse_prims(self, selection, include_xform=False, ignore_rigid=True, visible_only=True) -> list:
         """Traverse and collect valid prims from the given selection.
 
         Iterates through the selected prim paths and their children (if enabled), filtering
@@ -241,7 +244,7 @@ class Extension(omni.ext.IExt):
                     prims.append(curr_prim)
         return prims
 
-    def prim_is_valid(self, prim, include_xform=False, visible_only=True):
+    def prim_is_valid(self, prim, include_xform=False, visible_only=True) -> bool:
         """Check if a prim is valid for physics API application.
 
         A prim is considered valid if it is a geometric primitive (Cylinder, Capsule, Cone,

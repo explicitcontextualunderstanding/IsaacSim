@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module provides functions for file-related actions within the Omniverse Kit Menu such as posting notifications, quitting the application, handling USD stages, and registering or deregistering actions."""
+"""File menu action handlers for Isaac Sim."""
 
 __all__ = ["register_actions", "deregister_actions"]
 
@@ -23,12 +23,17 @@ import omni.usd
 
 
 def post_notification(message: str, info: bool = False, duration: int = 3):
-    """Posts a notification with a given message.
+    """Post a notification with a message.
 
     Args:
-        message (str): The message to be displayed in the notification.
-        info (bool, optional): If True, the notification is of type INFO. Otherwise, it's of type WARNING. Defaults to False.
-        duration (int, optional): The duration in seconds for which the notification should be displayed. Defaults to 3.
+        message: The message to display.
+        info: Whether to post an info notification.
+        duration: Duration in seconds for the notification.
+
+    Example:
+        .. code-block:: python
+
+            post_notification("Scene saved.")
     """
     try:
         import omni.kit.notification_manager as nm
@@ -43,11 +48,15 @@ def post_notification(message: str, info: bool = False, duration: int = 3):
 
 
 def quit_kit(fast: bool = False):
-    """Initiates the application shutdown process.
+    """Request the application to quit.
 
     Args:
-        fast (bool): If True, sets the application to fast shutdown mode before quitting.
-                     Default is False, which means a regular shutdown.
+        fast: Whether to enable fast shutdown.
+
+    Example:
+        .. code-block:: python
+
+            quit_kit(fast=True)
     """
     if fast:
         carb.settings.get_settings().set("/app/fastShutdown", True)
@@ -55,14 +64,15 @@ def quit_kit(fast: bool = False):
 
 
 def open_stage_with_new_edit_layer():
-    """Opens the current USD stage with a new edit layer.
+    """Open the current USD stage with a new edit layer.
 
-    This function retrieves the current stage from the USD context, checks if it is valid,
-    and then opens it with a new edit layer using the 'open_with_new_edit_layer' method
-    from 'omni.kit.window.file'. If the stage is not valid, a notification is posted.
+    This posts a notification if no valid stage is available.
 
-    Raises:
-        Posts a warning notification if no valid stage is available."""
+    Example:
+        .. code-block:: python
+
+            open_stage_with_new_edit_layer()
+    """
     stage = omni.usd.get_context().get_stage()
     if not stage:
         post_notification("Cannot Re-open with New Edit Layer. No valid stage")
@@ -71,13 +81,16 @@ def open_stage_with_new_edit_layer():
     omni.kit.window.file.open_with_new_edit_layer(stage.GetRootLayer().identifier)
 
 
-def register_actions(extension_id):
-    """Registers file-related actions within an extension.
+def register_actions(extension_id: str):
+    """Register file-related actions within an extension.
 
     Args:
-        extension_id (str): The unique identifier for the extension that is registering the actions.
+        extension_id: The unique identifier for the extension that is registering the actions.
 
-    This method registers several actions related to file operations, including exiting the application, exiting quickly, and opening the current stage with a new edit layer. These actions are tagged as 'File Actions' and are made available in the application's UI under the 'File' menu.
+    Example:
+        .. code-block:: python
+
+            register_actions("isaacsim.gui.menu.file_menu")
     """
     action_registry = omni.kit.actions.core.get_action_registry()
     actions_tag = "File Actions"
@@ -109,11 +122,16 @@ def register_actions(extension_id):
     )
 
 
-def deregister_actions(extension_id):
-    """Removes all registered actions for a given extension from the action registry.
+def deregister_actions(extension_id: str):
+    """Remove all registered actions for an extension.
 
     Args:
-        extension_id (str): The unique identifier of the extension whose actions are to be deregistered.
+        extension_id: The unique identifier of the extension whose actions are to be deregistered.
+
+    Example:
+        .. code-block:: python
+
+            deregister_actions("isaacsim.gui.menu.file_menu")
     """
     action_registry = omni.kit.actions.core.get_action_registry()
     action_registry.deregister_all_actions_for_extension(extension_id)

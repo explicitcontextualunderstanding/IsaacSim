@@ -582,8 +582,24 @@ class Ros2CameraGraph(MenuHelperWindow):
 
 
 class Ros2RtxLidarGraph(MenuHelperWindow):
+    # Point cloud metadata options: (display_name, attribute_name)
+    # attribute_name corresponds to the input on ROS2RtxLidarPointCloudConfig node
+    METADATA_OPTIONS = [
+        ("Intensity", "Intensity"),
+        ("Timestamp", "Timestamp"),
+        ("Emitter ID", "EmitterId"),
+        ("Channel ID", "ChannelId"),
+        ("Material ID", "MaterialId"),
+        ("Tick ID", "TickId"),
+        ("Hit Normal", "HitNormal"),
+        ("Velocity", "Velocity"),
+        ("Object ID", "ObjectId"),
+        ("Echo ID", "EchoId"),
+        ("Tick State", "TickState"),
+    ]
+
     def __init__(self):
-        super().__init__("ROS2 RTX Lidar Graph", width=400, height=300)
+        super().__init__("ROS2 RTX Lidar Graph", width=400, height=650)
         self._og_path = "/Graph/ROS_LidarRTX"
         self._frame_id = "sim_lidar"
         self._node_namespace = ""
@@ -593,6 +609,9 @@ class Ros2RtxLidarGraph(MenuHelperWindow):
         self._laser_scan_topic = "/laser_scan"
         self._point_cloud_pub = False
         self._point_cloud_topic = "/point_cloud"
+
+        # Point cloud metadata options - dictionary keyed by attribute name
+        self._metadata_selected = {attr_name: False for _, attr_name in self.METADATA_OPTIONS}
 
         # build UI
         self._build_ui()
@@ -703,29 +722,83 @@ class Ros2RtxLidarGraph(MenuHelperWindow):
         if self._point_cloud_pub:
             point_cloud_node = get_next_free_path(self._og_path + "/PointCloudPublish", "")
             point_cloud_node_name = Path(point_cloud_node).name
-            og.Controller.edit(
-                graph_handle,
-                {
-                    keys.CREATE_NODES: [
-                        (point_cloud_node_name, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"),
-                    ],
-                    keys.SET_VALUES: [
-                        (point_cloud_node + ".inputs:topicName", self._point_cloud_topic),
-                        (point_cloud_node + ".inputs:type", "point_cloud"),
-                        (point_cloud_node + ".inputs:frameId", self._frame_id),
-                        (point_cloud_node + ".inputs:nodeNamespace", self._node_namespace),
-                    ],
-                    keys.CONNECT: [
-                        (render_node + ".outputs:execOut", point_cloud_node + ".inputs:execIn"),
-                        (render_node + ".outputs:renderProductPath", point_cloud_node + ".inputs:renderProductPath"),
-                    ],
-                },
-            )
+
+            # Check if any metadata is selected, create config node and connect it
+            selected_metadata = [attr for attr, selected in self._metadata_selected.items() if selected]
+
+            if selected_metadata:
+                pcl_config_node = get_next_free_path(self._og_path + "/PointCloudConfig", "")
+                pcl_config_node_name = Path(pcl_config_node).name
+
+                # Create the config node with the selected metadata
+                config_set_values = [(f"{pcl_config_node}.inputs:output{attr}", True) for attr in selected_metadata]
+
+                # Point cloud helper values
+                helper_set_values = [
+                    (point_cloud_node + ".inputs:topicName", self._point_cloud_topic),
+                    (point_cloud_node + ".inputs:type", "point_cloud"),
+                    (point_cloud_node + ".inputs:frameId", self._frame_id),
+                    (point_cloud_node + ".inputs:nodeNamespace", self._node_namespace),
+                ]
+
+                # Enable Object ID map publishing if ObjectId metadata is selected
+                if "ObjectId" in selected_metadata:
+                    helper_set_values.append((point_cloud_node + ".inputs:enableObjectIdMap", True))
+
+                og.Controller.edit(
+                    graph_handle,
+                    {
+                        keys.CREATE_NODES: [
+                            (pcl_config_node_name, "isaacsim.ros2.bridge.ROS2RtxLidarPointCloudConfig"),
+                            (point_cloud_node_name, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"),
+                        ],
+                        keys.SET_VALUES: config_set_values + helper_set_values,
+                        keys.CONNECT: [
+                            (render_node + ".outputs:execOut", point_cloud_node + ".inputs:execIn"),
+                            (
+                                render_node + ".outputs:renderProductPath",
+                                point_cloud_node + ".inputs:renderProductPath",
+                            ),
+                            (
+                                pcl_config_node + ".outputs:selectedMetadata",
+                                point_cloud_node + ".inputs:selectedMetadata",
+                            ),
+                        ],
+                    },
+                )
+            else:
+                og.Controller.edit(
+                    graph_handle,
+                    {
+                        keys.CREATE_NODES: [
+                            (point_cloud_node_name, "isaacsim.ros2.bridge.ROS2RtxLidarHelper"),
+                        ],
+                        keys.SET_VALUES: [
+                            (point_cloud_node + ".inputs:topicName", self._point_cloud_topic),
+                            (point_cloud_node + ".inputs:type", "point_cloud"),
+                            (point_cloud_node + ".inputs:frameId", self._frame_id),
+                            (point_cloud_node + ".inputs:nodeNamespace", self._node_namespace),
+                        ],
+                        keys.CONNECT: [
+                            (render_node + ".outputs:execOut", point_cloud_node + ".inputs:execIn"),
+                            (
+                                render_node + ".outputs:renderProductPath",
+                                point_cloud_node + ".inputs:renderProductPath",
+                            ),
+                        ],
+                    },
+                )
             if context_node:
                 og.Controller.connect(
                     og.Controller.attribute(context_node + ".outputs:context"),
                     og.Controller.attribute(point_cloud_node + ".inputs:context"),
                 )
+        elif any(self._metadata_selected.values()):
+            # Warn if metadata is selected but point cloud is not enabled
+            post_notification(
+                "Point cloud metadata options are selected but Point Cloud publishing is disabled. Metadata options will be ignored.",
+                status=NotificationStatus.WARNING,
+            )
 
     def _build_ui(self):
         og_path_def = ParamWidget.FieldDef(
@@ -767,6 +840,36 @@ class Ros2RtxLidarGraph(MenuHelperWindow):
                     SimpleCheckBox(self._point_cloud_pub, self._on_point_cloud_pub, model=cb)
                     ui.Spacer(width=ui.Percent(5))
                     self.point_cloud_topic_input = ParamWidget(field_def=point_cloud_topic_def)
+
+                # Point Cloud Metadata Section
+                ui.Spacer(height=5)
+                ui.Label("Point Cloud Metadata", word_wrap=True)
+                with ui.HStack():
+                    # Split metadata options into two columns
+                    mid_point = (len(self.METADATA_OPTIONS) + 1) // 2
+                    left_options = self.METADATA_OPTIONS[:mid_point]
+                    right_options = self.METADATA_OPTIONS[mid_point:]
+
+                    with ui.VStack(spacing=2):
+                        for display_name, attr_name in left_options:
+                            with ui.HStack():
+                                ui.Label(display_name, width=ui.Percent(30))
+                                cb = ui.SimpleBoolModel(default_value=self._metadata_selected[attr_name])
+                                SimpleCheckBox(
+                                    self._metadata_selected[attr_name],
+                                    lambda checked, attr=attr_name: self._on_metadata_changed(attr, checked),
+                                    model=cb,
+                                )
+                    with ui.VStack(spacing=2):
+                        for display_name, attr_name in right_options:
+                            with ui.HStack():
+                                ui.Label(display_name, width=ui.Percent(30))
+                                cb = ui.SimpleBoolModel(default_value=self._metadata_selected[attr_name])
+                                SimpleCheckBox(
+                                    self._metadata_selected[attr_name],
+                                    lambda checked, attr=attr_name: self._on_metadata_changed(attr, checked),
+                                    model=cb,
+                                )
 
                 with ui.HStack():
                     ui.Spacer(width=ui.Percent(10))
@@ -850,3 +953,7 @@ class Ros2RtxLidarGraph(MenuHelperWindow):
 
     def _on_point_cloud_pub(self, check_state):
         self._point_cloud_pub = check_state
+
+    def _on_metadata_changed(self, attr_name, check_state):
+        """Handle metadata checkbox state change."""
+        self._metadata_selected[attr_name] = check_state

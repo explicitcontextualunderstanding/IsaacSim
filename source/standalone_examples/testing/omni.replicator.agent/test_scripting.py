@@ -25,10 +25,10 @@ if __name__ == "__main__":
 
     app.update()
 
-    enable_extension("omni.kit.scripting")
+    enable_extension("omni.behavior.scripting.core")
 
     import omni.usd
-    from omni.kit.scripting import ApplyScriptingAPICommand
+    from omni.behavior.scripting.core import ApplyScriptingAPICommand
     from pxr import OmniScriptingSchema
 
     async def work():
@@ -44,3 +44,5 @@ if __name__ == "__main__":
         assert prim.HasAPI(OmniScriptingSchema.OmniScriptingAPI)
 
     asyncio.run(work())
+
+    app.close()

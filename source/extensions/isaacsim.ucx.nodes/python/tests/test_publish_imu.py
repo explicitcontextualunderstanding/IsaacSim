@@ -16,6 +16,7 @@
 import struct
 import time
 
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
 import omni
 import omni.graph.core as og
@@ -142,8 +143,7 @@ class TestUCXPublishImu(UCXTestCase):
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
 
-        for _ in range(3):
-            await omni.kit.app.get_app().next_update_async()
+        await app_utils.update_app_async(steps=3)
         self.create_ucx_client(self.port)
         timestamp, frame_id, orientation, angular_vel, linear_accel = await self.receive_imu_message()
 

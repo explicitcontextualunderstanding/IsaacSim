@@ -148,6 +148,18 @@
               },
               {
                 "dock_id": 9,
+                "dock_tab_bar_enabled": true,
+                "dock_tab_bar_visible": true,
+                "height": 574.0,
+                "position_x": 1726.0,
+                "position_y": 26.0,
+                "selected_in_dock": true,
+                "title": "Robot Hierarchy",
+                "visible": true,
+                "width": 643.0
+              },
+              {
+                "dock_id": 9,
                 "height": 574.0,
                 "position_x": 1726.0,
                 "position_y": 26.0,

@@ -48,7 +48,7 @@ BASIC_WRITER_ANNOTATORS_ARGS = (
     "colorize_instance_id_segmentation",
     "colorize_instance_segmentation",
     "pointcloud_include_unlabelled",
-    # "colorize_depth",  # NVBugs: 5402125 inf falues in empty stage
+    "colorize_depth",
 )
 
 SEMANTICS_DEPENDENT_ANNOTATORS = {
@@ -87,9 +87,11 @@ EXPECTED_FILES_PER_FRAME_BY_ANNOTATOR = {
     },
     "distance_to_camera": {
         "npy": 1,
+        "png": 1,
     },
     "distance_to_image_plane": {
         "npy": 1,
+        "png": 1,
     },
     "bounding_box_3d": {
         "npy": 1,
@@ -142,7 +144,9 @@ class TestRecorderBasic(omni.kit.test.AsyncTestCase):
     """
 
     async def setUp(self):
-        pass
+        await omni.kit.app.get_app().next_update_async()
+        omni.usd.get_context().new_stage()
+        await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
         await omni.kit.app.get_app().next_update_async()

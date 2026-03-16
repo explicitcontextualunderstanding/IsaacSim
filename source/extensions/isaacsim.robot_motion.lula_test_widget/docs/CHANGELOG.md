@@ -1,4 +1,8 @@
 # Changelog
+## [1.2.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
 ## [1.1.3] - 2025-12-05
 ### Changed
 - Migrate to Events 2.0.

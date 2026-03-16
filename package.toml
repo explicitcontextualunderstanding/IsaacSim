@@ -94,7 +94,7 @@ files_exclude = [
 
 [isaac-sim-standalone.linux-x86_64]
 files = [
-    ["../../docs/isaac_sim/latest/**", "docs/py/"] # linux ext api docs
+    ["../../docs/isaac-sim/latest/py/**", "docs/py/"] # linux ext api docs
 ]
 files_strip = [
     ["**/*.so"],
@@ -103,15 +103,34 @@ files_strip = [
 files_strip_exclude = [
     ["extscache/omni.kit.pip_archive*/pip_prebundle/**"],
     ["exts/omni.isaac.ml_archive/pip_prebundle/**"],
+    ["exts/isaacsim.pip.newton/pip_prebundle/**"],
     ["exts/omni.isaac.core_archive/pip_prebundle/**"],
     ["exts/omni.pip.cloud/pip_prebundle/**"],
     ["exts/omni.pip.compute/pip_prebundle/**"],
+    ["kit/exts/omni.kit.pip_archive/pip_prebundle/**"],
+    ["extscache/omni.kit.livestream.*/**"],
+]
+
+[isaac-sim-standalone.linux-aarch64]
+files_strip = [
+    ["**/*.so"],
+]
+
+files_strip_exclude = [
+    ["extscache/omni.kit.pip_archive*/pip_prebundle/**"],
+    ["exts/omni.isaac.ml_archive/pip_prebundle/**"],
+    ["exts/isaacsim.pip.newton/pip_prebundle/**"],
+    ["exts/omni.isaac.core_archive/pip_prebundle/**"],
+    ["exts/omni.pip.cloud/pip_prebundle/**"],
+    ["exts/omni.pip.compute/pip_prebundle/**"],
+    ["kit/exts/omni.kit.pip_archive/pip_prebundle/**"],
+    ["extscache/omni.kit.livestream.*/**"],
 ]
 
 [isaac-sim-standalone.windows-x86_64]
 files = [
     ["exts/omni.pip.compute/pip_prebundle/scipy/_lib"],
-    # ["../../docs/isaac_sim/latest/**", "docs/py/"] # windows ext api docs
+    # ["../../docs/isaac-sim/latest/py/**", "docs/py/"] # windows ext api docs
 ]
 files_exclude = [
     ["standalone_examples/cortex/**"], # Cortex not shipped on windows

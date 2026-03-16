@@ -105,7 +105,7 @@ class XformPrim(Prim):
         if positions is not None or translations is not None or orientations is not None or scales is not None:
             assert (
                 positions is None or translations is None
-            ), "Both 'positions' and 'translations' are specified. Specifie only one of them"
+            ), "Both 'positions' and 'translations' are specified. Specify only one of them"
             if self._non_root_articulation_link:
                 raise carb.log_warn(
                     (
@@ -1141,6 +1141,13 @@ class XformPrim(Prim):
             for i, prim in enumerate(fabric_prims):
                 prim.CreateAttribute(self._fabric_view_index_attr, usdrt.Sdf.ValueTypeNames.UInt, True)
                 prim.GetAttribute(self._fabric_view_index_attr).Set(i)
+                # create local/world matrix attributes if they don't exist
+                xformable = usdrt.Rt.Xformable(prim)
+                if not xformable.GetFabricHierarchyLocalMatrixAttr():
+                    xformable.CreateFabricHierarchyLocalMatrixAttr()
+                if not xformable.GetFabricHierarchyWorldMatrixAttr():
+                    xformable.CreateFabricHierarchyWorldMatrixAttr()
+
         if key not in self._fabric_data:
             # create fabric data
             if key == "world-matrix":

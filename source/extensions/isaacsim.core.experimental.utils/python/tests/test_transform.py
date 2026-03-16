@@ -380,3 +380,255 @@ class TestTransform(omni.kit.test.AsyncTestCase):
         self.assertTrue(
             np.allclose(quaternion_result_left.numpy(), quaternion_result_right.numpy(), atol=self.tolerance)
         )
+
+    async def test_quaternion_to_euler_angles(self):
+        """Test quaternion_to_euler_angles with single and batch inputs"""
+        # Test identity quaternion with different input types
+        quaternion_inputs = [
+            [1.0, 0.0, 0.0, 0.0],  # list
+            np.array([1.0, 0.0, 0.0, 0.0]),  # numpy
+            wp.array([1.0, 0.0, 0.0, 0.0]),  # warp
+        ]
+
+        for quaternion in quaternion_inputs:
+            result = transform_utils.quaternion_to_euler_angles(quaternion)
+
+            # Check that result is a warp array
+            self.assertIsInstance(result, wp.array)
+            self.assertEqual(result.shape, (3,))
+
+            # Identity quaternion should produce zero euler angles
+            result_np = result.numpy()
+            expected = np.array([0.0, 0.0, 0.0])
+            self.assertTrue(np.allclose(result_np, expected, atol=self.tolerance))
+
+        # Test batch of identity quaternions
+        identity_batch = np.array([[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+        result_batch = transform_utils.quaternion_to_euler_angles(identity_batch)
+
+        # Check that result is a warp array with correct shape
+        self.assertIsInstance(result_batch, wp.array)
+        self.assertEqual(result_batch.shape, (2, 3))
+
+        # Check all results are zero
+        result_batch_np = result_batch.numpy()
+        expected_batch = np.zeros((2, 3))
+        self.assertTrue(np.allclose(result_batch_np, expected_batch, atol=self.tolerance))
+
+    async def test_quaternion_to_euler_angles_degrees(self):
+        """Test quaternion_to_euler_angles with degrees output"""
+        # Identity quaternion should produce zero angles in both radians and degrees
+        identity = np.array([1.0, 0.0, 0.0, 0.0])
+
+        result_rad = transform_utils.quaternion_to_euler_angles(identity, degrees=False)
+        result_deg = transform_utils.quaternion_to_euler_angles(identity, degrees=True)
+
+        # Both should be zero
+        self.assertTrue(np.allclose(result_rad.numpy(), np.zeros(3), atol=self.tolerance))
+        self.assertTrue(np.allclose(result_deg.numpy(), np.zeros(3), atol=self.tolerance))
+
+        # Test 90 degree rotation around X axis
+        # Quaternion for 90 deg around X: [cos(45), sin(45), 0, 0] = [0.7071, 0.7071, 0, 0]
+        quat_90x = np.array([0.7071067811865476, 0.7071067811865476, 0.0, 0.0])
+
+        result_rad = transform_utils.quaternion_to_euler_angles(quat_90x, degrees=False, extrinsic=True)
+        result_deg = transform_utils.quaternion_to_euler_angles(quat_90x, degrees=True, extrinsic=True)
+
+        # For extrinsic convention, output order is [X, Y, Z], so X rotation is at index 0
+        # Should be approximately [pi/2, 0, 0] in radians and [90, 0, 0] in degrees
+        self.assertTrue(np.allclose(result_rad.numpy()[0], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_deg.numpy()[0], 90.0, atol=self.tolerance))
+
+    async def test_quaternion_to_euler_angles_intrinsic(self):
+        """Test quaternion_to_euler_angles with intrinsic convention"""
+        # Identity quaternion should produce zero angles
+        identity = np.array([1.0, 0.0, 0.0, 0.0])
+        result_identity = transform_utils.quaternion_to_euler_angles(identity, extrinsic=False)
+        self.assertTrue(np.allclose(result_identity.numpy(), np.zeros(3), atol=self.tolerance))
+
+        # 90 degree rotation around X should be [pi/2, 0, 0] in intrinsic [X, Y, Z] order
+        quat_90x = np.array([0.7071067811865476, 0.7071067811865476, 0.0, 0.0])
+        result_90x = transform_utils.quaternion_to_euler_angles(quat_90x, extrinsic=False)
+        result_90x_np = result_90x.numpy()
+        self.assertTrue(np.allclose(result_90x_np[0], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_90x_np[1:], np.zeros(2), atol=self.tolerance))
+
+        # 90 degree rotation around Y should be [0, pi/2, 0]
+        quat_90y = np.array([0.7071067811865476, 0.0, 0.7071067811865476, 0.0])
+        result_90y = transform_utils.quaternion_to_euler_angles(quat_90y, extrinsic=False)
+        result_90y_np = result_90y.numpy()
+        self.assertTrue(np.allclose(result_90y_np[1], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_90y_np[[0, 2]], np.zeros(2), atol=self.tolerance))
+
+    async def test_quaternion_to_euler_angles_intrinsic_degrees(self):
+        """Test quaternion_to_euler_angles with intrinsic convention in degrees"""
+        # 90 degree rotation around Z should be [0, 0, 90] in intrinsic [X, Y, Z] order
+        quat_90z = np.array([0.7071067811865476, 0.0, 0.0, 0.7071067811865476])
+        result_deg = transform_utils.quaternion_to_euler_angles(quat_90z, degrees=True, extrinsic=False)
+        result_deg_np = result_deg.numpy()
+        self.assertTrue(np.allclose(result_deg_np[2], 90.0, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_deg_np[:2], np.zeros(2), atol=self.tolerance))
+
+    async def test_quaternion_to_euler_angles_batch_intrinsic(self):
+        """Test quaternion_to_euler_angles batch path with intrinsic convention"""
+        sqrt_half = np.sqrt(0.5)
+        quaternion_batch = np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],  # Identity
+                [sqrt_half, sqrt_half, 0.0, 0.0],  # 90 deg around X
+                [sqrt_half, 0.0, sqrt_half, 0.0],  # 90 deg around Y
+                [sqrt_half, 0.0, 0.0, sqrt_half],  # 90 deg around Z
+            ],
+            dtype=np.float32,
+        )
+
+        result = transform_utils.quaternion_to_euler_angles(quaternion_batch, extrinsic=False)
+
+        # Check shape
+        self.assertEqual(result.shape, (4, 3))
+
+        result_np = result.numpy()
+
+        # For intrinsic convention, output order is [X, Y, Z]
+        # Check identity gives zero angles
+        self.assertTrue(np.allclose(result_np[0], np.zeros(3), atol=self.tolerance))
+
+        # Check 90 deg X rotation gives [pi/2, 0, 0]
+        self.assertTrue(np.allclose(result_np[1, 0], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_np[1, 1:], np.zeros(2), atol=self.tolerance))
+
+        # Check 90 deg Y rotation gives [0, pi/2, 0]
+        self.assertTrue(np.allclose(result_np[2, 1], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_np[2, [0, 2]], np.zeros(2), atol=self.tolerance))
+
+        # Check 90 deg Z rotation gives [0, 0, pi/2]
+        self.assertTrue(np.allclose(result_np[3, 2], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_np[3, :2], np.zeros(2), atol=self.tolerance))
+
+    async def test_euler_quaternion_roundtrip(self):
+        """Test round-trip conversion: euler -> quaternion -> euler"""
+        # Test various euler angles
+        test_angles = [
+            np.array([0.0, 0.0, 0.0]),  # Identity
+            np.array([0.5, 0.0, 0.0]),  # Small X rotation
+            np.array([0.0, 0.5, 0.0]),  # Small Y rotation
+            np.array([0.0, 0.0, 0.5]),  # Small Z rotation
+            np.array([0.3, 0.4, 0.5]),  # Combined rotation
+        ]
+
+        for euler_original in test_angles:
+            # Convert to quaternion
+            euler_extrinsic = euler_original[[2, 1, 0]]
+            quaternion = transform_utils.euler_angles_to_quaternion(euler_extrinsic, extrinsic=True)
+
+            # Convert back to euler
+            euler_back = transform_utils.quaternion_to_euler_angles(quaternion, extrinsic=True)
+
+            # Should be approximately equal
+            self.assertTrue(
+                np.allclose(euler_original, euler_back.numpy(), atol=1e-5),
+                f"Round-trip failed for {euler_original}: got {euler_back.numpy()}",
+            )
+
+    async def test_quaternion_euler_roundtrip(self):
+        """Test round-trip conversion: quaternion -> euler -> quaternion"""
+        # Test various quaternions (all unit quaternions)
+        test_quaternions = [
+            np.array([1.0, 0.0, 0.0, 0.0]),  # Identity
+            np.array([0.7071, 0.7071, 0.0, 0.0]),  # 90 deg around X
+            np.array([0.7071, 0.0, 0.7071, 0.0]),  # 90 deg around Y
+            np.array([0.7071, 0.0, 0.0, 0.7071]),  # 90 deg around Z
+            np.array([0.5, 0.5, 0.5, 0.5]),  # Combined rotation
+        ]
+
+        for quat_original in test_quaternions:
+            # Normalize to ensure it's a unit quaternion
+            quat_original = quat_original / np.linalg.norm(quat_original)
+
+            # Convert to euler
+            euler = transform_utils.quaternion_to_euler_angles(quat_original, extrinsic=True)
+
+            # Convert back to quaternion
+            euler_extrinsic = euler.numpy()[[2, 1, 0]]
+            quat_back = transform_utils.euler_angles_to_quaternion(euler_extrinsic, extrinsic=True)
+
+            # Quaternions q and -q represent the same rotation
+            quat_back_np = quat_back.numpy()
+            self.assertTrue(
+                np.allclose(quat_original, quat_back_np, atol=1e-5)
+                or np.allclose(quat_original, -quat_back_np, atol=1e-5),
+                f"Round-trip failed for {quat_original}: got {quat_back_np}",
+            )
+
+    async def test_euler_quaternion_roundtrip_intrinsic(self):
+        """Test round-trip conversion with intrinsic convention"""
+        test_angles = [
+            np.array([0.0, 0.0, 0.0]),
+            np.array([0.5, 0.0, 0.0]),
+            np.array([0.0, 0.5, 0.0]),
+            np.array([0.0, 0.0, 0.5]),
+            np.array([0.3, 0.4, 0.5]),
+        ]
+
+        for euler_original in test_angles:
+            quaternion = transform_utils.euler_angles_to_quaternion(euler_original, extrinsic=False)
+            euler_back = transform_utils.quaternion_to_euler_angles(quaternion, extrinsic=False)
+            self.assertTrue(
+                np.allclose(euler_original, euler_back.numpy(), atol=1e-5),
+                f"Intrinsic round-trip failed for {euler_original}: got {euler_back.numpy()}",
+            )
+
+    async def test_quaternion_euler_roundtrip_intrinsic(self):
+        """Test round-trip conversion: quaternion -> euler -> quaternion with intrinsic convention"""
+        test_quaternions = [
+            np.array([1.0, 0.0, 0.0, 0.0]),  # Identity
+            np.array([0.7071, 0.7071, 0.0, 0.0]),  # 90 deg around X
+            np.array([0.7071, 0.0, 0.7071, 0.0]),  # 90 deg around Y
+            np.array([0.7071, 0.0, 0.0, 0.7071]),  # 90 deg around Z
+            np.array([0.5, 0.5, 0.5, 0.5]),  # Combined rotation
+        ]
+
+        for quat_original in test_quaternions:
+            quat_original = quat_original / np.linalg.norm(quat_original)
+            euler = transform_utils.quaternion_to_euler_angles(quat_original, extrinsic=False)
+            quat_back = transform_utils.euler_angles_to_quaternion(euler, extrinsic=False)
+
+            quat_back_np = quat_back.numpy()
+            self.assertTrue(
+                np.allclose(quat_original, quat_back_np, atol=1e-5)
+                or np.allclose(quat_original, -quat_back_np, atol=1e-5),
+                f"Intrinsic round-trip failed for {quat_original}: got {quat_back_np}",
+            )
+
+    async def test_quaternion_to_euler_angles_batch(self):
+        """Test quaternion_to_euler_angles with batch of different rotations"""
+        quaternion_batch = np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],  # Identity
+                [0.7071, 0.7071, 0.0, 0.0],  # 90 deg around X
+                [0.7071, 0.0, 0.7071, 0.0],  # 90 deg around Y
+                [0.7071, 0.0, 0.0, 0.7071],  # 90 deg around Z
+            ],
+            dtype=np.float32,
+        )
+
+        result = transform_utils.quaternion_to_euler_angles(quaternion_batch, extrinsic=True)
+
+        # Check shape
+        self.assertEqual(result.shape, (4, 3))
+
+        result_np = result.numpy()
+
+        # For extrinsic convention, output order is [X, Y, Z]
+        # Check identity gives zero angles
+        self.assertTrue(np.allclose(result_np[0], np.zeros(3), atol=self.tolerance))
+
+        # Check 90 deg X rotation gives [pi/2, 0, 0]
+        self.assertTrue(np.allclose(result_np[1, 0], np.pi / 2, atol=self.tolerance))
+        self.assertTrue(np.allclose(result_np[1, 1:], np.zeros(2), atol=self.tolerance))
+
+        # Check 90 deg Y rotation gives [0, pi/2, 0]
+        self.assertTrue(np.allclose(result_np[2, 1], np.pi / 2, atol=self.tolerance))
+
+        # Check 90 deg Z rotation gives [0, 0, pi/2]
+        self.assertTrue(np.allclose(result_np[3, 2], np.pi / 2, atol=self.tolerance))

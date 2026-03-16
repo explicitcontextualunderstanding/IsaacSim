@@ -1,11 +1,11 @@
 [package]
-version = "2.1.3"
+version = "2.2.0"
 category = "Simulation"
 title = "Generate Extension"
 description = "UI tool for generating extension templates for different common workflows"
 keywords = []
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -25,3 +25,6 @@ name = "startup"
 dependencies = [
     "omni.isaac.ml_archive",
 ]
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

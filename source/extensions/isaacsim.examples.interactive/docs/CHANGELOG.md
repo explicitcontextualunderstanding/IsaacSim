@@ -1,4 +1,30 @@
 # Changelog
+
+## [4.15.1] - 2026-03-05
+### Changed
+- Experimental API alignment: app_utils for timeline control, SimulationEvent for physics callbacks.
+
+## [4.15.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [4.14.0] - 2026-03-02
+### Changed
+- Replaced timeline API with app utils for simulation control.
+- Converted Robo Party to Experimental APIs.
+
+## [4.13.0] - 2026-01-10
+### Changed
+- The Getting Started, Replay Follow Target, Robo Factory, and Surface Gripper examples now depend on the new Warp-based APIs
+
+## [4.12.1] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [4.12.0] - 2025-12-22
+### Changed
+- Simplified bin filling example to improve stability, replaced dropped parts with dropped cubes
+
 ## [4.11.2] - 2025-12-07
 ### Changed
 - Update description

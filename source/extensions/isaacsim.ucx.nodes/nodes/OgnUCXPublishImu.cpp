@@ -66,7 +66,7 @@ public:
 
 protected:
     /**
-     * @brief Generate message from node inputs.
+     * @brief Generate message from IMU data.
      * @details
      * Serializes IMU metadata and sensor data.
      * Message format:
@@ -78,29 +78,23 @@ protected:
      * - linear_acceleration (3 doubles, 24 bytes) - if enabled
      * - angular_velocity (3 doubles, 24 bytes) - if enabled
      *
-     * @param[in] db Database accessor for node inputs
+     * @param[in] data IMU data to serialize
      * @return std::vector<uint8_t> Serialized message data
      */
-    std::vector<uint8_t> generateMessage(OgnUCXPublishImuDatabase& db) override
+    std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::ImuData& data) override
     {
-        const double timestamp = db.inputs.timeStamp();
-        const std::string frameId = db.inputs.frameId();
-        const bool publishOrientation = db.inputs.publishOrientation();
-        const bool publishLinearAcceleration = db.inputs.publishLinearAcceleration();
-        const bool publishAngularVelocity = db.inputs.publishAngularVelocity();
-
         // Calculate message size
-        size_t messageSize = sizeof(double) + sizeof(uint32_t) + frameId.length() + sizeof(uint8_t);
+        size_t messageSize = sizeof(double) + sizeof(uint32_t) + data.frameId.length() + sizeof(uint8_t);
 
-        if (publishOrientation)
+        if (data.publishOrientation)
         {
             messageSize += sizeof(double) * 4; // Quaternion (x, y, z, w)
         }
-        if (publishLinearAcceleration)
+        if (data.publishLinearAcceleration)
         {
             messageSize += sizeof(double) * 3; // Vector3
         }
-        if (publishAngularVelocity)
+        if (data.publishAngularVelocity)
         {
             messageSize += sizeof(double) * 3; // Vector3
         }
@@ -109,29 +103,29 @@ protected:
         size_t offset = 0;
 
         // Write timestamp
-        std::memcpy(messageData.data() + offset, &timestamp, sizeof(double));
+        std::memcpy(messageData.data() + offset, &data.timestamp, sizeof(double));
         offset += sizeof(double);
 
         // Write frameId length
-        const uint32_t frameIdLength = static_cast<uint32_t>(frameId.length());
+        const uint32_t frameIdLength = static_cast<uint32_t>(data.frameId.length());
         std::memcpy(messageData.data() + offset, &frameIdLength, sizeof(uint32_t));
         offset += sizeof(uint32_t);
 
         // Write frameId string
-        std::memcpy(messageData.data() + offset, frameId.c_str(), frameId.length());
-        offset += frameId.length();
+        std::memcpy(messageData.data() + offset, data.frameId.c_str(), data.frameId.length());
+        offset += data.frameId.length();
 
         // Write publish flags
         uint8_t publishFlags = 0;
-        if (publishOrientation)
+        if (data.publishOrientation)
         {
             publishFlags |= 0x01;
         }
-        if (publishLinearAcceleration)
+        if (data.publishLinearAcceleration)
         {
             publishFlags |= 0x02;
         }
-        if (publishAngularVelocity)
+        if (data.publishAngularVelocity)
         {
             publishFlags |= 0x04;
         }
@@ -139,30 +133,23 @@ protected:
         offset += sizeof(uint8_t);
 
         // Write orientation if enabled
-        if (publishOrientation)
+        if (data.publishOrientation)
         {
-            auto& orientation = db.inputs.orientation();
-            double orientationData[4] = { orientation.GetImaginary()[0], orientation.GetImaginary()[1],
-                                          orientation.GetImaginary()[2], orientation.GetReal() };
-            std::memcpy(messageData.data() + offset, orientationData, sizeof(double) * 4);
+            std::memcpy(messageData.data() + offset, data.orientation.data(), sizeof(double) * 4);
             offset += sizeof(double) * 4;
         }
 
         // Write linear acceleration if enabled
-        if (publishLinearAcceleration)
+        if (data.publishLinearAcceleration)
         {
-            auto& linearAcceleration = db.inputs.linearAcceleration();
-            double accelData[3] = { linearAcceleration[0], linearAcceleration[1], linearAcceleration[2] };
-            std::memcpy(messageData.data() + offset, accelData, sizeof(double) * 3);
+            std::memcpy(messageData.data() + offset, data.linearAcceleration.data(), sizeof(double) * 3);
             offset += sizeof(double) * 3;
         }
 
         // Write angular velocity if enabled
-        if (publishAngularVelocity)
+        if (data.publishAngularVelocity)
         {
-            auto& angularVelocity = db.inputs.angularVelocity();
-            double velocityData[3] = { angularVelocity[0], angularVelocity[1], angularVelocity[2] };
-            std::memcpy(messageData.data() + offset, velocityData, sizeof(double) * 3);
+            std::memcpy(messageData.data() + offset, data.angularVelocity.data(), sizeof(double) * 3);
             offset += sizeof(double) * 3;
         }
 

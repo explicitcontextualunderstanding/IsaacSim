@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Global variables for the gain tuner extension configuration."""
+
+
 EXTENSION_TITLE = "Gain Tuner"
 
 EXTENSION_DESCRIPTION = "Auto Tuner for Articulation PD Gains"

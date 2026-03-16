@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module for setting up USD attributes and parameters for holonomic robots with mecanum wheels."""
+
+
 import carb
 import numpy as np
 import omni
@@ -24,13 +27,11 @@ from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
 # TODO: Why isn't this a "HolonomicRobot" that inherits robot?
 class HolonomicRobotUsdSetup:
-    """
-    Sets up the attributes on the prims of a holonomic robot. Specifically adds the `isaacmecanumwheel:radius` and `isaacmecanumwheel:angle` attributes to the wheel joints of the robot prim
+    """Sets up the attributes on the prims of a holonomic robot. Specifically adds the `isaacmecanumwheel:radius` and `isaacmecanumwheel:angle` attributes to the wheel joints of the robot prim
 
     Args:
-
-        prim_path (str): path of the robot articulation
-        com_prim_path (str): path of the xform representing the center of mass of the vehicle
+        robot_prim_path: Path of the robot articulation.
+        com_prim_path: Path of the xform representing the center of mass of the vehicle.
     """
 
     def __init__(self, robot_prim_path: str, com_prim_path: str):
@@ -39,8 +40,11 @@ class HolonomicRobotUsdSetup:
         self.from_usd(self._robot_prim_path, self._com_prim_path)
 
     def from_usd(self, robot_prim_path, com_prim_path):
-        """
-        if the USD contains all the necessary information, automatically extract them and compile
+        """If the USD contains all the necessary information, automatically extract them and compile.
+
+        Args:
+            robot_prim_path: Path of the robot articulation.
+            com_prim_path: Path of the xform representing the center of mass of the vehicle.
         """
         stage = get_current_stage()
         robot_prim = get_prim_at_path(robot_prim_path)
@@ -77,6 +81,11 @@ class HolonomicRobotUsdSetup:
         self._wheel_axis = axis[joint.GetAxisAttr().Get()]
 
     def get_holonomic_controller_params(self):
+        """Parameters needed for holonomic robot control.
+
+        Returns:
+            A tuple containing (wheel_radius, wheel_positions, wheel_orientations, mecanum_angles, wheel_axis, up_axis).
+        """
         return (
             self._wheel_radius,
             self._wheel_positions,
@@ -87,32 +96,72 @@ class HolonomicRobotUsdSetup:
         )
 
     def get_articulation_controller_params(self):
+        """Parameters needed for articulation control.
+
+        Returns:
+            List of wheel degree of freedom names.
+        """
         return self._wheel_dof_names
 
     @property
     def wheel_radius(self):
+        """Radius values for each wheel.
+
+        Returns:
+            List of wheel radius values.
+        """
         return self._wheel_radius
 
     @property
     def wheel_positions(self):
+        """Position coordinates for each wheel relative to the center of mass.
+
+        Returns:
+            Array of wheel positions with shape (num_wheels, 3).
+        """
         return self._wheel_positions
 
     @property
     def wheel_orientations(self):
+        """Orientation quaternions for each wheel relative to the center of mass.
+
+        Returns:
+            Array of wheel orientations with shape (num_wheels, 4).
+        """
         return self._wheel_orientations
 
     @property
     def mecanum_angles(self):
+        """Mecanum wheel angles for each wheel joint.
+
+        Returns:
+            List of mecanum wheel angles.
+        """
         return self._mecanum_angles
 
     @property
     def wheel_dof_names(self):
+        """Degree of freedom names for each wheel joint.
+
+        Returns:
+            List of wheel degree of freedom names.
+        """
         return self._wheel_dof_names
 
     @property
     def wheel_axis(self):
+        """Axis of rotation for the wheels.
+
+        Returns:
+            Array representing the wheel rotation axis.
+        """
         return self._wheel_axis
 
     @property
     def up_axis(self):
+        """Up axis of the USD stage.
+
+        Returns:
+            Array representing the stage up axis.
+        """
         return self._up_axis

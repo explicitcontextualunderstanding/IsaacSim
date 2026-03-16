@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI builder for managing Jupyter Code Editor extension menu integration."""
+
+
 import os
 import weakref
 import webbrowser
@@ -20,7 +24,15 @@ import carb
 
 
 class UIBuilder:
-    """Manage extension UI"""
+    """Manage extension UI
+
+    Args:
+        menu_name: Name of the menu where the item will be added.
+        menu_item_name: Name of the menu item to display.
+        host: Host address for the Jupyter server.
+        port: Port number for the Jupyter server.
+        get_url_callback: Callback function to retrieve the display URL.
+    """
 
     def __init__(self, menu_name, menu_item_name, host, port, get_url_callback):
         self._menu_items = []
@@ -38,7 +50,7 @@ class UIBuilder:
         self._app_folder = os.path.normpath(os.path.join(self._app_folder, os.pardir))
 
     def startup(self):
-        """Create menu item"""
+        """Create menu item."""
         try:
             from omni.kit.menu.utils import MenuItemDescription, add_menu_items
 
@@ -53,7 +65,7 @@ class UIBuilder:
             pass
 
     def shutdown(self):
-        """Clean up menu item"""
+        """Clean up menu item."""
         try:
             from omni.kit.menu.utils import remove_menu_items
 
@@ -63,7 +75,12 @@ class UIBuilder:
         self._menu_items = []
 
     def _launch(self, *args, **kwargs):
-        """Open Jupyter in the default browser"""
+        """Open Jupyter in the default browser.
+
+        Args:
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         url = f"http://127.0.0.1:{self._port}"
         carb.log_info(f"Open Jupyter in the default browser: {url}")
         webbrowser.open_new_tab(url)

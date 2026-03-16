@@ -124,6 +124,11 @@ def main(argv=None):
                 )
             out_file.write("\n")
 
+        if len(files_strip):
+            out_file.write(
+                "\n# Make files writable so strip can modify in place; ignore strip errors (non-ELF/wrong-arch)\n"
+            )
+            out_file.write("chmod -R u+w ${output_folder}\n")
         for file_strip_array in files_strip:
             for file_strip in file_strip_array:
                 out_file.write("\n#Stripping files\n")
@@ -133,8 +138,9 @@ def main(argv=None):
                     excludes = " ".join(
                         [f"-not -path '{file_strip_exclude[0]}' " for file_strip_exclude in files_strip_exclude]
                     )
+                # Use 'strip "$1" || true' so unrecognized format (e.g. wrong-arch .so) or permission errors don't fail the build
                 out_file.write(
-                    f"find ${{output_folder}} -type f -ipath '{file_strip}' {excludes} -exec strip {{}} \\;\n"
+                    f"find ${{output_folder}} -type f -ipath '{file_strip}' {excludes} -exec sh -c 'strip \"$1\" || true' _ {{}} \\;\n"
                 )
 
     os.chmod("./generated_rsync_package.sh", 0o755)

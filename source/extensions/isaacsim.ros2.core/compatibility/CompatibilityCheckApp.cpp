@@ -43,15 +43,15 @@ int main(int argc, const char* argv[])
 
     char* rosDistro = getenv("ROS_DISTRO");
 
-    if (!rosDistro || !isaacsim::ros2::core::isRos2DistroSupported(rosDistro))
+    if (!rosDistro)
     {
-        CARB_LOG_ERROR(
-            "Unsupported ROS_DISTRO '%s' - Supported distributions: Humble, Jazzy", rosDistro ? rosDistro : "null");
+        CARB_LOG_ERROR("ROS_DISTRO env var not specified");
         return EXIT_FAILURE;
     }
 
-    const auto distro = isaacsim::ros2::core::stringToRos2Distro(rosDistro).value();
-    if (distro == isaacsim::ros2::core::Ros2Distro::eHumble)
+    // Humble-specific extra libraries (safe check for unknown distros)
+    auto knownDistro = isaacsim::ros2::core::stringToRos2Distro(rosDistro);
+    if (knownDistro.has_value() && *knownDistro == isaacsim::ros2::core::Ros2Distro::eHumble)
     {
         libList.insert(libList.begin() + 5, std::string("ament_index_cpp"));
         libList.insert(libList.begin() + 8, std::string("rcl_logging_interface"));

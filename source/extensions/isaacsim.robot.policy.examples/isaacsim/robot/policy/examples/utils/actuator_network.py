@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides neural network implementations for Series Elastic Actuator (SEA) torque computation in robotic control."""
+
+
 import numpy as np
 from isaacsim.core.deprecation_manager import import_module
 from numpy import genfromtxt
@@ -32,8 +36,7 @@ class LstmSeaNetwork:
         self._default_joint_pos = None
 
     def get_hidden_state(self) -> torch.Tensor:
-        """
-        Get the current hidden state of the LSTM.
+        """Get the current hidden state of the LSTM.
 
         Returns:
             The hidden state tensor
@@ -44,8 +47,7 @@ class LstmSeaNetwork:
             return self._hidden_state[1].detach()
 
     def setup(self, path_or_buffer, default_joint_pos: torch.Tensor):
-        """
-        Set up the network by loading weights and configuring default positions.
+        """Set up the network by loading weights and configuring default positions.
 
         Args:
             path_or_buffer: Path to the JIT model file or file buffer
@@ -67,8 +69,7 @@ class LstmSeaNetwork:
 
     @torch.no_grad()
     def compute_torques(self, joint_pos, joint_vel, actions) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Compute joint torques based on current joint states and desired actions.
+        """Compute joint torques based on current joint states and desired actions.
 
         Args:
             joint_pos: Current joint positions
@@ -125,16 +126,33 @@ class SeaNetwork(torch.nn.Module):
     """
 
     def setup(self, weights_path: str, default_joint_pos: torch.Tensor):
+        """Initialize the SEA network by loading weights and setting default joint positions.
+
+        Args:
+            weights_path: Path to the CSV file containing network weights.
+            default_joint_pos: Default joint positions tensor.
+        """
         # load the weights into network
         self._load_weights(weights_path)
         # set the default joint position
         self._default_joint_pos = default_joint_pos
 
     def reset(self):
+        """Reset the joint position and velocity histories to zeros."""
         self._joint_pos_history.fill(0.0)
         self._joint_vel_history.fill(0.0)
 
     def compute_torques(self, joint_pos, joint_vel, actions) -> torch.Tensor:
+        """Compute joint torques based on current joint states and desired actions.
+
+        Args:
+            joint_pos: Current joint positions.
+            joint_vel: Current joint velocities.
+            actions: Desired joint actions.
+
+        Returns:
+            Computed torques scaled by the output scale factor.
+        """
         self._update_joint_history(joint_pos, joint_vel, actions)
         return self._compute_sea_torque()
 
@@ -143,6 +161,11 @@ class SeaNetwork(torch.nn.Module):
     """
 
     def _load_weights(self, weights_path: str):
+        """Load network weights from a CSV file and assign them to the MLP layers.
+
+        Args:
+            weights_path: Path to the CSV file containing network weights.
+        """
         # load the data as torch tensor
         data = torch.from_numpy(genfromtxt(weights_path, delimiter=",", dtype=np.float32))
         # manually defines the number of neurons in MLP
@@ -165,6 +188,13 @@ class SeaNetwork(torch.nn.Module):
         self.eval()
 
     def _update_joint_history(self, joint_pos, joint_vel, actions):
+        """Update the joint position and velocity history buffers with current values.
+
+        Args:
+            joint_pos: Current joint positions.
+            joint_vel: Current joint velocities.
+            actions: Desired joint actions.
+        """
         joint_pos = torch.as_tensor(joint_pos)
         joint_vel = torch.as_tensor(joint_vel)
         # compute error in position
@@ -175,7 +205,12 @@ class SeaNetwork(torch.nn.Module):
         self._joint_pos_history[:, self._history_size] = joint_pos_error
         self._joint_vel_history[:, self._history_size] = joint_vel
 
-    def _compute_sea_torque(self):
+    def _compute_sea_torque(self) -> torch.Tensor:
+        """Compute SEA torques using the MLP network and historical joint data.
+
+        Returns:
+            Computed torques from the SEA network.
+        """
         inp = torch.zeros((12, 6))
         for dof in range(12):
             inp[dof, 0] = self._sea_vel_scale * self._joint_vel_history[dof, self._history_size - self._delays[0]]

@@ -124,6 +124,6 @@ bool UsdNoticeListener::isEnabled()
     return this->m_enableFlag;
 }
 
-}
-}
-}
+} // namespace simulation_manager
+} // namespace core
+} // namespace isaacsim

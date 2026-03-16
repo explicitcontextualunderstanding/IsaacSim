@@ -15,4 +15,9 @@
 
 # there is no extension, so we just import bindings
 
+"""Surface gripper UI extension components for Isaac Sim robot control interface."""
+
+
 from .extension import Extension
+
+__all__ = []

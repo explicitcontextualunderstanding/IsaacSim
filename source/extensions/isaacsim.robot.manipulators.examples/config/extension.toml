@@ -1,11 +1,11 @@
 [package]
-version = "1.2.4"
+version = "1.6.1"
 category = "example"
 title = "Manipulators Examples"
 description = "Provides example implementations for Franka and Universal Robots manipulators demonstrating pick-and-place, follow target, and motion planning tasks."
 keywords = ["manipulators","grippers"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -28,10 +28,23 @@ writeTarget.kit = true
 name = "isaacsim.robot.manipulators.examples"
 
 [[python.module]]
-name = "isaacsim.robot.manipulators.examples.franka.interactive.pick_place"
+name = "isaacsim.robot.manipulators.examples.interactive.pick_place"
 
 [[python.module]]
-name = "isaacsim.robot.manipulators.examples.universal_robots.interactive.follow_target"
+name = "isaacsim.robot.manipulators.examples.interactive.follow_target"
+
+[[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+stdoutFailPatterns.exclude = [    
+    '*The NumPy module was reloaded*',
+]
 
 [[test]]
 dependencies = [
@@ -45,7 +58,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -61,6 +74,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -86,15 +100,5 @@ stdoutFailPatterns.exclude = [
     '*The NumPy module was reloaded*',
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
-
-stdoutFailPatterns.exclude = [    
-    '*The NumPy module was reloaded*',
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

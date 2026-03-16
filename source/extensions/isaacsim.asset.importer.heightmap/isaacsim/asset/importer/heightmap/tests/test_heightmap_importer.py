@@ -83,10 +83,10 @@ class TestHeightmapImporter(omni.kit.test.AsyncTestCase):
     @patch("isaacsim.asset.importer.heightmap.importer.UsdPhysics")
     @patch("isaacsim.asset.importer.heightmap.importer.stage_utils")
     @patch("isaacsim.asset.importer.heightmap.importer.UsdGeom")
-    @patch("isaacsim.asset.importer.heightmap.importer.add_ground_plane")
+    @patch("isaacsim.asset.importer.heightmap.importer.GroundPlane")
     @patch("isaacsim.asset.importer.heightmap.importer.UsdLux")
     def test_create_heightmap_success(
-        self, mock_usd_lux, mock_add_ground_plane, mock_usd_geom, mock_stage_utils, mock_usd_physics
+        self, mock_usd_lux, mock_ground_plane, mock_usd_geom, mock_stage_utils, mock_usd_physics
     ):
         """Test successful heightmap creation."""
         # Create a simple test image with some black pixels
@@ -153,6 +153,7 @@ class TestHeightmapImporter(omni.kit.test.AsyncTestCase):
 
         # Verify collision API was applied
         mock_usd_physics.CollisionAPI.Apply.assert_called_once()
+        mock_ground_plane.assert_called_once()
 
     def test_generate_occupied_positions_with_simple_image(self):
         """Test position generation with a simple test image."""

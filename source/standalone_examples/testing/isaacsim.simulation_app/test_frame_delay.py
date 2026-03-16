@@ -51,17 +51,18 @@ import pprint
 
 import carb
 import cv2
-import isaacsim.core.utils.numpy.rotations as rot_utils
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.transform as transform_utils
 import numpy as np
 import omni.replicator.core as rep
 import omni.usd
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.utils.prims import add_labels
-from isaacsim.core.utils.viewports import set_camera_view
+from isaacsim.core.experimental.objects import Cube, GroundPlane
+from isaacsim.core.experimental.prims import RigidPrim
+from isaacsim.core.experimental.utils.semantics import add_labels
+from isaacsim.core.rendering_manager import ViewportManager
 from isaacsim.sensors.camera import Camera
 from omni.replicator.core import AnnotatorRegistry, Writer
-from pxr import UsdGeom
+from pxr import UsdGeom, UsdPhysics
 
 # rep.settings.set_render_rtx_realtime(antialiasing="DLAA")
 
@@ -244,22 +245,21 @@ def generate_result(data: list[dict], banner: list[str] = []):
 simulation_app.update()
 
 # Setup scene
-set_camera_view(eye=CAMERA_POS, target=[0, 0, 0], camera_prim_path="/OmniverseKit_Persp")
+ViewportManager.set_camera_view("/OmniverseKit_Persp", eye=CAMERA_POS, target=[0, 0, 0])
 
-world = World(stage_units_in_meters=1.0)
-world.scene.add_default_ground_plane()
+GroundPlane("/World/ground_plane")
 
-cube = world.scene.add(
-    DynamicCuboid(
-        prim_path="/cube",
-        name="cube",
-        position=np.array([-3.0, 0.0, 0.1]),
-        scale=np.array([1.0, 2.0, 0.2]),
-        size=1.0,
-        color=np.array([255, 0, 0]),
-    )
+# Create cube with physics
+cube_prim = Cube(
+    "/cube",
+    positions=[[-3.0, 0.0, 0.1]],
+    scales=[[1.0, 2.0, 0.2]],
+    sizes=1.0,
 )
-add_labels(cube.prim, labels=["cube"], instance_name="class")
+UsdPhysics.RigidBodyAPI.Apply(cube_prim.prims[0])
+UsdPhysics.CollisionAPI.Apply(cube_prim.prims[0])
+rigid_cube = RigidPrim("/cube")
+add_labels(cube_prim.prims[0], labels=["cube"], taxonomy="class")
 
 camera = None
 writer = None
@@ -273,10 +273,10 @@ else:
         prim_path=CAMERA_PATH,
         position=np.array(CAMERA_POS),
         resolution=RESOLUTION,
-        orientation=rot_utils.euler_angles_to_quats(np.array([0, 90, 90]), degrees=True),
+        orientation=transform_utils.euler_angles_to_quaternion(np.array([[0, 90, 90]]), degrees=True).numpy().flatten(),
     )
 
-world.reset()
+app_utils.play()
 
 if USE_REPLICATOR_WRITER:
     rep.WriterRegistry.register(CustomWriter)
@@ -291,13 +291,13 @@ else:
 
 # Do some warmup steps
 for _ in range(5):
-    world.step(render=True)
+    simulation_app.update()
 
 data = []
 validation_errors = []
 
 # Get data and object info before running the collection steps
-position = cube.get_world_pose()[0]
+position = rigid_cube.get_world_poses()[0].numpy().flatten()
 rgb, semantic_segmentation, bbox = get_data(camera or writer)
 data.append(
     {"position": position, "rgb": rgb, "semantic_segmentation": semantic_segmentation, "bbox": bbox, "label": "before"}
@@ -314,15 +314,15 @@ if not is_valid:
 # Do some collection steps
 for i in range(COLLECTION_STEPS):
     # Move object
-    position = cube.get_world_pose()[0]
+    position = rigid_cube.get_world_poses()[0].numpy().flatten()
     position[0] += 0.5
-    cube.set_world_pose(position=position)
+    rigid_cube.set_world_poses(positions=[position])
 
     # Step the simulation
-    world.step(render=True)
+    simulation_app.update()
 
     # Get data and object info
-    position = cube.get_world_pose()[0]
+    position = rigid_cube.get_world_poses()[0].numpy().flatten()
     rgb, semantic_segmentation, bbox = get_data(camera or writer)
     data.append(
         {

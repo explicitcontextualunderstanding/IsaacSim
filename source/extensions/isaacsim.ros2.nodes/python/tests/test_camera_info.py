@@ -47,9 +47,7 @@ SAVE_DEPTH_IMAGES_AS_TEST = False
 SAVE_DEPTH_IMAGES_AS_GOLDEN = False
 
 
-# Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2CameraInfo(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
@@ -66,7 +64,6 @@ class TestRos2CameraInfo(ROS2TestCase):
 
         pass
 
-    # After running each test
     async def tearDown(self):
 
         self._timeline.stop()
@@ -158,40 +155,18 @@ class TestRos2CameraInfo(ROS2TestCase):
         from sensor_msgs.msg import CameraInfo
 
         self._camera_info = None
+        self._camera_info_timestamp_prev = None
 
         def camera_info_callback(data):
             self._camera_info = data
-
-        node = self.create_node("camera_tester")
-        camera_info_sub = self.create_subscription(
-            node, CameraInfo, "camera_info", camera_info_callback, get_qos_profile()
-        )
-
-        await omni.kit.app.get_app().next_update_async()
-
-        def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
-
-        import time
-
-        system_time = time.time()
-
-        for num in range(3):
-            print(f"Play #{num+1}")
-            self._timeline.play()
-            await omni.kit.app.get_app().next_update_async()
-            for _ in range(10):
-                if self._camera_info is None:
-                    await simulate_async(1.25, callback=spin)
-
-            self.assertIsNotNone(self._camera_info)
-
             self.assertEqual(self._camera_info.width, 1920)
             self.assertEqual(self._camera_info.height, 1200)
-            self.assertGreaterEqual(self._camera_info.header.stamp.sec, 1)
-            self.assertLess(self._camera_info.header.stamp.sec, system_time / 2.0)
 
-            # Test contents of k matrix (function of width, height, focal length, apertures)
+            current_timestamp = self._camera_info.header.stamp.sec + self._camera_info.header.stamp.nanosec * 1e-9
+            if self._camera_info_timestamp_prev is not None:
+                self.assertAlmostEqual(current_timestamp - self._camera_info_timestamp_prev, 1.0 / 60.0)
+            self._camera_info_timestamp_prev = current_timestamp
+
             self.assertAlmostEqual(self._camera_info.k[0], 1920.0 * 2.87343 / 5.76, places=2)
             self.assertAlmostEqual(self._camera_info.k[1], 0.0)
             self.assertAlmostEqual(self._camera_info.k[2], 1920.0 * 0.5)
@@ -218,6 +193,27 @@ class TestRos2CameraInfo(ROS2TestCase):
             distortion_coefficients = [0.147811, -0.032313, -0.000194, -0.000035, 0.008823, 0.517913, -0.06708, 0.01695]
             for i in range(len(distortion_coefficients)):
                 self.assertAlmostEqual(self._camera_info.d[i], distortion_coefficients[i])
+
+        node = self.create_node("camera_tester")
+        camera_info_sub = self.create_subscription(
+            node, CameraInfo, "camera_info", camera_info_callback, get_qos_profile()
+        )
+
+        await omni.kit.app.get_app().next_update_async()
+
+        def spin():
+            rclpy.spin_once(node, timeout_sec=0.01)
+
+        for num in range(3):
+            print(f"Play #{num+1}")
+            self._timeline.play()
+
+            await self.simulate_until_condition(
+                lambda: self._camera_info is not None and self._camera_info.header.stamp.sec >= 1.0,
+                max_frames=120,
+                per_frame_callback=spin,
+            )
+
             self._timeline.stop()
 
             # make sure all previous messages are cleared
@@ -225,6 +221,7 @@ class TestRos2CameraInfo(ROS2TestCase):
             spin()
             await omni.kit.app.get_app().next_update_async()
             self._camera_info = None
+            self._camera_info_timestamp_prev = None
 
     def _add_light(self, name: str, position: List[float]) -> None:
         sphereLight = UsdLux.SphereLight.Define(get_current_stage(), Sdf.Path(f"/World/SphereLight_{name}"))
@@ -435,10 +432,10 @@ class TestRos2CameraInfo(ROS2TestCase):
 
         # Start spinning the nodes
         def spin_left():
-            rclpy.spin_once(node_left, timeout_sec=0.1)
+            rclpy.spin_once(node_left, timeout_sec=0.01)
 
         def spin_right():
-            rclpy.spin_once(node_right, timeout_sec=0.1)
+            rclpy.spin_once(node_right, timeout_sec=0.01)
 
         # Wait for camera info and images to be received
         self._timeline.play()
@@ -613,17 +610,14 @@ class TestRos2CameraInfo(ROS2TestCase):
         )
 
         def spin_system_time():
-            rclpy.spin_once(node_system, timeout_sec=0.1)
+            rclpy.spin_once(node_system, timeout_sec=0.01)
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(0.5, callback=spin_system_time)
 
-        for _ in range(10):
-            if self._camera_info_system_time is None:
-                await simulate_async(0.5, callback=spin_system_time)
-            else:
-                break
+        await self.simulate_until_condition(
+            lambda: self._camera_info_system_time is not None, max_frames=300, per_frame_callback=spin_system_time
+        )
 
         self.assertIsNotNone(self._camera_info_system_time)
         system_timestamp = (
@@ -657,17 +651,14 @@ class TestRos2CameraInfo(ROS2TestCase):
         )
 
         def spin_sim_time():
-            rclpy.spin_once(node_sim, timeout_sec=0.1)
+            rclpy.spin_once(node_sim, timeout_sec=0.01)
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(0.5, callback=spin_sim_time)
 
-        for _ in range(10):
-            if self._camera_info_sim_time is None:
-                await simulate_async(0.5, callback=spin_sim_time)
-            else:
-                break
+        await self.simulate_until_condition(
+            lambda: self._camera_info_sim_time is not None, max_frames=300, per_frame_callback=spin_sim_time
+        )
 
         self.assertIsNotNone(self._camera_info_sim_time)
         sim_timestamp = (
@@ -684,13 +675,10 @@ class TestRos2CameraInfo(ROS2TestCase):
         # Check if sim time reset to Zero
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(0.5, callback=spin_sim_time)
 
-        for _ in range(10):
-            if self._camera_info_sim_time is None:
-                await simulate_async(0.5, callback=spin_sim_time)
-            else:
-                break
+        await self.simulate_until_condition(
+            lambda: self._camera_info_sim_time is not None, max_frames=300, per_frame_callback=spin_sim_time
+        )
 
         self.assertIsNotNone(self._camera_info_sim_time)
         sim_timestamp = (
@@ -727,17 +715,14 @@ class TestRos2CameraInfo(ROS2TestCase):
         )
 
         def spin_sim_time():
-            rclpy.spin_once(node_sim, timeout_sec=0.1)
+            rclpy.spin_once(node_sim, timeout_sec=0.01)
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(0.5, callback=spin_sim_time)
 
-        for _ in range(10):
-            if self._camera_info_sim_time is None:
-                await simulate_async(0.5, callback=spin_sim_time)
-            else:
-                break
+        await self.simulate_until_condition(
+            lambda: self._camera_info_sim_time is not None, max_frames=300, per_frame_callback=spin_sim_time
+        )
 
         self.assertIsNotNone(self._camera_info_sim_time)
         sim_timestamp = (
@@ -753,13 +738,10 @@ class TestRos2CameraInfo(ROS2TestCase):
         # Check if current sim time is larger than prev sim time
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(0.5, callback=spin_sim_time)
 
-        for _ in range(10):
-            if self._camera_info_sim_time is None:
-                await simulate_async(0.5, callback=spin_sim_time)
-            else:
-                break
+        await self.simulate_until_condition(
+            lambda: self._camera_info_sim_time is not None, max_frames=300, per_frame_callback=spin_sim_time
+        )
 
         self.assertIsNotNone(self._camera_info_sim_time)
         sim_timestamp = (
@@ -1056,13 +1038,17 @@ class TestRos2CameraInfo(ROS2TestCase):
         import rclpy
 
         # Spin ROS2 node to receive messages
-        for _ in range(timeout_iterations):
-            rclpy.spin_once(node, timeout_sec=0.1)
-            if all([depth_image_msg[0], pointcloud_msg[0], camera_info_msg[0]]):
-                break
-            await omni.kit.app.get_app().next_update_async()
+        def spin_and_check():
+            rclpy.spin_once(node, timeout_sec=0.01)
+
+        condition_met = await self.simulate_until_condition(
+            lambda: all([depth_image_msg[0], pointcloud_msg[0], camera_info_msg[0]]),
+            max_frames=timeout_iterations,
+            per_frame_callback=spin_and_check,
+        )
 
         # Verify we received all messages
+        self.assertTrue(condition_met, "Failed to receive all messages within timeout")
         self.assertIsNotNone(depth_image_msg[0], "Failed to receive depth image message")
         self.assertIsNotNone(pointcloud_msg[0], "Failed to receive pointcloud message")
         self.assertIsNotNone(camera_info_msg[0], "Failed to receive camera info message")

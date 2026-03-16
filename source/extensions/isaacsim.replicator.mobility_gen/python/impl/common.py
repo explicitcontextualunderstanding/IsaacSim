@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Common base classes and utilities for hierarchical state management and simulation data handling."""
+
+
 from collections import OrderedDict
 from enum import Enum
 from typing import Dict, List
@@ -22,6 +25,20 @@ __all__ = ["Buffer", "Module"]
 
 
 class Buffer:
+    """A tagged container for storing and managing data values within modules.
+
+    The Buffer class provides a flexible storage mechanism that associates arbitrary data with optional tags for
+    filtering and categorization. Buffers are commonly used within Module hierarchies to organize state data,
+    sensor outputs, or configuration parameters that can be selectively accessed based on their tags.
+
+    Tags enable powerful filtering capabilities, allowing buffers to be grouped by type (e.g., "rgb",
+    "segmentation", "depth") or other categorical attributes. This makes it easy to retrieve specific subsets
+    of data from complex module hierarchies.
+
+    Args:
+        value: The data value to store in the buffer.
+        tags: List of string tags for categorizing and filtering the buffer.
+    """
 
     def __init__(self, value=None, tags: List[str] | None = None):
         self.value = value
@@ -33,7 +50,7 @@ class Buffer:
         """Get the buffer value.
 
         Returns:
-            any: The value of the buffer.
+            The value of the buffer.
         """
         return self.value
 
@@ -41,31 +58,31 @@ class Buffer:
         """Set the buffer value.
 
         Args:
-            value (any): The value of the buffer.
+            value: The value of the buffer.
         """
         self.value = value
 
-    def includes_tags(self, tags: List[str]):
+    def includes_tags(self, tags: List[str]) -> bool:
         """Check if the buffer includes a set of tags.
 
         Args:
-            tags (List[str]): The set of tags the buffer must include.
+            tags: The set of tags the buffer must include.
 
         Returns:
-            bool: True if the buffer includes all tags.
+            True if the buffer includes all tags.
         """
         tags_a = set(self.tags)
         tags_b = set(tags)
         return tags_a.issuperset(tags_b)
 
-    def excludes_tags(self, tags: List[str]):
+    def excludes_tags(self, tags: List[str]) -> bool:
         """Check if the buffer excludes a set of tags.
 
         Args:
-            tags (List[str]): The set of tags the buffer must exclude.
+            tags: The set of tags the buffer must exclude.
 
         Returns:
-            bool: True if the buffer excludes all tags.
+            True if the buffer excludes all tags.
         """
         tags_a = set(self.tags)
         tags_b = set(tags)
@@ -73,12 +90,41 @@ class Buffer:
 
 
 class Module:
+    """Base class for hierarchical state management and simulation data handling.
+
+    This class provides a framework for organizing simulation components in a tree structure with automatic
+    state management capabilities. It supports nested modules and buffers, enabling efficient data collection,
+    serialization, and replay functionality for simulation scenarios.
+
+    The Module class manages two types of objects:
+    - Child modules: Other Module instances that form a hierarchical structure
+    - Buffers: Data containers (Buffer instances) that store simulation state with optional tagging
+
+    Key features include:
+    - Automatic discovery of nested modules and buffers
+    - State dictionary generation with tag-based filtering
+    - Specialized methods for different rendering types (RGB, segmentation, depth, normals)
+    - State loading and saving for simulation replay
+    - Non-strict state loading that handles missing keys gracefully
+
+    The class supports tag-based filtering of buffers, allowing selective state operations based on data
+    types such as "rgb", "segmentation", "depth", and "normals". This enables efficient handling of
+    large simulation datasets by separating common state from heavy image data.
+
+    Rendering control methods traverse the module hierarchy to enable specific types of rendering on
+    all applicable child modules. The actual rendering logic is typically implemented in specialized
+    subclasses like camera modules.
+
+    State management follows a two-phase approach: ``update_state()`` reads current simulation data into
+    buffers, while ``write_replay_data()`` applies buffered state back to the simulation for replay
+    scenarios.
+    """
 
     def children(self) -> Dict[str, "Module"]:
-        """Get the immediate children attached to the module.
+        """Immediate children attached to the module.
 
         Returns:
-            Dict[str, Module]: A dictionary of all immediate children.
+            A dictionary of all immediate children.
         """
         children = OrderedDict()
         for k, v in self.__dict__.items():
@@ -87,10 +133,10 @@ class Module:
         return children
 
     def buffers(self) -> Dict[str, Buffer]:
-        """Get the buffers directly attached to the module.
+        """Buffers directly attached to the module.
 
         Returns:
-            Dict[str, Buffer]: A dictionary of all directly attached buffers.
+            A dictionary of all directly attached buffers.
         """
         buffers = OrderedDict()
         for k, v in self.__dict__.items():
@@ -101,9 +147,11 @@ class Module:
     def named_modules(self, prefix: str = "") -> Dict[str, "Module"]:
         """Get a dictionary of all nested modules.
 
+        Args:
+            prefix: A prefix for module names.
+
         Returns:
-            Dict[str, Module]: The dictionary of all nested modules with
-                expanded names as keys.
+            The dictionary of all nested modules with expanded names as keys.
         """
 
         named_modules = OrderedDict()
@@ -125,9 +173,13 @@ class Module:
     ) -> Dict[str, "Buffer"]:
         """Get a dictionary of all nested buffers.
 
+        Args:
+            prefix: A prefix for buffer names.
+            include_tags: A set of tags that each buffer must include.
+            exclude_tags: A set of tags that each buffer must exclude.
+
         Returns:
-            Dict[str, Buffer]: The dictionary of all nested buffers with
-                expanded names as keys.
+            The dictionary of all nested buffers with expanded names as keys.
         """
 
         named_buffers = OrderedDict()
@@ -154,75 +206,75 @@ class Module:
         """Get the state dictionary of the module.
 
         Args:
-            prefix (str, optional): A prefix for state value names. Defaults to "".
-            include_tags (List[str] | None, optional): A set of tags that each buffer must include. Defaults to None.
-            exclude_tags (List[str] | None, optional): A set of tags that each buffer must exclude. Defaults to None.
+            prefix: A prefix for state value names.
+            include_tags: A set of tags that each buffer must include.
+            exclude_tags: A set of tags that each buffer must exclude.
 
         Returns:
-            Dict[str, any]: The module's state dictionary.
+            The module's state dictionary.
         """
         named_values = OrderedDict()
         for name, buffer in self.named_buffers(prefix, include_tags, exclude_tags).items():
             named_values[name] = buffer.value
         return named_values
 
-    def state_dict_common(self, prefix: str = ""):
+    def state_dict_common(self, prefix: str = "") -> Dict[str, any]:
         """Get the state dictionary, including only common types (no images).
 
         This method gets the state dictionary, but excludes any state values
-        that are tagged with "segmentation" or "rgb" or "depth.  This state is intended to be small
+        that are tagged with "segmentation" or "rgb" or "depth". This state is intended to be small
         (in number of bytes), so it can be efficiently saved with a single call
         to np.save(...).
 
         Args:
-            prefix (str, optional): A prefix for state value names. Defaults to "".
+            prefix: A prefix for state value names.
 
         Returns:
-            _type_: The module's state dictionary, including only common types.
+            The module's state dictionary, including only common types.
         """
         return self.state_dict(prefix, exclude_tags=["rgb", "segmentation", "depth", "normals"])
 
-    def state_dict_rgb(self, prefix: str = ""):
-        """Get the state dictionary, including only values tagged "rgb"
+    def state_dict_rgb(self, prefix: str = "") -> Dict[str, any]:
+        """Get the state dictionary, including only values tagged "rgb".
 
         Args:
-            prefix (str, optional): A prefix for state value names. Defaults to "".
+            prefix: A prefix for state value names.
 
         Returns:
-            _type_: The module's state dictionary, including only values tagged "rgb".
+            The module's state dictionary, including only values tagged "rgb".
         """
         return self.state_dict(prefix, include_tags=["rgb"])
 
-    def state_dict_segmentation(self, prefix: str = ""):
-        """Get the state dictionary, including only values tagged "segmentation"
+    def state_dict_segmentation(self, prefix: str = "") -> Dict[str, any]:
+        """Get the state dictionary, including only values tagged "segmentation".
 
         Args:
-            prefix (str, optional): A prefix for state value names. Defaults to "".
+            prefix: A prefix for state value names.
 
         Returns:
-            _type_: The module's state dictionary, including only values tagged "segmentation".
+            The module's state dictionary, including only values tagged "segmentation".
         """
         return self.state_dict(prefix, include_tags=["segmentation"])
 
-    def state_dict_depth(self, prefix: str = ""):
-        """Get the state dictionary, including only values tagged "depth"
+    def state_dict_depth(self, prefix: str = "") -> Dict[str, any]:
+        """Get the state dictionary, including only values tagged "depth".
 
         Args:
-            prefix (str, optional): A prefix for state value names. Defaults to "".
+            prefix: A prefix for state value names.
 
         Returns:
-            _type_: The module's state dictionary, including only values tagged "depth".
+            The module's state dictionary, including only values tagged "depth".
         """
         return self.state_dict(prefix, include_tags=["depth"])
 
-    def state_dict_normals(self, prefix: str = ""):
-        """Get the state dictionary, including only values tagged "normals"
+    def state_dict_normals(self, prefix: str = "") -> Dict[str, any]:
+        """Get the state dictionary, including only values tagged "normals".
 
         Args:
-            prefix (str, optional): A prefix for state value names. Defaults to "".
+            prefix: A prefix for state value names.
 
         Returns:
-            _type_: The module's state dictionary, including only values tagged "normals".
+            The module's state dictionary, including only values tagged "normals".
         """
         return self.state_dict(prefix, include_tags=["normals"])
 
@@ -284,18 +336,18 @@ class Module:
 
         Example usage:
 
-        ```python
-        reader = Reader(recording_path="...")
+        .. code-block:: python
 
-        # Read state from disk
-        state_dict = reader.read_state_dict_common(index=20)
+            reader = Reader(recording_path="...")
 
-        # Update module state buffers
-        scenario.load_state_dict(state_dict)
+            # Read state from disk
+            state_dict = reader.read_state_dict_common(index=20)
 
-        # Send module replay-related state to Isaac Sim
-        scenario.write_replay_data()
-        ```
+            # Update module state buffers
+            scenario.load_state_dict(state_dict)
+
+            # Send module replay-related state to Isaac Sim
+            scenario.write_replay_data()
 
         This method is overwritten by some classes to perform the logic
         of updating Isaac Sim.  For example, the Robot class uses this
@@ -335,6 +387,9 @@ class Module:
 
         This method only updates the state buffer values, and does not modify the
         simulation.  This is accomplished using other methods.
+
+        Args:
+            state_dict: The state dictionary containing buffer values to load.
         """
         for k, v in self.named_buffers().items():
             if k in state_dict:

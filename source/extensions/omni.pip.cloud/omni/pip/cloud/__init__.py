@@ -29,3 +29,6 @@ class Extension(omni.ext.IExt):
 
     def on_shutdown(self):
         pass
+
+
+__all__ = []

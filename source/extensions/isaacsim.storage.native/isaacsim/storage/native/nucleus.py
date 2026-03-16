@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Nucleus server utilities for Isaac Sim asset storage and management operations."""
+
+
 import asyncio
 import json
 import os
@@ -20,6 +23,7 @@ import os
 # python
 import typing
 from collections import namedtuple
+from typing import List, Tuple, Union
 from urllib.parse import urlparse
 
 # omniverse
@@ -32,6 +36,8 @@ from omni.client import CopyBehavior, Result
 
 DEFAULT_ASSET_ROOT_PATH_SETTING = "/persistent/isaac/asset_root/default"
 DEFAULT_ASSET_ROOT_TIMEOUT_SETTING = "/persistent/isaac/asset_root/timeout"
+DEFAULT_ASSET_ROOT_RETRY_ATTEMPTS_SETTING = "/persistent/isaac/asset_root/retry_attempts"
+DEFAULT_ASSET_ROOT_RETRY_BASE_DELAY_SETTING = "/persistent/isaac/asset_root/retry_base_delay"
 
 
 class Version(namedtuple("Version", "major minor patch")):
@@ -180,11 +186,10 @@ async def download_assets_async(
         dst: URL of Nucleus server to copy assets to.
         progress_callback: Callback function to keep track of progress of copy.
             The callback receives two arguments: current count and total count.
-        concurrency: Number of concurrent copy operations. Default value: 10.
-        copy_behaviour: Behavior if the destination exists. Default value: OVERWRITE.
+        concurrency: Number of concurrent copy operations.
+        copy_behaviour: Behavior if the destination exists.
         copy_after_delete: True if destination needs to be deleted before a copy.
-            Default value: True.
-        timeout: Timeout in seconds for each copy operation. Default value: 300 seconds.
+        timeout: Timeout in seconds for each copy operation.
 
     Returns:
         Result of the copy operation.
@@ -240,7 +245,7 @@ def check_server(server: str, path: str, timeout: float = 10.0) -> bool:
     Args:
         server: Name of Nucleus server.
         path: Path to search.
-        timeout: Timeout in seconds. Default value: 10 seconds.
+        timeout: Timeout in seconds.
 
     Returns:
         True if folder is found.
@@ -258,32 +263,64 @@ def check_server(server: str, path: str, timeout: float = 10.0) -> bool:
 
 
 async def check_server_async(server: str, path: str, timeout: float = 10.0) -> bool:
-    """Check a specific server for a path (asynchronous version).
+    """Check a specific server for a path.
+
+    This function retries transient failures using exponential backoff.
+    It retries when the stat operation times out or returns
+    ``omni.client.Result.ERROR_CONNECTION``. Retry behavior is controlled by:
+    ``/persistent/isaac/asset_root/retry_attempts`` and
+    ``/persistent/isaac/asset_root/retry_base_delay``.
 
     Args:
         server: Name of Nucleus server.
         path: Path to search.
-        timeout: Timeout in seconds. Default value: 10 seconds.
+        timeout: Per-attempt timeout in seconds.
 
     Returns:
-        True if folder is found.
+        True if folder is found, False otherwise.
     """
     carb.log_info("Checking path: {}{}".format(server, path))
 
-    try:
-        result, _ = await asyncio.wait_for(omni.client.stat_async("{}{}".format(server, path)), timeout)
-        if result == Result.OK:
-            carb.log_info("Success: {}{}".format(server, path))
-            return True
-        else:
-            carb.log_info("Failure: {}{} not accessible".format(server, path))
+    settings = carb.settings.get_settings()
+    retry_attempts = settings.get(DEFAULT_ASSET_ROOT_RETRY_ATTEMPTS_SETTING)
+    if not isinstance(retry_attempts, int) or retry_attempts < 1:
+        retry_attempts = 3
+    retry_base_delay = settings.get(DEFAULT_ASSET_ROOT_RETRY_BASE_DELAY_SETTING)
+    if not isinstance(retry_base_delay, (int, float)) or retry_base_delay <= 0:
+        retry_base_delay = 0.5
+
+    delay = float(retry_base_delay)
+    server_path = "{}{}".format(server, path)
+    for attempt in range(1, retry_attempts + 1):
+        try:
+            result, _ = await asyncio.wait_for(omni.client.stat_async(server_path), timeout)
+            if result == Result.OK:
+                carb.log_info("Success: {}".format(server_path))
+                return True
+            if result == Result.ERROR_CONNECTION and attempt < retry_attempts:
+                carb.log_warn(
+                    f"check_server_async() connection error on attempt {attempt}/{retry_attempts}, retrying in {delay:.2f}s"
+                )
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            carb.log_info("Failure: {} not accessible".format(server_path))
             return False
-    except asyncio.TimeoutError:
-        carb.log_warn(f"check_server_async() timeout {timeout}")
-        return False
-    except Exception as ex:
-        carb.log_warn(f"Exception: {type(ex).__name__}")
-        return False
+        except asyncio.TimeoutError:
+            if attempt < retry_attempts:
+                carb.log_warn(
+                    f"check_server_async() timeout {timeout} on attempt {attempt}/{retry_attempts}, retrying in {delay:.2f}s"
+                )
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            carb.log_warn(f"check_server_async() timeout {timeout}")
+            return False
+        except Exception as ex:
+            carb.log_warn(f"Exception: {type(ex).__name__}")
+            return False
+
+    return False
 
 
 def build_server_list() -> typing.List:
@@ -313,7 +350,7 @@ def find_nucleus_server(suffix: str) -> typing.Tuple[bool, str]:
         This function is deprecated. Use :func:`get_assets_root_path` instead.
 
     Args:
-        suffix: Path to folder to search for. Default value: /Isaac.
+        suffix: Path to folder to search for.
 
     Returns:
         Tuple of (found, url) where found is True if Nucleus server with suffix is found
@@ -565,7 +602,7 @@ def get_assets_root_path(*, skip_check: bool = False) -> str:
 
 
 async def get_assets_root_path_async(*, skip_check: bool = False) -> str:
-    """Tries to find the root path to the Isaac Sim assets on a Nucleus server (asynchronous version).
+    """Tries to find the root path to the Isaac Sim assets on a Nucleus server.
 
     Args:
         skip_check: If True, skip the checking step to verify that the resolved path exists.
@@ -741,11 +778,11 @@ async def list_folder(path: str) -> typing.Tuple[typing.List, typing.List]:
     Args:
         path: Path to root folder.
 
-    Raises:
-        Exception: When unable to find files under the path.
-
     Returns:
         Tuple containing list of file paths and list of sub-folder paths.
+
+    Raises:
+        Exception: When unable to find files under the path.
     """
     # omni.client is a singleton, import locally to allow to run with multiprocessing
     import omni.client

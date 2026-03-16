@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
-from typing import List
+"""Property widget for the Isaac Namespace attribute on prims."""
 
-import carb
+
 import omni
 import omni.ui as ui
 from omni.kit.property.usd.prim_selection_payload import PrimSelectionPayload
@@ -41,8 +40,15 @@ _ROBOT_SCHEMA_CLASSES = (
 )
 
 
-def Singleton(class_):
-    """A singleton decorator"""
+def _singleton(class_: type):  # noqa: N802
+    """Decorator that ensures only one instance of a class is created.
+
+    Args:
+        class_: The class to wrap as a singleton.
+
+    Returns:
+        A wrapper that always returns the same instance.
+    """
     instances = {}
 
     def getinstance(*args, **kwargs):
@@ -53,17 +59,31 @@ def Singleton(class_):
     return getinstance
 
 
-def _prim_has_robot_schema(prim):
+def _prim_has_robot_schema(prim) -> bool:
+    """Check if a prim has any Isaac Sim robot schema API applied.
+
+    Examines the prim to determine if it has ROBOT_API, LINK_API, or JOINT_API schemas from Isaac Sim's robot schema.
+
+    Args:
+        prim: The USD prim to check for robot schema APIs.
+
+    Returns:
+        True if the prim has any robot schema API, False otherwise.
+    """
     if not prim:
         return False
-    for schema in _ROBOT_SCHEMA_CLASSES:
-        if prim.HasAPI(schema.value):
-            return True
-    return False
+    return any(prim.HasAPI(schema.value) for schema in _ROBOT_SCHEMA_CLASSES)
 
 
-@Singleton
+@_singleton
 class NamespaceWidget(UsdPropertiesWidget):
+    """Property widget for the Isaac Namespace attribute.
+
+    Args:
+        title: Display title for the widget.
+        collapsed: Whether the widget starts collapsed.
+    """
+
     def __init__(self, title: str, collapsed: bool = False):
         super().__init__(title, collapsed)
         from omni.kit.property.usd import PrimPathWidget
@@ -77,13 +97,22 @@ class NamespaceWidget(UsdPropertiesWidget):
         self._old_payload = None
 
     def destroy(self):
+        """Remove button menu entries and clean up resources."""
         from omni.kit.property.usd import PrimPathWidget
 
         for menu in self._add_button_menus:
             PrimPathWidget.remove_button_menu_entry(menu)
         self._add_button_menus = []
 
-    def _button_show(self, objects: dict):
+    def _button_show(self, objects: dict) -> bool:
+        """Determines whether the namespace button should be shown in the property panel.
+
+        Args:
+            objects: Dictionary containing prim_list and stage information.
+
+        Returns:
+            True if at least one prim can have a namespace attribute added.
+        """
         if "prim_list" not in objects or "stage" not in objects:
             return False
         stage = objects["stage"]
@@ -106,6 +135,11 @@ class NamespaceWidget(UsdPropertiesWidget):
         return False
 
     def _button_onclick(self, payload: PrimSelectionPayload):
+        """Handles the click event for the namespace button by creating namespace attributes on selected prims.
+
+        Args:
+            payload: Selection payload containing prim paths to process.
+        """
         stage = self._payload.get_stage()
         for path in payload:
             if path:
@@ -119,7 +153,7 @@ class NamespaceWidget(UsdPropertiesWidget):
         self._request_refresh()
 
     def _request_refresh(self):
-        """Refreshes the entire property window"""
+        """Refresh the entire property window."""
         selection = omni.usd.get_context().get_selection()
         selected_paths = selection.get_selected_prim_paths()
         window = omni.kit.window.property.get_window()._window  # noqa: PLW0212
@@ -130,6 +164,12 @@ class NamespaceWidget(UsdPropertiesWidget):
         window.frame.rebuild()
 
     def _on_usd_changed(self, notice, stage):
+        """Handles USD stage change notifications and refreshes the widget when needed.
+
+        Args:
+            notice: USD change notice containing information about what changed.
+            stage: The USD stage that was modified.
+        """
         targets = notice.GetChangedInfoOnlyPaths()
         if self._old_payload != self.on_new_payload(
             self._payload
@@ -138,7 +178,15 @@ class NamespaceWidget(UsdPropertiesWidget):
         else:
             super()._on_usd_changed(notice, stage)
 
-    def _get_prim(self, prim_path):
+    def _get_prim(self, prim_path) -> Usd.Prim | None:
+        """Retrieves a prim that is eligible for namespace attribute management.
+
+        Args:
+            prim_path: Path to the prim to retrieve.
+
+        Returns:
+            The prim if it exists and can have a namespace attribute, None otherwise.
+        """
         if prim_path:
             stage = self._payload.get_stage()
             if stage:
@@ -151,11 +199,15 @@ class NamespaceWidget(UsdPropertiesWidget):
                     return prim
         return None
 
-    def on_new_payload(self, payload):
-        """
-        See PropertyWidget.on_new_payload
-        """
+    def on_new_payload(self, payload: list):
+        """See ``PropertyWidget.on_new_payload``.
 
+        Args:
+            payload: The new prim selection payload.
+
+        Returns:
+            The prim if found, or ``False`` if the widget should not be shown.
+        """
         if not super().on_new_payload(payload):
             return False
 
@@ -170,13 +222,22 @@ class NamespaceWidget(UsdPropertiesWidget):
         return self._prim
 
     def on_remove_attr(self):
+        """Remove the Namespace attribute from the selected prim."""
         stage = self._payload.get_stage()
         if stage:
             prim = self._get_prim(self._payload.get_paths()[0])
             if prim and prim.HasAttribute(robot_schema.Attributes.NAMESPACE.name):
                 prim.RemoveProperty(robot_schema.Attributes.NAMESPACE.name)
 
-    def _filter_props_to_build(self, props):
+    def _filter_props_to_build(self, props) -> list[Usd.Attribute]:
+        """Filters properties to only include namespace attributes and sets their display properties.
+
+        Args:
+            props: List of properties to filter.
+
+        Returns:
+            Filtered list containing only namespace attributes with updated display names.
+        """
         props = [
             prop
             for prop in props
@@ -187,12 +248,19 @@ class NamespaceWidget(UsdPropertiesWidget):
             props[0].SetDocumentation("Namespace of the prim in Isaac Sim")
         return props
 
-    def build_items(self):
+    def build_items(self) -> None:
+        """Build property items only when the frame is expanded and a prim is selected."""
         if self._collapsable_frame and not self._collapsable_frame.collapsed and self._prim:
             super().build_items()
 
-    def _build_frame_header(self, collapsed, text: str, id: str = None):
-        """Custom header for CollapsableFrame"""
+    def _build_frame_header(self, collapsed: bool, text: str, id: str | None = None):
+        """Build a custom header for the CollapsableFrame with a remove button.
+
+        Args:
+            collapsed: Whether the frame is currently collapsed.
+            text: The header label text.
+            id: Optional identifier for the header.
+        """
         if id is None:
             id = text
 

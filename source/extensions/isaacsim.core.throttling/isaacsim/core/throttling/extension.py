@@ -44,7 +44,6 @@ class Extension(omni.ext.IExt):
         # Enable the developer throttling settings when extension starts
         carb.settings.get_settings().set("/app/show_developer_preference_section", True)
 
-        timeline = omni.timeline.get_timeline_interface()
         self.timeline_event_sub_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
             event_name=omni.timeline.GLOBAL_EVENT_PLAY,
             on_event=self._on_play,

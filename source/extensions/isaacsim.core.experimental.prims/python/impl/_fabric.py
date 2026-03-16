@@ -16,9 +16,7 @@ import usdrt
 import warp as wp
 
 
-def update_fabric_selection(
-    *, stage: usdrt.Usd.Stage, data: dict, device: wp.context.Device, attr: str, count: int
-) -> bool:
+def update_fabric_selection(*, stage: usdrt.Usd.Stage, data: dict, device: wp.Device, attr: str, count: int) -> bool:
     # update selection
     selection = data["selection"]
     if selection is None or device.alias.startswith("cuda"):

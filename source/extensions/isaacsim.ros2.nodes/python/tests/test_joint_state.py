@@ -35,17 +35,11 @@ from .common import ROS2TestCase, get_qos_profile, set_joint_drive_parameters
 
 
 class TestRos2JointStatePublisher(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
-        await omni.usd.get_context().new_stage_async()
-
-        await omni.kit.app.get_app().next_update_async()
-
         ## load asset and setup ROS bridge
         # open simple_articulation asset (with one drivable revolute and one drivable prismatic joint)
-        await omni.kit.app.get_app().next_update_async()
         self.usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
         (result, error) = await open_stage_async(self.usd_path)
         await omni.kit.app.get_app().next_update_async()
@@ -78,10 +72,6 @@ class TestRos2JointStatePublisher(ROS2TestCase):
 
         pass
 
-    # After running each test
-    async def tearDown(self):
-        await super().tearDown()
-
     async def test_joint_state_position_publisher(self):
         import rclpy
         from sensor_msgs.msg import JointState
@@ -98,7 +88,7 @@ class TestRos2JointStatePublisher(ROS2TestCase):
         js_sub = self.create_subscription(node, JointState, "joint_states", js_callback, get_qos_profile())
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         default_position = [-80 * PI / 180.0, 0.4, 30 * PI / 180.0]
 
@@ -135,7 +125,7 @@ class TestRos2JointStatePublisher(ROS2TestCase):
         js_sub = self.create_subscription(node, JointState, "joint_states", js_callback, get_qos_profile())
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         joint_paths = [
             "/Articulation/Arm/CenterRevoluteJoint",
@@ -176,17 +166,132 @@ class TestRos2JointStatePublisher(ROS2TestCase):
         node.destroy_node()
 
 
-class TestRos2JointStateSubscriber(ROS2TestCase):
-    # Before running each test
+class TestRos2JointStatePublisherFromSensor(ROS2TestCase):
+    """Test ROS2 Publish Joint State using the new path: Isaac Read Joint State outputs connected (no targetPrim)."""
+
     async def setUp(self):
         await super().setUp()
-        await omni.usd.get_context().new_stage_async()
-
+        self.usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
+        (result, error) = await open_stage_async(self.usd_path)
         await omni.kit.app.get_app().next_update_async()
+        self.assertTrue(result)
+        self._stage = omni.usd.get_context().get_stage()
+        try:
+            og.Controller.edit(
+                {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
+                {
+                    og.Controller.Keys.CREATE_NODES: [
+                        ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                        ("ReadJointState", "isaacsim.sensors.physics.IsaacReadJointState"),
+                        ("PublishJointState", "isaacsim.ros2.bridge.ROS2PublishJointState"),
+                        ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+                    ],
+                    og.Controller.Keys.SET_VALUES: [
+                        ("ReadJointState.inputs:prim", [usdrt.Sdf.Path("/Articulation")]),
+                    ],
+                    og.Controller.Keys.CONNECT: [
+                        ("OnPlaybackTick.outputs:tick", "ReadJointState.inputs:execIn"),
+                        ("ReadJointState.outputs:execOut", "PublishJointState.inputs:execIn"),
+                        ("ReadJointState.outputs:jointNames", "PublishJointState.inputs:jointNames"),
+                        ("ReadJointState.outputs:jointPositions", "PublishJointState.inputs:jointPositions"),
+                        ("ReadJointState.outputs:jointVelocities", "PublishJointState.inputs:jointVelocities"),
+                        ("ReadJointState.outputs:jointEfforts", "PublishJointState.inputs:jointEfforts"),
+                        ("ReadJointState.outputs:jointDofTypes", "PublishJointState.inputs:jointDofTypes"),
+                        ("ReadJointState.outputs:stageMetersPerUnit", "PublishJointState.inputs:stageMetersPerUnit"),
+                        ("ReadJointState.outputs:sensorTime", "PublishJointState.inputs:sensorTime"),
+                        ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
+                    ],
+                },
+            )
+        except Exception as e:
+            print(e)
+
+    async def test_joint_state_position_publisher_from_sensor(self):
+        """Publish joint state from Isaac Read Joint State outputs; verify positions on joint_states topic."""
+        import rclpy
+        from sensor_msgs.msg import JointState
+
+        self.js_ros = JointState()
+
+        def js_callback(data: JointState):
+            self.js_ros.position = data.position
+            self.js_ros.velocity = data.velocity
+            self.js_ros.effort = data.effort
+
+        node = self.create_node("isaac_sim_test_joint_state_pub_sensor")
+        js_sub = self.create_subscription(node, JointState, "joint_states", js_callback, get_qos_profile())
+
+        def spin():
+            rclpy.spin_once(node, timeout_sec=0.01)
+
+        default_position = [-80 * PI / 180.0, 0.4, 30 * PI / 180.0]
+
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await simulate_async(2, 60, spin)
+        received_position = self.js_ros.position
+
+        self.assertAlmostEqual(received_position[0], default_position[0], delta=1e-3)
+        self.assertAlmostEqual(received_position[1], default_position[1], delta=1e-3)
+        self.assertAlmostEqual(received_position[2], default_position[2], delta=1e-3)
+
+        self._timeline.stop()
+        spin()
+        node.destroy_subscription(js_sub)
+        node.destroy_node()
+
+    async def test_joint_state_velocity_publisher_from_sensor(self):
+        """Publish joint state from Isaac Read Joint State; verify velocities on joint_states topic."""
+        import rclpy
+        from sensor_msgs.msg import JointState
+
+        self.js_ros = JointState()
+
+        def js_callback(data: JointState):
+            self.js_ros.velocity = data.velocity
+
+        node = self.create_node("isaac_sim_test_joint_state_pub_sensor_vel")
+        js_sub = self.create_subscription(node, JointState, "joint_states", js_callback, get_qos_profile())
+
+        def spin():
+            rclpy.spin_once(node, timeout_sec=0.01)
+
+        joint_paths = [
+            "/Articulation/Arm/CenterRevoluteJoint",
+            "/Articulation/Slider/PrismaticJoint",
+            "/Articulation/DistalPivot/DistalRevoluteJoint",
+        ]
+        joint_types = ["angular", "linear", "angular"]
+        test_velocities = [5, 0.1, -2.5]
+        joint_stiffness = 0
+        joint_damping = 1e4
+        num_joints = 3
+        for i in range(num_joints):
+            set_joint_drive_parameters(
+                joint_paths[i], joint_types[i], "velocity", test_velocities[i], joint_stiffness, joint_damping
+            )
+
+        self._timeline.play()
+        await simulate_async(2, 60, spin)
+        received_velocity = self.js_ros.velocity
+
+        comp_velocity = [5 * PI / 180.0, 0.1, -2.5 * PI / 180.0]
+        self.assertAlmostEqual(received_velocity[0], comp_velocity[0], delta=1e-3)
+        self.assertAlmostEqual(received_velocity[1], comp_velocity[1], delta=1e-3)
+        self.assertAlmostEqual(received_velocity[2], comp_velocity[2], delta=1e-3)
+
+        self._timeline.stop()
+        spin()
+        node.destroy_subscription(js_sub)
+        node.destroy_node()
+
+
+class TestRos2JointStateSubscriber(ROS2TestCase):
+    async def setUp(self):
+        await super().setUp()
 
         ## load asset and setup ROS bridge
         # open simple_articulation asset (with one drivable revolute and one drivable prismatic joint)
-        await omni.kit.app.get_app().next_update_async()
         self.usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/articulation_3_joints.usd"
         (result, error) = await open_stage_async(self.usd_path)
         await omni.kit.app.get_app().next_update_async()
@@ -228,10 +333,6 @@ class TestRos2JointStateSubscriber(ROS2TestCase):
             print(e)
 
         pass
-
-    # After running each test
-    async def tearDown(self):
-        await super().tearDown()
 
     async def test_joint_state_subscriber_node(self):
         """

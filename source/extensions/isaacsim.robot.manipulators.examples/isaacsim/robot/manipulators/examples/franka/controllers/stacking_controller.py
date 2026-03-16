@@ -38,7 +38,7 @@ class StackingController(manipulators_controllers.StackingController):
         robot_articulation: SingleArticulation,
         picking_order_cube_names: List[str],
         robot_observation_name: str,
-    ) -> None:
+    ):
         manipulators_controllers.StackingController.__init__(
             self,
             name=name,

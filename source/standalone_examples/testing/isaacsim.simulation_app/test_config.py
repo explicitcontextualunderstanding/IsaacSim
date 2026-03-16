@@ -25,9 +25,8 @@ simulation_app = SimulationApp(
 )
 
 import carb
-import isaacsim.core.utils.stage as stage_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.app
-from isaacsim.core.api import World
 
 
 def test_createstage_config(kit):

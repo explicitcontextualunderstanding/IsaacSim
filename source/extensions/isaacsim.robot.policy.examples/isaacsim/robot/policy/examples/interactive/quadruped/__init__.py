@@ -15,5 +15,10 @@
 
 # NOTE: Import here your extension examples to be propagated to ISAAC SIM Extensions startup
 
+"""Interactive quadruped robot policy examples for Isaac Sim."""
+
+
 from .quadruped_example import QuadrupedExample
 from .quadruped_example_extension import QuadrupedExampleExtension
+
+__all__ = ["QuadrupedExample"]

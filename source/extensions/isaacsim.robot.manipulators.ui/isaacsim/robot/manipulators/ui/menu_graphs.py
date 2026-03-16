@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI windows for creating robotic control graphs in Isaac Sim through OmniGraph integration."""
+
+
 import os
 
 import omni.graph.core as og
@@ -33,6 +37,20 @@ OG_DOCS_LINK = "https://docs.isaacsim.omniverse.nvidia.com/latest/omnigraph/omni
 
 
 class ArticulationPositionWindow(MenuHelperWindow):
+    """Window for creating and configuring articulation position control graphs in Isaac Sim.
+
+    This window provides a user interface to set up position control for robotic articulations by automatically
+    generating OmniGraph networks. The generated graph includes joint command arrays, joint name arrays, and an
+    IsaacArticulationController node that enables position-based control of robot joints.
+
+    The window allows users to specify a robot prim, configure graph settings, and choose whether to add the
+    controller to an existing graph or create a new one. Upon creation, the graph enables real-time joint position
+    control through the Property Manager interface during simulation.
+
+    Key features include automatic joint discovery from USD physics prims, support for both revolute and prismatic
+    joints, and proper unit conversion between USD degrees and PhysX radians for revolute joints.
+    """
+
     def __init__(self):
         super().__init__("Articulation Position Controller", width=400, height=500)
 
@@ -49,6 +67,11 @@ class ArticulationPositionWindow(MenuHelperWindow):
         self._build_ui()
 
     def _build_ui(self):
+        """Builds the user interface for the articulation position controller window.
+
+        Creates the UI components including graph path input, robot prim selector, instruction text,
+        and action buttons for creating the articulation controller graph.
+        """
         self._og_path = get_next_free_path(self._og_path, "")
         og_path_def = ParamWidget.FieldDef(
             name="og_path",
@@ -132,6 +155,12 @@ class ArticulationPositionWindow(MenuHelperWindow):
         return
 
     def make_graph(self):
+        """Creates the Omniverse graph for articulation position control.
+
+        Stops the timeline, creates or uses an existing graph, and adds nodes for joint command arrays,
+        articulation controller, and joint names. Connects the nodes and sets default position values
+        for all joints.
+        """
         # stop simulation before adding the graph
         self._timeline = omni.timeline.get_timeline_interface()
         self._timeline.stop()
@@ -215,6 +244,11 @@ class ArticulationPositionWindow(MenuHelperWindow):
         )
 
     def _on_ok(self):
+        """Handles the OK button click event.
+
+        Retrieves input values, validates parameters, creates the articulation graph if validation
+        passes, and closes the window. Shows a warning notification if parameter validation fails.
+        """
         self._og_path = self.og_path_input.get_value()
         self._robot_prim_path = self.robot_prim_input.get_value()
 
@@ -225,7 +259,16 @@ class ArticulationPositionWindow(MenuHelperWindow):
         else:
             post_notification("Parameter check failed", status=NotificationStatus.WARNING)
 
-    def _check_params(self):
+    def _check_params(self) -> bool:
+        """Validates the input parameters for creating the articulation controller.
+
+        Checks if the specified graph path exists (when adding to existing graph), locates the
+        articulation root prim under the robot parent, and collects joint information including
+        names and default positions.
+
+        Returns:
+            True if all parameters are valid and joints are found.
+        """
         stage = omni.usd.get_context().get_stage()
 
         if self._add_to_existing_graph:
@@ -288,13 +331,37 @@ class ArticulationPositionWindow(MenuHelperWindow):
         return True
 
     def _on_cancel(self):
+        """Handles the Cancel button click event.
+
+        Closes the window without creating the articulation graph.
+        """
         self.visible = False
 
     def _on_use_existing_graph(self, check_state):
+        """Handles the checkbox state change for using an existing graph.
+
+        Args:
+            check_state: The new checkbox state indicating whether to add to an existing graph.
+        """
         self._add_to_existing_graph = check_state
 
 
 class ArticulationVelocityWindow(MenuHelperWindow):
+    """A UI window for creating velocity controller graphs for robotic articulations.
+
+    This window provides an interface to generate OmniGraph nodes that control joint velocities of robotic
+    articulations. It automatically detects joints in the specified robot prim, creates the necessary graph
+    nodes including joint command arrays and articulation controllers, and connects them for velocity-based
+    control.
+
+    The window allows users to specify whether to add to an existing graph or create a new one, select the
+    robot prim containing the articulation, and set the graph path. Upon creation, users can control joint
+    velocities by modifying values in the generated JointCommandArray node during simulation.
+
+    The controller uses radians for revolute joints while USD properties display in degrees. Default velocity
+    values are extracted from the joint drive APIs of the robot's joints.
+    """
+
     def __init__(self):
         super().__init__("Articulation Velocity Controller", width=500, height=470)
 
@@ -311,6 +378,11 @@ class ArticulationVelocityWindow(MenuHelperWindow):
         self._build_ui()
 
     def _build_ui(self):
+        """Constructs the user interface elements for the velocity controller window.
+
+        Creates input fields for graph path and robot prim selection, instruction text,
+        checkboxes for configuration options, and action buttons for creating or canceling the controller graph.
+        """
         self._og_path = get_next_free_path(self._og_path, "")
         og_path_def = ParamWidget.FieldDef(
             name="og_path",
@@ -393,6 +465,11 @@ class ArticulationVelocityWindow(MenuHelperWindow):
         return
 
     def make_graph(self):
+        """Creates an OmniGraph for articulation velocity control.
+
+        Stops the simulation timeline, then creates or modifies a graph with nodes for joint command arrays,
+        joint name arrays, and an articulation controller configured for velocity control.
+        """
         # stop simulation before adding the graph
         self._timeline = omni.timeline.get_timeline_interface()
         self._timeline.stop()
@@ -477,6 +554,11 @@ class ArticulationVelocityWindow(MenuHelperWindow):
         )
 
     def _on_ok(self):
+        """Handles the OK button click to create the velocity controller graph.
+
+        Retrieves input values, validates parameters, creates the graph if validation passes,
+        and closes the window. Shows a warning notification if parameter validation fails.
+        """
         self._og_path = self.og_path_input.get_value()
         self._robot_prim_path = self.robot_prim_input.get_value()
 
@@ -487,7 +569,16 @@ class ArticulationVelocityWindow(MenuHelperWindow):
         else:
             post_notification("Parameter check failed", status=NotificationStatus.WARNING)
 
-    def _check_params(self):
+    def _check_params(self) -> bool:
+        """Validates the input parameters for creating the velocity controller graph.
+
+        Checks if the specified graph path exists (when adding to existing graph), locates the
+        articulation root prim, discovers joints under the robot prim, and extracts joint names
+        and default velocities.
+
+        Returns:
+            True if all parameters are valid, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
 
         if self._add_to_existing_graph:
@@ -541,13 +632,32 @@ class ArticulationVelocityWindow(MenuHelperWindow):
         return True
 
     def _on_cancel(self):
+        """Handles the Cancel button click to close the window without creating a graph."""
         self.visible = False
 
     def _on_use_existing_graph(self, check_state):
+        """Updates the flag for adding to an existing graph based on checkbox state.
+
+        Args:
+            check_state: Whether the checkbox is checked.
+        """
         self._add_to_existing_graph = check_state
 
 
 class GripperWindow(MenuHelperWindow):
+    """UI window for creating gripper controller OmniGraph configurations.
+
+    This window provides an interface for setting up gripper control systems by creating OmniGraph nodes
+    and connections. It allows users to configure gripper parameters including joint names, position limits,
+    speed settings, and optional keyboard controls. The window can create new graphs or add gripper
+    controller nodes to existing OmniGraph structures.
+
+    The interface includes input fields for specifying the parent robot prim, gripper root prim,
+    graph path, and gripper-specific parameters like open/close positions and movement speed.
+    Users can optionally enable keyboard control (O-open, C-close, N-stop) and specify which joints
+    should be controlled as gripper joints when not all articulated joints are part of the gripper mechanism.
+    """
+
     def __init__(self):
         super().__init__("Gripper Controller", width=400, height=550)
 
@@ -567,6 +677,11 @@ class GripperWindow(MenuHelperWindow):
         self._build_ui()
 
     def _build_ui(self):
+        """Builds the gripper controller configuration UI.
+
+        Creates the user interface elements for configuring gripper parameters including graph path,
+        robot and gripper prim selection, speed settings, joint limits, and keyboard control options.
+        """
 
         self._og_path = get_next_free_path(self._og_path, "")
         og_path_def = ParamWidget.FieldDef(
@@ -692,6 +807,11 @@ class GripperWindow(MenuHelperWindow):
         return
 
     def make_graph(self):
+        """Creates the gripper controller OmniGraph.
+
+        Generates an OmniGraph with gripper controller nodes, array nodes for joint positions and speeds,
+        and optional keyboard input nodes. Connects all nodes to form a complete gripper control system.
+        """
 
         # stop physics before adding graphs
         self._timeline = omni.timeline.get_timeline_interface()
@@ -833,6 +953,10 @@ class GripperWindow(MenuHelperWindow):
             )
 
     def _on_ok(self):
+        """Handles OK button click to create the gripper controller graph.
+
+        Retrieves all input values, validates parameters, and creates the graph if validation passes.
+        """
         self._og_path = self.og_path_input.get_value()
         self._parent_robot_path = self.parent_robot_input.get_value()
         self._gripper_root_path = self.gripper_root_input.get_value()
@@ -849,7 +973,15 @@ class GripperWindow(MenuHelperWindow):
         else:
             post_notification("Parameter check failed", status=NotificationStatus.WARNING)
 
-    def _check_params(self):
+    def _check_params(self) -> bool:
+        """Validates gripper controller parameters.
+
+        Checks if the existing graph is valid, ensures no duplicate gripper controllers exist,
+        and verifies the articulation root prim is found under the parent robot prim.
+
+        Returns:
+            True if all parameters are valid, False otherwise.
+        """
         # turn joint names from tokens to a list
         self._joint_names = [item.strip() for item in self._joint_names.split(",")]
 
@@ -890,11 +1022,25 @@ class GripperWindow(MenuHelperWindow):
         return True
 
     def _on_cancel(self):
+        """Handles Cancel button click to close the window.
+
+        Hides the gripper controller configuration window without creating the graph.
+        """
         self.visible = False
 
     def _on_checked_box(self, check_state):
+        """Handles checkbox state change for keyboard control option.
+
+        Args:
+            check_state: The new checkbox state for keyboard control.
+        """
         self._use_keyboard = check_state
         print(f"using keyboard set to {self._use_keyboard}\n O-open, C-close, N-stop")
 
     def _on_use_existing_graph(self, check_state):
+        """Handles checkbox state change for using existing graph option.
+
+        Args:
+            check_state: The new checkbox state for adding to an existing graph.
+        """
         self._add_to_existing_graph = check_state

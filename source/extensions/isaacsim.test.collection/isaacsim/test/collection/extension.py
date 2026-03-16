@@ -13,12 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test collection extension for Isaac Sim integration tests."""
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
+    """Test collection extension for Isaac Sim.
+
+    Provides a collection of integration tests for validating robot simulations,
+    physics behavior, and various Isaac Sim subsystems.
+    """
+
+    def on_startup(self, ext_id: str):
+        """Initialize the extension when it is loaded.
+
+        Args:
+            ext_id: Extension identifier provided by the extension manager.
+        """
         pass
 
     def on_shutdown(self):
+        """Clean up resources when the extension is unloaded."""
         pass

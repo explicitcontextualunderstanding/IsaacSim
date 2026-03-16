@@ -51,6 +51,8 @@ class Plane(Shape):
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         axes: Axes (plane's axis along which the surface is aligned) (shape ``(N,)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
+        colors: Display colors (shape ``(N, 3)``).
+            If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         positions: Positions in the world frame (shape ``(N, 3)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         translations: Translations in the local frame (shape ``(N, 3)``).
@@ -74,9 +76,9 @@ class Plane(Shape):
         >>> from isaacsim.core.experimental.objects import Plane
         >>>
         >>> # given an empty USD stage with the /World Xform prim,
-        >>> # create planes at paths: /World/prim_0, /World/prim_1, and /World/prim_2
+        >>> # create cyan planes at paths: /World/prim_0, /World/prim_1, and /World/prim_2
         >>> paths = ["/World/prim_0", "/World/prim_1", "/World/prim_2"]
-        >>> prims = Plane(paths)  # doctest: +NO_CHECK
+        >>> prims = Plane(paths, colors=[0.0, 1.0, 1.0])  # doctest: +NO_CHECK
     """
 
     def __init__(
@@ -87,6 +89,8 @@ class Plane(Shape):
         widths: float | list | np.ndarray | wp.array | None = None,
         lengths: float | list | np.ndarray | wp.array | None = None,
         axes: Literal["X", "Y", "Z"] | list[Literal["X", "Y", "Z"]] | None = None,
+        # Shape
+        colors: list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -113,6 +117,7 @@ class Plane(Shape):
         super().__init__(
             paths,
             resolve_paths=False,
+            colors=colors,
             positions=positions,
             translations=translations,
             orientations=orientations,

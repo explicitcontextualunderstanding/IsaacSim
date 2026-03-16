@@ -29,7 +29,7 @@ from isaacsim.replicator.behavior.utils.behavior_utils import (
 )
 from isaacsim.replicator.behavior.utils.scene_utils import create_mdl_material
 from isaacsim.storage.native import get_assets_root_path
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade
 
 

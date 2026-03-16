@@ -105,7 +105,7 @@ libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
 }
 
-extra_usd_libs = {}
+extra_usd_libs = { "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -114,7 +114,6 @@ add_usd(extra_usd_libs)
 filter { "system:linux" }
 disablewarnings { "error=narrowing", "error=unused-but-set-variable", "error=unused-variable" }
 links {
-    "boost_system",
 }
 filter {}
 

@@ -13,58 +13,70 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for simulation context crash scenarios to ensure timeline operations don't cause crashes."""
+
+
 import asyncio
 
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.test
-from isaacsim.core.api.robots.robot import Robot
-from isaacsim.core.api.world import World
-from isaacsim.core.utils.stage import add_reference_to_stage, create_new_stage_async, update_stage_async
+import omni.timeline
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.storage.native import get_assets_root_path_async
 
 
 # Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of module will
 # make it auto-discoverable by omni.kit.test
 class TestSimulationContextCrash(omni.kit.test.AsyncTestCase):
+    """Tests for simulation context crash scenarios."""
+
     # Before running each test
     async def setUp(self):
+        """Set up test environment with new stage."""
         self._physics_dt = 1 / 60  # duration of physics frame in seconds
 
         self._timeline = omni.timeline.get_timeline_interface()
 
-        await create_new_stage_async()
-        await update_stage_async()
+        await stage_utils.create_new_stage_async()
+        await app_utils.update_app_async()
 
         pass
 
     # After running each test
     async def tearDown(self):
+        """Clean up test environment and stop timeline."""
         self._timeline.stop()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             print("tearDown, assets still loading, waiting to finish...")
             await asyncio.sleep(1.0)
-        await update_stage_async()
-        World.clear_instance()
+        await app_utils.update_app_async()
         pass
 
     async def test_simulation_context_crash(self):
+        """Test that stopping timeline after articulation creation does not crash."""
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/Denso/CobottaPro900/cobotta_pro_900.usd"
         robot_prim_path = "/cobotta_pro_900"
 
-        add_reference_to_stage(usd_path, robot_prim_path)
+        stage_utils.add_reference_to_stage(usd_path, robot_prim_path)
 
         self._timeline = omni.timeline.get_timeline_interface()
 
         # Start Simulation and wait
         self._timeline.play()
-        await update_stage_async()
-        self._robot = Robot(robot_prim_path)
-        self._robot.initialize()
-        # Initializing World after creating a robot will cause undefined behavior if timeline is playing
-        world = World()
-        # initializing causes timeline to stop if playing
-        await world.initialize_simulation_context_async()
-        await update_stage_async()
-        self.assertEqual(world.is_playing(), False)
+        await app_utils.update_app_async()
+
+        # Create Articulation while timeline is playing
+        self._robot = Articulation(robot_prim_path)
+        await omni.kit.app.get_app().next_update_async()
+
+        # Stop the timeline to mimic the old World initialization behavior
+        self._timeline.stop()
+        await app_utils.update_app_async()
+
+        self.assertEqual(self._timeline.is_playing(), False)
+
         # Make sure this call doesn't crash due to invalid physx handles
-        self._robot.disable_gravity()
+        # Use experimental API to disable gravity on the articulation links
+        self._robot.set_link_enabled_gravities(False)

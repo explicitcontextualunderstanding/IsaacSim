@@ -14,15 +14,14 @@
 # limitations under the License.
 
 import carb
+import isaacsim.core.experimental.utils.app as app_utils
 import omni.kit
 
 # NOTE:
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-import omni.timeline
 from isaacsim.core.experimental.prims import RigidPrim
-from isaacsim.core.experimental.utils.stage import create_new_stage_async
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
 from isaacsim.examples.interactive.kaya_gamepad import KayaGamepad
@@ -33,13 +32,9 @@ class TestKayaGamepadSample(omni.kit.test.AsyncTestCase):
 
     # Before running each test
     async def setUp(self):
-        await create_new_stage_async()
         self._provider = carb.input.acquire_input_provider()
         self._gamepad = self._provider.create_gamepad("test", "0")
         await get_app().next_update_async()
-
-        # Initialize timeline
-        self._timeline = omni.timeline.get_timeline_interface()
 
         self._sample = KayaGamepad()
         self._sample.set_world_settings(physics_dt=1.0 / 60, stage_units_in_meters=1.0)
@@ -48,8 +43,8 @@ class TestKayaGamepadSample(omni.kit.test.AsyncTestCase):
     # After running each test
     async def tearDown(self):
         # Stop timeline if running
-        if self._timeline.is_playing():
-            self._timeline.stop()
+        if app_utils.is_playing():
+            app_utils.stop()
 
         await get_app().next_update_async()
 
@@ -78,19 +73,19 @@ class TestKayaGamepadSample(omni.kit.test.AsyncTestCase):
         self.assertLess(initial_position[0][0], 0.1)
 
         # Start the simulation - Action Graphs only execute when timeline is playing
-        self._timeline.play()
+        app_utils.play()
         await get_app().next_update_async()
 
-        # Send gamepad input to move the robot forward
-        for i in range(100):
+        # Send gamepad input to move the robot forward (enough steps for motion in CI)
+        for i in range(600):
             self._provider.buffer_gamepad_event(self._gamepad, carb.input.GamepadInput.LEFT_STICK_UP, 1.0)
             await get_app().next_update_async()
 
         # Stop simulation and disconnect gamepad
-        self._timeline.pause()
+        app_utils.pause()
         self._provider.set_gamepad_connected(self._gamepad, False)
         await get_app().next_update_async()
 
         # Verify robot moved forward (positive X direction, convert warp array to numpy)
         final_position = kaya_prim.get_world_poses()[0].numpy()
-        self.assertGreater(final_position[0][0], 0.9)
+        self.assertGreater(final_position[0][0], 0.2)

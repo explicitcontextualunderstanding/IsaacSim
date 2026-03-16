@@ -29,14 +29,15 @@ class Franka(Robot):
 
     Args:
         prim_path: USD prim path for the robot.
-        name: Name identifier for the robot. Defaults to "franka_robot".
-        usd_path: Path to custom USD file. Defaults to None.
-        position: Initial position of the robot. Defaults to None.
-        orientation: Initial orientation as quaternion. Defaults to None.
-        end_effector_prim_name: Name of the end effector prim. Defaults to None.
-        gripper_dof_names: Names of gripper DOFs. Defaults to None.
-        gripper_open_position: Gripper open joint positions. Defaults to None.
-        gripper_closed_position: Gripper closed joint positions. Defaults to None.
+        name: Name identifier for the robot.
+        usd_path: Path to custom USD file.
+        position: Initial position of the robot.
+        orientation: Initial orientation as quaternion.
+        end_effector_prim_name: Name of the end effector prim.
+        gripper_dof_names: Names of gripper DOFs.
+        gripper_open_position: Gripper open joint positions.
+        gripper_closed_position: Gripper closed joint positions.
+        deltas: Action deltas for the gripper joints.
     """
 
     def __init__(
@@ -51,7 +52,7 @@ class Franka(Robot):
         gripper_open_position: Optional[np.ndarray] = None,
         gripper_closed_position: Optional[np.ndarray] = None,
         deltas: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         prim = get_prim_at_path(prim_path)
         self._end_effector = None
         self._gripper = None
@@ -103,7 +104,7 @@ class Franka(Robot):
 
     @property
     def end_effector(self) -> SingleRigidPrim:
-        """Get the end effector prim.
+        """End effector prim.
 
         Returns:
             The end effector as a SingleRigidPrim.
@@ -112,15 +113,19 @@ class Franka(Robot):
 
     @property
     def gripper(self) -> ParallelGripper:
-        """Get the gripper controller.
+        """Gripper controller.
 
         Returns:
             The parallel gripper controller.
         """
         return self._gripper
 
-    def initialize(self, physics_sim_view=None) -> None:
-        """Initialize the robot and its components."""
+    def initialize(self, physics_sim_view=None):
+        """Initialize the robot and its components.
+
+        Args:
+            physics_sim_view: Physics simulation view.
+        """
         super().initialize(physics_sim_view)
         self._end_effector = SingleRigidPrim(prim_path=self._end_effector_prim_path, name=self.name + "_end_effector")
         self._end_effector.initialize(physics_sim_view)
@@ -133,7 +138,7 @@ class Franka(Robot):
         )
         return
 
-    def post_reset(self) -> None:
+    def post_reset(self):
         """Reset callback to configure gripper control modes."""
         super().post_reset()
         self._gripper.post_reset()

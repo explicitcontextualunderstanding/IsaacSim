@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides a base test class that automatically times test method execution for performance monitoring."""
+
+
 import gc
 import time
 

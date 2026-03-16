@@ -26,7 +26,7 @@ args, unknown = parser.parse_known_args()
 # Simple example showing how to change resolution
 kit = SimulationApp({"headless": False})
 import carb
-from isaacsim.core.utils.stage import is_stage_loading, open_stage
+from isaacsim.core.experimental.utils.stage import is_stage_loading, open_stage
 from isaacsim.storage.native import get_assets_root_path
 from omni.kit.viewport.utility import get_active_viewport
 

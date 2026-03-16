@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension that demonstrates a Franka Panda robot performing a drawer opening task using a trained policy."""
+
+
 import os
 
 import omni.ext
@@ -22,7 +25,28 @@ from isaacsim.robot.policy.examples.interactive.franka import FrankaExample
 
 
 class FrankaExampleExtension(omni.ext.IExt):
+    """Extension that demonstrates a Franka Panda robot performing a drawer opening task using a trained policy.
+
+    This extension provides an interactive example showcasing a Franka Panda robot executing a drawer opening
+    policy that was trained in Isaac Lab. The robot attempts to open a drawer in front of it and maintain
+    it in an open position. The simulation automatically resets every 10 seconds (simulation time), allowing
+    the robot to repeatedly demonstrate the task.
+
+    The extension integrates with the Isaac Sim examples browser, registering itself under the "Policy"
+    category as "Franka". It provides a complete UI interface through the BaseSampleUITemplate, including
+    documentation links and overview information for users.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the Franka example extension and registers it with the examples browser.
+
+        Sets up the Franka Panda drawer opening policy example with UI components and documentation.
+        The example demonstrates a trained Isaac Lab policy where the Franka robot attempts to open
+        a drawer and hold it open, resetting every 10 seconds of simulation time.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self.example_name = "Franka"
         self.category = "Policy"
 
@@ -49,4 +73,5 @@ class FrankaExampleExtension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Cleans up the extension by deregistering the Franka example from the examples browser."""
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)

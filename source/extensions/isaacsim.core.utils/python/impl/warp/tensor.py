@@ -42,11 +42,11 @@ def get_type(dtype):
 
 def convert(data, device, dtype="float32", indexed=False):
     arr = None
-    if not isinstance(data, wp.types.array) and not isinstance(data, wp.types.indexedarray):
+    if not isinstance(data, wp.array) and not isinstance(data, wp.indexedarray):
         arr = wp.array(data, dtype=get_type(dtype), device=device)
     else:
         arr = data.to(device)
-    if indexed and not isinstance(arr, wp.types.indexedarray):
+    if indexed and not isinstance(arr, wp.indexedarray):
         return wp.indexedarray(arr, [None])
     else:
         return arr
@@ -100,9 +100,9 @@ def resolve_indices(indices, count, device):
 
 
 def move_data(data, device):
-    if isinstance(data, wp.types.array):
+    if isinstance(data, wp.array):
         return data.to(device)
-    elif isinstance(data, wp.types.indexedarray):
+    elif isinstance(data, wp.indexedarray):
         indices = data.indices
         if str(device) != str(data.device):
             return wp.indexedarray(data.contiguous().to(device), indices=[None])
@@ -112,16 +112,16 @@ def move_data(data, device):
 
 def tensor_cat(data, device=None, dim=-1):
     for i, d in enumerate(data):
-        if isinstance(d, wp.types.array):
+        if isinstance(d, wp.array):
             data[i] = wp.to_torch(d)
-        elif isinstance(d, wp.types.indexedarray):
+        elif isinstance(d, wp.indexedarray):
             data[i] = torch.tensor(d.numpy(), device=device)
     torch_cat = torch.cat(data, dim=dim)
     return wp.from_torch(torch_cat)
 
 
 def expand_dims(data, axis):
-    if isinstance(data, wp.types.array):
+    if isinstance(data, wp.array):
         data = wp.to_torch(data)
     data_torch = torch.unsqueeze(data, axis)
     dtype = wp.int32 if data_torch.dtype in (torch.int32, torch.long) else wp.float32
@@ -129,9 +129,9 @@ def expand_dims(data, axis):
 
 
 def to_list(data):
-    if isinstance(data, wp.types.array):
+    if isinstance(data, wp.array):
         return data.numpy().tolist()
-    elif isinstance(data, wp.types.indexedarray):
+    elif isinstance(data, wp.indexedarray):
         return data.numpy().tolist()
     elif isinstance(data, torch.Tensor):
         return data.cpu().numpy().tolist()

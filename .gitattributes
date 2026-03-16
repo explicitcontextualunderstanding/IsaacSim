@@ -21,3 +21,11 @@
 *.pdf filter=lfs diff=lfs merge=lfs -text
 *.ico filter=lfs diff=lfs merge=lfs -text
 source/apps/cache/isaacsim.asset.browser.cache.json filter=lfs diff=lfs merge=lfs -text
+
+# User guide docs LFS rules (migrated from isaacsim-docs)
+docs/**/*content/** filter=lfs diff=lfs merge=lfs -text
+docs/images/** filter=lfs diff=lfs merge=lfs -text
+docs/**/images/** filter=lfs diff=lfs merge=lfs -text
+docs/*/*.ico filter=lfs diff=lfs merge=lfs -text
+docs/**/*content/video/** filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text

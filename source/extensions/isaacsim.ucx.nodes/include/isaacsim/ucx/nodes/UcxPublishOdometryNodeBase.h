@@ -21,18 +21,43 @@
 #include <omni/graph/core/CppWrappers.h>
 #include <omni/graph/core/iComputeGraph.h>
 
+#include <array>
 #include <cstring>
 #include <vector>
 
 using omni::graph::core::GraphInstanceID;
 using omni::graph::core::NodeObj;
 
+namespace isaacsim::ucx::nodes
+{
+
+/**
+ * @struct OdometryData
+ * @brief Data structure for odometry message payload.
+ * @details
+ * Contains computed odometry data including relative pose and body-frame velocities/accelerations.
+ * All values are in body frame relative to the starting pose.
+ */
+struct OdometryData
+{
+    double timestamp; //!< Timestamp value in seconds
+    std::array<double, 3> position; //!< Relative position (x, y, z) in body frame
+    std::array<double, 4> orientation; //!< Relative orientation quaternion (w, x, y, z)
+    std::array<double, 3> linearVelocity; //!< Linear velocity (x, y, z) in body frame
+    std::array<double, 3> angularVelocity; //!< Angular velocity (x, y, z) in body frame
+    std::array<double, 3> linearAcceleration; //!< Linear acceleration (x, y, z) in body frame
+    std::array<double, 3> angularAcceleration; //!< Angular acceleration (x, y, z) in body frame
+};
+
+} // namespace isaacsim::ucx::nodes
+
 /**
  * @class UCXPublishOdometryNodeBase
  * @brief Templated base class for UCX odometry data publishing nodes.
  * @details
  * This template provides common functionality for publishing odometry data over UCX
- * with timeout support. Derived classes implement message generation logic via generateMessage().
+ * with timeout support. Derived classes implement data extraction via extractData()
+ * and message serialization via generateMessage().
  *
  * @tparam DatabaseT The OGN database type for the node
  */
@@ -58,7 +83,7 @@ protected:
      * @brief Common compute logic for odometry publishing nodes.
      * @details
      * Handles listener initialization, connection checking, and message publishing with timeout.
-     * Delegates to publishMessage() for actual message generation and sending.
+     * Extracts data using extractData() and serializes using generateMessage().
      * Sets execOut port on success.
      *
      * @param[in] db Database accessor for node inputs/outputs
@@ -79,7 +104,8 @@ protected:
             return true;
         }
 
-        bool success = publishMessage(db, tag, timeoutMs);
+        isaacsim::ucx::nodes::OdometryData data = extractData(db);
+        bool success = this->publishMessage(db, generateMessage(data), tag, timeoutMs);
 
         if (success)
         {
@@ -90,37 +116,41 @@ protected:
     }
 
     /**
-     * @brief Generate message from node inputs.
+     * @brief Extract odometry data from node inputs.
      * @details
-     * Pure virtual function that derived classes must implement to create
-     * and serialize their odometry message data.
+     * Pure virtual function that derived classes must implement to extract
+     * and compute odometry data from their specific database type.
+     * This includes reading raw inputs, computing relative poses, and
+     * transforming velocities to body frame.
      *
      * @param[in] db Database accessor for node inputs
-     * @return std::vector<uint8_t> Serialized message data
+     * @return OdometryData Computed odometry data
      */
-    virtual std::vector<uint8_t> generateMessage(DatabaseT& db) = 0;
+    virtual isaacsim::ucx::nodes::OdometryData extractData(DatabaseT& db) = 0;
 
     /**
-     * @brief Publishes an odometry message over UCX with timeout.
+     * @brief Generate message from odometry data.
      * @details
-     * Generates the message by calling the derived class's virtual generateMessage(),
-     * then sends it using UCX tagged send and waits for completion with timeout.
+     * Pure virtual function that derived classes must implement to serialize
+     * odometry data into the appropriate message format.
      *
-     * @param[in] db Database accessor for logging and inputs
-     * @param[in] tag UCX tag for message identification
-     * @param[in] timeoutMs Timeout in milliseconds for send request (0 = infinite)
-     * @return bool True if publish succeeded, false otherwise
+     * @param[in] data Odometry data to serialize
+     * @return std::vector<uint8_t> Serialized message data
      */
-    bool publishMessage(DatabaseT& db, uint64_t tag, uint32_t timeoutMs)
-    {
-        std::vector<uint8_t> messageData = generateMessage(db);
-
-        if (messageData.empty())
-        {
-            db.logError("Failed to generate message");
-            return false;
-        }
-
-        return this->sendMessage(db, messageData, tag, timeoutMs);
-    }
+    virtual std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::OdometryData& data) = 0;
 };
+
+// NOTE: To use this base class:
+// 1. Derive your OGN node class from UCXPublishOdometryNodeBase<YourDatabase>
+// 2. Implement static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+//    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
+//    - Call state.reset()
+// 3. Implement static bool compute(YourDatabase& db) that:
+//    - Extracts inputs from db (port, tag, timeoutMs)
+//    - Gets the per-instance state: auto& state = db.template perInstanceState<YourClass>()
+//    - Calls state.computeImpl(db, port, tag, timeoutMs)
+// 4. Implement virtual OdometryData extractData(DatabaseT& db) override
+//    - Read inputs, compute relative pose and body-frame velocities
+// 5. Implement virtual std::vector<uint8_t> generateMessage(const OdometryData& data) override
+//    - Serialize the odometry data into the message format
+// 6. See OgnUCXPublishOdometry.cpp for examples

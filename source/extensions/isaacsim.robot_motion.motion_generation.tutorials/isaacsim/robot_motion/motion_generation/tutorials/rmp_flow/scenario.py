@@ -1,11 +1,20 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto. Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tutorial example module demonstrating RMPflow motion generation with a Franka Panda robot for collision-aware end-effector target tracking."""
+
 
 import os
 
@@ -25,6 +34,28 @@ from isaacsim.storage.native import get_assets_root_path
 
 
 class FrankaRmpFlowExample:
+    """Tutorial example demonstrating RMPflow motion generation with a Franka Panda robot.
+
+    This class sets up a complete robotic scene with a Franka Panda robot, target object, and obstacle,
+    then uses RMPflow (Riemannian Motion Policies) to generate smooth, collision-aware motion for the robot's
+    end-effector to reach target positions.
+
+    The example loads a Franka robot and configures it with RMPflow motion generation capabilities,
+    demonstrating real-time obstacle avoidance and end-effector target tracking. The robot autonomously
+    generates joint trajectories that navigate around obstacles while reaching desired poses.
+
+    Key features:
+    - Automatic loading of Franka robot assets and motion policy configuration
+    - Real-time collision avoidance using RMPflow algorithms
+    - End-effector target tracking with smooth trajectory generation
+    - Support for movable obstacles and robot base pose updates
+    - Debug mode with collision sphere visualization
+
+    Typical usage involves calling load_example_assets() to set up the scene, setup() to initialize
+    RMPflow, and then repeatedly calling update() in the simulation loop to generate and apply
+    motion commands.
+    """
+
     def __init__(self):
         self._rmpflow = None
         self._articulation_rmpflow = None
@@ -35,6 +66,14 @@ class FrankaRmpFlowExample:
         self._dbg_mode = False
 
     def load_example_assets(self):
+        """Loads the Franka robot, target frame, and obstacle assets into the stage.
+
+        Adds a Franka Panda robot at "/panda", a target frame at "/World/target", and a blue cube obstacle.
+        The assets are loaded at their default positions which serve as their initial positions.
+
+        Returns:
+            A tuple containing the articulation, target, and obstacle objects for registration with the core World.
+        """
         # Add the Franka and target to the stage
         # The position in which things are loaded is also the position in which they
 
@@ -55,6 +94,12 @@ class FrankaRmpFlowExample:
         return self._articulation, self._target, self._obstacle
 
     def setup(self):
+        """Initializes the RMPflow motion generation system and connects it to the Franka robot.
+
+        Loads the RMPflow configuration for the Franka robot, creates the RmpFlow object, adds the obstacle,
+        and wraps it with ArticulationMotionPolicy to connect to the robot articulation. Sets the initial
+        target pose for the end effector.
+        """
         # Loading RMPflow can be done quickly for supported robots
         print("Supported Robots with a Provided RMPflow Config:", list(get_supported_robot_policy_pairs().keys()))
         rmp_config = load_supported_motion_policy_config("Franka", "RMPflow")
@@ -77,6 +122,15 @@ class FrankaRmpFlowExample:
         self._target.set_world_pose(np.array([0.5, 0, 0.7]), euler_angles_to_quats([0, np.pi, 0]))
 
     def update(self, step: float):
+        """Updates the RMPflow system and applies motion to the robot for the current frame.
+
+        Sets the end effector target based on the target object's position, updates the world state
+        to track obstacle and robot base movements, computes the next articulation action using RMPflow,
+        and applies it to the robot.
+
+        Args:
+            step: The time elapsed for this frame in seconds.
+        """
         # Step is the time elapsed on this frame
         target_position, target_orientation = self._target.get_world_pose()
 
@@ -93,6 +147,11 @@ class FrankaRmpFlowExample:
         self._articulation.apply_action(action)
 
     def reset(self):
+        """Resets the example to its initial state.
+
+        In debug mode, resets the RMPflow internal state and re-visualizes collision spheres.
+        Resets the target object to its initial position and orientation.
+        """
         # Rmpflow is stateless unless it is explicitly told not to be
         if self._dbg_mode:
             # RMPflow was set to roll out robot state internally, assuming that all returned

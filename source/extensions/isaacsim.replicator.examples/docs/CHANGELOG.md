@@ -1,4 +1,32 @@
 # Changelog
+## [1.9.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.8.0] - 2026-02-26
+### Changed
+- Added test for SDG getting started example with replicator enableWriteToFabric and wait_for_render options
+
+## [1.7.2] - 2026-02-21
+### Changed
+- Fixed SDG physics based volume filling example test to use the omni.physx api
+
+## [1.7.1] - 2026-02-19
+### Changed
+- SimulationManager device is set back to its default state following the deformable SDG example test
+
+## [1.7.0] - 2026-02-08
+### Changed
+- Added SDG deformables example test
+
+## [1.6.9] - 2026-02-04
+### Changed
+- Synched snippets with docs, typos and print statements fixes
+
+## [1.6.8] - 2026-01-05
+### Changed
+- Augmentation examples use basic empty stage (dome light + ground plane) by default, with optional env_url for custom stages
+
 ## [1.6.7] - 2025-12-17
 ### Changed
 - Added missing import for SDG getting started to be in sync with docs

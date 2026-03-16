@@ -54,7 +54,7 @@ links {
     "omni.usd",
     "isaacsim.util.debug_draw.primitive_drawing",
 }
-extra_usd_libs = { "usdGeom", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

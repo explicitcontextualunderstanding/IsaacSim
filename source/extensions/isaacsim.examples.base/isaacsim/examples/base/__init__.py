@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Base classes and templates for creating Isaac Sim simulation examples with standardized UI frameworks and lifecycle management."""
+
+
 from isaacsim.examples.base.base_sample_experimental import BaseSample
 from isaacsim.examples.base.base_sample_extension_experimental import BaseSampleUITemplate
+
+__all__ = ["BaseSample", "BaseSampleUITemplate"]

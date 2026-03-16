@@ -15,9 +15,11 @@
 import carb
 
 
-def on_copy_to_clipboard(to_copy: str) -> None:
-    """
-    Copy text to system clipboard
+def on_copy_to_clipboard(to_copy: str):
+    """Copy text to system clipboard.
+
+    Args:
+        to_copy: The text to copy to the clipboard.
     """
     try:
         import pyperclip

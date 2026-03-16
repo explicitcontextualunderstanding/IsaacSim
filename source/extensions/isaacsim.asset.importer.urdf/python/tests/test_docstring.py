@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import isaacsim.asset.importer.urdf._urdf as urdf_bindings
 import isaacsim.core.experimental.utils.impl.stage as stage_utils
 import isaacsim.test.docstring
+from isaacsim.asset.importer.urdf import URDFImporter, URDFImporterConfig
 
 
 class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
@@ -30,4 +30,15 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
         super().tearDown()
 
     async def test_urdf_docstrings(self):
-        await self.assertDocTests(urdf_bindings)
+        """Validate docstring examples for URDF importer classes.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.asset.importer.urdf import URDFImporterConfig
+            >>> URDFImporterConfig()
+            <...>
+        """
+        await self.assertDocTests(URDFImporter)
+        await self.assertDocTests(URDFImporterConfig)

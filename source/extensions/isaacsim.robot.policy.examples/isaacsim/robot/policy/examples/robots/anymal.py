@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides a policy controller for ANYmal quadruped robot executing flat terrain locomotion using an LSTM-based SEA network."""
+
+
 import io
 
 import omni
@@ -31,7 +34,15 @@ class AnymalFlatTerrainPolicy(PolicyController):
 
     This controller implements a learned policy for stable walking on flat terrain,
     handling velocity commands for forward/backward motion, lateral motion, and turning.
-    Uses an LSTM-based Series Elastic Actuator (SEA) network for torque control."""
+    Uses an LSTM-based Series Elastic Actuator (SEA) network for torque control.
+
+    Args:
+        prim_path: The prim path of the robot on the stage.
+        root_path: The path to the articulation root of the robot.
+        usd_path: The robot usd filepath in the directory.
+        position: The position of the robot.
+        orientation: The orientation of the robot.
+    """
 
     def __init__(
         self,
@@ -40,7 +51,7 @@ class AnymalFlatTerrainPolicy(PolicyController):
         usd_path: str | None = None,
         position: list[float] | None = None,
         orientation: list[float] | None = None,
-    ) -> None:
+    ):
         """
         Initialize anymal robot, import policy and actuator network.
 
@@ -66,8 +77,7 @@ class AnymalFlatTerrainPolicy(PolicyController):
         self._policy_counter = 0
 
     def _compute_observation(self, command):
-        """
-        Compute the observation vector for the policy.
+        """Compute the observation vector for the policy.
 
         The observation includes base linear/angular velocities, gravity direction,
         command velocities, joint positions/velocities, and previous actions.
@@ -113,8 +123,7 @@ class AnymalFlatTerrainPolicy(PolicyController):
         return obs
 
     def forward(self, dt, command):
-        """
-        Computes and applies joint torques for ANYmal locomotion based on the policy output.
+        """Computes and applies joint torques for ANYmal locomotion based on the policy output.
         The control runs at a decimated rate and uses an actuator network to convert
         policy actions into joint torques. Joint order is:
         FL (hip, thigh, calf) -> FR -> RL -> RR.
@@ -142,9 +151,8 @@ class AnymalFlatTerrainPolicy(PolicyController):
         self.robot.set_dof_efforts(wp.from_torch(joint_torques))
         self._policy_counter += 1
 
-    def initialize(self, physics_sim_view=None) -> None:
-        """
-        Initialize the articulation interface and set up drive mode.
+    def initialize(self, physics_sim_view=None):
+        """Initialize the articulation interface and set up drive mode.
 
         Args:
             physics_sim_view: The physics simulation view

@@ -12,13 +12,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Help menu registration and documentation helpers."""
+from functools import partial
+
+import omni.ext
+import omni.kit.actions.core
 import omni.kit.app
 import omni.kit.menu.utils
-from omni.kit.menu.utils import LayoutSourceSearch, MenuItemDescription, MenuLayout, add_menu_items
+from omni.kit.menu.utils import MenuItemDescription, MenuLayout, add_menu_items
 
 
 class HelpMenuExtension:
-    def __init__(self, ext_id):
+    """Build and manage the Help menu for Isaac Sim.
+
+    Args:
+        ext_id: Extension identifier provided by the extension manager.
+    """
+
+    def __init__(self, ext_id: str):
+        self._ext_id = ext_id
+        self._ext_name = omni.ext.get_extension_name(ext_id)
+        self._registered_actions = []
+
         self.__menu_layout = [
             MenuLayout.Menu(
                 "Help",
@@ -60,36 +75,80 @@ class HelpMenuExtension:
             name="Physics Examples",
             onclick_action=("omni.physxuicommon.windowmenuitem", "WindowMenuItemAction_PhysicsDemoScenes"),
         )
-        warp_demo = MenuItemDescription(
-            name="Warp Sample Scenes",
-            onclick_action=("omni.warp", "browse_scenes"),
-        )
 
-        demo_items = [robotics_demo, physics_demo, warp_demo]
+        demo_items = [robotics_demo, physics_demo]
 
         add_menu_items(demo_items, "Help")
 
-        ISAAC_DOCS_URL = "https://docs.isaacsim.omniverse.nvidia.com/latest/index.html"
+        ISAAC_DOCS_URL = "https://docs.isaacsim.omniverse.nvidia.com/latest"
         REFERENCE_GUIDE_URL = ISAAC_DOCS_URL + "/index.html"
         MANUAL_URL = ISAAC_DOCS_URL + "/py/index.html"
         FORUMS_URL = "https://forums.developer.nvidia.com/c/omniverse/simulation/69"
         KIT_MANUAL_URL = "https://docs.omniverse.nvidia.com/py/kit/index.html"
 
+        action_registry = omni.kit.actions.core.get_action_registry()
+
+        # Register actions for help menu items
+        action_registry.register_action(
+            self._ext_name,
+            "open_isaac_online_guide",
+            partial(self.open_ref_url, REFERENCE_GUIDE_URL),
+            display_name="Open Isaac Sim Online Guide",
+            description="Open the Isaac Sim online documentation",
+        )
+        self._registered_actions.append("open_isaac_online_guide")
+
+        action_registry.register_action(
+            self._ext_name,
+            "open_isaac_scripting_manual",
+            partial(self.open_ref_url, MANUAL_URL),
+            display_name="Open Isaac Sim Scripting Manual",
+            description="Open the Isaac Sim Python scripting manual",
+        )
+        self._registered_actions.append("open_isaac_scripting_manual")
+
+        action_registry.register_action(
+            self._ext_name,
+            "open_isaac_forums",
+            partial(self.open_ref_url, FORUMS_URL),
+            display_name="Open Isaac Sim Online Forums",
+            description="Open the Isaac Sim online forums",
+        )
+        self._registered_actions.append("open_isaac_forums")
+
+        action_registry.register_action(
+            self._ext_name,
+            "open_kit_manual",
+            partial(self.open_ref_url, KIT_MANUAL_URL),
+            display_name="Open Kit Programming Manual",
+            description="Open the Kit programming manual",
+        )
+        self._registered_actions.append("open_kit_manual")
+
+        action_registry.register_action(
+            self._ext_name,
+            "open_physics_manual",
+            self._open_physics_manual,
+            display_name="Open Physics Programming Manual",
+            description="Open the physics programming manual",
+        )
+        self._registered_actions.append("open_physics_manual")
+
         reference_guide_menu_item = MenuItemDescription(
-            name="Isaac Sim Online Guide", onclick_fn=lambda: self.open_ref_url(REFERENCE_GUIDE_URL)
+            name="Isaac Sim Online Guide", onclick_action=(self._ext_name, "open_isaac_online_guide")
         )
         scripting_manual_menu_item = MenuItemDescription(
-            name="Isaac Sim Scripting Manual", onclick_fn=lambda: self.open_ref_url(MANUAL_URL)
+            name="Isaac Sim Scripting Manual", onclick_action=(self._ext_name, "open_isaac_scripting_manual")
         )
         forums_menu_item = MenuItemDescription(
-            name="Isaac Sim Online Forums", onclick_fn=lambda: self.open_ref_url(FORUMS_URL)
+            name="Isaac Sim Online Forums", onclick_action=(self._ext_name, "open_isaac_forums")
         )
         kit_manual_menu_item = MenuItemDescription(
-            name="Kit Programming Manual", onclick_fn=lambda: self.open_ref_url(KIT_MANUAL_URL)
+            name="Kit Programming Manual", onclick_action=(self._ext_name, "open_kit_manual")
         )
 
         physics_menu_item = MenuItemDescription(
-            name="Physics Programming Manual", onclick_fn=lambda: self.open_ref_url(resolve_physics_ref_url())
+            name="Physics Programming Manual", onclick_action=(self._ext_name, "open_physics_manual")
         )
 
         add_menu_items(
@@ -104,9 +163,37 @@ class HelpMenuExtension:
         )
 
     def shutdown(self):
+        """Remove menu layouts and deregister actions.
+
+        Example:
+            .. code-block:: python
+
+                menu = HelpMenuExtension("ext.id")
+                menu.shutdown()
+        """
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
 
-    def open_ref_url(self, url):
+        # Deregister all actions
+        action_registry = omni.kit.actions.core.get_action_registry()
+        for action_id in self._registered_actions:
+            action_registry.deregister_action(self._ext_name, action_id)
+        self._registered_actions = []
+
+    def _open_physics_manual(self):
+        """Open the physics programming manual URL."""
+        self.open_ref_url(resolve_physics_ref_url())
+
+    def open_ref_url(self, url: str):
+        """Open a documentation URL using the system browser.
+
+        Args:
+            url: URL to open.
+
+        Example:
+            .. code-block:: python
+
+                HelpMenuExtension("ext.id").open_ref_url("https://docs.omniverse.nvidia.com/")
+        """
         import platform
         import subprocess
         import webbrowser
@@ -118,7 +205,17 @@ class HelpMenuExtension:
             subprocess.Popen(["xdg-open", url])
 
 
-def resolve_physics_ref_url():
+def resolve_physics_ref_url() -> str:
+    """Resolve the correct physics documentation URL for the current version.
+
+    Returns:
+        The resolved physics documentation URL.
+
+    Example:
+        .. code-block:: python
+
+            url = resolve_physics_ref_url()
+    """
     # get URL by physx extensions version
     try:
         manager = omni.kit.app.get_app().get_extension_manager()
@@ -128,12 +225,12 @@ def resolve_physics_ref_url():
         url = f"https://docs.omniverse.nvidia.com/kit/docs/omni_physics/{version}/index.html"
 
         # check if website exists
-        import requests
+        import requests  # type: ignore[import-untyped]
 
         response = requests.head(url, timeout=5)
         if response.status_code > 400:
             raise Exception()
-    except:
+    except Exception:
         url = "https://docs.omniverse.nvidia.com/kit/docs/omni_physics/latest/index.html"
 
     return url

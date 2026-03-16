@@ -477,7 +477,6 @@ def compute(db: og.Database):
 
 class TestRos2Nav2WaypointFollower(ROS2TestCase):
 
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
@@ -495,7 +494,6 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
 
         await create_new_stage_async()
 
-    # After running each test
     async def tearDown(self):
         await super().tearDown()
 
@@ -521,26 +519,21 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
                         ("MakeArrayOrientation", "omni.graph.nodes.ConstructArray"),
                         ("Branch", "omni.graph.action.Branch"),
                         ("ResetBranch", "omni.graph.action.Branch"),
-                        ("TranslateStringConstant", "omni.graph.nodes.ConstantToken"),
-                        ("OrientStringConstant", "omni.graph.nodes.ConstantToken"),
                         ("FrameIdConstant", "omni.graph.nodes.ConstantToken"),
                         ("WaypointPrimPath", "omni.graph.nodes.ConstantString"),
                         ("WaypointCountConstant", "omni.graph.nodes.ConstantInt"),
-                        ("TranslateReadPrimAttribute", "omni.graph.nodes.ReadPrimAttribute"),
-                        ("OrientReadPrimAttribute", "omni.graph.nodes.ReadPrimAttribute"),
-                        ("IsaacReadSimulationTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+                        ("ReadPrimLocalTransform", "omni.graph.nodes.ReadPrimLocalTransform"),
+                        ("TokenToTarget", "omni.graph.nodes.ToTarget"),
+                        ("GetTranslation", "omni.graph.nodes.GetMatrix4Translation"),
+                        ("GetRotationQuaternion", "omni.graph.nodes.GetMatrix4Quaternion"),
                         ("ForEach", "omni.graph.action.ForEach"),
                         ("GetPrimPaths", "omni.graph.nodes.GetPrimPaths"),
                         ("GetPrims", "omni.replicator.core.OgnGetPrims"),
                     ],
                     keys.SET_VALUES: [
                         ("WaypointPrimPath.inputs:value", self._goal_parent_prim + "/"),
-                        ("TranslateStringConstant.inputs:value", "xformOp:translate"),
-                        ("OrientStringConstant.inputs:value", "xformOp:orient"),
                         ("FrameIdConstant.inputs:value", self._frame_id),
                         ("WaypointCountConstant.inputs:value", self._number_of_waypoints),
-                        ("TranslateReadPrimAttribute.inputs:usePath", True),
-                        ("OrientReadPrimAttribute.inputs:usePath", True),
                         ("GetPrims.inputs:cachePrims", False),
                         ("GetPrims.inputs:ignoreCase", False),
                         ("WaypointScriptNode.inputs:script", WAYPOINT_SCRIPT),
@@ -568,20 +561,12 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
                         ("GetPrims.outputs:prims", "GetPrimPaths.inputs:prims"),
                         ("GetPrimPaths.outputs:primPaths", "ForEach.inputs:arrayIn"),
                         ("ForEach.outputs:loopBody", "GatherWaypointsScriptNode.inputs:execIn"),
-                        ("ForEach.outputs:element", "TranslateReadPrimAttribute.inputs:primPath"),
-                        ("ForEach.outputs:element", "OrientReadPrimAttribute.inputs:primPath"),
-                        ("TranslateStringConstant.inputs:value", "TranslateReadPrimAttribute.inputs:name"),
-                        ("OrientStringConstant.inputs:value", "OrientReadPrimAttribute.inputs:name"),
-                        (
-                            "IsaacReadSimulationTime.outputs:simulationTime",
-                            "TranslateReadPrimAttribute.inputs:usdTimecode",
-                        ),
-                        (
-                            "IsaacReadSimulationTime.outputs:simulationTime",
-                            "OrientReadPrimAttribute.inputs:usdTimecode",
-                        ),
-                        ("TranslateReadPrimAttribute.outputs:value", "MakeArrayTranslation.inputs:input0"),
-                        ("OrientReadPrimAttribute.outputs:value", "MakeArrayOrientation.inputs:input0"),
+                        ("ForEach.outputs:element", "TokenToTarget.inputs:value"),
+                        ("TokenToTarget.outputs:converted", "ReadPrimLocalTransform.inputs:prim"),
+                        ("ReadPrimLocalTransform.outputs:value", "GetTranslation.inputs:matrix"),
+                        ("ReadPrimLocalTransform.outputs:value", "GetRotationQuaternion.inputs:matrix"),
+                        ("GetTranslation.outputs:translation", "MakeArrayTranslation.inputs:input0"),
+                        ("GetRotationQuaternion.outputs:quaternion", "MakeArrayOrientation.inputs:input0"),
                         ("MakeArrayTranslation.outputs:array", "GatherWaypointsScriptNode.inputs:translation"),
                         ("MakeArrayOrientation.outputs:array", "GatherWaypointsScriptNode.inputs:orientation"),
                         ("WaypointCountConstant.inputs:value", "GatherWaypointsScriptNode.inputs:waypoint_count"),
@@ -615,13 +600,34 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         return True
 
     def _create_waypoints(self, waypoint, xform_path):
+        """Create a waypoint xform prim with translation, orientation, and scale.
+
+        Args:
+            waypoint: List of 7 floats [x, y, z, qw, qx, qy, qz] where:
+                - [x, y, z] is translation
+                - [qw, qx, qy, qz] is quaternion orientation (will be normalized automatically)
+            xform_path: USD prim path for the waypoint.
+
+        Returns:
+            True if waypoint was created successfully, False otherwise.
+
+        Note:
+            Quaternions are automatically normalized to ensure magnitude = 1.
+            This allows passing any non-zero quaternion which will be normalized before setting.
+        """
         try:
             stage = omni.usd.get_context().get_stage()
 
             xform_prim = UsdGeom.Xform.Define(stage, xform_path)
 
             translation = Gf.Vec3f(waypoint[0], waypoint[1], waypoint[2])
+
+            # Create quaternion and normalize it to ensure magnitude = 1
+            # Quaternion is automatically normalized above via GetNormalized()
+            # This ensures the transform is valid and matches ActionGraph output
             quaternion = Gf.Quatf(waypoint[3], waypoint[4], waypoint[5], waypoint[6])
+            quaternion = quaternion.GetNormalized()
+
             scale = Gf.Vec3f(1.0, 1.0, 1.0)
 
             xform_prim.AddTranslateOp().Set(translation)
@@ -693,6 +699,57 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
 
         rclpy.spin_once(self.__node, timeout_sec=10)
 
+    def _get_normalized_quaternion_components(self, qw, qx, qy, qz):
+        """Get normalized quaternion components using Gf.Quatf for test comparison.
+
+        Args:
+            qw: Real component (w) of the quaternion.
+            qx: Imaginary component (x) of the quaternion.
+            qy: Imaginary component (y) of the quaternion.
+            qz: Imaginary component (z) of the quaternion.
+
+        Returns:
+            Tuple of (qx_norm, qy_norm, qz_norm, qw_norm) in ActionGraph output order [x, y, z, w].
+        """
+        normalized_quat = Gf.Quatf(qw, qx, qy, qz).GetNormalized()
+        imaginary = normalized_quat.GetImaginary()
+        return (imaginary[0], imaginary[1], imaginary[2], normalized_quat.GetReal())
+
+    def _compare_waypoint_results(self, received_msg, expected_result, tolerance=1e-3):
+        """Compare received waypoint message with expected result using floating point tolerance.
+
+        Args:
+            received_msg: Received message data string.
+            expected_result: Expected result string.
+            tolerance: Floating point comparison tolerance. Defaults to 1e-3.
+
+        Returns:
+            True if results match within tolerance, False otherwise.
+        """
+        import ast
+
+        try:
+            # Parse the received data and expected result
+            # Format: "Mode: ['[[x, y, z], [qx, qy, qz, qw]]', ...]"
+            received_str = received_msg.split(": ", 1)[1]
+            expected_str = expected_result.split(": ", 1)[1]
+
+            received_data = ast.literal_eval(received_str)
+            expected_data = ast.literal_eval(expected_str)
+
+            # Compare with floating point tolerance
+            for recv_wp, exp_wp in zip(received_data, expected_data):
+                recv_vals = ast.literal_eval(recv_wp)
+                exp_vals = ast.literal_eval(exp_wp)
+                for recv_list, exp_list in zip(recv_vals, exp_vals):
+                    for r, e in zip(recv_list, exp_list):
+                        if abs(r - e) > tolerance:
+                            return False
+            return True
+        except Exception as e:
+            print(f"Error comparing results: {e}")
+            return False
+
     async def test_waypoint_mode_action_graph(self):
         import threading
 
@@ -702,10 +759,16 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         # Test to verify waypoint mode action graph
         self._enable_patrolling = False  # Switch waypoint mode
         self._enable_multi_robot = False
+        # Quaternion (1.0, 1.0, 1.0, 0.0) will be normalized to (0.577, 0.577, 0.577, 0.0)
         self._waypoints = [[1.0, 3.0, 0.0, 1.0, 1.0, 1.0, 0.0]]
         self._number_of_waypoints = len(self._waypoints)
 
-        self.__expected_result = "Waypoint Mode: ['[[1.0, 3.0, 0.0], [1.0, 1.0, 0.0, 1.0]]']"
+        # Calculate normalized quaternion values from waypoint: ActionGraph outputs as [x, y, z, w]
+        # Waypoint format: [x, y, z, qw, qx, qy, qz] - indices [3:7] are quaternion components
+        qx, qy, qz, qw = self._get_normalized_quaternion_components(
+            self._waypoints[0][3], self._waypoints[0][4], self._waypoints[0][5], self._waypoints[0][6]
+        )
+        self.__expected_result = f"Waypoint Mode: ['[[1.0, 3.0, 0.0], [{qx}, {qy}, {qz}, {qw}]]']"
         self.__result = False
 
         # Create a node named 'waypoint_subscriber'
@@ -720,7 +783,7 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         # Define a callback function that will be called when a message is received
         def listener_callback(msg):
             print(f"Received: {msg.data}")
-            self.__result = msg.data == self.__expected_result
+            self.__result = self._compare_waypoint_results(msg.data, self.__expected_result)
 
         # Create a subscription to the 'topic' topic, listening for String messages
         self.create_subscription(self.__node, String, "topic", listener_callback, 10)
@@ -747,10 +810,19 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         # Test to verify patrolling mode action graph
         self._enable_patrolling = True  # Switch patrolling mode
         self._enable_multi_robot = False
+        # Quaternions will be normalized: (1,1,1,0) -> (0.577, 0.577, 0.577, 0.0) and (15,15,15,0) normalized
         self._waypoints = [[1.0, 3.0, 0.0, 1.0, 1.0, 1.0, 0.0], [15.0, 35.0, 0.0, 15.0, 15.0, 15.0, 0.0]]
         self._number_of_waypoints = len(self._waypoints)
 
-        self.__expected_result = "Patrolling Mode: ['[[1.0, 3.0, 0.0], [1.0, 1.0, 0.0, 1.0]]', '[[15.0, 35.0, 0.0], [15.0, 15.0, 0.0, 15.0]]']"
+        # Calculate normalized quaternions from waypoints: ActionGraph outputs as [x, y, z, w]
+        # Waypoint format: [x, y, z, qw, qx, qy, qz] - indices [3:7] are quaternion components
+        qx1, qy1, qz1, qw1 = self._get_normalized_quaternion_components(
+            self._waypoints[0][3], self._waypoints[0][4], self._waypoints[0][5], self._waypoints[0][6]
+        )
+        qx2, qy2, qz2, qw2 = self._get_normalized_quaternion_components(
+            self._waypoints[1][3], self._waypoints[1][4], self._waypoints[1][5], self._waypoints[1][6]
+        )
+        self.__expected_result = f"Patrolling Mode: ['[[1.0, 3.0, 0.0], [{qx1}, {qy1}, {qz1}, {qw1}]]', '[[15.0, 35.0, 0.0], [{qx2}, {qy2}, {qz2}, {qw2}]]']"
         self.__result = False
 
         # Create a node named 'patrolling_subscriber'
@@ -766,7 +838,7 @@ class TestRos2Nav2WaypointFollower(ROS2TestCase):
         # Define a callback function that will be called when a message is received
         def listener_callback(msg):
             print(f"Received: {msg.data}")
-            self.__result = msg.data == self.__expected_result
+            self.__result = self._compare_waypoint_results(msg.data, self.__expected_result)
 
         # Create a subscription to the 'topic' topic, listening for String messages
         self.create_subscription(self.__node, String, "topic", listener_callback, 10)

@@ -13,4 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Icon implementation for sensor GUI components."""
+
+
 from .extension import *

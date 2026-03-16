@@ -1,4 +1,21 @@
 # Changelog
+## [1.1.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [1.0.1] - 2026-02-09
+### Fixed
+- Fix crash issue when IPhysxSimulation interface is not available
+
+## [1.0.0] - 2026-02-01
+### Changed
+- Deprecated this extension in favor of isaacsim.sensors.experimental.physics extension
+- Moved omnigraph nodes from this extension to isaacsim.sensors.nodes extension. The nodes use the new api from isaacsim.sensors.experimental.physics extension.
+
+## [0.7.0] - 2026-01-28
+### Added
+- Refactor IMU and contact sensor tests to use experimental core APIs
+
 ## [0.6.3] - 2025-12-07
 ### Changed
 - Fix clang tidy issues in cpp code

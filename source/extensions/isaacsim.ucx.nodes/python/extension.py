@@ -32,7 +32,11 @@ class UCXBridgeExtension(omni.ext.IExt):
     """UCX Bridge Extension class."""
 
     def on_startup(self, ext_id):
-        """Called when the extension is loaded."""
+        """Called when the extension is loaded.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         carb.log_info("UCX Bridge Extension starting up")
 
         # Acquire the native plugin interface - this triggers plugin load

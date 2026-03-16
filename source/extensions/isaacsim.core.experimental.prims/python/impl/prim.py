@@ -277,7 +277,7 @@ class Prim(ABC):
 
     def _deregister_callbacks(self) -> None:
         """Deregister all internal callbacks."""
-        for callback_id in self._callback_ids:
+        for callback_id in getattr(self, "_callback_ids", []):
             SimulationManager.deregister_callback(callback_id)
         self._callback_ids = []
 

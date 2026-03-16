@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides user interface components for Isaac Sim Replicator behavior management and exposed variable configuration."""
+
+
 from .extension import *
+
+__all__ = ["ExposedVariablesPropertyWidget"]

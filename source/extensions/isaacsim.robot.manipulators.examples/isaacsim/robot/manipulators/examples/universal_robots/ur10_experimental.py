@@ -20,6 +20,8 @@ import numpy as np
 import warp as wp
 from isaacsim.core.experimental.prims import Articulation, RigidPrim
 from isaacsim.core.experimental.utils.impl.transform import quaternion_conjugate, quaternion_multiplication
+from isaacsim.core.simulation_manager import SimulationManager
+from isaacsim.robot.manipulators.grippers.surface_gripper import SurfaceGripper
 from isaacsim.storage.native import get_assets_root_path
 
 
@@ -29,6 +31,15 @@ class UR10Experimental(Articulation):
     This class inherits from Articulation and provides high-level control commands for the UR10 robot,
     including inverse kinematics for end-effector positioning and gripper control.
     It can either use an existing robot path or create a new one from USD assets.
+
+    Args:
+        robot_path: USD path where the robot should be created or exists.
+        create_robot: Whether to create a new robot from USD assets.
+        end_effector_link: The end effector rigid body link. If None, creates from robot_path.
+        attach_gripper: Whether to attach a gripper to the robot.
+
+    Raises:
+        ValueError: If create_robot is False but no robot exists at robot_path.
     """
 
     def __init__(
@@ -68,6 +79,13 @@ class UR10Experimental(Articulation):
             self.end_effector_link = end_effector_link
 
         self._attach_gripper = attach_gripper
+        self._gripper = None
+        if attach_gripper:
+            end_effector_path = f"{robot_path}/ee_link"
+            self._gripper = SurfaceGripper(
+                end_effector_prim_path=end_effector_path,
+                surface_gripper_path=f"{end_effector_path}/SurfaceGripper",
+            )
 
         if create_robot:
             # Set robot default state with good working pose
@@ -88,6 +106,19 @@ class UR10Experimental(Articulation):
 
         # UR10 has 6 arm DOFs
         self._num_arm_dofs = 6
+
+    def initialize(self) -> None:
+        """Initialize the surface gripper if attached.
+
+        Call after the simulation is running (e.g. after timeline play).
+        The surface gripper (suction) must be initialized before open_gripper/close_gripper work correctly.
+        """
+        if self._gripper is not None:
+            physics_sim_view = SimulationManager.get_physics_sim_view()
+            self._gripper.initialize(
+                physics_sim_view=physics_sim_view,
+                articulation_num_dofs=self.get_actual_dof_count(),
+            )
 
     def differential_inverse_kinematics(
         self,
@@ -167,10 +198,10 @@ class UR10Experimental(Articulation):
         """Get current robot state including DOF positions and end effector pose.
 
         Returns:
-            A tuple containing:
-                - current_dof_positions: Current joint positions [N, 6 or 7] (6 for arm, +1 if gripper)
-                - current_end_effector_position: Current end effector position [N, 3]
-                - current_end_effector_orientation: Current end effector orientation [N, 4] as quaternion
+            A tuple containing (current_dof_positions, current_end_effector_position, current_end_effector_orientation)
+            where current_dof_positions are current joint positions [N, 6 or 7] (6 for arm, +1 if gripper),
+            current_end_effector_position is current end effector position [N, 3], and
+            current_end_effector_orientation is current end effector orientation [N, 4] as quaternion.
         """
         current_dof_positions = self.get_dof_positions().numpy()
         current_end_effector_position, current_end_effector_orientation = self.end_effector_link.get_world_poses()
@@ -184,7 +215,7 @@ class UR10Experimental(Articulation):
         position: np.ndarray,
         orientation: np.ndarray,
         ik_method: str = "damped-least-squares",
-    ) -> None:
+    ):
         """Set the end effector to a specific pose (position and orientation).
 
         This method uses inverse kinematics to move the end effector to the target pose.
@@ -249,13 +280,36 @@ class UR10Experimental(Articulation):
         except:
             return self._num_arm_dofs  # Fallback to arm DOFs only
 
+    def get_downward_orientation(self) -> np.ndarray:
+        """Get the standard downward-facing orientation for the end effector.
+
+        UR10 ee_link frame differs from Franka: [0, 1, 0, 0] (180° about X) yields
+        a horizontal gripper facing the user. This returns a quaternion that tilts
+        the approach axis so the gripper points down (world -Y in Isaac Sim).
+
+        Returns:
+            Quaternion [w, x, y, z] representing downward-facing orientation,
+            shape (1, 4).
+        """
+        return np.array([[0.0, 0.70710678, 0.0, -0.70710678]])
+
+    def open_gripper(self) -> None:
+        """Open the gripper (release suction). Uses the SurfaceGripper API for the Short_Suction gripper."""
+        if self._gripper is not None:
+            self._gripper.open()
+
+    def close_gripper(self) -> None:
+        """Close the gripper (activate suction to hold an object). Uses the SurfaceGripper API for the Short_Suction gripper."""
+        if self._gripper is not None:
+            self._gripper.close()
+
     def reset_to_default_pose(self) -> None:
         """Reset the robot to its default pose with open gripper if attached."""
         # Get the actual DOF count to create the right sized array
         total_dofs = self.get_actual_dof_count()
 
         # Base arm positions (always 6 DOFs for UR10)
-        arm_positions = [-np.pi / 2, -np.pi / 2, -np.pi / 2, -np.pi / 2, np.pi / 2, 0]
+        arm_positions = [0, 0, 0, 0, 0, 0]
 
         if total_dofs > self._num_arm_dofs:
             # Add gripper DOFs (set to open position)
@@ -269,3 +323,5 @@ class UR10Experimental(Articulation):
 
         self.set_dof_positions(default_positions)
         self.set_dof_position_targets(default_positions)
+        if self._gripper is not None:
+            self.open_gripper()

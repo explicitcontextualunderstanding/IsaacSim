@@ -12,3 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Internal MJCF importer implementation exports."""
+
+from ._mjcf import _mjcf as _mjcf
+from .config import MJCFImporterConfig as MJCFImporterConfig
+from .converter import MJCFImporter as MJCFImporter

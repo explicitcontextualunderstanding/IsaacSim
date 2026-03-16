@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides high level functions to deal with batched data from surface gripper views in Isaac Sim."""
+
+
 from __future__ import annotations
 
 import isaacsim.core.experimental.utils.ops as ops_utils
@@ -95,6 +98,7 @@ class GripperView(XformPrim):
         self.set_surface_gripper_properties(max_grip_distance, coaxial_force_limit, shear_force_limit, retry_interval)
 
     def __del__(self):
+        """Clean up the gripper view resources."""
         XformPrim.__del__(self)
 
     def get_surface_gripper_status(self, indices: list | np.ndarray | wp.array | None = None) -> list[str]:
@@ -102,10 +106,9 @@ class GripperView(XformPrim):
 
         Args:
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[str]: Status of the surface grippers ("Open", "Closing", or "Closed"). Shape (M,).
+            Status of the surface grippers ("Open", "Closing", or "Closed"). Shape (M,).
         """
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
         prim_paths = [self._prim_paths[i] for i in indices]
@@ -116,11 +119,9 @@ class GripperView(XformPrim):
 
         Args:
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[str]: List of gripped object paths for each gripper. Shape (M,).
-
+            List of gripped object paths for each gripper. Shape (M,).
         """
 
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
@@ -134,13 +135,12 @@ class GripperView(XformPrim):
 
         Args:
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Returns:
-            tuple[list[float], list[float], list[float], list[float]]: First index is maximum grip distance. Shape (M,).
-                                                                       Second index is coaxial force limit. Shape (M,).
-                                                                       Third index is shear force limit. Shape (M,).
-                                                                       Fourth index is the retry interval. Shape (M,).
+            A tuple of (max_grip_distance, coaxial_force_limit, shear_force_limit, retry_interval) where
+            max_grip_distance is the maximum grip distance (shape (M,)), coaxial_force_limit is the coaxial force
+            limit (shape (M,)), shear_force_limit is the shear force limit (shape (M,)), and retry_interval is the
+            retry interval (shape (M,)).
         """
         max_grip_distance = []
         coaxial_force_limit = []
@@ -160,17 +160,16 @@ class GripperView(XformPrim):
         self,
         values: list[float],
         indices: list | np.ndarray | wp.array | None = None,
-    ) -> None:
+    ):
         """Set up the status for the surface grippers.
 
         Args:
             values: New status of the surface gripper. Shape (N,). Where N is the number of encapsulated prims in the view.
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Raises:
-            Exception: If the length of values does not match the number of encapsulated prims in the view.
-            Exception: If a value in indices is larger then the number of encapsulated prims in the view.
+            ValueError: If the length of values does not match the number of encapsulated prims in the view.
+            ValueError: If a value in indices is larger then the number of encapsulated prims in the view.
         """
         # Ensure length of values matches number of gripper
         if self.count != len(values):
@@ -191,7 +190,7 @@ class GripperView(XformPrim):
         shear_force_limit: list[float] | None = None,
         retry_interval: list[float] | None = None,
         indices: list | np.ndarray | wp.array | None = None,
-    ) -> None:
+    ):
         """Set up the properties for the surface grippers.
 
         Args:
@@ -207,8 +206,8 @@ class GripperView(XformPrim):
                      Defaults to None (i.e: all prims in the view).
 
         Raises:
-            Exception: If the length of any properties does not match the number of encapsulated prims in the view.
-            Exception: If a value in indices is larger then the number of encapsulated prims in the view.
+            ValueError: If the length of any properties does not match the number of encapsulated prims in the view.
+            ValueError: If a value in indices is larger then the number of encapsulated prims in the view.
         """
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
         # Setup max grip distance if provided

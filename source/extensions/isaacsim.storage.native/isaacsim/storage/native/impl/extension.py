@@ -29,7 +29,7 @@ class Extension(omni.ext.IExt):
     authentication using credentials stored in environment variables.
     """
 
-    def on_startup(self, ext_id):
+    def on_startup(self, ext_id: str):
         """Initialize the extension.
 
         Registers an authentication callback if ETM_ACTIVE environment variable is set.
@@ -43,7 +43,7 @@ class Extension(omni.ext.IExt):
         if os.getenv("ETM_ACTIVE"):
             self._auth_cb = omni.client.register_authentication_callback(self._authenticate)
 
-    def _authenticate(self, prefix):
+    def _authenticate(self, prefix: str) -> tuple[str, str] | None:
         """Authentication callback for Omniverse client.
 
         Retrieves credentials from ISAACSIM_OMNI_USER and ISAACSIM_OMNI_PASS

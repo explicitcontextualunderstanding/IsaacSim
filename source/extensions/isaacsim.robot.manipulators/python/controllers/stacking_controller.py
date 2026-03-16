@@ -12,7 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Module providing a stacking controller for manipulating objects in a specified order using a pick and place controller."""
+
+
 import typing
+from typing import List, Optional
 
 import numpy as np
 from isaacsim.core.api.controllers.base_controller import BaseController
@@ -36,7 +41,7 @@ class StackingController(BaseController):
         pick_place_controller: PickPlaceController,
         picking_order_cube_names: typing.List[str],
         robot_observation_name: str,
-    ) -> None:
+    ):
         BaseController.__init__(self, name=name)
         self._pick_place_controller = pick_place_controller
         self._picking_order_cube_names = picking_order_cube_names
@@ -50,6 +55,16 @@ class StackingController(BaseController):
         end_effector_orientation: typing.Optional[np.ndarray] = None,
         end_effector_offset: typing.Optional[np.ndarray] = None,
     ) -> ArticulationAction:
+        """Executes the stacking sequence by picking and placing cubes in the specified order.
+
+        Args:
+            observations: Dictionary containing robot and cube observations including positions and joint states.
+            end_effector_orientation: Optional orientation for the end effector during manipulation.
+            end_effector_offset: Optional position offset for the end effector during manipulation.
+
+        Returns:
+            Articulation action containing joint positions for the robot.
+        """
         if self._current_cube >= len(self._picking_order_cube_names):
             target_joint_positions = [None] * observations[self._robot_observation_name]["joint_positions"].shape[0]
             return ArticulationAction(joint_positions=target_joint_positions)
@@ -65,11 +80,11 @@ class StackingController(BaseController):
             self._pick_place_controller.reset()
         return actions
 
-    def reset(self, picking_order_cube_names: typing.Optional[typing.List[str]] = None) -> None:
+    def reset(self, picking_order_cube_names: typing.Optional[typing.List[str]] = None):
         """Reset the controller state and optionally update the picking order.
 
         Args:
-            picking_order_cube_names: New list of cube names to pick in order. Defaults to None.
+            picking_order_cube_names: New list of cube names to pick in order.
         """
         self._current_cube = 0
         self._pick_place_controller.reset()

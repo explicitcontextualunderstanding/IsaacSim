@@ -18,6 +18,7 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -148,12 +149,12 @@ def run_scripts(suites, dry_run=False, print_live_output=False, failure_keywords
                             user_args = script_args.split()
                             all_args.extend(user_args)
 
-                        command = f"{script} {' '.join(all_args)}"
+                        command = [script] + all_args
 
                         start_time = time.time()
                         if print_live_output:
-                            print(f"\n===== Running: {command} =====")
-                            proc = subprocess.run(command, text=True, shell=True)
+                            print(f"\n===== Running: {shlex.join(command)} =====")
+                            proc = subprocess.run(command, text=True)
                             end_time = time.time()
                             duration = end_time - start_time
                             # For live output, we can't check keywords since output isn't captured
@@ -170,7 +171,7 @@ def run_scripts(suites, dry_run=False, print_live_output=False, failure_keywords
                                 }
                             )
                         else:
-                            proc = subprocess.run(command, capture_output=True, text=True, shell=True)
+                            proc = subprocess.run(command, capture_output=True, text=True)
                             end_time = time.time()
                             duration = end_time - start_time
 
@@ -404,8 +405,8 @@ def main():
                     if args.script_args:
                         user_args = args.script_args.split()
                         all_args.extend(user_args)
-                    command = f"{script} {' '.join(all_args)}"
-                    print(f"    {command}")
+                    command = [script] + all_args
+                    print(f"    {shlex.join(command)}")
         else:
             print(f"  Bucket: {args.bucket}")
             for script in filtered_suites[args.suite][args.bucket]:
@@ -414,8 +415,8 @@ def main():
                 if args.script_args:
                     user_args = args.script_args.split()
                     all_args.extend(user_args)
-                command = f"{script} {' '.join(all_args)}"
-                print(f"    {command}")
+                command = [script] + all_args
+                print(f"    {shlex.join(command)}")
     else:
         # Load failure keywords with priority: CLI args > config > defaults
         failure_keywords = None

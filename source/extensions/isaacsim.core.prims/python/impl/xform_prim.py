@@ -1127,7 +1127,7 @@ class XFormPrim(Prim):
             if not xformable_prim.HasWorldXform():
                 xformable_prim.SetWorldXformFromUsd()
 
-    def _reset_fabric_selection(self, dt) -> None:
+    def _reset_fabric_selection(self, dt, context=None) -> None:
         self._selection = None
         for data_tensor_name in self._fabric_data_valid.keys():
             self._fabric_data_valid[data_tensor_name] = False

@@ -13,61 +13,72 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for Isaac Sim application layout configurations."""
+
+from __future__ import annotations
+
 import itertools
 import os
-from os import walk
 from pathlib import Path
 
 import carb
 import omni.kit.app
-from omni.kit import ui_test
+import omni.kit.ui_test as ui_test
 from omni.kit.quicklayout import QuickLayout
 from omni.kit.test import AsyncTestCase
 from omni.ui.workspace_utils import CompareDelegate
 
-EXTENSION_FOLDER_PATH = Path(omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__))
+_EXTENSION_FOLDER_PATH = Path(omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__))
 
 
 class TestLayoutsExtensions(AsyncTestCase):
-    async def setUp(self):
+    """Test suite for Isaac Sim window layout configurations.
+
+    Validates that all layout JSON files in the extension's layouts folder
+    can be loaded correctly and produce consistent window arrangements.
+    """
+
+    async def setUp(self) -> None:
+        """Set up test environment by creating a new stage."""
         omni.usd.get_context().new_stage()
-        # Make sure the stage loaded
         await omni.kit.app.get_app().next_update_async()
 
-    # After running each test
-    async def tearDown(self):
+    async def tearDown(self) -> None:
+        """Clean up test environment after each test."""
         await omni.kit.app.get_app().next_update_async()
         super().tearDown()
         await omni.kit.app.get_app().next_update_async()
 
-    async def test_isaacsim_layouts(self):
-        layout_files = []
-        ext_path = EXTENSION_FOLDER_PATH
-        for dirpath, dirnames, filenames in walk(f"{ext_path}/layouts/"):
-            for file in filenames:
-                layout_files.append(f"{dirpath}/{file}")
+    async def test_isaacsim_layouts(self) -> None:
+        """Test that all Isaac Sim layouts load correctly in all combinations.
+
+        Iterates through all layout files in the layouts folder and tests loading
+        them in all possible pair combinations. For each layout, verifies that
+        the loaded state matches the expected configuration from the JSON file.
+        """
+        layouts_dir = _EXTENSION_FOLDER_PATH / "layouts"
+        layout_files = [str(layouts_dir / f) for f in os.listdir(layouts_dir) if f.endswith(".json")]
 
         compare_delegate = CompareDelegate()
 
-        #### test logic:
-        # for all the layouts inside the layouts folder, open one after another in all possible combinations
-        # compare the layout (opened last) with the json file that the layout is loaded from
-        # if they are not the same, print the error
-        #####
+        async def test_layout(layout_path: str) -> None:
+            """Load a layout file and verify it matches the expected configuration.
 
-        for a, b in itertools.combinations(layout_files, 2):
-            # for layout in layout_files:
-            async def test_layout(layout: str):
-                # load layout twice as some don't load fully 1st time
-                QuickLayout.load_file(layout, keep_windows_open=False)
-                await ui_test.human_delay(50)
-                QuickLayout.load_file(layout, keep_windows_open=False)
-                await ui_test.human_delay(500)
+            Args:
+                layout_path: Full path to the layout JSON file to test.
+            """
+            # Load layout twice as some layouts don't fully load on first attempt
+            QuickLayout.load_file(layout_path, keep_windows_open=False)
+            await ui_test.human_delay(50)
+            QuickLayout.load_file(layout_path, keep_windows_open=False)
+            await ui_test.human_delay(500)
 
-                compare_errors = QuickLayout.compare_file(layout, compare_delegate)
-                if compare_errors:
-                    for ce in compare_errors:
-                        carb.log_error(f"{os.path.basename(layout)} compare_errors:{ce}")
+            compare_errors = QuickLayout.compare_file(layout_path, compare_delegate)
+            if compare_errors:
+                layout_name = os.path.basename(layout_path)
+                for error in compare_errors:
+                    carb.log_error(f"{layout_name} compare_errors: {error}")
 
-            await test_layout(a)
-            await test_layout(b)
+        for layout_a, layout_b in itertools.combinations(layout_files, 2):
+            await test_layout(layout_a)
+            await test_layout(layout_b)

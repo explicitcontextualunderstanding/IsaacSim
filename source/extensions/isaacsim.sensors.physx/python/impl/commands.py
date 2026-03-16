@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides command classes for creating and managing PhysX range sensor prims in Isaac Sim."""
+
+
 from typing import Optional
 
 import carb
@@ -163,6 +166,24 @@ class RangeSensorCreateLidar(omni.kit.commands.Command):
             yaw_offset=0.0,
             enable_semantics=False,
         )
+
+    Args:
+        path: Path for the new lidar sensor prim.
+        parent: Parent prim path.
+        translation: Translation vector for the lidar sensor.
+        orientation: Orientation quaternion for the lidar sensor.
+        min_range: Minimum range of the sensor.
+        max_range: Maximum range of the sensor.
+        draw_points: Whether to draw points for visualization.
+        draw_lines: Whether to draw lines for visualization.
+        horizontal_fov: Horizontal field of view in degrees.
+        vertical_fov: Vertical field of view in degrees.
+        horizontal_resolution: Horizontal resolution in degrees per sample.
+        vertical_resolution: Vertical resolution in degrees per sample.
+        rotation_rate: Rotation rate of the sensor in Hz.
+        high_lod: Whether to enable high level of detail rendering.
+        yaw_offset: Yaw offset in degrees.
+        enable_semantics: Whether to enable semantic segmentation.
     """
 
     def __init__(
@@ -261,6 +282,17 @@ class RangeSensorCreateGeneric(omni.kit.commands.Command):
             draw_lines=False,
             sampling_rate=60,
         )
+
+    Args:
+        path: Path for the new prim.
+        parent: Parent prim path.
+        translation: Translation vector for the prim.
+        orientation: Orientation quaternion for the prim.
+        min_range: Minimum range of the sensor.
+        max_range: Maximum range of the sensor.
+        draw_points: Whether to draw points for visualization.
+        draw_lines: Whether to draw lines for visualization.
+        sampling_rate: Sampling rate of the sensor in Hz.
     """
 
     def __init__(

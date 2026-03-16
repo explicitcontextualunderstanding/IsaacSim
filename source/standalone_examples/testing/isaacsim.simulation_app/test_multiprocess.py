@@ -27,17 +27,17 @@ def run_simulation():
 
     simulation_app = SimulationApp()
 
+    import isaacsim.core.experimental.utils.app as app_utils
     import omni.kit.app
-    from isaacsim.core.api import World
+    from isaacsim.core.experimental.objects import GroundPlane
 
-    world = World(stage_units_in_meters=1.0, physics_prim_path="/physicsScene", backend="numpy")
-    world.scene.add_default_ground_plane()
-    world.reset()
+    GroundPlane("/World/ground_plane")
+    app_utils.play()
 
     frame_idx = 0
     while simulation_app.is_running():
-        if world.is_playing():
-            world.step(render=True)
+        if app_utils.is_playing():
+            simulation_app.update()
         else:
             simulation_app.update()
             # we should exit this loop before we hit frame 200 unless we are stuck on an exit screen

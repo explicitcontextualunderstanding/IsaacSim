@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Delegate implementation for displaying example assets in Isaac Sim's browser detail view."""
+
+
 import asyncio
 from pathlib import Path
 from typing import Optional
@@ -31,10 +34,10 @@ ICON_PATH = CURRENT_PATH.parent.parent.parent.parent.joinpath("isaacsim.examples
 
 
 class AssetDetailDelegate(FolderDetailDelegate):
-    """
-    Delegate to show asset item in detail view
+    """Delegate to show asset item in detail view
+
     Args:
-        model (ExampleBrowserModel): Example browser model
+        model: Example browser model
     """
 
     def __init__(self, model: ExampleBrowserModel):
@@ -55,6 +58,7 @@ class AssetDetailDelegate(FolderDetailDelegate):
             )
 
     def destroy(self):
+        """Cleans up the delegate by destroying the drop helper and calling parent cleanup."""
         self._drop_helper = None
         super().destroy()
 
@@ -65,7 +69,14 @@ class AssetDetailDelegate(FolderDetailDelegate):
     #     return item.thumbnail
 
     def on_drag(self, item: DetailItem) -> str:
-        """Could be dragged to viewport window"""
+        """Could be dragged to viewport window.
+
+        Args:
+            item: The detail item being dragged.
+
+        Returns:
+            The URL of the item being dragged.
+        """
         # thumbnail = self.get_thumbnail(item)
         icon_size = 128
         with ui.VStack(width=icon_size):
@@ -97,10 +108,29 @@ class AssetDetailDelegate(FolderDetailDelegate):
         return item.url
 
     def _on_drop_accepted(self, url):
+        """Determines if a drop operation should be accepted.
+
+        Args:
+            url: The URL of the item being dropped.
+
+        Returns:
+            True if the drop should be accepted, False otherwise.
+        """
         # Only handle dragging from asset browser
         return url == self._dragging_url
 
     def _on_drop(self, url, target, viewport_name, context_name):  # pylint: disable=useless-return
+        """Handles the drop operation by temporarily enabling instanceable references for specific categories.
+
+        Args:
+            url: The URL of the dropped item.
+            target: The drop target.
+            viewport_name: Name of the viewport where the drop occurred.
+            context_name: Name of the context.
+
+        Returns:
+            None to let the viewport handle asset dropping.
+        """
         saved_instanceable = self._settings.get("/persistent/app/stage/instanceableOnCreatingReference")
         if not saved_instanceable and url == self._dragging_url:
             # Enable instanceable for viewport asset drop handler
@@ -117,8 +147,12 @@ class AssetDetailDelegate(FolderDetailDelegate):
         # Let viewport do asset dropping
         return None  # noqa: R501
 
-    def on_right_click(self, item: DetailItem) -> None:
-        """Show context menu"""
+    def on_right_click(self, item: DetailItem):
+        """Show context menu.
+
+        Args:
+            item: The detail item that was right-clicked.
+        """
         self._action_item = item
         if self._context_menu is None:
             self._context_menu = ContextMenu()

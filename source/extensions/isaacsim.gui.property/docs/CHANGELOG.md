@@ -1,4 +1,19 @@
 # Changelog
+## [1.5.1] - 2026-03-05
+### Fixed
+- Fixed incorrect type annotation (List to list)
+
+## [1.5.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, and update docstrings
+
+## [1.4.0] - 2026-02-20
+### Added
+- Introduced widget for applying IsaacSiteAPI to Xformable prims
+
+## [1.3.0] - 2026-01-28
+### Added
+- Introduced new widget for setting the IsaacMotionPlanningAPI collisionEnabled attribute
 
 ## [1.2.1] - 2025-12-01
 ### Changed

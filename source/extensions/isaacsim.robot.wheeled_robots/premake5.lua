@@ -53,7 +53,7 @@ links {
     --    "usdGeom", "usdUtils", "omni.usd",
 }
 
-extra_usd_libs = {}
+extra_usd_libs = { "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

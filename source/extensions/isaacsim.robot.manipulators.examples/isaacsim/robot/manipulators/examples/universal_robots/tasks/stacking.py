@@ -26,10 +26,10 @@ class Stacking(BaseStacking):
     """UR10 robot stacking task.
 
     Args:
-        name: Task name. Defaults to "ur10_stacking".
-        target_position: Stack target position. Defaults to None.
-        cube_size: Size of each cube. Defaults to None.
-        offset: Task offset. Defaults to None.
+        name: Task name.
+        target_position: Stack target position.
+        cube_size: Size of each cube.
+        offset: Task offset.
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class Stacking(BaseStacking):
         target_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         if target_position is None:
             target_position = np.array([0.7, 0.7, 0]) / get_stage_units()
         BaseStacking.__init__(
@@ -70,7 +70,7 @@ class Stacking(BaseStacking):
         )
         return self._ur10_robot
 
-    def pre_step(self, time_step_index: int, simulation_time: float) -> None:
+    def pre_step(self, time_step_index: int, simulation_time: float):
         """Called before each physics step to update gripper.
 
         Args:

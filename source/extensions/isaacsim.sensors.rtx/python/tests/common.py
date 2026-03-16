@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Common utilities for RTX sensor tests."""
+
 import asyncio
 import os
 import unittest
@@ -38,7 +40,15 @@ from isaacsim.storage.native import get_assets_root_path
 from pxr import Gf, UsdGeom
 
 
-def create_sarcophagus(enable_nonvisual_material: bool = True):
+def create_sarcophagus(enable_nonvisual_material: bool = True) -> dict:
+    """Create a sarcophagus-shaped test environment made of cubes.
+
+    Args:
+        enable_nonvisual_material: Whether to apply nonvisual materials to the cubes.
+
+    Returns:
+        Dictionary mapping cube prim paths to their material information.
+    """
     # Autogenerate sarcophagus
     dims = [(10, 5, 7), (15, 9, 11), (20, 13, 15), (25, 17, 19)]
     i = 0

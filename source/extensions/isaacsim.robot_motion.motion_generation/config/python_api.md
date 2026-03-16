@@ -1,0 +1,206 @@
+# Public API for module isaacsim.robot_motion.motion_generation:
+
+## Classes
+
+- class WorldInterface
+  - def __init__(self)
+  - def update_world(self, updated_obstacles: Optional[List] = None)
+  - def add_obstacle(self, obstacle: isaacsim.core.api.objects, static: Optional[bool] = False) -> bool
+  - def add_cuboid(self, cuboid: Union[cuboid.DynamicCuboid, cuboid.FixedCuboid, cuboid.VisualCuboid], static: bool = False) -> bool
+  - def add_sphere(self, sphere: Union[sphere.DynamicSphere, sphere.VisualSphere], static: bool = False) -> bool
+  - def add_capsule(self, capsule: Union[capsule.DynamicCapsule, capsule.VisualCapsule], static: bool = False) -> bool
+  - def add_cylinder(self, cylinder: Union[cylinder.DynamicCylinder, cylinder.VisualCylinder], static: bool = False) -> bool
+  - def add_cone(self, cone: Union[cone.DynamicCone, cone.VisualCone], static: bool = False) -> bool
+  - def add_ground_plane(self, ground_plane: ground_plane.GroundPlane) -> bool
+  - def disable_obstacle(self, obstacle: isaacsim.core.api.objects) -> bool
+  - def enable_obstacle(self, obstacle: isaacsim.core.api.objects) -> bool
+  - def remove_obstacle(self, obstacle: isaacsim.core.api.objects) -> bool
+  - def reset(self)
+
+- class MotionPolicy(WorldInterface)
+  - def __init__(self)
+  - def set_robot_base_pose(self, robot_translation: np.array, robot_orientation: np.array)
+  - def compute_joint_targets(self, active_joint_positions: np.array, active_joint_velocities: np.array, watched_joint_positions: np.array, watched_joint_velocities: np.array, frame_duration: float) -> Tuple[np.array, np.array]
+  - def get_active_joints(self) -> List[str]
+  - def get_watched_joints(self) -> List[str]
+  - def set_cspace_target(self, active_joint_targets: np.array)
+  - def set_end_effector_target(self, target_translation = None, target_orientation = None)
+
+- class RmpFlow(LulaInterfaceHelper, MotionPolicy)
+  - def __init__(self, robot_description_path: str, urdf_path: str, rmpflow_config_path: str, end_effector_frame_name: str, maximum_substep_size: float, ignore_robot_state_updates = False)
+  - def set_ignore_state_updates(self, ignore_robot_state_updates)
+  - def set_cspace_target(self, active_joint_targets)
+  - def update_world(self, updated_obstacles: List = None)
+  - def compute_joint_targets(self, active_joint_positions: np.array, active_joint_velocities: np.array, watched_joint_positions: np.array, watched_joint_velocities: np.array, frame_duration: float) -> Tuple[np.array, np.array]
+  - def visualize_collision_spheres(self)
+  - def visualize_end_effector_position(self)
+  - def stop_visualizing_collision_spheres(self)
+  - def stop_visualizing_end_effector(self)
+  - def get_collision_spheres_as_prims(self) -> List
+  - def get_end_effector_as_prim(self) -> objects.cuboid.VisualCuboid
+  - def delete_collision_sphere_prims(self)
+  - def delete_end_effector_prim(self)
+  - def reset(self)
+  - def set_internal_robot_joint_states(self, active_joint_positions: np.array, active_joint_velocities: np.array, watched_joint_positions: np.array, watched_joint_velocities: np.array)
+  - def get_internal_robot_joint_states(self) -> Tuple[np.array, np.array, np.array, np.array]
+  - def get_default_cspace_position_target(self) -> np.array
+  - def get_active_joints(self) -> List[str]
+  - def get_watched_joints(self) -> List[str]
+  - def get_end_effector_pose(self, active_joint_positions: np.array) -> Tuple[np.array, np.array]
+  - def get_kinematics_solver(self) -> LulaKinematicsSolver
+  - def set_end_effector_target(self, target_position = None, target_orientation = None)
+  - def set_robot_base_pose(self, robot_position: np.array, robot_orientation: np.array)
+  - def add_obstacle(self, obstacle: objects, static: bool = False) -> bool
+  - def add_cuboid(self, cuboid: Union[objects.cuboid.DynamicCuboid, objects.cuboid.FixedCuboid, objects.cuboid.VisualCuboid], static: bool = False) -> bool
+  - def add_sphere(self, sphere: Union[objects.sphere.DynamicSphere, objects.sphere.VisualSphere], static: bool = False) -> bool
+  - def add_capsule(self, capsule: Union[objects.capsule.DynamicCapsule, objects.capsule.VisualCapsule], static: bool = False) -> bool
+  - def add_ground_plane(self, ground_plane: objects.ground_plane.GroundPlane) -> bool
+  - def disable_obstacle(self, obstacle: objects) -> bool
+  - def enable_obstacle(self, obstacle: objects) -> bool
+  - def remove_obstacle(self, obstacle: objects) -> bool
+
+- class ArticulationMotionPolicy
+  - def __init__(self, robot_articulation: SingleArticulation, motion_policy: MotionPolicy, default_physics_dt: float = 1 / 60.0)
+  - def move(self, physics_dt: float = None)
+  - def get_next_articulation_action(self, physics_dt: float = None) -> ArticulationAction
+  - def get_active_joints_subset(self) -> ArticulationSubset
+  - def get_watched_joints_subset(self) -> ArticulationSubset
+  - def get_robot_articulation(self) -> SingleArticulation
+  - def get_motion_policy(self) -> MotionPolicy
+  - def get_default_physics_dt(self) -> float
+  - def set_default_physics_dt(self, physics_dt: float)
+
+- class KinematicsSolver(WorldInterface)
+  - def __init__(self)
+  - def set_robot_base_pose(self, robot_positions: np.array, robot_orientation: np.array)
+  - def get_joint_names(self) -> List[str]
+  - def get_all_frame_names(self) -> List[str]
+  - def compute_forward_kinematics(self, frame_name: str, joint_positions: np.array, position_only: Optional[bool] = False) -> Tuple[np.array, np.array]
+  - def compute_inverse_kinematics(self, frame_name: str, target_positions: np.array, target_orientation: Optional[np.array] = None, warm_start: Optional[np.array] = None, position_tolerance: Optional[float] = None, orientation_tolerance: Optional[float] = None) -> Tuple[np.array, bool]
+  - def supports_collision_avoidance(self) -> bool
+
+- class LulaKinematicsSolver(KinematicsSolver)
+  - def __init__(self, robot_description_path: str, urdf_path: str, robot_description: Optional[lula.RobotDescription] = None)
+  - [property] def bfgs_cspace_limit_biasing(self) -> bool
+  - [bfgs_cspace_limit_biasing.setter] def bfgs_cspace_limit_biasing(self, value)
+  - [property] def bfgs_cspace_limit_biasing_weight(self) -> float
+  - [bfgs_cspace_limit_biasing_weight.setter] def bfgs_cspace_limit_biasing_weight(self, value)
+  - [property] def bfgs_cspace_limit_penalty_region(self) -> float
+  - [bfgs_cspace_limit_penalty_region.setter] def bfgs_cspace_limit_penalty_region(self, value)
+  - [property] def bfgs_gradient_norm_termination(self) -> float
+  - [bfgs_gradient_norm_termination.setter] def bfgs_gradient_norm_termination(self, value)
+  - [property] def bfgs_gradient_norm_termination_coarse_scale_factor(self) -> float
+  - [bfgs_gradient_norm_termination_coarse_scale_factor.setter] def bfgs_gradient_norm_termination_coarse_scale_factor(self, value)
+  - [property] def bfgs_max_iterations(self) -> int
+  - [bfgs_max_iterations.setter] def bfgs_max_iterations(self, value)
+  - [property] def bfgs_orientation_weight(self) -> float
+  - [bfgs_orientation_weight.setter] def bfgs_orientation_weight(self, value)
+  - [property] def bfgs_position_weight(self) -> float
+  - [bfgs_position_weight.setter] def bfgs_position_weight(self, value)
+  - [property] def ccd_bracket_search_num_uniform_samples(self) -> int
+  - [ccd_bracket_search_num_uniform_samples.setter] def ccd_bracket_search_num_uniform_samples(self, value)
+  - [property] def ccd_descent_termination_delta(self) -> float
+  - [ccd_descent_termination_delta.setter] def ccd_descent_termination_delta(self, value)
+  - [property] def ccd_max_iterations(self) -> int
+  - [ccd_max_iterations.setter] def ccd_max_iterations(self, value)
+  - [property] def ccd_orientation_weight(self) -> float
+  - [ccd_orientation_weight.setter] def ccd_orientation_weight(self, value)
+  - [property] def ccd_position_weight(self) -> float
+  - [ccd_position_weight.setter] def ccd_position_weight(self, value)
+  - [property] def irwin_hall_sampling_order(self) -> int
+  - [irwin_hall_sampling_order.setter] def irwin_hall_sampling_order(self, value)
+  - [property] def max_num_descents(self) -> int
+  - [max_num_descents.setter] def max_num_descents(self, value)
+  - [property] def sampling_seed(self) -> int
+  - [sampling_seed.setter] def sampling_seed(self, value)
+  - def set_robot_base_pose(self, robot_position: np.array, robot_orientation: np.array)
+  - def get_joint_names(self) -> List[str]
+  - def get_all_frame_names(self) -> List[str]
+  - def compute_forward_kinematics(self, frame_name: str, joint_positions: np.array, position_only: Optional[bool] = False) -> Tuple[np.array, np.array]
+  - def compute_inverse_kinematics(self, frame_name: str, target_position: np.array, target_orientation: np.array = None, warm_start: np.array = None, position_tolerance: float = None, orientation_tolerance: float = None) -> Tuple[np.array, bool]
+  - def supports_collision_avoidance(self) -> bool
+  - def set_default_orientation_tolerance(self, tolerance: float)
+  - def set_default_position_tolerance(self, tolerance: float)
+  - def set_default_cspace_seeds(self, seeds: np.array)
+  - def get_default_orientation_tolerance(self) -> float
+  - def get_default_position_tolerance(self) -> float
+  - def get_default_cspace_seeds(self) -> List[np.array]
+  - def get_cspace_position_limits(self) -> Tuple[np.array, np.array]
+  - def get_cspace_velocity_limits(self) -> np.array
+  - def get_cspace_acceleration_limits(self) -> np.array
+  - def get_cspace_jerk_limits(self) -> np.array
+
+- class ArticulationKinematicsSolver
+  - def __init__(self, robot_articulation: SingleArticulation, kinematics_solver: KinematicsSolver, end_effector_frame_name: str)
+  - def compute_end_effector_pose(self, position_only: bool = False) -> Tuple[np.array, np.array]
+  - def compute_inverse_kinematics(self, target_position: np.array, target_orientation: Optional[np.array] = None, position_tolerance: Optional[float] = None, orientation_tolerance: Optional[float] = None) -> Tuple[ArticulationAction, bool]
+  - def set_end_effector_frame(self, end_effector_frame_name: str)
+  - def get_end_effector_frame(self) -> str
+  - def get_joints_subset(self) -> ArticulationSubset
+  - def get_kinematics_solver(self) -> KinematicsSolver
+
+- class PathPlanner(WorldInterface)
+  - def __init__(self)
+  - def set_robot_base_pose(self, robot_translation: np.array, robot_orientation: np.array)
+  - def compute_path(self, active_joint_positions: np.array, watched_joint_positions: np.array) -> np.array
+  - def get_active_joints(self) -> List[str]
+  - def get_watched_joints(self) -> List[str]
+  - def set_cspace_target(self, active_joint_targets: np.array)
+  - def set_end_effector_target(self, target_translation, target_orientation = None)
+
+- class Trajectory
+  - def __init__(self)
+  - [property] def start_time(self) -> float
+  - [property] def end_time(self) -> float
+  - def get_active_joints(self) -> List[str]
+  - def get_joint_targets(self, time: float) -> Tuple[np.array, np.array]
+
+- class LulaCSpaceTrajectoryGenerator
+  - def __init__(self, robot_description_path: str, urdf_path: str)
+  - def compute_c_space_trajectory(self, waypoint_positions: np.array) -> LulaTrajectory
+  - def compute_timestamped_c_space_trajectory(self, waypoint_positions: np.array, timestamps: np.array, interpolation_mode: str = 'cubic_spline') -> LulaTrajectory
+  - def get_active_joints(self) -> List[str]
+  - def get_c_space_position_limits(self) -> np.array
+  - def get_c_space_velocity_limits(self) -> np.array
+  - def get_c_space_acceleration_limits(self) -> np.array
+  - def get_c_space_jerk_limits(self) -> np.array
+  - def set_c_space_position_limits(self, lower_position_limits: np.array, upper_position_limits: np.array)
+  - def set_c_space_velocity_limits(self, velocity_limits: np.array)
+  - def set_c_space_acceleration_limits(self, acceleration_limits: np.array)
+  - def set_c_space_jerk_limits(self, jerk_limits: np.array)
+  - def set_solver_param(self, param_name: str, param_val: Union[int, float, str])
+
+- class LulaTaskSpaceTrajectoryGenerator
+  - get_active_joints: Unknown
+  - get_c_space_position_limits: Unknown
+  - get_c_space_velocity_limits: Unknown
+  - get_c_space_acceleration_limits: Unknown
+  - get_c_space_jerk_limits: Unknown
+  - set_c_space_position_limits: Unknown
+  - set_c_space_velocity_limits: Unknown
+  - set_c_space_acceleration_limits: Unknown
+  - set_c_space_jerk_limits: Unknown
+  - set_c_space_trajectory_generator_solver_param: Unknown
+  - def __init__(self, robot_description_path: str, urdf_path: str)
+  - def get_all_frame_names(self) -> List[str]
+  - def compute_task_space_trajectory_from_points(self, positions: np.array, orientations: np.array, frame_name: str) -> LulaTrajectory
+  - def compute_task_space_trajectory_from_path_spec(self, path_spec: Union[lula.CompositePathSpec, lula.TaskSpacePathSpec], frame_name: str) -> LulaTrajectory
+  - def get_path_conversion_config(self) -> lula.TaskSpacePathConversionConfig
+
+- class ArticulationTrajectory
+  - def __init__(self, robot_articulation: SingleArticulation, trajectory: Trajectory, physics_dt: float)
+  - def get_action_at_time(self, time: float) -> ArticulationAction
+  - def get_action_sequence(self, timestep: float = None) -> List[ArticulationAction]
+  - def get_trajectory_duration(self) -> float
+  - def get_active_joints_subset(self) -> ArticulationSubset
+  - def get_robot_articulation(self) -> SingleArticulation
+  - def get_trajectory(self) -> Trajectory
+
+- class MotionPolicyController(BaseController)
+  - def __init__(self, name: str, articulation_motion_policy: ArticulationMotionPolicy)
+  - def forward(self, target_end_effector_position: np.ndarray, target_end_effector_orientation: Optional[np.ndarray] = None) -> ArticulationAction
+  - def add_obstacle(self, obstacle: isaacsim.core.api.objects, static: bool = False)
+  - def remove_obstacle(self, obstacle: isaacsim.core.api.objects)
+  - def reset(self)
+  - def get_articulation_motion_policy(self) -> ArticulationMotionPolicy
+  - def get_motion_policy(self) -> MotionPolicy

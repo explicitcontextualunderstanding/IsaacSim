@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Demonstrates a Franka robot following a target cube using RMP Flow control with interactive UI and obstacle management."""
+
+
 from isaacsim.examples.interactive.follow_target.follow_target import FollowTarget
 from isaacsim.examples.interactive.follow_target.follow_target_extension import FollowTargetExtension
+
+__all__ = ["FollowTarget"]

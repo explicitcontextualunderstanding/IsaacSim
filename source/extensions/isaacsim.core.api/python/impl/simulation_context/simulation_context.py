@@ -224,6 +224,7 @@ class SimulationContext:
             SimulationContext._instance._stage_open_callback = None
             SimulationContext._instance._physics_timer_callback = None
             SimulationContext._instance._event_timer_callback = None
+            SimulationContext._instance._on_post_physics_ready_callback = None
             SimulationContext._instance = None
             SimulationContext._sim_context_initialized = False
             SimulationManager.set_backend("numpy")

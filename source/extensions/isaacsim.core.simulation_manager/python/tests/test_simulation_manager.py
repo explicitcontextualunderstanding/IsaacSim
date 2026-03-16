@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import carb
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.app
 import omni.kit.test
 import omni.timeline
 from isaacsim.core.simulation_manager import IsaacEvents, SimulationManager
+from pxr import PhysxSchema, UsdPhysics
 
 
 class TestSimulationManagerBackend(omni.kit.test.AsyncTestCase):
@@ -117,7 +119,7 @@ class TestSimulationManagerDefaultCallbacks(omni.kit.test.AsyncTestCase):
         self.assertTrue(all(status.values()))
 
         # Test get_default_callback_status returns correct keys
-        expected_keys = {"warm_start", "on_stop", "post_warm_start", "stage_open"}
+        expected_keys = {"warm_start", "on_stop", "post_warm_start", "stage_open", "stage_close"}
         self.assertEqual(set(status.keys()), expected_keys)
 
         # Test invalid callback name returns False
@@ -274,27 +276,34 @@ class TestSimulationManagerPhysicsSceneSettings(omni.kit.test.AsyncTestCase):
             with self.assertRaises(ValueError):
                 SimulationManager.set_physics_dt(1.5)
 
-        # Test broadphase type
-        for btype in ["MBP", "GPU"]:
-            try:
-                SimulationManager.set_broadphase_type(btype)
-                result = SimulationManager.get_broadphase_type()
-                self.assertEqual(result, btype)
-            except Exception as e:
-                print(f"test_physics_scene_settings_no_scene broadphase failed for {btype}: {e}")
+        # PhysX-specific settings - only test assertions when PhysX is active
+        is_physx = SimulationManager.get_active_physics_engine() == "physx"
 
-        # Test solver type
-        for solver in ["TGS", "PGS"]:
-            try:
-                SimulationManager.set_solver_type(solver)
-                result = SimulationManager.get_solver_type()
-                self.assertEqual(result, solver)
-            except Exception as e:
-                print(f"test_physics_scene_settings_no_scene solver failed for {solver}: {e}")
+        if is_physx:
+            # Test broadphase type (PhysX-specific)
+            for btype in ["MBP", "GPU"]:
+                try:
+                    SimulationManager.set_broadphase_type(btype)
+                    result = SimulationManager.get_broadphase_type()
+                    self.assertEqual(result, btype)
+                    # For Newton, set_broadphase_type is a no-op, get returns default
+                except Exception as e:
+                    print(f"test_physics_scene_settings_no_scene broadphase failed for {btype}: {e}")
 
-        # Test invalid solver type raises exception
-        with self.assertRaises(Exception):
-            SimulationManager.set_solver_type("INVALID")
+        # Test solver type (PhysX-specific)
+        if is_physx:
+            for solver in ["TGS", "PGS"]:
+                try:
+                    SimulationManager.set_solver_type(solver)
+                    result = SimulationManager.get_solver_type()
+                    self.assertEqual(result, solver)
+                except Exception as e:
+                    print(f"test_physics_scene_settings_no_scene solver failed for {solver}: {e}")
+
+        # Test invalid solver type raises exception (PhysX-specific)
+        if is_physx:
+            with self.assertRaises(ValueError):
+                SimulationManager.set_solver_type("INVALID")
 
         # Test CCD
         try:
@@ -302,31 +311,34 @@ class TestSimulationManagerPhysicsSceneSettings(omni.kit.test.AsyncTestCase):
         except Exception as e:
             print(f"test_physics_scene_settings_no_scene failed to set device to cpu: {e}")
 
-        try:
-            SimulationManager.enable_ccd(True)
-            self.assertTrue(SimulationManager.is_ccd_enabled())
-            SimulationManager.enable_ccd(False)
-            self.assertFalse(SimulationManager.is_ccd_enabled())
-        except Exception as e:
-            print(f"test_physics_scene_settings_no_scene ccd failed: {e}")
+        if is_physx:
+            try:
+                SimulationManager.enable_ccd(True)
+                self.assertTrue(SimulationManager.is_ccd_enabled())
+                SimulationManager.enable_ccd(False)
+                self.assertFalse(SimulationManager.is_ccd_enabled())
+            except Exception as e:
+                print(f"test_physics_scene_settings_no_scene ccd failed: {e}")
 
-        # Test GPU dynamics
-        try:
-            SimulationManager.enable_gpu_dynamics(True)
-            self.assertTrue(SimulationManager.is_gpu_dynamics_enabled())
-            SimulationManager.enable_gpu_dynamics(False)
-            self.assertFalse(SimulationManager.is_gpu_dynamics_enabled())
-        except Exception as e:
-            print(f"test_physics_scene_settings_no_scene gpu_dynamics failed: {e}")
+        # Test GPU dynamics (PhysX-specific)
+        if is_physx:
+            try:
+                SimulationManager.enable_gpu_dynamics(True)
+                self.assertTrue(SimulationManager.is_gpu_dynamics_enabled())
+                SimulationManager.enable_gpu_dynamics(False)
+                self.assertFalse(SimulationManager.is_gpu_dynamics_enabled())
+            except Exception as e:
+                print(f"test_physics_scene_settings_no_scene gpu_dynamics failed: {e}")
 
-        # Test stabilization
-        try:
-            SimulationManager.enable_stablization(True)
-            self.assertTrue(SimulationManager.is_stablization_enabled())
-            SimulationManager.enable_stablization(False)
-            self.assertFalse(SimulationManager.is_stablization_enabled())
-        except Exception as e:
-            print(f"test_physics_scene_settings_no_scene stabilization failed: {e}")
+        # Test stabilization (PhysX-specific)
+        if is_physx:
+            try:
+                SimulationManager.enable_stablization(True)
+                self.assertTrue(SimulationManager.is_stablization_enabled())
+                SimulationManager.enable_stablization(False)
+                self.assertFalse(SimulationManager.is_stablization_enabled())
+            except Exception as e:
+                print(f"test_physics_scene_settings_no_scene stabilization failed: {e}")
 
         # Test get default physics scene
         scene = SimulationManager.get_default_physics_scene()
@@ -335,6 +347,8 @@ class TestSimulationManagerPhysicsSceneSettings(omni.kit.test.AsyncTestCase):
 
     async def test_physics_scene_settings_with_scene(self):
         """Test all physics scene settings with a specific physics scene."""
+        if SimulationManager._engine != "physx":
+            self.skipTest(f"Skipping PhysX-specific test (active engine: {SimulationManager._engine})")
         await self._create_physics_scene()
 
         # Test set physics dt with physics scene
@@ -485,13 +499,11 @@ class TestSimulationManagerCallbacks(omni.kit.test.AsyncTestCase):
 
         # Test deregistering callback
         callback_id = SimulationManager.register_callback(lambda x: None, event=IsaacEvents.PHYSICS_READY)
-        SimulationManager.deregister_callback(callback_id)
-        with self.assertRaises(Exception):
-            SimulationManager.deregister_callback(callback_id)
+        self.assertTrue(SimulationManager.deregister_callback(callback_id))
+        self.assertFalse(SimulationManager.deregister_callback(callback_id))
 
-        # Test deregistering invalid callback raises exception
-        with self.assertRaises(Exception):
-            SimulationManager.deregister_callback(999999)
+        # Test deregistering invalid callback (log a warning and do nothing)
+        self.assertFalse(SimulationManager.deregister_callback(999999))
 
     async def test_event_dispatch(self):
         """Test that all events are dispatched correctly."""
@@ -633,6 +645,97 @@ class TestSimulationManagerSimulationLifecycle(omni.kit.test.AsyncTestCase):
         self.assertIsInstance(result, bool)
 
 
+class TestSimulationManagerPhysicsEngines(omni.kit.test.AsyncTestCase):
+    """Tests for SimulationManager physics engine switching and management."""
+
+    async def setUp(self):
+        """Method called to prepare the test fixture."""
+        super().setUp()
+        await stage_utils.create_new_stage_async()
+        # Create a physics scene with proper PhysX schema
+        stage = stage_utils.get_current_stage()
+        scene_prim = stage_utils.define_prim("/World/PhysicsScene")
+        UsdPhysics.Scene.Define(stage, scene_prim.GetPath())
+        PhysxSchema.PhysxSceneAPI.Apply(scene_prim)
+        await omni.kit.app.get_app().next_update_async()
+        # Register the physics scene with SimulationManager
+        SimulationManager.set_default_physics_scene("/World/PhysicsScene")
+        self._original_engine = SimulationManager.get_active_physics_engine()
+
+    async def tearDown(self):
+        """Method called immediately after the test method has been called."""
+        if self._original_engine:
+            try:
+                SimulationManager.switch_physics_engine(self._original_engine, verbose=False)
+            except Exception:
+                pass
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        super().tearDown()
+
+    async def test_engine_query_and_switching(self):
+        """Test engine query methods and switching to PhysX."""
+        # This test is specific to PhysX - skip if another engine is active
+        if SimulationManager.get_active_physics_engine() != "physx":
+            self.skipTest(
+                f"Skipping PhysX-specific test (active engine: {SimulationManager.get_active_physics_engine()})"
+            )
+        # Test get_active_physics_engine returns PhysX by default
+        engine = SimulationManager.get_active_physics_engine()
+        self.assertEqual(engine, "physx")
+
+        # Test get_available_physics_engines returns list with PhysX
+        engines = SimulationManager.get_available_physics_engines(verbose=False)
+        self.assertGreater(len(engines), 0)
+        engine_names = [e[0] for e in engines]
+        self.assertIn("physx", engine_names)
+
+        # Test switching to same engine
+        result = SimulationManager.switch_physics_engine("physx", verbose=False)
+        self.assertTrue(result)
+        self.assertEqual(SimulationManager.get_active_physics_engine(), "physx")
+
+    async def test_invalid_switch_preserves_state(self):
+        """Test that invalid engine switches preserve all state and PhysX continues working."""
+        # This test is specific to PhysX - skip if another engine is active
+        if SimulationManager.get_active_physics_engine() != "physx":
+            self.skipTest(
+                f"Skipping PhysX-specific test (active engine: {SimulationManager.get_active_physics_engine()})"
+            )
+        # Capture state before invalid switches
+        engine_before = SimulationManager.get_active_physics_engine()
+        dt_before = SimulationManager.get_physics_dt()
+        broadphase_before = SimulationManager.get_broadphase_type()
+        solver_before = SimulationManager.get_solver_type()
+        ccd_before = SimulationManager.is_ccd_enabled()
+        gpu_before = SimulationManager.is_gpu_dynamics_enabled()
+        stab_before = SimulationManager.is_stablization_enabled()
+
+        # Attempt invalid switch
+        self.assertFalse(SimulationManager.switch_physics_engine("invalid_engine", verbose=False))
+
+        # Verify all state is preserved
+        self.assertEqual(SimulationManager.get_active_physics_engine(), engine_before)
+        self.assertEqual(SimulationManager.get_physics_dt(), dt_before)
+        self.assertEqual(SimulationManager.get_broadphase_type(), broadphase_before)
+        self.assertEqual(SimulationManager.get_solver_type(), solver_before)
+        self.assertEqual(SimulationManager.is_ccd_enabled(), ccd_before)
+        self.assertEqual(SimulationManager.is_gpu_dynamics_enabled(), gpu_before)
+        self.assertEqual(SimulationManager.is_stablization_enabled(), stab_before)
+
+        # Verify PhysX methods still work correctly
+        SimulationManager.set_broadphase_type("GPU")
+        self.assertEqual(SimulationManager.get_broadphase_type(), "GPU")
+
+        SimulationManager.set_solver_type("PGS")
+        self.assertEqual(SimulationManager.get_solver_type(), "PGS")
+
+        # Restore original values
+        SimulationManager.set_broadphase_type(broadphase_before)
+        SimulationManager.set_solver_type(solver_before)
+
+
 class TestSimulationManagerFabricAndNoticeHandlers(omni.kit.test.AsyncTestCase):
     """Tests for SimulationManager fabric and USD notice handler management."""
 
@@ -649,8 +752,8 @@ class TestSimulationManagerFabricAndNoticeHandlers(omni.kit.test.AsyncTestCase):
         """Test all fabric and USD notice handler functionality."""
         # Test enable/disable fabric
         try:
-            SimulationManager.enable_fabric(True)
             SimulationManager.enable_fabric(False)
+            SimulationManager.enable_fabric(True)
         except Exception as e:
             print(f"test_fabric_and_notice_handlers enable_fabric failed: {e}")
 
@@ -659,9 +762,10 @@ class TestSimulationManagerFabricAndNoticeHandlers(omni.kit.test.AsyncTestCase):
         self.assertIsInstance(result, bool)
 
         # Test enable/disable USD notice handler
+
         try:
-            SimulationManager.enable_usd_notice_handler(True)
             SimulationManager.enable_usd_notice_handler(False)
+            SimulationManager.enable_usd_notice_handler(True)
         except Exception as e:
             print(f"test_fabric_and_notice_handlers usd_notice_handler failed: {e}")
 
@@ -670,10 +774,314 @@ class TestSimulationManagerFabricAndNoticeHandlers(omni.kit.test.AsyncTestCase):
             stage = stage_utils.get_current_stage()
             stage_id = stage_utils.get_stage_id(stage)
 
-            SimulationManager.enable_fabric_usd_notice_handler(stage_id, True)
             SimulationManager.enable_fabric_usd_notice_handler(stage_id, False)
+            SimulationManager.enable_fabric_usd_notice_handler(stage_id, True)
 
             result = SimulationManager.is_fabric_usd_notice_handler_enabled(stage_id)
             self.assertIsInstance(result, bool)
         except Exception as e:
             print(f"test_fabric_and_notice_handlers fabric_usd_notice_handler failed: {e}")
+
+
+class TestSimulationManagerStageTransitions(omni.kit.test.AsyncTestCase):
+    """Tests for SimulationManager behavior during stage transitions and prim invalidation."""
+
+    async def setUp(self):
+        """Method called to prepare the test fixture."""
+        super().setUp()
+        await stage_utils.create_new_stage_async()
+        self._physics_scene_path = "/PhysicsScene"
+
+    async def tearDown(self):
+        """Method called immediately after the test method has been called."""
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        super().tearDown()
+
+    async def test_stale_physics_scene_prim_reference(self):
+        """Test that SimulationManager handles stale prim references gracefully.
+
+        This test directly simulates the bug condition where the _physics_scenes
+        dictionary contains a PhysxScene with an invalid/expired prim reference.
+
+        This reproduces the exact issue that caused failures in robot_setup.assembler tests,
+        where certain USD operations invalidate physics scene prims without triggering
+        the deletion callback.
+
+        The sequence:
+        1. Create physics scene and start simulation (caches PhysxScene with prim reference)
+        2. Stop simulation
+        3. Simulate prim invalidation by clearing root layer and recreating scene
+        4. The cached PhysxScene now has a stale prim reference
+        5. Try to play - without fix, this raises RuntimeError for expired prim
+        """
+        from pxr import Sdf
+
+        # Create physics scene and start simulation
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify simulation started and physics scene is cached
+        self.assertTrue(SimulationManager.is_simulating())
+        physics_scenes_before = SimulationManager.get_physics_scenes()
+        self.assertGreater(len(physics_scenes_before), 0, "Physics scene should be cached")
+
+        # Store reference to cached prim for verification later
+        cached_prim = physics_scenes_before[0].prim
+        self.assertTrue(cached_prim.IsValid(), "Cached prim should be valid initially")
+
+        # Stop simulation
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Simulate the bug condition: Clear the root layer's content which invalidates
+        # the cached prim reference, but does NOT trigger the deletion callback
+        # that would remove the entry from _physics_scenes
+        stage = stage_utils.get_current_stage()
+        root_layer = stage.GetRootLayer()
+
+        # Clear the layer content - this invalidates existing prim references
+        root_layer.Clear()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify the cached prim is now invalid (the bug condition)
+        self.assertFalse(cached_prim.IsValid(), "Cached prim should be invalid after layer clear")
+
+        # Verify _physics_scenes still has the stale entry (this is the bug)
+        physics_scenes_after_clear = SimulationManager.get_physics_scenes()
+        # Note: The stale entry may or may not still be present depending on
+        # whether the fix is enabled
+
+        # Create a new physics scene at the same path
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+        # Try to play again - without the fix, this raises:
+        # RuntimeError: Accessed invalid expired 'PhysicsScene' prim </PhysicsScene>
+        timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify simulation is running
+        self.assertTrue(SimulationManager.is_simulating())
+
+        # Verify we can access physics scene properties without error
+        dt = SimulationManager.get_physics_dt()
+        self.assertIsNotNone(dt)
+        self.assertGreater(dt, 0)
+
+    async def test_physics_scene_prim_invalidation_on_stage_change(self):
+        """Test that SimulationManager handles expired physics scene prims gracefully.
+
+        This test verifies that when a stage is changed (e.g., new stage opened),
+        the SimulationManager properly handles the case where cached physics scene
+        prim references become invalid/expired.
+
+        The sequence that can cause issues:
+        1. Create physics scene and start simulation (caches PhysxScene with prim reference)
+        2. Stop simulation
+        3. Open new stage (invalidates the cached prim reference)
+        4. Play again - should not raise RuntimeError for expired prim
+        """
+        # Create physics scene and start simulation
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify simulation started successfully
+        self.assertTrue(SimulationManager.is_simulating())
+
+        # Stop simulation
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Open a new stage - this invalidates any cached prim references
+        await stage_utils.create_new_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Create a new physics scene on the new stage
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+        # Play again - this should NOT raise RuntimeError for expired prim
+        # The SimulationManager should properly handle the stage transition
+        timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify simulation is running on the new stage
+        self.assertTrue(SimulationManager.is_simulating())
+
+        # Verify we can access physics scene properties without error
+        dt = SimulationManager.get_physics_dt()
+        self.assertIsNotNone(dt)
+        self.assertGreater(dt, 0)
+
+    async def test_physics_scene_deletion_during_simulation(self):
+        """Test SimulationManager behavior when physics scene is deleted.
+
+        This test verifies that deleting a physics scene prim while simulation
+        is stopped doesn't cause errors when trying to play again.
+        """
+        # Create physics scene and start simulation
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify simulation started
+        self.assertTrue(SimulationManager.is_simulating())
+
+        # Stop simulation
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Delete the physics scene prim
+        stage = stage_utils.get_current_stage()
+        stage.RemovePrim(self._physics_scene_path)
+        await omni.kit.app.get_app().next_update_async()
+
+        # Create a new physics scene
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+        # Play again - should handle the prim recreation gracefully
+        timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Verify simulation is running
+        self.assertTrue(SimulationManager.is_simulating())
+
+    async def test_multiple_stage_transitions(self):
+        """Test SimulationManager across multiple stage open/close cycles.
+
+        This test verifies that repeated stage transitions don't accumulate
+        stale physics scene references.
+        """
+        timeline = omni.timeline.get_timeline_interface()
+
+        for i in range(3):
+            # Create new stage
+            await stage_utils.create_new_stage_async()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Create physics scene
+            stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+            await omni.kit.app.get_app().next_update_async()
+
+            # Play simulation
+            timeline.play()
+            await omni.kit.app.get_app().next_update_async()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Verify simulation started
+            self.assertTrue(SimulationManager.is_simulating(), f"Simulation failed to start on iteration {i}")
+
+            # Verify physics dt is accessible
+            dt = SimulationManager.get_physics_dt()
+            self.assertIsNotNone(dt, f"Physics dt was None on iteration {i}")
+
+            # Stop simulation
+            timeline.stop()
+            await omni.kit.app.get_app().next_update_async()
+
+
+class TestSimulationManagerMultiTickRendering(omni.kit.test.AsyncTestCase):
+    """Tests for SimulationManager multi-tick rendering mode support."""
+
+    async def setUp(self):
+        """Method called to prepare the test fixture."""
+        super().setUp()
+        # Enable multi-tick rate support
+        carb.settings.get_settings().set_bool("/rtx/hydra/supportMultiTickRate", True)
+        await stage_utils.create_new_stage_async()
+        self._physics_scene_path = "/World/PhysicsScene"
+        stage_utils.define_prim(self._physics_scene_path, type_name="PhysicsScene")
+        await omni.kit.app.get_app().next_update_async()
+
+    async def tearDown(self):
+        """Method called immediately after the test method has been called."""
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        super().tearDown()
+        carb.settings.get_settings().set_bool("/rtx/hydra/supportMultiTickRate", False)
+
+    async def test_multi_tick_simulation_time_update(self):
+        """Test that simulation time is updated correctly with multi-tick rendering mode.
+
+        This test verifies that when /rtx/hydra/supportMultiTickRate is enabled,
+        the simulation time is properly propagated to the run loop for SWH synchronization.
+        The SWHExternalSimulationTime should start at zero and increase with each physics step.
+        """
+
+        # Track the SWHExternalSimulationTime values received in update events
+        received_sim_times = []
+
+        def _update_callback(event):
+            if "SWHExternalSimulationTime" in event.payload:
+                received_sim_times.append(event.payload["SWHExternalSimulationTime"])
+
+        subscription = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+            on_event=_update_callback,
+            observer_name="test_multi_tick_simulation_time",
+        )
+
+        # Start simulation
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.play()
+
+        # First update after play - simulation time should be zero initially
+        await omni.kit.app.get_app().next_update_async()
+
+        self.assertTrue(SimulationManager.is_simulating())
+        self.assertGreater(len(received_sim_times), 0, "SWHExternalSimulationTime was not received")
+
+        # The first received time should be zero (or very close to zero)
+        first_time = received_sim_times[0]
+        self.assertAlmostEqual(first_time, 0.0, places=5, msg="Initial SWHExternalSimulationTime should be zero")
+
+        # Run several more updates and verify time increases
+        for i in range(5):
+            prev_time = received_sim_times[-1]
+            previous_sim_time = SimulationManager.get_simulation_time()
+            await omni.kit.app.get_app().next_update_async()
+
+            # Should have received new time values
+            self.assertGreater(len(received_sim_times), i + 1)
+
+            # Each new time should be greater than the previous
+            current_time = received_sim_times[-1]
+            self.assertGreater(current_time, prev_time, f"SWHExternalSimulationTime should increase on step {i + 1}")
+
+        # Verify the times match - SWH time is updated after sim time advances,
+        # so the final SWH time should match the second-to-last simulation time
+        final_swh_time = received_sim_times[-1]
+        self.assertAlmostEqual(
+            final_swh_time,
+            previous_sim_time,
+            places=5,
+            msg="SWHExternalSimulationTime should advance by physics dt each step",
+        )
+
+        # Stop simulation
+        timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+
+        # Cleanup
+        subscription = None

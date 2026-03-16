@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides wrapper class for running motion policies on simulated robots."""
+
+
 import carb
 from isaacsim.core.api.articulations import ArticulationSubset
 from isaacsim.core.deprecation_manager import import_module
@@ -28,22 +31,17 @@ class ArticulationMotionPolicy:
     """Wrapper class for running MotionPolicy on simulated robots.
 
     Args:
-        robot_articulation (SingleArticulation): an initialized robot Articulation object
-        motion_policy (MotionPolicy): an instance of a class that implements the MotionPolicy interface
-        default_physics_dt (float): Default physics step size to use when computing actions. A MotionPolicy computes a target
-            position/velocity for the next frame of the simulation using the provided physics dt to know how far in the future that will be.
-            Isaac Sim can be run with a constant or variable physics framerate.
-            When not specified on an individual frame, the dt of the frame is assumed
-            to be the provided default value.
-
-    Returns:
-        None
-
+        robot_articulation: An initialized robot Articulation object.
+        motion_policy: An instance of a class that implements the MotionPolicy interface.
+        default_physics_dt: Default physics step size to use when computing actions. A MotionPolicy computes a target
+            position/velocity for the next frame of the simulation using the provided physics dt to know how far in the
+            future that will be. Isaac Sim can be run with a constant or variable physics framerate. When not specified
+            on an individual frame, the dt of the frame is assumed to be the provided default value.
     """
 
     def __init__(
         self, robot_articulation: SingleArticulation, motion_policy: MotionPolicy, default_physics_dt: float = 1 / 60.0
-    ) -> None:
+    ):
 
         self.physics_dt = default_physics_dt
         self._robot_articulation = robot_articulation
@@ -57,15 +55,12 @@ class ArticulationMotionPolicy:
 
         self._default_physics_dt = default_physics_dt
 
-    def move(self, physics_dt: float = None) -> None:
+    def move(self, physics_dt: float = None):
         """Use underlying MotionPolicy to compute and apply joint targets to the robot over the next frame.
 
         Args:
-            physics_dt (float): Physics dt to use on this frame to calculate the next action.  This overrides
+            physics_dt: Physics dt to use on this frame to calculate the next action. This overrides
                 the default_physics_dt argument, but does not change the default on future calls.
-
-        Return:
-            None
         """
         action = self.get_next_articulation_action(physics_dt=physics_dt)
         self._articulation_controller.apply_action(action)
@@ -74,11 +69,11 @@ class ArticulationMotionPolicy:
         """Use underlying MotionPolicy to compute joint targets for the robot over the next frame.
 
         Args:
-            physics_dt (float): Physics dt to use on this frame to calculate the next action.  This overrides
+            physics_dt: Physics dt to use on this frame to calculate the next action. This overrides
                 the default_physics_dt argument, but does not change the default on future calls.
 
         Returns:
-            ArticulationAction: Desired position/velocity target for the robot in the next frame
+            Desired position/velocity target for the robot in the next frame.
         """
 
         if physics_dt is None:
@@ -118,7 +113,7 @@ class ArticulationMotionPolicy:
         """Get view into active joints
 
         Returns:
-            ArticulationSubset: returns robot states for active joints in an order compatible with the MotionPolicy
+            Returns robot states for active joints in an order compatible with the MotionPolicy.
         """
         return self._active_joints_view
 
@@ -126,7 +121,7 @@ class ArticulationMotionPolicy:
         """Get view into watched joints
 
         Returns:
-            ArticulationSubset: returns robot states for watched joints in an order compatible with the MotionPolicy
+            Returns robot states for watched joints in an order compatible with the MotionPolicy.
         """
         return self._watched_joints_view
 
@@ -134,7 +129,7 @@ class ArticulationMotionPolicy:
         """Get the underlying Articulation object representing the robot.
 
         Returns:
-            SingleArticulation: Articulation object representing the robot.
+            Articulation object representing the robot.
         """
         return self._robot_articulation
 
@@ -142,7 +137,7 @@ class ArticulationMotionPolicy:
         """Get MotionPolicy that is being used to compute ArticulationActions
 
         Returns:
-            MotionPolicy: MotionPolicy being used to compute ArticulationActions
+            MotionPolicy being used to compute ArticulationActions.
         """
         return self.motion_policy
 
@@ -150,17 +145,14 @@ class ArticulationMotionPolicy:
         """Get the default value of the physics dt that is used to compute actions when none is provided
 
         Returns:
-            float: Default physics dt
+            Default physics dt.
         """
         return self._default_physics_dt
 
-    def set_default_physics_dt(self, physics_dt: float) -> None:
+    def set_default_physics_dt(self, physics_dt: float):
         """Set the default value of the physics dt that is used to compute actions when none is provided
 
         Args:
-            physics_dt (float): Default physics dt
-
-        Returns:
-            None
+            physics_dt: Default physics dt.
         """
         self._default_physics_dt = physics_dt

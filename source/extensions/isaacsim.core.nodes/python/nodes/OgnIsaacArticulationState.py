@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.core.nodes import BaseResetNode
 from isaacsim.core.nodes.ogn.OgnIsaacArticulationStateDatabase import OgnIsaacArticulationStateDatabase
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.stage import get_current_stage
 from pxr import UsdPhysics
 
 
@@ -33,13 +33,12 @@ class OgnIsaacArticulationStateInternalState(BaseResetNode):
 
         self._dof_names = []
         self._dof_indices = None
-        self._joint_indices = None
+        self._link_indices = None
         self._articulation = None
         super().__init__(initialize=False)
 
     def initialize_articulation(self):
-        self._articulation = SingleArticulation(self.robot_prim, reset_xform_properties=False)
-        self._articulation.initialize()
+        self._articulation = Articulation(self.robot_prim)
         self.initialized = True
 
     def pick_dofs(self, dof_names, dof_indices):
@@ -48,7 +47,7 @@ class OgnIsaacArticulationStateInternalState(BaseResetNode):
         # names given
         if len(self.dof_names):
             self._dof_names = self.dof_names[:]
-            self._dof_indices = np.array([self._articulation.get_dof_index(name) for name in self.dof_names])
+            self._dof_indices = self._articulation.get_dof_indices(self.dof_names).numpy().flatten()
         # DOF indexes given
         elif self.dof_indices.size:
             self._dof_names = [self._articulation.dof_names[index] for index in self.dof_indices]
@@ -56,15 +55,15 @@ class OgnIsaacArticulationStateInternalState(BaseResetNode):
         # no names or indexes (all DOFs)
         else:
             self._dof_names = self._articulation.dof_names
-            self._dof_indices = np.array([self._articulation.get_dof_index(name) for name in self._dof_names])
+            self._dof_indices = self._articulation.get_dof_indices(self._dof_names).numpy().flatten()
         # get joint indices
-        self._joint_indices = []
-        stage = get_current_stage()
-        dof_paths = {path.split("/")[-1]: path for path in self._articulation._articulation_view._dof_paths[0]}
+        self._link_indices = []
+        stage = stage_utils.get_current_stage(backend="usd")
+        dof_paths = {path.split("/")[-1]: path for path in self._articulation.dof_paths[0]}
         for name in self._dof_names:
             joint = UsdPhysics.Joint.Get(stage, dof_paths[name])
             link_name = stage.GetPrimAtPath(joint.GetBody1Rel().GetTargets()[0]).GetName()
-            self._joint_indices.append(self._articulation._articulation_view.get_link_index(link_name))
+            self._link_indices.append(self._articulation.get_link_indices(link_name).numpy().item())
 
     def get_dof_names(self):
         return self._dof_names
@@ -72,17 +71,14 @@ class OgnIsaacArticulationStateInternalState(BaseResetNode):
     def get_articulation_state(self):
         positions, velocities, efforts, forces, torques = [], [], [], [], []
         if self.initialized:
-            positions = self._articulation.get_joint_positions(self._dof_indices)
-            velocities = self._articulation.get_joint_velocities(self._dof_indices)
-            efforts = self._articulation.get_measured_joint_efforts(self._dof_indices)
-            forces_torques = self._articulation.get_measured_joint_forces(self._joint_indices)
-            forces = forces_torques[:, :3]
-            torques = forces_torques[:, 3:]
-        return positions, velocities, efforts, forces, torques
+            positions = self._articulation.get_dof_positions(dof_indices=self._dof_indices)
+            velocities = self._articulation.get_dof_velocities(dof_indices=self._dof_indices)
+            efforts = self._articulation.get_dof_projected_joint_forces(dof_indices=self._dof_indices)
+            forces, torques = self._articulation.get_link_incoming_joint_force(link_indices=self._link_indices)
+        return positions.numpy()[0], velocities.numpy()[0], efforts.numpy()[0], forces.numpy()[0], torques.numpy()[0]
 
     def custom_reset(self):
         self._articulation = None
-        pass
 
 
 class OgnIsaacArticulationState:

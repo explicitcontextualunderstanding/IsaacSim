@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Writer for the DOPE (Deep Object Pose Estimation) dataset format."""
+
+
 import io
 import json
 from typing import Dict, List
@@ -22,9 +25,25 @@ import numpy as np
 from omni.replicator.core import AnnotatorRegistry, BackendDispatch, Writer, WriterRegistry
 from omni.syntheticdata import SyntheticData
 
-from ..utils import NumpyEncoder
-
 NodeTemplate, NodeConnectionTemplate = SyntheticData.NodeTemplate, SyntheticData.NodeConnectionTemplate
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy arrays by converting them to lists."""
+
+    def default(self, obj):
+        """Serialize numpy arrays to JSON-compatible lists.
+
+        Args:
+            obj: The object to serialize. If it's a numpy array, converts to list.
+
+        Returns:
+            JSON-serializable representation of the object.
+        """
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
 
 __version__ = "0.0.1"
 
@@ -35,26 +54,29 @@ class DOPEWriter(Writer):
     .. deprecated::
         This class has been deprecated and will be removed in the next major release.
 
-    Attributes:
-        output_dir:
-            Output directory string that indicates the directory to save the results. If use_s3 == True, this will be the bucket name.
-        semantic_types:
-            List of semantic types to consider when filtering annotator data. Default: ["class"]
-        image_output_format:
-            String that indicates the format of saved RGB images. Default: "png"
-        use_s3:
-            Boolean value that indicates whether output will be written to s3 bucket. Default: False
+    Args:
+        output_dir: Output directory string that indicates the directory to save the results.
+            If use_s3 == True, this will be the bucket name.
+        class_name_to_index_map: Dictionary mapping class names to their corresponding indices.
+        semantic_types: List of semantic types to consider when filtering annotator data.
+        image_output_format: String that indicates the format of saved RGB images.
+        use_s3: Boolean value that indicates whether output will be written to s3 bucket.
+        bucket_name: Name of the S3 bucket when using S3 output.
+        endpoint_url: Custom endpoint URL for S3 service.
+        s3_region: AWS region for S3 bucket.
 
     Example:
-        >>> import omni.replicator.core as rep
-        >>> camera = rep.create.camera()
-        >>> render_product = rep.create.render_product(camera, (512, 512))
-        >>> writer = rep.WriterRegistry.get("DOPEWriter")
-        >>> import carb
-        >>> tmp_dir = carb.tokens.get_tokens_interface().resolve("${temp}/rgb")
-        >>> writer.initialize(output_dir=tmp_dir, class_name_to_index_map=class_name_to_index_map)
-        >>> writer.attach([render_product])
-        >>> rep.orchestrator.run()
+        .. code-block:: python
+
+            >>> import omni.replicator.core as rep
+            >>> camera = rep.create.camera()
+            >>> render_product = rep.create.render_product(camera, (512, 512))
+            >>> writer = rep.WriterRegistry.get("DOPEWriter")
+            >>> import carb
+            >>> tmp_dir = carb.tokens.get_tokens_interface().resolve("${temp}/rgb")
+            >>> writer.initialize(output_dir=tmp_dir, class_name_to_index_map=class_name_to_index_map)
+            >>> writer.attach([render_product])
+            >>> rep.orchestrator.run()
     """
 
     def __init__(
@@ -248,7 +270,7 @@ class DOPEWriter(Writer):
 
         file_path = f"{render_product_path}{image_id}.json"
         buf = io.BytesIO()
-        buf.write(json.dumps(output, indent=2, cls=NumpyEncoder).encode())
+        buf.write(json.dumps(output, indent=2, cls=_NumpyEncoder).encode())
         self._backend.write_blob(file_path, buf.getvalue())
 
     def _check_frame_validity(self, data: dict) -> bool:

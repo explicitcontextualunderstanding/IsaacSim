@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.1.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
 ## [3.0.3] - 2025-10-27
 ### Changed
 - Make omni.isaac.ml_archive an explicit test dependency

@@ -290,7 +290,6 @@ def main():
     extension_dirs = [
         str(repo_root / "source" / "deprecated"),
         str(repo_root / "source" / "extensions"),
-        # str(repo_root / "source" / "internal_extensions"),
     ]
 
     # Extensions to exclude from checking

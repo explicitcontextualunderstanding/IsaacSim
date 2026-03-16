@@ -19,6 +19,44 @@ import cv2
 import numpy as np
 
 
+def debug_draw_clear_points():
+    """Clear all debug draw points from the viewport."""
+    from isaacsim.util.debug_draw import _debug_draw
+
+    draw_iface = _debug_draw.acquire_debug_draw_interface()
+    draw_iface.clear_points()
+
+
+def debug_draw_pointcloud(pointcloud_data, color, size, clear_existing=False):
+    """Draw a pointcloud in the viewport for visual debugging.
+
+    Args:
+        pointcloud_data: NumPy array with shape (N, 3) containing 3D points.
+        color: RGBA tuple for the point color (e.g., (1, 0, 0, 1) for red).
+        size: Size of the points to draw.
+        clear_existing: If True, clear existing points before drawing.
+    """
+    if not (isinstance(pointcloud_data, np.ndarray) and pointcloud_data.ndim == 2 and pointcloud_data.shape[1] == 3):
+        print("Warning: pointcloud_data must be a NumPy array with shape (N, 3).")
+        return
+
+    from isaacsim.util.debug_draw import _debug_draw
+
+    draw_iface = _debug_draw.acquire_debug_draw_interface()
+
+    points_cloud = []
+    colors_cloud = []
+    sizes_cloud = []
+    for i in range(pointcloud_data.shape[0]):
+        points_cloud.append(pointcloud_data[i].tolist())
+        colors_cloud.append(color)
+        sizes_cloud.append(size)
+
+    if clear_existing:
+        debug_draw_clear_points()
+    draw_iface.draw_points(points_cloud, colors_cloud, sizes_cloud)
+
+
 def save_image(
     image, filename: str, golden_dir: str, test_dir: str, save_as_golden: bool = False, save_as_test: bool = False
 ) -> None:

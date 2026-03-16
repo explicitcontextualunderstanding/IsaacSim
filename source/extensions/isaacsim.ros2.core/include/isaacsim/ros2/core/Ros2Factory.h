@@ -192,6 +192,15 @@ public:
     virtual std::shared_ptr<Ros2ImageMessage> createImageMessage() = 0;
 
     /**
+     * @brief Create a ROS 2 `sensor_msgs/msg/CompressedImage` message.
+     * @details
+     * Creates a message that can be used to publish compressed image data (e.g., H264, HEVC).
+     *
+     * @return Shared pointer to the created compressed image message.
+     */
+    virtual std::shared_ptr<Ros2CompressedImageMessage> createCompressedImageMessage() = 0;
+
+    /**
      * @brief Create a ROS 2 `isaac_ros_nitros_bridge_interfaces/msg/NitrosBridgeImage` message.
      * @details
      * Creates a message that can be used for transferring images between NITROS and ROS 2.

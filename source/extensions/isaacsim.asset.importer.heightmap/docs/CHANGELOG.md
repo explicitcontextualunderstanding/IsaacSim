@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.2.1] - 2026-02-23
+### Changed
+- Add isaacsim.core.experimental.objects dependency, remove omni.physics.physx dependency for groundplane creation
+
 ## [2.2.0] - 2025-11-05
 ### Changed
 - Renamed Block World Generator to Heightmap Importer

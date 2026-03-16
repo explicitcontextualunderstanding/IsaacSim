@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.5.1] - 2026-03-09
+### Fixed
+- Hardened subprocess call to avoid shell=True with string concatenation
+
+## [1.5.0] - 2026-02-26
+### Added
+- CompressedImage message backend
+
+## [1.4.0] - 2026-02-24
+### Changed
+-  Removed hardcoded ROS 2 distribution checks. Added experimental support for any ROS 2 distribution beyond Jazzy to be sourced and used with Isaac Sim.
+
+## [1.3.1] - 2026-02-20
+### Changed
+- Fixed ROS 2 service request polling so `takeRequest()` can receive a pending request on its first poll call.
+- Added a regression doctest covering first-poll request/response behavior for `Ros2Service`.
+
+## [1.3.0] - 2026-02-01
+### Changed
+- Removed isaacsim.sensors.experimental.physics dependency
+
+## [1.2.7] - 2026-01-23
+### Changed
+- Set publish_with_queue_thread extension setting to true
+
+## [1.2.6] - 2026-01-21
+### Added
+- Added ros2 image buffer utils
+
+## [1.2.5] - 2025-12-23
+### Changed
+- Added a simulate_until_condition method to simplify test cases
+
 ## [1.2.4] - 2025-12-11
 ### Changed
 - Update ros2 test case to wait for viewport to be ready

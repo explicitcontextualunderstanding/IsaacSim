@@ -1,4 +1,36 @@
 # Changelog
+## [1.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.3.7] - 2026-02-26
+### Changed
+- Migrated behavior scripting dependency from omni.kit.scripting to omni.behavior.scripting.core
+
+## [1.3.6] - 2026-02-21
+### Changed
+- Updated SDG physics based volume filling behavior script to use the omni.physx api
+
+## [1.3.5] - 2026-02-03
+### Changed
+- Update sdg pipeline golden images with new randomization determinism by pausing the timeline before capturing frames
+
+## [1.3.4] - 2026-01-22
+### Changed
+- Increased test tolerances for golden image comparison until randomizations are deterministic
+
+## [1.3.3] - 2026-01-22
+### Changed
+- Disable behavior test output until tests are run
+
+## [1.3.2] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [1.3.1] - 2025-12-16
+### Changed
+- Migrate extension implementation to core experimental API
+
 ## [1.3.0] - 2025-12-03
 ### Changed
 - Added explicit seed to randomizers to make them deterministic

@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides synthetic data recording functionality for Isaac Sim through the Replicator framework."""
+
+
 from .synthetic_recorder_extension import *
+
+__all__ = ["SyntheticRecorderWindow"]

@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides utilities for the Robot Setup Wizard including UI components, asset pickers, and tree view delegates."""
+
+
 from .resetable_widget import ResetableComboBox, ResetableField, ResetableLabelField, ResetButton
 from .robot_asset_picker import RobotAssetPicker
 from .treeview_delegate import (

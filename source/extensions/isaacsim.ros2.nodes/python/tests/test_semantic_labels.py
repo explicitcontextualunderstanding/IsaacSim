@@ -30,9 +30,7 @@ from isaacsim.core.utils.viewports import set_camera_view
 from .common import ROS2TestCase, get_qos_profile
 
 
-# Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2SemanticLabels(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
@@ -47,7 +45,6 @@ class TestRos2SemanticLabels(ROS2TestCase):
 
         pass
 
-    # After running each test
     async def tearDown(self):
         await super().tearDown()
 
@@ -102,18 +99,40 @@ class TestRos2SemanticLabels(ROS2TestCase):
 
         await omni.kit.app.get_app().next_update_async()
 
-        self._clock_data = deque(maxlen=5)
-        self._label_data = None
-
         def clear_data():
-            self._clock_data.clear()
-            self._label_data = None
+            self._clock_data = deque(maxlen=5)
+            self._clock_callback_count = 0
+            self._semantic_label_data = None
+            self._semantic_label_dict = None
+            self._semantic_labels_callback_count = 0
+            self._semantic_labels_timestamp = None
 
         def clock_callback(data):
+            self._clock_callback_count += 1
             self._clock_data.append(round(data.clock.sec + data.clock.nanosec / 1.0e9, 1))
 
         def semantic_labels_callback(data):
-            self._label_data = data.data
+            self._semantic_labels_callback_count += 1
+
+            # Test that the labels are correct
+            self._semantic_label_data = data.data
+            self._semantic_label_dict = json.loads(data.data)
+            classes = set()
+            for label_id, label_info in self._semantic_label_dict.items():
+                if label_id == "time_stamp":
+                    continue
+                self.assertIn("class", label_info)
+                classes.add(label_info["class"])
+            for expected_class in self._expected_classes:
+                self.assertIn(expected_class, classes)
+            for unexpected_class in self._unexpected_classes:
+                self.assertNotIn(unexpected_class, classes)
+
+            # Update latest received timestamp
+            self._semantic_labels_timestamp = (
+                self._semantic_label_dict["time_stamp"]["sec"]
+                + self._semantic_label_dict["time_stamp"]["nanosec"] / 1.0e9
+            )
 
         node = self.create_node("semantic_label_tester")
         clock_sub = self.create_subscription(node, Clock, "/clock", clock_callback, get_qos_profile())
@@ -122,78 +141,52 @@ class TestRos2SemanticLabels(ROS2TestCase):
         )
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
-
-        def find_class(label_dict, class_value):
-            for label_id, label_info in label_dict.items():
-                for key in label_info:
-                    if key == "class":
-                        if label_info[key] == class_value:
-                            return True
-            return False
-
-        def find_timestamp(label_dict, clock_data):
-
-            sec = int(label_dict["time_stamp"]["sec"])
-            nanosec = int(label_dict["time_stamp"]["nanosec"])
-
-            time_val = round(sec + nanosec / 1.0e9, 1)
-
-            if clock_data.count(time_val) > 0:
-                return True
-
-            return False
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         viewport_api = omni.kit.viewport.utility.get_active_viewport()
-
         await omni.kit.app.get_app().next_update_async()
 
-        self.assertIsNone(self._label_data)
+        clear_data()
+        self._expected_classes = ["cube0"]
+        self._unexpected_classes = ["cube1"]
+
+        # Run first test, with camera pointing at cube0
         self._timeline.play()
-
         await omni.syntheticdata.sensors.next_sensor_data_async(viewport_api)
-
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(
+            lambda: self._semantic_label_data is not None,
+            max_frames=60,
+            per_frame_callback=spin,
+        )
         self._timeline.stop()
+        self.assertGreater(self._clock_callback_count, 0)
+        self.assertGreater(self._semantic_labels_callback_count, 0)
+        self.assertIn(round(self._semantic_labels_timestamp, 1), self._clock_data)
+
+        # Spin to clear the message buffers
         await omni.kit.app.get_app().next_update_async()
         spin()
+        spin()
+        spin()
+        await omni.kit.app.get_app().next_update_async()
 
-        self.assertIsNotNone(self._label_data)
-        self.assertIsNotNone(self._clock_data)
-
-        labels_dict = json.loads(self._label_data)
-        print(labels_dict)
-        self.assertTrue(find_class(labels_dict, "cube0"))
-        self.assertFalse(find_class(labels_dict, "cube1"))
-
-        self.assertTrue(find_timestamp(labels_dict, self._clock_data))
-
-        # Point Camera towards the other box
+        # Run second test, with camera pointing at cube1
         set_camera_view(eye=np.array([0, 0, 3]), target=np.array([-4, 4, 0]), camera_prim_path="/OmniverseKit_Persp")
         await omni.kit.app.get_app().next_update_async()
 
         clear_data()
-
-        self.assertIsNone(self._label_data)
+        self._expected_classes = ["cube1"]
+        self._unexpected_classes = ["cube0"]
 
         self._timeline.play()
-
-        await omni.syntheticdata.sensors.next_sensor_data_async(viewport_api)
-
-        await simulate_async(1, 60, spin)
-
+        await self.simulate_until_condition(
+            lambda: self._semantic_labels_callback_count > 5,
+            max_frames=60,
+            per_frame_callback=spin,
+        )
         self._timeline.stop()
-        await omni.kit.app.get_app().next_update_async()
-        spin()
-
-        self.assertIsNotNone(self._label_data)
-        self.assertIsNotNone(self._clock_data)
-
-        labels_dict = json.loads(self._label_data)
-
-        self.assertTrue(find_class(labels_dict, "cube1"))
-        self.assertFalse(find_class(labels_dict, "cube0"))
-
-        self.assertTrue(find_timestamp(labels_dict, self._clock_data))
+        self.assertGreater(self._clock_callback_count, 0)
+        self.assertGreater(self._semantic_labels_callback_count, 0)
+        self.assertIn(round(self._semantic_labels_timestamp, 1), self._clock_data)
 
         pass

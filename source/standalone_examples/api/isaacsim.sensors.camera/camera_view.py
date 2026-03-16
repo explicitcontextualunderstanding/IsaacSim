@@ -24,27 +24,27 @@ import os
 
 import numpy as np
 import omni.replicator.core as rep
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import VisualCuboid
+import omni.timeline
 from isaacsim.core.deprecation_manager import import_module
+from isaacsim.core.experimental.materials import OmniPbrMaterial
+from isaacsim.core.experimental.objects import Cube, DomeLight, GroundPlane
 from isaacsim.sensors.camera import CameraView
 from PIL import Image
 
 torch = import_module("torch")
 
-# Create the world and add some visual cubes
-my_world = World(stage_units_in_meters=1.0)
+# Create visual cubes
+cube_material = OmniPbrMaterial("/World/Materials/cube_blue")
+cube_material.set_input_values("diffuse_color_constant", [0.0, 0.0, 1.0])
 for i in range(2):
-    my_world.scene.add(
-        VisualCuboid(
-            prim_path=f"/new_cube_{i}",
-            name=f"cube_{i}",
-            position=np.array([0, i * 0.5, 0.2]),
-            scale=np.array([0.1, 0.1, 0.1]),
-            size=1.0,
-            color=np.array([0, 0, 255]),
-        )
+    cube = Cube(
+        f"/new_cube_{i}",
+        sizes=1.0,
+        positions=np.array([0, i * 0.5, 0.2]),
+        scales=np.array([0.1, 0.1, 0.1]),
     )
+    cube.apply_visual_materials(cube_material)
+
 
 # Create the cameras
 camera_01 = rep.create.camera(position=(0, 0, 2), look_at=(0, 0, 0))
@@ -60,11 +60,10 @@ camera_view = CameraView(
     output_annotators=["rgb", "depth"],
 )
 
-# Add default ground plane environment and wait a few frames to fully load
-my_world.scene.add_default_ground_plane()
-my_world.reset()
-for i in range(20):
-    simulation_app.update()
+# Create ground plane and dome light
+dome_light = DomeLight("/World/DomeLight")
+dome_light.set_intensities(500)
+GroundPlane("/World/defaultGroundPlane", sizes=100.0)
 
 # Create output directory for the test data as images
 out_dir = os.path.join(os.getcwd(), "_out_camera_view")
@@ -84,10 +83,17 @@ depth_tiled_torch_out = torch.zeros(camera_view.tiled_resolution, device="cuda",
 depth_batched_shape = (len(camera_view.prims), *camera_view.camera_resolution, 1)
 depth_batched_out = torch.zeros(depth_batched_shape, device="cuda", dtype=torch.float32)
 
+# Start the timeline and run some warmup frames
+timeline = omni.timeline.get_timeline_interface()
+timeline.play()
+timeline.commit()
+for i in range(5):
+    simulation_app.update()
+
 # Capture the data for the required number of frames
 for i in range(NUM_CAPTURES):
     print(f" ** Step {i} ** ")
-    my_world.step(render=True)
+    simulation_app.update()
 
     #### RGB
     print(f" ** Running RGB data tests:")

@@ -27,8 +27,8 @@ while [ $# -gt 0 ]; do
         -h|--help)
             echo "Usage: $0 [--tag TAG]"
             echo "  --tag TAG    Docker image tag (default: isaac-sim-docker:latest)"
-            echo "  --x86_64     Platform tag (default: x86_64)"
-            echo "  --aarch64    Platform tag (default: x86_64)"
+            echo "  --x86_64     Build for x86_64 platform (default)"
+            echo "  --aarch64    Build for arm64 platform"
             echo "  --push       Push docker image tag"
             echo "  -h, --help   Show this help message"
             exit 0
@@ -41,10 +41,26 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if docker buildx inspect | grep -q $CONTAINER_PLATFORM; then
+HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null)
+if [ -z "$HOST_ARCH" ]; then
+    echo "ERROR: Could not detect host architecture. Is Docker running?"
+    exit 1
+fi
+case "$HOST_ARCH" in
+    aarch64) HOST_ARCH=arm64 ;;
+    x86_64)  HOST_ARCH=amd64 ;;
+esac
+NATIVE_PLATFORM="linux/$HOST_ARCH"
+if docker buildx inspect 2>/dev/null | grep -q "$CONTAINER_PLATFORM"; then
     echo "This builder supports $CONTAINER_PLATFORM builds"
+elif [ "$CONTAINER_PLATFORM" = "$NATIVE_PLATFORM" ]; then
+    echo "Building natively for $CONTAINER_PLATFORM (host architecture)"
 else
     echo "ERROR: This host's buildx builder does NOT support $CONTAINER_PLATFORM"
+    echo ""
+    echo "To add support, create a builder with:"
+    echo "  docker buildx create --name multiarch --platform $CONTAINER_PLATFORM --use"
+    echo "  docker buildx inspect --bootstrap"
     exit 1
 fi
 

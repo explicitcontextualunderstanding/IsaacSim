@@ -21,10 +21,19 @@
 #include <isaacsim/core/cloner/Cloner.h>
 #include <omni/fabric/FabricUSD.h>
 #include <omni/fabric/IFabric.h>
+
+#if !defined(_WIN32)
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#    pragma GCC diagnostic ignored "-Wunused-variable"
+#endif
 #include <omni/fabric/connectivity/Connectivity.h>
 #include <usdrt/hierarchy/IFabricHierarchy.h>
 #include <usdrt/population/IUtils.h>
 #include <usdrt/scenegraph/usd/usd/stage.h>
+#if !defined(_WIN32)
+#    pragma GCC diagnostic pop
+#endif
 
 void initializeRigidBodyBatched(const std::vector<usdrt::SdfPath>& rbPaths,
                                 omni::fabric::IStageReaderWriter* iStageReaderWriter,

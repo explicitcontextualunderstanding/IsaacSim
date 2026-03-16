@@ -55,6 +55,26 @@ def get_ubuntu_version():
         return None
 
 
+def restore_ros2_python_paths():
+    """Restore system ROS 2 Python paths that Isaac Sim removed at startup.
+
+    Isaac Sim overrides PYTHONPATH with its own paths and saves the original
+    in OLD_PYTHONPATH. This function cross-references OLD_PYTHONPATH with
+    AMENT_PREFIX_PATH to find and re-add only the ROS 2 Python paths to sys.path.
+    """
+    ament_prefix = os.environ.get("AMENT_PREFIX_PATH")
+    old_pythonpath = os.environ.get("OLD_PYTHONPATH")
+    if ament_prefix is None or old_pythonpath is None:
+        return
+
+    for python_path in old_pythonpath.split(os.pathsep):
+        for ament_path in ament_prefix.split(os.pathsep):
+            if python_path.startswith(os.path.abspath(ament_path) + os.sep):
+                if python_path not in sys.path:
+                    sys.path.append(python_path)
+                break
+
+
 def setup_ros2_environment(extension_path, ros_distro):
     """Set up ROS 2 environment variables and paths if required.
 

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for Franka robot policy examples with both CPU and GPU simulation environments."""
+
+
 import asyncio
 
 import isaacsim.core.experimental.utils.prim as prim_utils
@@ -35,14 +38,39 @@ torch = import_module("torch")
 
 
 class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
+    """Test suite for the Franka robot policy example extension.
+
+    This test class validates the functionality of the Franka robot drawer opening policy by setting up
+    a simulation environment with a Franka robot and cabinet, then verifying the robot can successfully
+    open a drawer. The tests ensure proper robot initialization, cabinet interaction, and physics
+    simulation behavior.
+
+    The test suite creates a physics scene with a ground plane and Sektion cabinet, spawns a Franka
+    robot with the FrankaOpenDrawerPolicy, and validates that the robot can open the cabinet drawer
+    to a specified threshold. It uses CPU-based simulation by default with a 200Hz physics rate.
+    """
+
     def get_device(self):
-        """Return the device to use for tensors. Override in subclasses."""
+        """Return the device to use for tensors. Override in subclasses.
+
+        Returns:
+            The torch device for tensor operations.
+        """
         return torch.device("cpu")
 
+    def get_physics_rate(self):
+        """Return the physics rate for the drawer opening test.
+
+        Returns:
+            The physics rate in Hz.
+        """
+        return 200  # CPU needs a lower rate
+
     async def setUp(self):
+        """Set up the test environment with physics scene, ground plane, and cabinet."""
         await stage_utils.create_new_stage_async()
         # This needs to be set so that kit updates match physics updates
-        self._physics_rate = 400
+        self._physics_rate = self.get_physics_rate()
 
         device_str = str(self.get_device())
         backend = "torch" if device_str != "cpu" else "numpy"
@@ -75,6 +103,7 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
+        """Clean up test environment by stopping timeline and deregistering callbacks."""
         await omni.kit.app.get_app().next_update_async()
         self._timeline.stop()
         SimulationManager.deregister_callback(self._physics_callback_id)
@@ -85,6 +114,7 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     async def test_franka_add(self):
+        """Test adding a Franka robot to the scene and verify its properties."""
         await self.spawn_franka()
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
@@ -105,6 +135,7 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         self.assertTrue(cabinet_prim.IsValid(), "Cabinet prim should be valid")
 
     async def test_franka_open_drawer(self):
+        """Test the Franka robot's ability to open a drawer using the FrankaOpenDrawerPolicy."""
         await self.spawn_franka()
         await omni.kit.app.get_app().next_update_async()
         max_drawer_opening = 0
@@ -124,6 +155,12 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         self.assertGreater(max_drawer_opening, 0.3)
 
     async def spawn_franka(self, name="franka", add_physics_callback=True):
+        """Spawn a Franka robot with drawer opening policy in the simulation.
+
+        Args:
+            name: Name for the robot prim in the stage.
+            add_physics_callback: Whether to register a physics step callback for the robot.
+        """
         self._prim_path = "/World/" + name
 
         self._franka = FrankaOpenDrawerPolicy(prim_path=self._prim_path, position=[0, 0, 0], cabinet=self.cabinet)
@@ -141,11 +178,42 @@ class TestFrankaExampleExtension(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     def on_physics_step(self, step_size, context):
+        """Physics step callback that advances the Franka robot's policy.
+
+        Args:
+            step_size: The physics time step size.
+            context: The simulation context.
+        """
         if self._franka:
             self._franka.forward(step_size)
 
 
 class TestFrankaGPU(TestFrankaExampleExtension):
+    """GPU-accelerated test class for Franka robot policy examples.
+
+    This class extends the base Franka test functionality to run on CUDA-enabled GPUs,
+    providing accelerated physics simulation and tensor operations. It configures the
+    test environment to use CUDA devices and higher physics rates optimized for GPU
+    performance.
+
+    The class automatically sets up a physics simulation environment with a Franka robot
+    and cabinet, then runs validation tests for robot spawning and drawer opening tasks.
+    GPU acceleration enables faster convergence and higher simulation rates compared to
+    CPU-based testing.
+    """
+
     def get_device(self):
-        """Return the device to use for tensors"""
+        """Return the device to use for tensors.
+
+        Returns:
+            The torch device to use for tensor operations.
+        """
         return torch.device("cuda")
+
+    def get_physics_rate(self):
+        """Return the physics rate for the drawer opening test.
+
+        Returns:
+            The physics simulation rate in Hz.
+        """
+        return 400  # GPU converges faster

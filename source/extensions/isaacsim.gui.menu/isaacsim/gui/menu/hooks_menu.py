@@ -12,17 +12,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Hook utilities for menu post-processing."""
 import omni.kit.menu.utils
+from omni.kit.menu.utils import MenuItemDescription
 
 
 class HookMenuHandler:
+    """Register a hook to adjust menu item appearance."""
+
     def __init__(self):
         omni.kit.menu.utils.add_hook(self.__hook_func)
 
     def shutdown(self):
+        """Remove the menu hook.
+
+        Example:
+            .. code-block:: python
+
+                handler = HookMenuHandler()
+                handler.shutdown()
+        """
         omni.kit.menu.utils.remove_hook(self.__hook_func)
 
-    def __hook_func(self, merged_menu):
+    def __hook_func(self, merged_menu: dict[str, list[MenuItemDescription]]):
+        """Strip glyphs from non-Create menus.
+
+        Args:
+            merged_menu: Mapping of menu names to menu item lists.
+        """
         for name in merged_menu:
             for i in merged_menu[name].copy():
                 # remove all glyphs in all menus expect create

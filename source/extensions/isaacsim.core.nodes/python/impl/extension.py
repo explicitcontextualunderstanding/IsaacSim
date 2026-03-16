@@ -20,8 +20,6 @@ import omni.kit.commands
 import omni.syntheticdata
 import omni.syntheticdata._syntheticdata as sd
 from isaacsim.core.nodes.scripts.utils import register_annotator_from_node_with_telemetry
-from isaacsim.core.utils.prims import get_prim_at_path
-from isaacsim.core.utils.stage import get_current_stage
 from omni.replicator.core import AnnotatorRegistry
 from omni.syntheticdata import sensors
 from pxr import Sdf, Usd

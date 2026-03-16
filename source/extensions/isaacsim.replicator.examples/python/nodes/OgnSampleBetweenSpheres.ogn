@@ -1,7 +1,7 @@
 {
     "OgnSampleBetweenSpheres": {
         "version": 1,
-        "description": "Assignes uniformly sampled between two spheres",
+        "description": "Assigns uniformly sampled between two spheres",
         "language": "Python",
         "categoryDefinitions": "config/CategoryDefinition.json",
         "categories": ["isaacReplicatorExamples"],

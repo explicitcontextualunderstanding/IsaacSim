@@ -12,13 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Plugin registration helpers for robot schema modules."""
 
 import os
 
 from pxr import Plug
 
 
-def _register_plugin_path(path):
+def _register_plugin_path(path: str) -> None:
+    """Register USD plugins located at a given path.
+
+    Args:
+        path: Directory path containing a plugInfo.json file.
+    """
     # Check if plugins at this path are already registered to avoid duplicate registration
     # which can occur when the module is reloaded
     pluginfo_path = os.path.join(path, "plugInfo.json")
@@ -28,7 +34,7 @@ def _register_plugin_path(path):
     try:
         import json
 
-        with open(pluginfo_path, "r") as f:
+        with open(pluginfo_path) as f:
             # Strip comment lines (lines starting with #) for JSON parsing
             lines = f.readlines()
             json_lines = [line for line in lines if not line.strip().startswith("#")]
@@ -67,6 +73,11 @@ def _register_plugin_path(path):
 
 
 def _register_plugins(ext_path: str):
+    """Register robot schema plugin resources for an extension path.
+
+    Args:
+        ext_path: Extension root path to scan for plugin resources.
+    """
     _register_plugin_path(os.path.join(ext_path, "usd", "schema", "isaac", "robot_schema"))
 
     plugin_path = os.path.join(ext_path, "plugins", "plugins")
@@ -79,4 +90,4 @@ ext_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 _register_plugins(ext_path)
 
 
-from . import robot_schema
+from . import robot_schema  # type: ignore[attr-defined]

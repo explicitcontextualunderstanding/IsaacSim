@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contact sensor example UI and scene setup."""
+
 import asyncio
 import weakref
+from typing import Any
 
 import carb
 import carb.eventdispatcher
@@ -24,23 +27,29 @@ import omni.physics.core
 import omni.ui as ui
 import omni.usd
 from isaacsim.examples.browser import get_instance as get_browser_instance
-from isaacsim.gui.components.menu import make_menu_item_description
 from isaacsim.gui.components.ui_utils import LABEL_WIDTH, get_style, setup_ui_headers
-from isaacsim.sensors.physics import _sensor
+from isaacsim.sensors.experimental.physics import ContactSensorBackend
 from isaacsim.storage.native import get_assets_root_path
-from omni.kit.menu.utils import MenuItemDescription, add_menu_items, remove_menu_items
 from pxr import Gf, UsdGeom
 
 EXTENSION_NAME = "Contact Sensor Example"
 
 
 class Extension(omni.ext.IExt):
+    """Extension that hosts the contact sensor example UI."""
+
     def on_startup(self, ext_id: str):
+        """Initialize the extension and register the example.
+
+        Args:
+            ext_id: Extension identifier provided by the extension manager.
+        """
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         self._ext_id = ext_id
         self._extension_path = ext_manager.get_extension_path(ext_id)
         self.meters_per_unit = 1.00
-        self._window = None
+        self._window: ui.Window | None = None
+        self._stage_event_subscription: Any | None = None
 
         get_browser_instance().register_example(
             name="Contact Sensor",
@@ -50,13 +59,30 @@ class Extension(omni.ext.IExt):
         )
 
     def build_window(self):
-        pass
+        """Build the example window entrypoint.
 
-    def _on_stage_closed(self, event):
-        """Stage closed event callback."""
+        Example:
+            .. code-block:: python
+
+                extension.build_window()
+        """
+
+    def _on_stage_closed(self, event: Any):
+        """Handle stage-closed events.
+
+        Args:
+            event: Stage event payload.
+        """
         self.on_closed()
 
     def build_ui(self):
+        """Build the UI controls for the contact sensor example.
+
+        Example:
+            .. code-block:: python
+
+                extension.build_ui()
+        """
         with ui.VStack(spacing=5, height=0):
 
             title = "Contact Sensor Example"
@@ -70,11 +96,12 @@ class Extension(omni.ext.IExt):
             ui.Button("Load Scene", clicked_fn=lambda: self._load_scene())
 
     def _load_scene(self):
+        """Load the contact sensor example scene and initialize UI state."""
         if self._window:
             # clear existing window
             self.on_closed()
 
-        self._cs = _sensor.acquire_contact_sensor_interface()
+        self._contact_backends: dict[str, ContactSensorBackend] = {}
 
         self._timeline = omni.timeline.get_timeline_interface()
         self.sub = omni.physics.core.get_physics_simulation_interface().subscribe_physics_on_step_events(
@@ -92,16 +119,17 @@ class Extension(omni.ext.IExt):
         self.sliders = []
         self.colors = [0xFFBBBBFF, 0xFFBBFFBB, 0xBBFFBBBB, 0xBBBBFFFF]
 
-        self.plots = []
-        self.plot_vals = []
+        self.plots: list[Any] = []
+        self.plot_vals: list[Any] = []
         style = {"background_color": 0xFF888888, "color": 0xFF333333, "secondary_color": self.colors[0]}
 
-        self._window = ui.Window(
+        window = ui.Window(
             title=EXTENSION_NAME, width=300, height=0, visible=True, dockPreference=ui.DockPreference.LEFT_BOTTOM
         )
-        self._window.set_visibility_changed_fn(self._on_visibility_changed)
+        self._window = window
+        window.set_visibility_changed_fn(self._on_visibility_changed)
 
-        with self._window.frame:
+        with window.frame:
             with ui.VStack(style=get_style(), spacing=5):
                 for i in range(4):
                     with ui.HStack():
@@ -115,14 +143,27 @@ class Extension(omni.ext.IExt):
         asyncio.ensure_future(self.create_scenario())
 
     def on_shutdown(self):
+        """Clean up resources when the extension is unloaded."""
         self.on_closed()
         get_browser_instance().deregister_example(name="Contact Sensor", category="Sensors")
 
-    def _on_visibility_changed(self, visible):
+    def _on_visibility_changed(self, visible: bool):
+        """Handle window visibility changes.
+
+        Args:
+            visible: Whether the window is visible.
+        """
         if not visible:
             self.on_closed()
 
     def on_closed(self):
+        """Tear down the example window and subscriptions.
+
+        Example:
+            .. code-block:: python
+
+                extension.on_closed()
+        """
         if self._window:
             self.sub = None
             self._timeline = None
@@ -130,10 +171,19 @@ class Extension(omni.ext.IExt):
             self._window.destroy()
             self._window = None
 
-    def _on_update(self, dt, context):
+    def _on_update(self, dt: float, context: Any):
+        """Update UI values from the contact sensor readings.
+
+        Args:
+            dt: Simulation time step.
+            context: Physics update context.
+        """
         if self._timeline.is_playing() and self.sliders:
             for i in range(4):
-                reading = self._cs.get_sensor_reading(self.leg_paths[i] + "/sensor")
+                path = self.leg_paths[i] + "/sensor"
+                if path not in self._contact_backends:
+                    self._contact_backends[path] = ContactSensorBackend(path)
+                reading = self._contact_backends[path].get_sensor_reading()
                 if reading.is_valid:
                     self.sliders[i].model.set_value(
                         float(reading.value) * self.meters_per_unit
@@ -146,6 +196,13 @@ class Extension(omni.ext.IExt):
             #     # print(c)
 
     async def create_scenario(self):
+        """Create the contact sensor example scene and sensor prims.
+
+        Example:
+            .. code-block:: python
+
+                await extension.create_scenario()
+        """
         self._assets_root_path = get_assets_root_path()
         if self._assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
@@ -161,18 +218,17 @@ class Extension(omni.ext.IExt):
 
         self.sensor_offsets = [Gf.Vec3d(40, 0, 0), Gf.Vec3d(40, 0, 0), Gf.Vec3d(40, 0, 0), Gf.Vec3d(40, 0, 0)]
         self.color = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1), (1, 1, 0, 1)]
-        self.sensorGeoms = []
+        self.sensorGeoms: list[Any] = []
 
         for i in range(4):
             result, sensor = omni.kit.commands.execute(
-                "IsaacSensorCreateContactSensor",
+                "IsaacSensorExperimentalCreateContactSensor",
                 path="/sensor",
                 parent=self.leg_paths[i],
                 min_threshold=0,
                 max_threshold=10000000,
                 color=self.color[i],
                 radius=0.12,
-                sensor_period=-1,
                 translation=self.sensor_offsets[i],
             )
 
@@ -182,3 +238,6 @@ class Extension(omni.ext.IExt):
             on_event=self._on_stage_closed,
             observer_name="isaacsim.sensors.physics.examples.contact_sensor._on_stage_closed",
         )
+
+
+__all__ = []

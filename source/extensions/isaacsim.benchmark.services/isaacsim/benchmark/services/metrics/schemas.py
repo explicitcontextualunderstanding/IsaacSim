@@ -12,15 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Schema dataclasses for benchmark metric payloads."""
+
 import json
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any
 
 import omni.kit.app
 
 
 @dataclass
 class OSConfiguration:
+    """Operating system configuration details.
+
+    Args:
+        platform: Platform identifier.
+        os: Operating system name.
+        os_major: Major OS version.
+        architecture: CPU architecture string.
+    """
+
     platform: str
     os: str
     os_major: str
@@ -29,6 +40,16 @@ class OSConfiguration:
 
 @dataclass
 class GPU:
+    """GPU descriptor.
+
+    Args:
+        number: GPU index.
+        gpu_id: GPU identifier string.
+        product_architecture: GPU architecture name.
+        product_brand: GPU brand.
+        product_name: GPU product name.
+    """
+
     number: int
     gpu_id: str
     product_architecture: str
@@ -38,25 +59,55 @@ class GPU:
 
 @dataclass
 class GPUConfiguration:
+    """GPU configuration details.
+
+    Args:
+        cuda_version: CUDA runtime version.
+        driver_version: Driver version string.
+        gpus: List of GPU descriptors.
+        primary_gpu: Primary GPU descriptor.
+        num_gpus: Total number of GPUs.
+    """
+
     cuda_version: float
     driver_version: str
-    gpus: List[GPU]
+    gpus: list[GPU]
     primary_gpu: GPU
     num_gpus: int
 
 
 @dataclass
 class CPUConfiguration:
+    """CPU configuration details.
+
+    Args:
+        model: CPU model string.
+    """
+
     model: str
 
 
 @dataclass
 class MemoryConfiguration:
+    """Memory configuration details.
+
+    Args:
+        ram_gb: Installed RAM in GB.
+    """
+
     ram_gb: float
 
 
 @dataclass
 class HardwareConfiguration:
+    """Hardware configuration details.
+
+    Args:
+        gpu_configuration: GPU configuration.
+        cpu_configuration: CPU configuration.
+        memory_configuration: Memory configuration.
+    """
+
     gpu_configuration: GPUConfiguration
     cpu_configuration: CPUConfiguration
     memory_configuration: MemoryConfiguration
@@ -64,6 +115,24 @@ class HardwareConfiguration:
 
 @dataclass
 class Application:
+    """Application build and version information.
+
+    Args:
+        name: Application short name.
+        name_full: Full application name.
+        kit_file: Kit file name.
+        version_minor: Minor version string.
+        version_major_minor_patch: Version string.
+        version_full: Full version string.
+        build_id: Build identifier.
+        kit_version_minor: Kit minor version string.
+        kit_version_patch: Kit patch version string.
+        kit_build_id: Kit build identifier.
+        package_name: Package name.
+        package_full: Full package name.
+        build_date: Build date timestamp.
+    """
+
     name: str
     name_full: str
     kit_file: str
@@ -81,6 +150,22 @@ class Application:
 
 @dataclass
 class ExecutionEnvironment:
+    """Execution environment identifiers.
+
+    Args:
+        primary_system: Primary system name.
+        primary_id: Primary system identifier.
+        primary_url: Primary system URL.
+        secondary_system: Secondary system name.
+        secondary_id: Secondary system identifier.
+        secondary_url: Secondary system URL.
+        extension_identifier: Extension identifier string.
+        etm_identifier: ETM identifier string.
+        input_build_url: Input build URL.
+        input_build_id: Input build identifier.
+        hostname: Hostname string.
+    """
+
     primary_system: str
     primary_id: str
     primary_url: str
@@ -96,11 +181,29 @@ class ExecutionEnvironment:
 
 @dataclass
 class BenchmarkIdentifier:
+    """Benchmark run identifier.
+
+    Args:
+        run_uuid: Run UUID string.
+    """
+
     run_uuid: str
 
 
 @dataclass
 class Benchmark:
+    """Benchmark metadata details.
+
+    Args:
+        name: Benchmark name.
+        asset_url: Asset URL.
+        version_identifier: Version identifier string.
+        checkpoint: Checkpoint number.
+        dssim_status: DSSIM status flag.
+        dssim: DSSIM value.
+        resolution: Render resolution string.
+    """
+
     name: str
     asset_url: str
     version_identifier: str
@@ -112,12 +215,34 @@ class Benchmark:
 
 @dataclass
 class Metric:
+    """Metric payload containing name and value.
+
+    Args:
+        name: Metric name.
+        value: Metric value.
+    """
+
     name: str
     value: Any
 
 
 @dataclass
 class BenchData:
+    """Top-level benchmark payload.
+
+    Args:
+        ts_created: Creation timestamp.
+        test_name: Test name.
+        schema: Schema version string.
+        hardware_configuration: Hardware configuration payload.
+        os_configuration: OS configuration payload.
+        application: Application payload.
+        execution_environment: Execution environment payload.
+        benchmark_identifier: Benchmark identifier payload.
+        benchmark: Benchmark payload.
+        metric: Metric payload.
+    """
+
     ts_created: int
     test_name: str
     schema: str
@@ -130,7 +255,17 @@ class BenchData:
     metric: Metric
 
     def get_fingerprint(self) -> str:
-        """Get session hash."""
+        """Get a short session fingerprint hash.
+
+        Returns:
+            Fingerprint hash string.
+
+        Example:
+
+        .. code-block:: python
+
+            fingerprint = bench_data.get_fingerprint()
+        """
         import hashlib
 
         params = {

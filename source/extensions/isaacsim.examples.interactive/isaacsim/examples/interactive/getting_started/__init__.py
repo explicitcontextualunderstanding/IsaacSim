@@ -13,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive tutorials for getting started with Isaac Sim, providing step-by-step guided examples for basic scene setup, physics simulation, and robot integration."""
+
+
 from isaacsim.examples.interactive.getting_started.getting_started import GettingStarted
 from isaacsim.examples.interactive.getting_started.getting_started_extension import GettingStartedExtension
 from isaacsim.examples.interactive.getting_started.start_with_robot import GettingStartedRobot
 from isaacsim.examples.interactive.getting_started.start_with_robot_extension import GettingStartedRobotExtension
+
+__all__ = ["GettingStarted", "GettingStartedRobot"]

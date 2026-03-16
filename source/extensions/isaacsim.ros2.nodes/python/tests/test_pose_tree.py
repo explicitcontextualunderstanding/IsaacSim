@@ -32,9 +32,7 @@ from usd.schema.isaac import robot_schema
 from .common import ROS2TestCase, add_cube, add_franka, get_qos_profile
 
 
-# Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2PoseTree(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
         await omni.usd.get_context().new_stage_async()
@@ -42,7 +40,6 @@ class TestRos2PoseTree(ROS2TestCase):
 
         pass
 
-    # After running each test
     async def tearDown(self):
         await super().tearDown()
 
@@ -93,11 +90,11 @@ class TestRos2PoseTree(ROS2TestCase):
             print(e)
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(lambda: self._tf_data is not None, max_frames=60, per_frame_callback=spin)
 
         # checks
         self.assertEqual(len(self._tf_data.transforms), 14)  # there are 12 items in the tree.
@@ -122,7 +119,7 @@ class TestRos2PoseTree(ROS2TestCase):
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(lambda: self._tf_data is not None, max_frames=60, per_frame_callback=spin)
 
         # checks
         self.assertEqual(
@@ -199,11 +196,11 @@ class TestRos2PoseTree(ROS2TestCase):
             print(e)
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(lambda: self._tf_data is not None, max_frames=60, per_frame_callback=spin)
 
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
@@ -218,7 +215,7 @@ class TestRos2PoseTree(ROS2TestCase):
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(lambda: self._tf_data is not None, max_frames=60, per_frame_callback=spin)
 
         # checks
         self.assertEqual(self._tf_data.transforms[11].header.frame_id, "cube")  # check the base is cube
@@ -301,12 +298,12 @@ class TestRos2PoseTree(ROS2TestCase):
             print(e)
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         # Run the simulation which will trigger the CARB_LOG_WARN when processing the duplicate "base_link" names
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(lambda: self._tf_data is not None, max_frames=60, per_frame_callback=spin)
 
         self._timeline.stop()
         spin()

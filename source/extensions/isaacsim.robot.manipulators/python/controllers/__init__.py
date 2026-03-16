@@ -12,5 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Controllers for robotic manipulator tasks including pick-and-place and stacking operations."""
+
+
 from isaacsim.robot.manipulators.controllers.pick_place_controller import PickPlaceController
 from isaacsim.robot.manipulators.controllers.stacking_controller import StackingController

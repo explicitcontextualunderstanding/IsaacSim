@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Test suite for image capture utilities in Isaac Sim."""
+
+
 import io
 import os
 import tempfile
@@ -53,7 +57,12 @@ class TestImageCapture(TimedAsyncTestCase):
             shutil.rmtree(self.test_dir)
         await super().tearDown()
 
-    def get_image_capture_golden_dir(self):
+    def get_image_capture_golden_dir(self) -> str:
+        """Path to golden assets directory for image capture tests.
+
+        Returns:
+            The absolute path to the golden assets directory.
+        """
         # Resolve path to golden assets for image capture tests.
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.test.utils")
@@ -61,6 +70,10 @@ class TestImageCapture(TimedAsyncTestCase):
         return os.path.join(extension_path, "data", "golden", "image_capture")
 
     async def setup_golden_stage(self):
+        """Create a minimal scene for deterministic rendering.
+
+        Sets up a basic USD stage with a cube and distant light for consistent test results.
+        """
         # Create a minimal scene for deterministic rendering.
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()

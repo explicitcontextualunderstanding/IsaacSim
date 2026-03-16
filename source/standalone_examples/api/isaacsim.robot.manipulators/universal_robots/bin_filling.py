@@ -32,7 +32,7 @@ my_ur10 = my_world.scene.get_object(task_params["robot_name"]["value"])
 my_controller = PickPlaceController(name="pick_place_controller", gripper=my_ur10.gripper, robot_articulation=my_ur10)
 articulation_controller = my_ur10.get_articulation_controller()
 
-added_screws = False
+added_cubes = False
 reset_needed = False
 task_completed = False
 while simulation_app.is_running():
@@ -44,7 +44,7 @@ while simulation_app.is_running():
         if reset_needed:
             my_world.reset()
             my_controller.reset()
-            added_screws = False
+            added_cubes = False
             reset_needed = False
             task_completed = False
         observations = my_world.get_observations()
@@ -55,10 +55,10 @@ while simulation_app.is_running():
             end_effector_offset=np.array([0, -0.098, 0.03]),
             end_effector_orientation=euler_angles_to_quat(np.array([np.pi, 0, np.pi / 2.0])),
         )
-        if not added_screws and my_controller.get_current_event() == 6 and not my_controller.is_paused():
+        if not added_cubes and my_controller.get_current_event() == 6 and not my_controller.is_paused():
             my_controller.pause()
-            my_task.add_screws(screws_number=20)
-            added_screws = True
+            my_task.add_cubes(cubes_number=20)
+            added_cubes = True
         if my_controller.is_done() and not task_completed:
             print("done picking and placing")
             task_completed = True

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Context menu implementation for the asset browser interface."""
+
+
 import os
 from urllib.parse import unquote
 
@@ -24,7 +27,16 @@ import toml
 from .style import CONTEXT_MENU_STYLE
 
 
-def get_content_folder():
+def get_content_folder() -> str | None:
+    """Retrieves the content root folder path from the Omniverse configuration.
+
+    Reads the omniverse.toml configuration file to extract the content_root path setting.
+    This path is typically used as the default location for collecting and storing Omniverse content.
+
+    Returns:
+        The content root folder path if found in the configuration, None if the configuration
+        cannot be read or the path is not found.
+    """
     try:
         global_config_path = carb.tokens.get_tokens_interface().resolve("${omni_global_config}")
         omniverse_config_path = os.path.join(global_config_path, "omniverse.toml").replace("\\", "/")
@@ -35,9 +47,7 @@ def get_content_folder():
 
 
 class ContextMenu(ui.Menu):
-    """
-    Context menu for asset browser.
-    """
+    """Context menu for asset browser."""
 
     def __init__(self):
         super().__init__("Asset browser context menu", style=CONTEXT_MENU_STYLE)
@@ -92,6 +102,11 @@ class ContextMenu(ui.Menu):
                 carb.log_warn("Plese enable omni.kit.clipboard first to copy URL link.")
 
     def _collect(self):
+        """Collects the current URL using the omni.kit.tool.collect extension.
+
+        Opens the collect tool with the current URL and sets the target folder to the content folder
+        specified in the launcher settings if available.
+        """
         try:
             # pylint: disable=redefined-outer-name
             import omni.kit.tool.collect
@@ -122,6 +137,10 @@ class ContextMenu(ui.Menu):
             carb.log_warn("Require omni.kit.tool.collect v2.0.5 or later!")
 
     def __add_at_current_selection(self):
+        """Adds the current URL file to the stage at the current selection.
+
+        Uses the omni.kit.menu.stage extension to add the file without replacing existing content.
+        """
         try:
             # pylint: disable=redefined-outer-name
             from omni.kit.menu.stage.content_browser_options import ContentBrowserOptions
@@ -131,6 +150,10 @@ class ContextMenu(ui.Menu):
             pass
 
     def __replace_current_selection(self):
+        """Replaces the current selection in the stage with the current URL file.
+
+        Uses the omni.kit.menu.stage extension to replace existing content with the file.
+        """
         try:
             # pylint: disable=redefined-outer-name
             from omni.kit.menu.stage.content_browser_options import ContentBrowserOptions
@@ -140,6 +163,10 @@ class ContextMenu(ui.Menu):
             pass
 
     def __copy_url_link(self):
+        """Copies the current URL to the system clipboard.
+
+        Uses the omni.kit.clipboard extension to copy the URL for sharing or pasting.
+        """
         import omni.kit.clipboard
 
         omni.kit.clipboard.copy(self.url)

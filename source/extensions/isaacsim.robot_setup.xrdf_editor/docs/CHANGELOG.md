@@ -1,4 +1,17 @@
 # Changelog
+## [3.4.1] - 2026-03-04
+### Fixed
+- Fix api errors
+- Removed incorrect type annotation for SimulationContext
+
+## [3.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [3.3.0] - 2026-02-26
+### Added
+- Can load and export XRDF version 2.0
+
 ## [3.2.5] - 2025-12-08
 ### Changed
 - Considers visual mesh scaling when generating collision spheres.

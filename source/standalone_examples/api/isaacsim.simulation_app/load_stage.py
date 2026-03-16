@@ -67,7 +67,7 @@ kit.update()
 kit.update()
 
 print("Loading stage...")
-from isaacsim.core.utils.stage import is_stage_loading
+from isaacsim.core.experimental.utils.stage import is_stage_loading
 
 while is_stage_loading():
     kit.update()

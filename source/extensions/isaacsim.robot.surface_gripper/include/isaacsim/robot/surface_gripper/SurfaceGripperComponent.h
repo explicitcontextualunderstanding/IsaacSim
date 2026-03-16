@@ -60,15 +60,21 @@ enum class PhysxActionType
  */
 struct PhysxAction
 {
+    /** @brief Action kind for this queued PhysX operation. */
     PhysxActionType type = PhysxActionType::Attach;
 
     // Common
+    /** @brief Joint to attach or detach. */
     physx::PxJoint* joint = nullptr;
+    /** @brief USD path for the joint, used for lookups and diagnostics. */
     std::string jointPath;
 
     // For Attach
+    /** @brief First rigid actor participating in the attachment. */
     physx::PxRigidActor* actor0 = nullptr;
+    /** @brief Second rigid actor participating in the attachment. */
     physx::PxRigidActor* actor1 = nullptr;
+    /** @brief Joint-local pose for actor1 when attaching. */
     physx::PxTransform localPose1;
 };
 
@@ -97,21 +103,29 @@ enum class Axis
  */
 struct UsdAction
 {
+    /** @brief Action kind for this queued USD operation. */
     UsdActionType type = UsdActionType::WriteStatus;
 
     // Common
+    /** @brief USD prim path for the gripper. */
     std::string primPath;
 
     // For WriteStatus
+    /** @brief Status token to write ("Open", "Closed", or "Closing"). */
     std::string statusToken; // "Open", "Closed", or "Closing"
 
     // For WriteGrippedObjectsAndFilters
+    /** @brief Paths of prims currently gripped by this gripper. */
     std::vector<std::string> grippedObjectPaths;
+    /** @brief Body-0 path used to build filtered collision pairs. */
     std::string body0PathForFilterPairs;
 
     // For WriteAttachmentPointBatch
+    /** @brief Attachment point API paths that should be applied. */
     std::vector<std::string> apiPathsToApply;
+    /** @brief Attachment paths excluded from articulation updates. */
     std::vector<std::string> excludeFromArticulationPaths;
+    /** @brief Per-attachment clearance offsets to persist to USD. */
     std::vector<std::pair<std::string, float>> clearanceOffsets;
 };
 
@@ -190,6 +204,7 @@ public:
      * @brief Initializes the surface gripper component
      * @param[in] prim USD prim representing the surface gripper
      * @param[in] stage USD stage containing the prim
+     * @param[in] writeToUsd Whether to write to USD or keep state in memory only
      */
     virtual void initialize(const pxr::UsdPrim& prim, const pxr::UsdStageWeakPtr stage, bool writeToUsd);
 
@@ -264,11 +279,19 @@ public:
         m_writeToUsd = writeToUsd;
     }
 
+    /**
+     * @brief Returns whether there are queued PhysX actions.
+     * @return True if the PhysX action queue is non-empty.
+     */
     bool hasPhysxActions() const
     {
         return !m_physxActions.empty();
     }
 
+    /**
+     * @brief Returns whether there are queued USD actions.
+     * @return True if the USD action queue is non-empty.
+     */
     bool hasUsdActions() const
     {
         return !m_usdActions.empty();
@@ -311,13 +334,11 @@ private:
      * @brief Processes a single attachment point to attempt a grip.
      * @details
      * Executes the raycast and attachment logic for one attachment point, updating
-     * the provided collections under the given mutexes when changes are detected.
+     * the provided collections when changes are detected.
      *
-     * @param[in] attachmentPath The USD path string of the attachment joint to process.
-     * @param[out] apToRemove Collection to append the attachment path to when it should transition to active.
-     * @param[out] clearanceOffsetsToPersist Collection to append clearance offset updates to persist to USD.
-     * @param[in,out] apMutex Mutex protecting per-attachment shared maps and vectors.
-     * @param[in,out] clearanceMutex Mutex protecting the clearance offsets collection.
+     * @param[in] attachmentIndex Index of the attachment point to process.
+     * @param[out] apToRemove Indices to remove when an attachment becomes active.
+     * @param[out] clearanceOffsetsToPersist Clearance offsets to persist to USD.
      */
     void _processAttachmentForGrip(size_t attachmentIndex,
                                    std::vector<size_t>& apToRemove,

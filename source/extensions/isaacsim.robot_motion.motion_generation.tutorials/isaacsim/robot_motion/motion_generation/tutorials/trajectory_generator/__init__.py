@@ -6,4 +6,10 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+
+"""Tutorial module for UR10 robot trajectory generation demonstrations in Isaac Sim."""
+
+
 from .extension import *
+
+__all__ = ["UIBuilder", "Extension"]

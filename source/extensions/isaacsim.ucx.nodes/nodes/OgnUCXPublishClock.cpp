@@ -62,20 +62,17 @@ public:
 
 protected:
     /**
-     * @brief Generate message from node inputs.
+     * @brief Generate message from clock data.
      * @details
-     * Serializes the timestamp as a double (8 bytes) in native byte order.
+     * Serializes the clock data as a double (8 bytes) in native byte order.
      *
-     * @param[in] db Database accessor for node inputs
+     * @param[in] data Clock data to serialize
      * @return std::vector<uint8_t> Serialized message data
      */
-    std::vector<uint8_t> generateMessage(OgnUCXPublishClockDatabase& db) override
+    std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::ClockData& data) override
     {
-        const double timestamp = db.inputs.timeStamp();
-
         std::vector<uint8_t> messageData(sizeof(double));
-        std::memcpy(messageData.data(), &timestamp, sizeof(double));
-
+        std::memcpy(messageData.data(), &data.timestamp, sizeof(double));
         return messageData;
     }
 };

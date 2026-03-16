@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension that provides UCX integration capabilities for Isaac Sim."""
+
+
 import carb
 import omni.ext
 
@@ -24,9 +27,15 @@ class UCXBridgeExtension(omni.ext.IExt):
     """
 
     def on_startup(self, ext_id):
+        """Initializes the UCX Bridge extension.
+
+        Args:
+            ext_id: Extension identifier provided by the extension manager.
+        """
 
         carb.log_info("Starting UCX Bridge extension")
 
     def on_shutdown(self):
+        """Cleans up the UCX Bridge extension resources."""
 
         carb.log_info("Shutting down UCX Bridge extension")

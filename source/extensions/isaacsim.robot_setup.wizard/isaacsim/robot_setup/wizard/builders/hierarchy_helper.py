@@ -47,8 +47,14 @@ JOINT_PRIM_TYPES = [
 
 
 def apply_hierarchy(lookup_table, reference_mesh, delete_prim_paths):
-    """
-    lookup_table is a dictionary of old paths and new paths
+    """Apply new robot hierarchy structure using lookup table mapping.
+
+    Lookup_table is a dictionary of old paths and new paths. This function reorganizes the robot structure by moving prims according to the lookup table, processes meshes, applies transforms, and creates physics variants.
+
+    Args:
+        lookup_table: Dictionary mapping old prim paths to new prim paths.
+        reference_mesh: Dictionary mapping link paths to reference mesh prim paths.
+        delete_prim_paths: List of prim paths to be deleted during cleanup.
     """
     # get it from registry of where to save the original stage, and where they want to save the new file,
 
@@ -127,8 +133,13 @@ def apply_hierarchy(lookup_table, reference_mesh, delete_prim_paths):
 
 
 def scaffolding(robot_stage):
-    """
-    create the scaffolding for the new structure
+    """Creates the scaffolding structure for the robot reorganization.
+
+    Sets up the necessary scope hierarchies including Looks, Joints, meshes, visuals, colliders folders
+    and creates link-specific xform prims under each scope.
+
+    Args:
+        robot_stage: The USD stage containing the robot to scaffold.
     """
     robot = RobotRegistry().get()
 
@@ -165,6 +176,15 @@ def scaffolding(robot_stage):
 
 
 def move_prim_by_type(prim, old_path, new_path):
+    """Move prim to appropriate location based on its type.
+
+    Recursively processes prim and its children, moving materials to Looks folder, joints to Joints folder, and other prims to the specified new path.
+
+    Args:
+        prim: The USD prim to move.
+        old_path: Current path of the prim.
+        new_path: Target path for the prim.
+    """
     prim_name = new_path.split("/")[3:][0]
     ## everything after the link name gets kept (assuming format of robot_name/link_name/stuff)
     if prim.GetChildren():
@@ -218,14 +238,19 @@ def move_prim_by_type(prim, old_path, new_path):
 
 
 def process_mesh(stage, robot_prim, reference_mesh):
-    """
-    before the meshes are moved to the meshe folder, it first has to transform based on the link it's under. steps are:
+    """Process and reorganize robot meshes into the mesh folder structure.
+
+    Before the meshes are moved to the meshe folder, it first has to transform based on the link it's under. steps are:
     0. move all the meshes to under the robot first so that all the meshes associated with the link are under the same prim
     1. find the reference mesh for each link
     2. apply the transform to the link, and mesh
     3. move the mesh to the meshes folder
     4. go through each link of the meshes, check if the mesh already has rigid body and/or collision API, if yes, strip them and create a copy without the physics, link that to the visual links
 
+    Args:
+        stage: The USD stage containing the robot.
+        robot_prim: The root robot prim.
+        reference_mesh: Dictionary mapping link paths to reference mesh prim paths.
     """
 
     robot = RobotRegistry().get()
@@ -297,8 +322,12 @@ def process_mesh(stage, robot_prim, reference_mesh):
 
 
 def recursive_physics_removal(prim):
-    """
-    remove the api from the prim
+    """Remove the api from the prim.
+
+    Recursively removes physics APIs (RigidBodyAPI and CollisionAPI) from the prim and all its children to ensure clean visual mesh references.
+
+    Args:
+        prim: The USD prim to process for physics API removal.
     """
     for child in prim.GetChildren():
         if child.HasAPI(UsdPhysics.RigidBodyAPI):
@@ -310,12 +339,12 @@ def recursive_physics_removal(prim):
 
 
 def relocate_parent_to_child_origin(parent_prim_path, reference_child_prim_path):
-    """
-    Moves the parent's transform to the reference child's origin and updates all children's
+    """Moves the parent's transform to the reference child's origin and updates all children's
     transforms to remain in their current global positions.
 
-    :param parent_prim: The parent UsdPrim object.
-    :param reference_child_prim: The child UsdPrim object to be used as the reference frame.
+    Args:
+        parent_prim_path: Path to the parent prim whose transform will be moved.
+        reference_child_prim_path: Path to the child prim that will serve as the new reference frame.
     """
     stage = omni.usd.get_context().get_stage()
     parent_prim = stage.GetPrimAtPath(parent_prim_path)
@@ -348,11 +377,15 @@ def relocate_parent_to_child_origin(parent_prim_path, reference_child_prim_path)
 
 
 def update_xforms(prim, new_xform, scale=(1, 1, 1)):
-    """
-    input:
-        prim,
-        the new transform with translation and rotation only,
-        the scale that needs to be put back into the xformOp
+    """Updates the transform operations of a prim with new translation, rotation, and scale values.
+
+    Sets the xformOp:translate, xformOp:orient, and xformOp:scale attributes on the prim,
+    creating them if they don't exist.
+
+    Args:
+        prim: The prim or UsdGeom.Xformable to update.
+        new_xform: The new transform matrix containing translation and rotation.
+        scale: The scale values to apply to the prim.
     """
     xformable = UsdGeom.Xformable(prim)
     prim = xformable.GetPrim()
@@ -384,12 +417,16 @@ def update_xforms(prim, new_xform, scale=(1, 1, 1)):
 
 
 def cleanup_xforms(delete_prim_paths):
-    """
-    xform rules:
-        - no xforms on the links in the meshes folder, keep the relative transformd within each link for the meshes(i.e. the foundational mesh for each link should be at the origin, not necesarily each piece that makes up that link)
-        - default xforms on link/collider references
-        - xform translation and rotation on /robot/link stays (these should be already post-reference-aligned)
-        - delete the prims in delete_prim_paths (should all be under /robot)
+    """Apply transform cleanup rules to robot structure.
+
+    Xform rules:
+    - no xforms on the links in the meshes folder, keep the relative transformd within each link for the meshes(i.e. the foundational mesh for each link should be at the origin, not necesarily each piece that makes up that link)
+    - default xforms on link/collider references
+    - xform translation and rotation on /robot/link stays (these should be already post-reference-aligned)
+    - delete the prims in delete_prim_paths (should all be under /robot)
+
+    Args:
+        delete_prim_paths: List of prim paths to delete during cleanup.
     """
     robot = RobotRegistry().get()
     stage = omni.usd.get_context().get_stage()
@@ -426,9 +463,13 @@ def cleanup_xforms(delete_prim_paths):
 
 
 def recursive_reset_transforms(prim, exclude_list=[]):
-    """
-    reset the transforms of the prim and all its children.
-    for xform:translate, default is 0,0,0 xform:orient, default is 0,0,0,1 xform:scale, default is 1,1,1 xform:pivot, default is 0,0,0
+    """Reset the transforms of the prim and all its children.
+
+    For xform:translate, default is 0,0,0 xform:orient, default is 0,0,0,1 xform:scale, default is 1,1,1 xform:pivot, default is 0,0,0.
+
+    Args:
+        prim: The USD prim to reset transforms for.
+        exclude_list: List of transform attribute names to exclude from reset.
     """
     for child in prim.GetChildren():
         for attr in child.GetAttributes():
@@ -446,8 +487,13 @@ def recursive_reset_transforms(prim, exclude_list=[]):
 
 
 def recursive_transform_removal(prim, exclude_list=[]):
-    """
-    Recursively remove xformOp attributes from all descendants
+    """Recursively remove xformOp attributes from all descendants.
+
+    Traverses through all child prims and removes transform operation attributes, with option to exclude specific attributes from removal.
+
+    Args:
+        prim: The USD prim to process.
+        exclude_list: List of transform attribute names to exclude from removal.
     """
     for child_prim in prim.GetAllChildren():
         # Get a list of attributes that start with xformOp
@@ -460,8 +506,9 @@ def recursive_transform_removal(prim, exclude_list=[]):
 
 
 def create_physics_variant():
-    """
-    create a physics variant for the robot
+    """Create a physics variant for the robot.
+
+    Creates a new physics layer with collision APIs, rigid body APIs, and references to collider meshes. Sets up the physics structure while preserving the base visual structure.
     """
     robot = RobotRegistry().get()
     if not robot:
@@ -535,8 +582,14 @@ def create_physics_variant():
 
 
 def _recursive_api_removal(prim, api_name, api_handle):
-    """
-    remove the api from the prim
+    """Remove the api from the prim.
+
+    Recursively traverses all children of the prim and removes the specified API schema from each child that has it applied.
+
+    Args:
+        prim: The USD prim to process.
+        api_name: The name of the API schema to remove.
+        api_handle: The API class handle used to remove the schema.
     """
     for child in prim.GetChildren():
         if api_name in child.GetAppliedSchemas():
@@ -545,8 +598,12 @@ def _recursive_api_removal(prim, api_name, api_handle):
 
 
 def clean_up(robot_stage):
-    """
-    delete all the scopes and prims that are not needed (how can you tell if a prim is "leftover"? or do we need user input: a list of vestigial prims, and ask to keep/delete/label as reference)
+    """Delete all the scopes and prims that are not needed.
+
+    Delete all the scopes and prims that are not needed (how can you tell if a prim is "leftover"? or do we need user input: a list of vestigial prims, and ask to keep/delete/label as reference).
+
+    Args:
+        robot_stage: The USD stage containing the robot to clean up.
     """
 
     pass

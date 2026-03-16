@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module for tuning joint gains on articulated robots through test signal generation and inertia analysis."""
+
+
 import asyncio
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Dict, List, Set, Tuple
@@ -27,25 +29,29 @@ import pxr
 import usd.schema.isaac.robot_schema as robot_schema
 import usd.schema.isaac.robot_schema.utils as rs_utils
 from isaacsim.core.experimental.prims import Articulation
-from pxr import Gf, Usd, UsdPhysics
-
-from .mass_query import query_prims
+from pxr import Gf, Sdf, Usd, UsdPhysics
 
 
 class GainsTestMode(IntEnum):
     """Enumeration of available test signal modes for gain tuning."""
 
     SINUSOIDAL = 0
+    """Test mode that generates sinusoidal signals for gain tuning analysis."""
     STEP = 1
+    """Test mode that generates step response signals for gain tuning analysis."""
     USER_PROVIDED = 2
+    """Test mode that allows custom user-defined signals for gain tuning analysis."""
 
 
 class JointMode(IntEnum):
     """Enumeration of joint control modes."""
 
     POSITION = 0
+    """Position control mode where joints are commanded to specific position targets."""
     VELOCITY = 1
+    """Velocity control mode where joints are commanded to specific velocity targets."""
     NONE = 2
+    """No control mode active for the joint."""
 
 
 @dataclass
@@ -334,34 +340,6 @@ def compute_parallel_axis_inertia(
     return result
 
 
-def transform_inertia_tensor(
-    principal_inertia: Gf.Vec3f, rotation: Gf.Quatf, mass: float, displacement: Gf.Vec3f
-) -> Gf.Matrix3f:
-    """Transform a diagonal principal-axis inertia tensor to world frame and apply parallel axis theorem.
-
-    Args:
-        principal_inertia: Diagonal inertia tensor components in principal axes frame.
-        rotation: Quaternion rotation from principal frame to world frame.
-        mass: Mass of the object.
-        displacement: Vector from center of mass to new origin in world frame.
-
-    Returns:
-        Inertia tensor in world frame about the new point.
-    """
-    # Convert principal inertia to diagonal matrix
-    principal_matrix = Gf.Matrix3f(principal_inertia[0], 0, 0, 0, principal_inertia[1], 0, 0, 0, principal_inertia[2])
-
-    # Rotate inertia tensor to world space: I_world = R * I_principal * R^T
-    rot_matrix = Gf.Matrix3f().SetRotate(Gf.Rotation(rotation))
-    world_inertia = rot_matrix * principal_matrix * rot_matrix.GetTranspose()
-
-    # Apply parallel axis theorem
-    displacement_term = _compute_displacement_inertia_term(displacement, mass)
-    result = Gf.Matrix3f(world_inertia)
-    result += displacement_term
-    return result
-
-
 def find_articulation_root(stage: pxr.Usd.Stage, robot_path: str) -> str:
     """Find the articulation root prim for a robot.
 
@@ -466,7 +444,6 @@ class GainTuner:
         self._robot_links = [
             link for link in pxr.Usd.PrimRange(self._robot) if link.HasAPI(robot_schema.Classes.LINK_API.value)
         ]
-        self._link_mass = query_prims(stage, [link.GetPath() for link in self._robot_links])
 
         async def update_link_mass():
             was_playing = self._timeline.is_playing()
@@ -657,7 +634,7 @@ class GainTuner:
 
     @property
     def joint_range_maximum(self) -> float:
-        """Get the joint range maximum.
+        """Joint range maximum.
 
         Returns:
             Joint range maximum.
@@ -675,7 +652,7 @@ class GainTuner:
 
     @property
     def position_impulse(self) -> float:
-        """Get the position impulse.
+        """Position impulse.
 
         Returns:
             Position impulse.
@@ -693,7 +670,7 @@ class GainTuner:
 
     @property
     def velocity_impulse(self) -> float:
-        """Get the velocity impulse.
+        """Velocity impulse.
 
         Returns:
             Velocity impulse.
@@ -711,7 +688,7 @@ class GainTuner:
 
     @property
     def robot(self) -> pxr.Usd.Prim:
-        """Get the robot prim.
+        """Robot prim.
 
         Returns:
             The robot prim.
@@ -724,6 +701,10 @@ class GainTuner:
         joint_pose: Gf.Matrix4d,
         robot_transform: Gf.Matrix4d,
         is_prismatic: bool,
+        link_path_to_index: Dict[Sdf.Path, int],
+        link_masses: np.ndarray,
+        link_com_positions: np.ndarray,
+        link_inertias: np.ndarray,
     ) -> Tuple[float, Gf.Matrix3f, bool]:
         """Accumulate mass and inertia for a set of links.
 
@@ -732,11 +713,14 @@ class GainTuner:
             joint_pose: The joint's pose matrix.
             robot_transform: The robot's world transform.
             is_prismatic: True if the joint is prismatic.
+            link_path_to_index: Mapping from link prim path to articulation link index.
+            link_masses: Mass for each link, shape ``(L,)``.
+            link_com_positions: Local-frame COM positions for each link, shape ``(L, 3)``.
+            link_inertias: Full 3x3 inertia tensors (row-major) for each link, shape ``(L, 9)``.
 
         Returns:
             Tuple of (total_mass, accumulated_inertia, is_fixed).
             Returns (0, zero_matrix, True) if a fixed link is encountered.
-            Returns None if mass data is not ready.
         """
         total_mass = 0.0
         accumulated_inertia = pxr.Gf.Matrix3f().SetZero()
@@ -747,26 +731,38 @@ class GainTuner:
             if link_path in self._fixed_links:
                 return (0.0, pxr.Gf.Matrix3f().SetZero(), True)
 
-            mass_data = self._link_mass[link_path]
-            if not (mass_data.valid and mass_data.done):
-                return None
+            link_index = link_path_to_index.get(link_path)
+            if link_index is None:
+                continue
 
-            mass = mass_data.mass
+            mass = float(link_masses[link_index])
             total_mass += mass
 
             if not is_prismatic:
                 link_pose = omni.usd.get_world_transform_matrix(link)
-                world_com = pxr.Gf.Vec3f(
+                com_local = link_com_positions[link_index].astype(float)
+                world_com = pxr.Gf.Vec3d(
                     (
                         link_pose
-                        * pxr.Gf.Matrix4d().SetTranslate(pxr.Gf.Vec3d(*mass_data.center_of_mass))
+                        * pxr.Gf.Matrix4d().SetTranslate(pxr.Gf.Vec3d(*com_local))
                         * robot_transform.GetInverse()
                     ).ExtractTranslation()
                 )
                 displacement = world_com - joint_pose.ExtractTranslation()
-                transformed_inertia = transform_inertia_tensor(
-                    mass_data.diagonal_inertia, mass_data.principal_axes, mass, displacement
+
+                inertia_flat = link_inertias[link_index].astype(float)
+                body_frame_inertia = pxr.Gf.Matrix3f(
+                    inertia_flat[0],
+                    inertia_flat[1],
+                    inertia_flat[2],
+                    inertia_flat[3],
+                    inertia_flat[4],
+                    inertia_flat[5],
+                    inertia_flat[6],
+                    inertia_flat[7],
+                    inertia_flat[8],
                 )
+                transformed_inertia = compute_parallel_axis_inertia(body_frame_inertia, mass, displacement)
                 accumulated_inertia += transformed_inertia
 
         return (total_mass, accumulated_inertia, False)
@@ -790,8 +786,18 @@ class GainTuner:
             This computation is dependent on the initial position of the robot.
             Natural frequency will be heavily biased by the initial position.
         """
-        if not self._robot:
+        if not self._robot or not self._articulation:
             return
+
+        # Build link path -> link index mapping
+        link_paths = self._articulation.link_paths[0]
+        link_path_to_index = {Sdf.Path(path): i for i, path in enumerate(link_paths)}
+
+        # Query all link mass properties from the Articulation tensor API
+        link_masses = self._articulation.get_link_masses().numpy()[0]  # (L,)
+        com_positions, _ = self._articulation.get_link_coms()
+        link_com_positions = com_positions.numpy()[0]  # (L, 3)
+        link_inertias = self._articulation.get_link_inertias().numpy()[0]  # (L, 9)
 
         robot_transform = omni.usd.get_world_transform_matrix(self._robot)
         joint_inertia = {}
@@ -803,15 +809,29 @@ class GainTuner:
             joint_axis = get_joint_axis_world_direction(joint, joint_pose)
 
             # Accumulate inertia for backward links
-            backward_result = self._accumulate_link_inertia(backward_links, joint_pose, robot_transform, is_prismatic)
-            if backward_result is None:
-                return
+            backward_result = self._accumulate_link_inertia(
+                backward_links,
+                joint_pose,
+                robot_transform,
+                is_prismatic,
+                link_path_to_index,
+                link_masses,
+                link_com_positions,
+                link_inertias,
+            )
             backward_mass, backward_inertia, backward_fixed = backward_result
 
             # Accumulate inertia for forward links
-            forward_result = self._accumulate_link_inertia(forward_links, joint_pose, robot_transform, is_prismatic)
-            if forward_result is None:
-                return
+            forward_result = self._accumulate_link_inertia(
+                forward_links,
+                joint_pose,
+                robot_transform,
+                is_prismatic,
+                link_path_to_index,
+                link_masses,
+                link_com_positions,
+                link_inertias,
+            )
             forward_mass, forward_inertia, forward_fixed = forward_result
 
             # Compute effective inertia based on joint type
@@ -1101,7 +1121,7 @@ class GainTuner:
         """
         pos_rmse_list = []
         vel_rmse_list = []
-        for dof_index in range(self._articulation.num_dof):
+        for dof_index in range(self._articulation.num_dofs):
             pos_rmse, vel_rmse = self._compute_gains_test_dof_error_terms(dof_index)
             pos_rmse_list.append(pos_rmse)
             vel_rmse_list.append(vel_rmse)

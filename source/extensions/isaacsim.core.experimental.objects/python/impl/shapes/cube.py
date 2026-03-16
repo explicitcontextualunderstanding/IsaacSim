@@ -40,6 +40,8 @@ class Cube(Shape):
             Can include regular expressions for matching multiple prims.
         sizes: Sizes (cube's edge length) (shape ``(N, 1)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
+        colors: Display colors (shape ``(N, 3)``).
+            If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         positions: Positions in the world frame (shape ``(N, 3)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         translations: Translations in the local frame (shape ``(N, 3)``).
@@ -63,9 +65,9 @@ class Cube(Shape):
         >>> from isaacsim.core.experimental.objects import Cube
         >>>
         >>> # given an empty USD stage with the /World Xform prim,
-        >>> # create cubes at paths: /World/prim_0, /World/prim_1, and /World/prim_2
+        >>> # create blue cubes at paths: /World/prim_0, /World/prim_1, and /World/prim_2
         >>> paths = ["/World/prim_0", "/World/prim_1", "/World/prim_2"]
-        >>> prims = Cube(paths)  # doctest: +NO_CHECK
+        >>> prims = Cube(paths, colors=[0.0, 0.0, 1.0])  # doctest: +NO_CHECK
     """
 
     def __init__(
@@ -74,6 +76,8 @@ class Cube(Shape):
         *,
         # Cube
         sizes: float | list | np.ndarray | wp.array | None = None,
+        # Shape
+        colors: list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
@@ -100,6 +104,7 @@ class Cube(Shape):
         super().__init__(
             paths,
             resolve_paths=False,
+            colors=colors,
             positions=positions,
             translations=translations,
             orientations=orientations,

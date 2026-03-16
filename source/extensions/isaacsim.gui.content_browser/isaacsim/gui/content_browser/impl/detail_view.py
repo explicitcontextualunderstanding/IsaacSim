@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Detail view implementation for the Isaac Sim content browser."""
+
+
 import os
 from collections import namedtuple
 from datetime import datetime
@@ -36,10 +39,11 @@ TXT_FILETYPES = (".json", ".yaml", ".yml", ".pt", ".txt", ".log")
 
 
 class ExtendedFileInfo(DetailFrameController):
-    """Extended file info show in detail view"""
+    """Extended file info shown in detail view."""
 
     MockListEntry = namedtuple("MockListEntry", "relative_path modified_time created_by modified_by size")
     _empty_list_entry = MockListEntry("File info", datetime.now(), "", "", 0)
+    """Default MockListEntry used when no file information is available or when file stat operation fails."""
 
     def __init__(self):
         super().__init__(
@@ -53,11 +57,11 @@ class ExtendedFileInfo(DetailFrameController):
         self._isaac_content_frame = None
 
     def build_header(self, collapsed: bool, title: str):
-        """
-        Builds the header. It is used to show the header of the file info.
+        """Builds the header. It is used to show the header of the file info.
+
         Args:
-            collapsed (bool): True if the header is collapsed.
-            title (str): title of the header to be shown.
+            collapsed: True if the header is collapsed.
+            title: Title of the header to be shown.
         """
         with ui.HStack(style_type_name_override="DetailFrame.Header"):
             if collapsed:
@@ -73,10 +77,20 @@ class ExtendedFileInfo(DetailFrameController):
             )
 
     def _build_ui_impl(self, selected: List[str] = []):
+        """Builds the UI implementation for the file info widget.
+
+        Args:
+            selected: List of selected file paths.
+        """
         self._widget = ui.Frame()
         run_coroutine(self._build_ui_async(selected))
 
     async def _build_ui_async(self, selected: List[str] = []):
+        """Builds the UI asynchronously, retrieving file information and displaying file details.
+
+        Args:
+            selected: List of selected file paths.
+        """
         entry = None
         if len(selected) == 0:
             self._frame.title = "No files selected"
@@ -141,14 +155,26 @@ class ExtendedFileInfo(DetailFrameController):
                                     ui.Label("No Additional Information")
 
     def _on_file_change_event(self, result: omni.client.Result, entry: omni.client.ListEntry):
+        """Handles file change events from the file resolver subscription.
+
+        Args:
+            result: The result of the file operation.
+            entry: The file list entry information.
+        """
         if result == omni.client.Result.OK and self._current_url:
             # isaac sim content info don't need to be updated on every single file change. only when clicked on.
             pass
 
     def _on_selection_changed_impl(self, selected: List[str] = []):
+        """Handles selection change events by rebuilding the UI with the new selection.
+
+        Args:
+            selected: List of selected file paths.
+        """
         self._build_ui_impl(selected)
 
     def _destroy_impl(self, _):
+        """Cleans up resources when the widget is destroyed."""
         if self._widget:
             self._widget.destroy()
         self._widget = None

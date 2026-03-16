@@ -647,13 +647,13 @@ class TestSimpleCloner(omni.kit.test.AsyncTestCase):
         )
 
         # attach physics to the stage
-        get_physics_simulation_interface().attach_stage(stage_id)
+        get_physics_simulation_interface().initialize(stage_id)
 
         # check that the prims are in physics
         num_dynamic_rigid_bodies = self.get_num_dynamic_rigid_bodies()
         self.assertTrue(num_dynamic_rigid_bodies == 4)
 
-        get_physics_simulation_interface().detach_stage()
+        get_physics_simulation_interface().close()
 
         cache.Erase(stage)
 
@@ -693,13 +693,13 @@ class TestSimpleCloner(omni.kit.test.AsyncTestCase):
         omni.usd.get_context().attach_stage_with_callback(stage_id, None)
 
         # attach physics to the stage
-        get_physics_simulation_interface().attach_stage(stage_id)
+        get_physics_simulation_interface().initialize(stage_id)
 
         # check that the prims are in physics
         num_dynamic_rigid_bodies = self.get_num_dynamic_rigid_bodies()
         self.assertTrue(num_dynamic_rigid_bodies == 4)
 
-        get_physics_simulation_interface().detach_stage()
+        get_physics_simulation_interface().close()
 
         await omni.usd.get_context().new_stage_async()
 

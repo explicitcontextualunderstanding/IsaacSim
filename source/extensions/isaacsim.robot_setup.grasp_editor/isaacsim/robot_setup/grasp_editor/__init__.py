@@ -12,5 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utilities for importing and managing grasp specifications from isaac_grasp YAML files."""
+
+
 from isaacsim.robot_setup.grasp_editor.extension import *
 from isaacsim.robot_setup.grasp_editor.grasp_importer import GraspSpec, import_grasps_from_file
+
+__all__ = ["import_grasps_from_file", "GraspSpec"]

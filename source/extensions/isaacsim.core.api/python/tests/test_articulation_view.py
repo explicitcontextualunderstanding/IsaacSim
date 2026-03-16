@@ -27,7 +27,6 @@ import omni.kit.test
 import omni.physics.core
 import warp as wp
 from isaacsim.core.api import World
-from isaacsim.core.api.objects.cuboid import FixedCuboid
 from isaacsim.core.deprecation_manager import import_module
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
@@ -43,11 +42,6 @@ torch = import_module("torch")
 INDEXED = [True, False]
 USD_PATH = [True, False]
 BACKEND = ["torch", "numpy", "warp"]
-template_cartpole_position_configs = {
-    "feasible states": torch.Tensor([[2, 3.1415 / 2], [2, 3.1415 / 2]]),
-    "boundary states": torch.Tensor([[4, 3.1415 / 2], [4, 3.1415 / 2]]),
-    "infeasible states": torch.Tensor([[5, 3.1415 / 2], [5, 3.1415 / 2]]),
-}
 
 
 class TestArticulationView(CoreTestCase):
@@ -64,14 +58,13 @@ class TestArticulationView(CoreTestCase):
         await update_stage_async()
         await super().tearDown()
 
-    async def setUpWorld(self, backend="torch", device="cpu", report_residuals=True):
+    async def setUpWorld(self, backend="torch", device="cpu"):
         World.clear_instance()
         await create_new_stage_async()
         self._my_world = World(stage_units_in_meters=1.0, backend=backend, device=device)
         await self._my_world.initialize_simulation_context_async()
         self._my_world.scene.add_default_ground_plane()
         self._my_world._physics_context.set_gravity(0)
-        self._my_world._physics_context.enable_residual_reporting(report_residuals)
 
     async def add_frankas(self, backend):
 
@@ -116,7 +109,7 @@ class TestArticulationView(CoreTestCase):
         self._my_world.scene.add(self._humanoids_view)
         await self._my_world.reset_async()
 
-    async def add_cartpoles(self, backend, report_residuals=False, add_blocker=False):
+    async def add_cartpoles(self, backend):
         asset_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/Cartpole/cartpole.usd"
         add_reference_to_stage(usd_path=asset_path, prim_path="/World/Cartpole_1")
         add_reference_to_stage(usd_path=asset_path, prim_path="/World/Cartpole_2")
@@ -127,25 +120,11 @@ class TestArticulationView(CoreTestCase):
             positions = torch.tensor(positions)
         elif backend == "warp":
             positions = wp.array(positions, device="cpu", dtype=wp.float32)
-        if add_blocker:
-            FixedCuboid(
-                prim_path=f"/World/box_11",
-                size=0.25,
-                position=[positions[0][0], positions[0][1] + 1.5, positions[0][2]],
-                color=np.array([0.5, 0, 0.0]),
-            )
-            FixedCuboid(
-                prim_path=f"/World/box_2",
-                size=0.25,
-                position=[positions[1][0], positions[1][1] + 1.5, positions[1][2]],
-                color=np.array([0.5, 0, 0.0]),
-            )
 
         self._cartpoles_view = Articulation(
             prim_paths_expr="/World/Cartpole_[1-2]",
             name="cartpole_view",
             positions=positions,
-            enable_residual_reports=report_residuals,
         )
         self._my_world.scene.add(self._cartpoles_view)
         await self._my_world.reset_async()
@@ -170,213 +149,6 @@ class TestArticulationView(CoreTestCase):
     async def _step(self):
         self._my_world.step_async()
         await update_stage_async()
-
-    async def base_case_setup_residual(
-        self,
-        desc,
-        position,
-        stiffness,
-        damping,
-        assertion_function,
-        pos_tol,
-        res_tol,
-        add_blocker=False,
-    ):
-        for device in ["cpu"]:
-            for indexed in [False]:
-                stiffness = stiffness.to(torch.device(device))
-                damping = damping.to(torch.device(device))
-                position = position.to(torch.device(device))
-
-                await self.setUpWorld(backend="torch", device=device, report_residuals=True)
-                self._my_world._physics_context.set_gravity(-10)
-                # TODO: other tests may enable fabric which will prevent write to USD for residuals
-                self._my_world._physics_context.enable_fabric(False)
-                await self.add_cartpoles(backend="torch", report_residuals=True, add_blocker=add_blocker)
-                pre_value = self._cartpoles_view.get_joint_positions()
-                self._cartpoles_view.set_body_masses(torch.tile(torch.Tensor([1, 1, 1]), (2, 1)))
-                self._cartpoles_view.set_solver_position_iteration_counts(torch.tensor([4, 4]))
-                self._cartpoles_view.set_solver_velocity_iteration_counts(torch.tensor([0, 0]))
-                for i in range(60):
-                    await omni.kit.app.get_app().next_update_async()
-                    self._cartpoles_view.set_gains(stiffness, damping, save_to_usd=True)
-                    self._cartpoles_view.set_joint_position_targets(position)
-                    if indexed:
-                        value = self._cartpoles_view.get_joint_positions(indices=[1], joint_indices=[0])
-                        art_res = self._cartpoles_view.get_position_residuals(indices=[1])
-                    else:
-                        value = self._cartpoles_view.get_joint_positions()
-                        art_res = self._cartpoles_view.get_position_residuals()
-
-                scene_res = self._my_world.get_physics_context().get_solver_position_residual()
-                print(
-                    "case description: ",
-                    desc,
-                    indexed,
-                    "\nScene residual: ",
-                    scene_res,
-                    "\nArticulation residuals:\n",
-                    art_res,
-                    "\nDesireable positions:\n",
-                    position,
-                    "\nFinal positions:\n",
-                    value,
-                    "\npos tol:\n",
-                    pos_tol,
-                    "\nres tol:\n",
-                    res_tol,
-                )
-                if indexed:
-                    assertion_function(np.isclose(position[1, 0].cpu(), value[0].cpu(), atol=pos_tol).all())
-                    assertion_function(np.isclose(art_res.cpu(), torch.Tensor([0]), atol=res_tol).all())
-                else:
-                    assertion_function(np.isclose(position.cpu(), value.cpu(), atol=pos_tol).all())
-                    assertion_function(np.isclose(art_res.cpu(), torch.Tensor([0, 0]), atol=res_tol).all())
-
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
-    async def test_joint_residuals_critically_damped_gains(self):
-        stiffness = torch.tile(torch.Tensor([[500.0, 180 / 3.1415 * 500.0]]), (2, 1))
-        damping = torch.tile(torch.Tensor([[20.0, 180 / 3.1415 * 50.0]]), (2, 1))
-        convergence_criteria = [
-            {
-                "assertion": self.assertTrue,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # reaches the goal, expecting small residuals
-            {
-                "assertion": self.assertTrue,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # reaches the goal, expecting small residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 1e-6,
-            },  # doesn't reach the goal, should have larger residual! #TODO:
-        ]
-        for (desc, positions), criteria in zip(template_cartpole_position_configs.items(), convergence_criteria):
-            await self.base_case_setup_residual(
-                desc, positions, stiffness, damping, criteria["assertion"], criteria["pos_tol"], criteria["res_tol"]
-            )
-
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
-    async def test_joint_residuals_under_damped_gains(self):
-        stiffness = torch.tile(torch.Tensor([[10.0, 10]]), (2, 1))
-        damping = torch.tile(torch.Tensor([[0.0, 0.0]]), (2, 1))
-        convergence_criteria = [
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.1,
-                "res_tol": 0.1,
-            },  # overshoots, expecting large residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.1,
-                "res_tol": 0.06,
-            },  # overshoots, expecting large large residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.1,
-                "res_tol": 0.01,
-            },  # overshoots, should have larger residual! #TODO:
-        ]
-        for (desc, positions), criteria in zip(template_cartpole_position_configs.items(), convergence_criteria):
-            await self.base_case_setup_residual(
-                desc, positions, stiffness, damping, criteria["assertion"], criteria["pos_tol"], criteria["res_tol"]
-            )
-
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
-    async def test_joint_residuals_over_damped_gains(self):
-        stiffness = torch.tile(torch.Tensor([[1.0, 180 / 3.1415 * 1.0]]), (2, 1))
-        damping = torch.tile(torch.Tensor([[5.0, 180 / 3.1415 * 5.0]]), (2, 1))
-        convergence_criteria = [
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.1,
-                "res_tol": 1e-4,
-            },  # doesn't reach the goal, should have larger residual! #TODO:
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.1,
-                "res_tol": 1e-4,
-            },  # doesn't reach the goal, should have larger residual! #TODO:
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.1,
-                "res_tol": 1e-4,
-            },  # doesn't reach the goal, should have larger residual! #TODO:
-        ]
-        for (desc, positions), criteria in zip(template_cartpole_position_configs.items(), convergence_criteria):
-            await self.base_case_setup_residual(
-                desc, positions, stiffness, damping, criteria["assertion"], criteria["pos_tol"], criteria["res_tol"]
-            )
-
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
-    async def test_joint_residuals_critically_damped_gains_with_cart_blocker(self):
-        stiffness = torch.tile(torch.Tensor([[50.0, 180 / 3.1415 * 50.0]]), (2, 1))
-        damping = torch.tile(torch.Tensor([[2.0, 180 / 3.1415 * 5.0]]), (2, 1))
-        convergence_criteria = [
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # doesn't reach the goal, expecting large residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # doesn't reach the goal, expecting large residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # doesn't reach the goal, expecting large residuals
-        ]
-        for (desc, positions), criteria in zip(template_cartpole_position_configs.items(), convergence_criteria):
-            await self.base_case_setup_residual(
-                desc,
-                positions,
-                stiffness,
-                damping,
-                criteria["assertion"],
-                criteria["pos_tol"],
-                criteria["res_tol"],
-                add_blocker=True,
-            )
-
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
-    async def test_joint_residuals_critically_damped_gains_with_pole_blocker(self):
-        stiffness = torch.tile(torch.Tensor([[50.0, 180 / 3.1415 * 50.0]]), (2, 1))
-        damping = torch.tile(torch.Tensor([[2.0, 180 / 3.1415 * 5.0]]), (2, 1))
-        convergence_criteria = [
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # doesn't reach the goal, expecting large residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # doesn't reach the goal, expecting large residuals
-            {
-                "assertion": self.assertFalse,
-                "pos_tol": 0.01,
-                "res_tol": 0.01,
-            },  # doesn't reach the goal, expecting large residuals
-        ]
-        for (desc, positions), criteria in zip(template_cartpole_position_configs.items(), convergence_criteria):
-            positions[:, 1] *= -1
-            await self.base_case_setup_residual(
-                desc,
-                positions,
-                stiffness,
-                damping,
-                criteria["assertion"],
-                criteria["pos_tol"],
-                criteria["res_tol"],
-                add_blocker=True,
-            )
 
     @unittest.skipIf(os.getenv("ETM_ACTIVE"), "skipped in ETM")
     async def test_world_poses_torch(self):

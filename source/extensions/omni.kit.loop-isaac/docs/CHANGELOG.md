@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0] - 2026-03-04
+### Changed
+- Added python_api.md
+
+## [1.4.0] - 2026-02-03
+### Added
+- Added `set_next_simulation_time` function and Python binding to support multi-tick rendering mode
+- When `/rtx/hydra/supportMultiTickRate` is enabled, `SWHExternalSimulationTime` is passed to the run loop
+
 ## [1.3.8] - 2025-10-17
 ### Fixed
 - Issue where setting manual mode to false in the carb settings did not work if set before app startup completed

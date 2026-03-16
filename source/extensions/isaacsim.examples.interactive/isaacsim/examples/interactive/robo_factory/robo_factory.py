@@ -13,71 +13,138 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+RoboFactory Interactive Example
+
+This interactive example demonstrates multiple robots performing stacking tasks
+in the same scene using experimental APIs.
+"""
+
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
-from isaacsim.examples.interactive.base_sample import BaseSample
-from isaacsim.robot.manipulators.examples.franka.controllers.stacking_controller import StackingController
-from isaacsim.robot.manipulators.examples.franka.tasks import Stacking
+from isaacsim.core.rendering_manager import ViewportManager
+from isaacsim.core.simulation_manager import SimulationEvent, SimulationManager
+from isaacsim.examples.base.base_sample_experimental import BaseSample
+from isaacsim.robot.manipulators.examples.franka.stacking import Stacking
 
 
 class RoboFactory(BaseSample):
-    def __init__(self) -> None:
+    """Interactive sample for multiple robots performing stacking tasks."""
+
+    def __init__(self):
         super().__init__()
-        self._tasks = []
-        self._controllers = []
-        self._articulation_controllers = []
+        self._stackings = []
         self._robots = []
         self._num_of_tasks = 4
-        return
+        self._physics_callback_id = None
+        self._is_executing = False
 
     def setup_scene(self):
-        world = self.get_world()
+        """Set up the scene with multiple robots and cubes."""
+        # Create multiple stackings with different offsets
         for i in range(self._num_of_tasks):
-            task = Stacking(name="task" + str(i), offset=np.array([0, (i * 2) - 3, 0]))
-            world.add_task(task)
-        return
+            offset = np.array([0, (i * 2) - 3, 0])
+            robot_path = f"/World/robot_{i}"
+            # Set robot name for logging
+            robot_name = f"{i}"  # Use robot index as identifier
+            stacking = Stacking(
+                robot_path=robot_path,
+                cube_positions=[
+                    np.array([0.3, 0.3, 0.0258]),
+                    np.array([0.6, -0.25, 0.0258]),
+                ],
+                offset=offset,
+                robot_name=robot_name,
+            )
+            stacking.setup_scene()
+            self._stackings.append(stacking)
+            self._robots.append(stacking.robot)
 
     async def setup_post_load(self):
-        for i in range(self._num_of_tasks):
-            self._tasks.append(self._world.get_task(name="task" + str(i)))
-        for i in range(self._num_of_tasks):
-            self._robots.append(self._world.scene.get_object(self._tasks[i].get_params()["robot_name"]["value"]))
-            self._controllers.append(
-                StackingController(
-                    name="stacking_controller",
-                    gripper=self._robots[i].gripper,
-                    robot_articulation=self._robots[i],
-                    picking_order_cube_names=self._tasks[i].get_cube_names(),
-                    robot_observation_name=self._robots[i].name,
-                )
-            )
-        for i in range(self._num_of_tasks):
-            self._articulation_controllers.append(self._robots[i].get_articulation_controller())
-        return
-
-    def _on_start_factory_physics_step(self, step_size):
-        observations = self._world.get_observations()
-        for i in range(self._num_of_tasks):
-            actions = self._controllers[i].forward(observations=observations, end_effector_offset=np.array([0, 0, 0]))
-            self._articulation_controllers[i].apply_action(actions)
-        return
-
-    async def _on_start_stacking_event_async(self):
-        world = self.get_world()
-        world.add_physics_callback("sim_step", self._on_start_factory_physics_step)
-        await world.play_async()
-        return
+        """Called after the scene is loaded."""
+        # Set camera view
+        ViewportManager.set_camera_view(eye=[10.0, 0.0, 5.0], target=[0.0, 0.0, 0.0], camera="/OmniverseKit_Persp")
+        print(f"Scene loaded with {self._num_of_tasks} robots")
 
     async def setup_pre_reset(self):
-        world = self.get_world()
-        if world.physics_callback_exists("sim_step"):
-            world.remove_physics_callback("sim_step")
-            for i in range(len(self._controllers)):
-                self._controllers[i].reset()
-        return
+        """Called before world reset."""
+        # Stop any ongoing execution and remove callbacks
+        if self._physics_callback_id is not None:
+            SimulationManager.deregister_callback(self._physics_callback_id)
+            self._physics_callback_id = None
 
-    def world_cleanup(self):
-        self._tasks = []
-        self._controllers = []
-        self._articulation_controllers = []
+        # Reset all stackings
+        for stacking in self._stackings:
+            stacking.reset()
+
+        self._is_executing = False
+
+    async def setup_post_reset(self):
+        """Called after world reset."""
+        # Reset all robots to default poses
+        for stacking in self._stackings:
+            stacking.reset_robot()
+
+    async def setup_post_clear(self):
+        """Called after clearing the scene."""
+        # Stop any ongoing execution and remove callbacks
+        if self._physics_callback_id is not None:
+            SimulationManager.deregister_callback(self._physics_callback_id)
+            self._physics_callback_id = None
+
+        self._stackings = []
         self._robots = []
-        return
+        self._is_executing = False
+
+    def physics_cleanup(self):
+        """Clean up world resources."""
+        # Stop any ongoing execution and remove callbacks
+        if self._physics_callback_id is not None:
+            SimulationManager.deregister_callback(self._physics_callback_id)
+            self._physics_callback_id = None
+
+        self._stackings = []
+        self._robots = []
+        self._is_executing = False
+
+    def _stacking_physics_callback(self, dt, context):
+        """Physics callback to execute stacking operations step by step.
+
+        Args:
+            dt: Time delta for the physics step.
+            context: Physics simulation context.
+        """
+        if not self._is_executing:
+            return
+
+        # Execute one step for each stacking
+        for stacking in self._stackings:
+            if not stacking.is_done():
+                stacking.forward()
+
+        # Check if all robots are done
+        all_done = all(stacking.is_done() for stacking in self._stackings)
+        if all_done:
+            print("All robots finished stacking!")
+            self._is_executing = False
+            if self._physics_callback_id is not None:
+                SimulationManager.deregister_callback(self._physics_callback_id)
+                self._physics_callback_id = None
+
+    async def _on_start_stacking_event_async(self):
+        """Start the stacking execution."""
+        if self._is_executing:
+            print("Stacking already in progress...")
+            return
+
+        print("Starting stacking execution...")
+        self._is_executing = True
+
+        # Register physics callback using SimulationManager
+        self._physics_callback_id = SimulationManager.register_callback(
+            self._stacking_physics_callback, event=SimulationEvent.PHYSICS_POST_STEP
+        )
+
+        # Start timeline playback
+        app_utils.play()
+        await app_utils.update_app_async()

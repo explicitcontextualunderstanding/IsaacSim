@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension demonstrating quadruped robot control using a Boston Dynamics Spot with a trained policy."""
+
+
 import os
 
 import omni.ext
@@ -22,7 +25,38 @@ from isaacsim.robot.policy.examples.interactive.quadruped import QuadrupedExampl
 
 
 class QuadrupedExampleExtension(omni.ext.IExt):
+    """Extension that demonstrates quadruped robot control using a Boston Dynamics Spot with a trained policy.
+
+    This extension provides an interactive example showing a Boston Dynamics Spot robot running a flat terrain
+    policy that was trained in Isaac Lab. The demonstration includes keyboard controls for navigating the robot
+    in different directions and rotational movements.
+
+    The extension registers itself with the examples browser under the "Policy" category and provides a
+    comprehensive UI with documentation links and source code access. Users can control the quadruped using
+    various keyboard inputs including arrow keys and numpad controls for forward, reverse, lateral, and
+    rotational movements.
+
+    Keyboard controls include:
+    - Up arrow/numpad 8: Move forward
+    - Down arrow/numpad 2: Move reverse
+    - Left arrow/numpad 4: Move left
+    - Right arrow/numpad 6: Move right
+    - N/numpad 7: Spin counterclockwise
+    - M/numpad 9: Spin clockwise
+
+    The extension integrates with the Isaac Sim examples browser system and provides access to detailed
+    documentation about policy deployment in Isaac Lab.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initialize the quadruped example extension.
+
+        Sets up the UI template with keyboard controls for Boston Dynamics Spot robot movement
+        and registers the example with the examples browser.
+
+        Args:
+            ext_id: Extension identifier string.
+        """
         self.example_name = "Quadruped"
         self.category = "Policy"
 
@@ -58,5 +92,9 @@ class QuadrupedExampleExtension(omni.ext.IExt):
         return
 
     def on_shutdown(self):
+        """Clean up the quadruped example extension.
+
+        Deregisters the example from the examples browser when the extension shuts down.
+        """
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
         return

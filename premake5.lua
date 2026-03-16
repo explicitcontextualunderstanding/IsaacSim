@@ -32,6 +32,9 @@ function isaacsim_build_settings()
     exceptionhandling("On")
     rtti("On")
     defines { "__STDC_VERSION__=0" } -- Define this to zero to prevent errors
+    
+    -- Remove FatalCompileWarnings flag to avoid warnings being treated as errors
+    removeflags { "FatalCompileWarnings" }
 
     filter { "system:windows" }
     defines {
@@ -43,7 +46,6 @@ function isaacsim_build_settings()
         "_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR",
     }
     disablewarnings { "4996" }
-    buildoptions { "/WX-" }  -- Disable warnings as errors (equivalent to Linux's -Wno-error)
     -- Linux platform settings
     filter { "system:linux" }
     disablewarnings { "error=unused-function" }
@@ -215,6 +217,7 @@ function group_apps(kit)
 
     define_local_experience("isaac-sim", "isaacsim.exp.full")
     define_local_experience("isaac-sim.fabric", "isaacsim.exp.full.fabric")
+    define_local_experience("isaac-sim.newton", "isaacsim.exp.full.newton")
     define_local_experience("isaac-sim.compatibility_check", "isaacsim.exp.compatibility_check")
     define_local_experience("isaac-sim.streaming", "isaacsim.exp.full.streaming", "--no-window ")
     if os.hostarch() == "x86_64" then

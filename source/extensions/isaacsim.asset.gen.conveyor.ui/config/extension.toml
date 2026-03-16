@@ -1,5 +1,5 @@
 [package]
-version = "2.1.18"
+version = "2.1.19"
 category = "Simulation"
 title = "Isaac Sim Conveyor belt utility UI"
 description="UI components for isaacsim.asset.gen.conveyor. It provides menu entries to support UI-based creation of Custom Conveyor Bodies, and a Conveyor Track tool that creates a system of fixed conveyor belts from a dataset."
@@ -40,7 +40,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -56,6 +56,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",

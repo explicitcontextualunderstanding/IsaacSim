@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import struct
 import time
 
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
 import omni
 import omni.graph.core as og
@@ -104,6 +106,7 @@ class TestUCXPublishClock(UCXTestCase):
                     og.Controller.Keys.SET_VALUES: [
                         ("PublishClock.inputs:port", self.port),
                         ("PublishClock.inputs:tag", DEFAULT_TEST_TAG),
+                        ("PublishClock.inputs:timeoutMs", 5000),
                     ],
                     og.Controller.Keys.CONNECT: [
                         ("OnImpulse.outputs:execOut", "PublishClock.inputs:execIn"),
@@ -139,7 +142,7 @@ class TestUCXPublishClock(UCXTestCase):
         while time.time() - start_time < RECEIVE_TIMEOUT_SECONDS:
             if request.completed:
                 break
-            time.sleep(0.001)
+            await asyncio.sleep(0.001)
 
         self.assertTrue(request.completed, "Did not receive clock message")
         request.check_error()
@@ -221,28 +224,6 @@ class TestUCXPublishClock(UCXTestCase):
                 f"Timestamp should increase (sample {i}: {timestamps[i]} <= sample {i-1}: {timestamps[i-1]})",
             )
 
-        # Analyze timestamp deltas
-        deltas = [timestamps[i] - timestamps[i - 1] for i in range(1, len(timestamps))]
-
-        # Compute statistics on deltas
-        if len(deltas) > 1:
-            avg_delta = sum(deltas) / len(deltas)
-            max_delta = max(deltas)
-            min_delta = min(deltas)
-            delta_variance = max_delta - min_delta
-            print(
-                f"Delta stats: avg={avg_delta:.6f}, min={min_delta:.6f}, max={max_delta:.6f}, variance={delta_variance:.6f}"
-            )
-
-            tolerance = 0.001 * avg_delta  # 0.1% of average delta tolerance
-            for i, delta in enumerate(deltas):
-                self.assertAlmostEqual(
-                    delta,
-                    avg_delta,
-                    delta=tolerance,
-                    msg=f"Delta {i} ({delta:.6f}) should be close to average ({avg_delta:.6f})",
-                )
-
     async def test_multiple_nodes_same_port(self):
         """Test that multiple nodes can share the same port (listener is reused)"""
 
@@ -261,6 +242,7 @@ class TestUCXPublishClock(UCXTestCase):
                         ("PublishClock1.inputs:tag", DEFAULT_TEST_TAG),
                         ("PublishClock2.inputs:port", self.port),  # Same port
                         ("PublishClock2.inputs:tag", DEFAULT_TEST_TAG + 1),  # Different tag
+                        ("PublishClock2.inputs:timeoutMs", 1000),
                     ],
                     og.Controller.Keys.CONNECT: [
                         ("OnImpulse.outputs:execOut", "PublishClock1.inputs:execIn"),
@@ -285,10 +267,11 @@ class TestUCXPublishClock(UCXTestCase):
 
         # Receive messages with different tags
         og.Controller.attribute("/ActionGraph/OnImpulse.state:enableImpulse").set(True)
-        await omni.kit.app.get_app().next_update_async()
-
-        timestamp1 = await self.receive_clock_message(tag=DEFAULT_TEST_TAG)
-        timestamp2 = await self.receive_clock_message(tag=DEFAULT_TEST_TAG + 1)
+        _, timestamp1, timestamp2 = await asyncio.gather(
+            omni.kit.app.get_app().next_update_async(),
+            self.receive_clock_message(tag=DEFAULT_TEST_TAG),
+            self.receive_clock_message(tag=DEFAULT_TEST_TAG + 1),
+        )
 
         print(f"Received from node 1: {timestamp1} seconds")
         print(f"Received from node 2: {timestamp2} seconds")

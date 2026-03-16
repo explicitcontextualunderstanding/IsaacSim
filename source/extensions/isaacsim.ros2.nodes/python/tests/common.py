@@ -20,6 +20,7 @@ import omni
 from isaacsim.core.api.materials import OmniPBR
 from isaacsim.core.api.objects import VisualCuboid
 from isaacsim.core.utils.stage import add_reference_to_stage, open_stage_async
+from isaacsim.ros2.core.impl.ros2_image_test_utils import create_image, ros2_image_to_buffer
 from isaacsim.ros2.core.impl.ros2_test_case import ROS2TestCase
 from isaacsim.sensors.rtx import apply_nonvisual_material, get_material_id
 from pxr import UsdPhysics
@@ -130,65 +131,11 @@ async def add_franka(assets_root_path):
     (result, error) = await open_stage_async(assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
 
 
-def get_qos_profile(depth: int = 1):
+def get_qos_profile(depth: int = 1, history: str = "keep_last"):
     from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 
-    return QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT, history=QoSHistoryPolicy.KEEP_LAST, depth=depth)
-
-
-def fields_to_dtype(fields, point_step):
-    """Convert a list of PointFields to a numpy record datatype."""
-    DUMMY_FIELD_PREFIX = "__"
-
-    from sensor_msgs.msg import PointField
-
-    # mappings between PointField types and numpy types
-    type_mappings = [
-        (PointField.INT8, np.dtype("int8")),
-        (PointField.UINT8, np.dtype("uint8")),
-        (PointField.INT16, np.dtype("int16")),
-        (PointField.UINT16, np.dtype("uint16")),
-        (PointField.INT32, np.dtype("int32")),
-        (PointField.UINT32, np.dtype("uint32")),
-        (PointField.FLOAT32, np.dtype("float32")),
-        (PointField.FLOAT64, np.dtype("float64")),
-    ]
-    pftype_to_nptype = dict(type_mappings)
-    nptype_to_pftype = dict((nptype, pftype) for pftype, nptype in type_mappings)
-
-    # sizes (in bytes) of PointField types
-    pftype_sizes = {
-        PointField.INT8: 1,
-        PointField.UINT8: 1,
-        PointField.INT16: 2,
-        PointField.UINT16: 2,
-        PointField.INT32: 4,
-        PointField.UINT32: 4,
-        PointField.FLOAT32: 4,
-        PointField.FLOAT64: 8,
-    }
-
-    offset = 0
-    np_dtype_list = []
-    for f in fields:
-        while offset < f.offset:
-            # might be extra padding between fields
-            np_dtype_list.append(("%s%d" % (DUMMY_FIELD_PREFIX, offset), np.uint8))
-            offset += 1
-
-        dtype = pftype_to_nptype[f.datatype]
-        if f.count != 1:
-            dtype = np.dtype((dtype, f.count))
-
-        np_dtype_list.append((f.name, dtype))
-        offset += pftype_sizes[f.datatype] * f.count
-
-    # might be extra padding between points
-    while offset < point_step:
-        np_dtype_list.append(("%s%d" % (DUMMY_FIELD_PREFIX, offset), np.uint8))
-        offset += 1
-
-    return np_dtype_list
+    history_policy = QoSHistoryPolicy.SYSTEM_DEFAULT if history == "system_default" else QoSHistoryPolicy.KEEP_LAST
+    return QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT, history=history_policy, depth=depth)
 
 
 def set_joint_drive_parameters(joint_path, joint_type, drive_type, target_value, stiffness=None, damping=None):

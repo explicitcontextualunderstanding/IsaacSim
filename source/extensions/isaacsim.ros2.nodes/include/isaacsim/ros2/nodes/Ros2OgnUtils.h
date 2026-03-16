@@ -883,8 +883,8 @@ inline bool writeNodeAttributeFromMessage(OmniGraphDatabase& db,
             if (messageField.isArray)
             {
                 auto data = *std::static_pointer_cast<std::vector<float>>(messageData.at(i));
-                auto outputValue =
-                    getAttributeWritableArrayData<float*>(db.abi_node(), "outputs:" + messageField.name, data.size());
+                auto outputValue = getAttributeWritableArrayData<float*>(
+                    db.abi_node(), inputOutput(isOutput) + ":" + prependStr + messageField.name, data.size());
                 if (checkCondition(outputValue, "Unable to write float array"))
                 {
                     std::memcpy(*outputValue, data.data(), data.size() * sizeof(float));
@@ -892,7 +892,8 @@ inline bool writeNodeAttributeFromMessage(OmniGraphDatabase& db,
             }
             else
             {
-                auto outputValue = getAttributeWritableData<float>(db.abi_node(), "outputs:" + messageField.name);
+                auto outputValue = getAttributeWritableData<float>(
+                    db.abi_node(), inputOutput(isOutput) + ":" + prependStr + messageField.name);
                 if (checkCondition(outputValue, "Unable to write float value"))
                 {
                     *outputValue = *std::static_pointer_cast<float>(messageData.at(i));
@@ -957,7 +958,7 @@ inline bool writeNodeAttributeFromMessage(OmniGraphDatabase& db,
             {
                 auto array = *std::static_pointer_cast<const std::vector<nlohmann::json>>(messageData.at(i));
                 auto outputValue = getAttributeWritableArrayData<NameToken*>(
-                    db.abi_node(), "outputs:" + messageField.name, array.size());
+                    db.abi_node(), inputOutput(isOutput) + ":" + prependStr + messageField.name, array.size());
                 if (checkCondition(outputValue, "Unable to write message array"))
                 {
                     for (size_t j = 0; j < array.size(); ++j)

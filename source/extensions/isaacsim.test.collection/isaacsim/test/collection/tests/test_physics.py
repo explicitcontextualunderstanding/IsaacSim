@@ -13,19 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test module for physics simulation behavior and USD integration in Isaac Sim."""
+
+
 import carb
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.kit.test
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.utils.extensions import get_extension_path_from_name
-from isaacsim.core.utils.prims import get_prim_at_path
-from isaacsim.core.utils.stage import add_reference_to_stage, open_stage_async
+import omni.timeline
+from isaacsim.core.experimental.objects import Cube
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim, XformPrim
+from isaacsim.core.experimental.utils.app import get_extension_path
+from isaacsim.core.experimental.utils.prim import get_prim_at_path
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Gf, Sdf, UsdGeom, UsdPhysics
 
 
 class TestPhysics(omni.kit.test.AsyncTestCase):
+    """Tests for physics simulation behavior and USD integration."""
+
     async def setUp(self):
+        """Set up test environment with new stage and physics settings."""
         await omni.usd.get_context().new_stage_async()
         self._stage = omni.usd.get_context().get_stage()
         carb.settings.get_settings().set("persistent/app/stage/upAxis", "Z")
@@ -35,6 +43,7 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
             await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
+        """Clean up test environment and wait for assets to load."""
         for _ in range(10):
             await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
@@ -43,15 +52,19 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_usd_updates(self):
+        """Test that physics updates propagate to USD when enabled."""
         carb.settings.get_settings().set_int("physics/updateToUsd", True)
-        cube = DynamicCuboid(prim_path="/World/Cube", position=[0, 0, 25])
-        cube_prim = get_prim_at_path("/World/Cube")
+        # Create cube geometry with collision and rigid body physics
+        cube_prim = Cube("/World/Cube", positions=[[0, 0, 25]])
+        GeomPrim("/World/Cube", apply_collision_apis=True)
+        rigid_prim = RigidPrim("/World/Cube")
 
         omni.timeline.get_timeline_interface().play()
         for frame in range(60):
             await omni.kit.app.get_app().next_update_async()
         # check to make sure that the cube fell due to gravity
-        position = np.array(omni.usd.get_world_transform_matrix(cube_prim).ExtractTranslation())
+        positions, _ = cube_prim.get_world_poses()
+        position = positions.numpy()[0]
         self.assertAlmostEqual(position[2], 20.013252, 0)
         carb.settings.get_settings().set_int("physics/updateToUsd", False)
         omni.timeline.get_timeline_interface().stop()
@@ -59,12 +72,14 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         omni.timeline.get_timeline_interface().play()
         for frame in range(60):
             await omni.kit.app.get_app().next_update_async()
-        position = np.array(omni.usd.get_world_transform_matrix(cube_prim).ExtractTranslation())
+        positions, _ = cube_prim.get_world_poses()
+        position = positions.numpy()[0]
         self.assertAlmostEqual(position[2], 25.0, 0)
         carb.settings.get_settings().set_int("physics/updateToUsd", True)
         pass
 
     async def test_rigid_body(self):
+        """Test rigid body physics equations of motion under gravity."""
 
         dt = 1.0 / self._physics_rate
 
@@ -82,6 +97,8 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         rigidBodyAPI = UsdPhysics.RigidBodyAPI.Apply(cubePrim)
         await omni.kit.app.get_app().next_update_async()
 
+        rigid_prim = RigidPrim(cubePath)
+
         # test acceleration, velocity, position
         omni.timeline.get_timeline_interface().play()
         # warm up simulation
@@ -92,11 +109,13 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         # simulate for one second
         time_elapsed = dt
         for frame in range(30):
-            p_0 = np.array(omni.usd.get_world_transform_matrix(cubePrim).ExtractTranslation())
+            positions, _ = rigid_prim.get_world_poses()
+            p_0 = positions.numpy()[0]
             v_0 = np.array(rigidBodyAPI.GetVelocityAttr().Get())
             await omni.kit.app.get_app().next_update_async()
 
-            p_1 = np.array(omni.usd.get_world_transform_matrix(cubePrim).ExtractTranslation())
+            positions, _ = rigid_prim.get_world_poses()
+            p_1 = positions.numpy()[0]
             v_1 = np.array(rigidBodyAPI.GetVelocityAttr().Get())
             # print("time elapsed", time_elapsed)
             v_expected = v_0[2] + a * dt
@@ -110,6 +129,7 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_reparenting(self):
+        """Test that prim reparenting works during simulation."""
         timeline = omni.timeline.get_timeline_interface()
         omni.kit.commands.execute("CreatePrim", prim_type="Xform")
         await omni.kit.app.get_app().next_update_async()
@@ -120,6 +140,7 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         await omni.usd.get_context().new_stage_async()
 
     async def test_stage_up_axis(self):
+        """Test gravity direction changes with stage up axis setting."""
         timeline = omni.timeline.get_timeline_interface()
         # Make a new stage Z up
         carb.settings.get_settings().set("persistent/app/stage/upAxis", "Z")
@@ -133,11 +154,14 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         UsdPhysics.RigidBodyAPI.Apply(cubePrim)
         await omni.kit.app.get_app().next_update_async()
 
+        rigid_prim = RigidPrim(cubePath)
+
         timeline.play()
         for frame in range(58):
             await omni.kit.app.get_app().next_update_async()
         # check to make sure that the cube fell -Z
-        position = np.array(omni.usd.get_world_transform_matrix(cubePrim).ExtractTranslation())
+        positions, _ = rigid_prim.get_world_poses()
+        position = positions.numpy()[0]
         self.assertAlmostEqual(position[2], -4.9867, delta=0.01)
         timeline.stop()
         UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
@@ -147,10 +171,12 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         for frame in range(58):
             await omni.kit.app.get_app().next_update_async()
         # check to make sure that the cube fell -Y
-        position = np.array(omni.usd.get_world_transform_matrix(cubePrim).ExtractTranslation())
+        positions, _ = rigid_prim.get_world_poses()
+        position = positions.numpy()[0]
         self.assertAlmostEqual(position[1], -4.9867, delta=0.01)
 
     async def test_stage_units(self):
+        """Test physics behavior is consistent across different stage units."""
         timeline = omni.timeline.get_timeline_interface()
         # Make a new stage Z up
         carb.settings.get_settings().set("persistent/app/stage/upAxis", "Z")
@@ -164,11 +190,14 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         UsdPhysics.RigidBodyAPI.Apply(cubePrim)
         await omni.kit.app.get_app().next_update_async()
 
+        rigid_prim = RigidPrim(cubePath)
+
         timeline.play()
         for frame in range(58):
             await omni.kit.app.get_app().next_update_async()
         # check to make sure that the cube fell -Z
-        position = np.array(omni.usd.get_world_transform_matrix(cubePrim).ExtractTranslation())
+        positions, _ = rigid_prim.get_world_poses()
+        position = positions.numpy()[0]
         self.assertAlmostEqual(position[2], -4.9867, delta=0.01)
         timeline.stop()
         # switch to meters
@@ -178,25 +207,28 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         timeline.play()
         for frame in range(58):
             await omni.kit.app.get_app().next_update_async()
-        position = np.array(omni.usd.get_world_transform_matrix(cubePrim).ExtractTranslation())
+        positions, _ = rigid_prim.get_world_poses()
+        position = positions.numpy()[0]
         self.assertAlmostEqual(position[2], -4.9867, delta=0.01)
 
     async def test_articulation_reference(self):
+        """Test articulation maintains consistent pose across timeline resets."""
         assets_root_path = await get_assets_root_path_async()
         asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         stage = omni.usd.get_context().get_stage()
         timeline = omni.timeline.get_timeline_interface()
 
-        add_reference_to_stage(asset_path, "/franka")
+        stage_utils.add_reference_to_stage(asset_path, "/franka")
 
         timeline.play()
         for frame in range(60):
             await omni.kit.app.get_app().next_update_async()
 
-        hand_prim = stage.GetPrimAtPath("/franka/panda_hand")
+        hand_xform = XformPrim("/franka/panda_hand")
 
         await omni.kit.app.get_app().next_update_async()
-        trans_a = np.array(omni.usd.get_world_transform_matrix(hand_prim).ExtractTranslation())
+        positions, _ = hand_xform.get_world_poses()
+        trans_a = positions.numpy()[0]
 
         timeline.stop()
         await omni.kit.app.get_app().next_update_async()
@@ -204,22 +236,23 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
         for frame in range(60):
             await omni.kit.app.get_app().next_update_async()
 
-        trans_b = np.array(omni.usd.get_world_transform_matrix(hand_prim).ExtractTranslation())
+        positions, _ = hand_xform.get_world_poses()
+        trans_b = positions.numpy()[0]
 
         self.assertAlmostEqual(np.linalg.norm(trans_a - trans_b), 0, delta=0.03)
 
     async def test_articulation_drive(self):
+        """Test articulation drive behavior with and without articulation root."""
         timeline = omni.timeline.get_timeline_interface()
-        extension_path = get_extension_path_from_name("isaacsim.test.collection")
+        extension_path = get_extension_path("isaacsim.test.collection")
         usd_path = extension_path + "/data/tests/articulation_drives_opposite.usd"
-        (result, error) = await open_stage_async(usd_path)
+        (result, error) = await stage_utils.open_stage_async(usd_path)
         # Make sure the stage loaded
         self.assertTrue(result)
 
         # get handle to each robot's chassis
-        stage = omni.usd.get_context().get_stage()
-        robot_joints = stage.GetPrimAtPath("/World/mock_robot/body")
-        robot_articulation = stage.GetPrimAtPath("/World/mock_robot_with_articulation_root/body")
+        robot_joints_xform = XformPrim("/World/mock_robot/body")
+        robot_articulation_xform = XformPrim("/World/mock_robot_with_articulation_root/body")
 
         # simulate for 60 frames
         timeline.play()
@@ -227,14 +260,17 @@ class TestPhysics(omni.kit.test.AsyncTestCase):
             await omni.kit.app.get_app().next_update_async()
 
         # compare position in the x direction
-        xpos_1 = np.array(omni.usd.get_world_transform_matrix(robot_joints).ExtractTranslation())[0]
-        xpos_2 = np.array(omni.usd.get_world_transform_matrix(robot_articulation).ExtractTranslation())[0]
+        positions_1, _ = robot_joints_xform.get_world_poses()
+        positions_2, _ = robot_articulation_xform.get_world_poses()
+        xpos_1 = positions_1.numpy()[0][0]
+        xpos_2 = positions_2.numpy()[0][0]
         pos_diff = np.linalg.norm(xpos_1 - xpos_2)
         self.assertAlmostEqual(pos_diff, 0, delta=1)
         self.assertGreater(xpos_1, 2)
         self.assertGreater(xpos_2, 2)
 
     async def test_delete(self):
+        """Test deleting articulations during simulation does not crash."""
         self._timeline = omni.timeline.get_timeline_interface()
         self._assets_root_path = await get_assets_root_path_async()
         if self._assets_root_path is None:

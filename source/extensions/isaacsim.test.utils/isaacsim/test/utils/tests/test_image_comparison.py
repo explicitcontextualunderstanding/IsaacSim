@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for image comparison functionality in Isaac Sim testing utilities."""
+
+
 import io
 import os
 import tempfile
@@ -46,30 +49,39 @@ class TestImageComparison(TimedAsyncTestCase):
             shutil.rmtree(self.test_dir)
         await super().tearDown()
 
-    def get_image_comparison_golden_dir(self):
+    def get_image_comparison_golden_dir(self) -> str:
+        """Resolve path to golden assets for image comparison tests.
+
+        Returns:
+            Path to the golden image comparison directory.
+        """
         # Resolve path to golden assets for image comparison tests.
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.test.utils")
         extension_path = ext_manager.get_extension_path(ext_id)
         return os.path.join(extension_path, "data", "golden", "image_comparison")
 
-    async def _test_golden_pair(self, img1_name, img2_name, mean_tol, abs_tol, perc, description):
+    async def _test_golden_pair(
+        self,
+        img1_name: str,
+        img2_name: str,
+        mean_tol: float,
+        abs_tol: float,
+        perc: tuple[float, float],
+        description: str,
+    ):
         """Helper to test golden image pairs with given tolerances.
 
         Args:
-            param img1_name: File name of the first image under the golden directory.
-            param img2_name: File name of the second image under the golden directory.
-            param mean_tol: Mean difference threshold.
-            param abs_tol: Absolute difference threshold.
-            param perc: Percentile threshold tuple as (percentile, tolerance).
-            param description: Human-readable description of the pair.
-
-        Returns:
-            None.
+            img1_name: File name of the first image under the golden directory.
+            img2_name: File name of the second image under the golden directory.
+            mean_tol: Mean difference threshold.
+            abs_tol: Absolute difference threshold.
+            perc: Percentile threshold tuple as (percentile, tolerance).
+            description: Human-readable description of the pair.
 
         Raises:
             AssertionError: If the similarity check fails or images are missing.
-
         """
         golden_dir = self.get_image_comparison_golden_dir()
         img1 = os.path.join(golden_dir, img1_name)

@@ -12,4 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides an Isaac Sim extension for generating various types of extension templates to help users create custom extensions."""
+
+
 from .extension import *
+
+__all__ = ["TemplateGenerator"]

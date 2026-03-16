@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""A manipulator that displays clickable icons in 3D viewport space for USD prims."""
+
+
 __all__ = ["IconManipulator", "PreventOthers"]
 
 import asyncio
@@ -29,23 +33,53 @@ SHOW_TITLE_PATH = "exts/omni.kit.prim.icon/showTitle"
 
 
 class PreventOthers(sc.GestureManager):
-    """
-    Prevent other gestures from hiding the icon click gesture.
-    """
+    """Prevent other gestures from hiding the icon click gesture."""
 
     def __init__(self):
         super().__init__()
 
-    def can_be_prevented(self, gesture):
+    def can_be_prevented(self, gesture) -> bool:
+        """Determines if this gesture can be prevented by other gestures.
+
+        Args:
+            gesture: The gesture to check for prevention capability.
+
+        Returns:
+            Always returns False to prevent this gesture from being hidden by others.
+        """
         return False
 
-    def should_prevent(self, gesture, preventer):
+    def should_prevent(self, gesture, preventer) -> bool:
+        """Determines if a preventer gesture should prevent the given gesture.
+
+        Args:
+            gesture: The gesture that might be prevented.
+            preventer: The gesture that might do the preventing.
+
+        Returns:
+            True if the preventer is in BEGAN or CHANGED state, otherwise delegates to parent implementation.
+        """
         if preventer.state == sc.GestureState.BEGAN or preventer.state == sc.GestureState.CHANGED:
             return True
         return super().should_prevent(gesture, preventer)
 
 
 class IconManipulator(sc.Manipulator):
+    """A scene manipulator that displays clickable icons in 3D viewport space for USD prims.
+
+    This manipulator renders icons as billboard images that always face the camera, positioned at specific
+    3D world coordinates. Each icon can display an optional text label and responds to click interactions.
+    The manipulator automatically updates icon visibility and positions when the underlying model changes.
+
+    The icons are built from a model that provides prim paths, positions, icon URLs, and click handlers.
+    When an icon is clicked, the manipulator delegates to the model's registered click handler for that prim.
+    Icons can be dynamically added, removed, or updated based on model notifications.
+
+    Args:
+        icon_scale: Scaling factor for icon size in the viewport.
+        **kwargs: Additional keyword arguments passed to the parent class.
+    """
+
     def __init__(self, icon_scale: float = 1.0, **kwargs):
         super().__init__(**kwargs)
         self._icons = {}
@@ -54,12 +88,18 @@ class IconManipulator(sc.Manipulator):
         self._icon_scale = icon_scale
 
     def on_build(self):
+        """Builds the icon panel and populates it with icons for all prims in the model."""
         if not self.model:
             return
         self._icon_panel = sc.Transform(transform=sc.Matrix44.get_translation_matrix(0, 0, 0))
         self.rebuild_icons()
 
     def rebuild_icons(self, need_check=False):
+        """Rebuilds all icons by clearing existing ones and creating new ones for all prims in the model.
+
+        Args:
+            need_check: Whether to check if the icon position is within the viewport before building.
+        """
         for prim_path in list(self._icons.keys()):
             if self._icons[prim_path]:
                 self._icons[prim_path].clear()
@@ -74,8 +114,15 @@ class IconManipulator(sc.Manipulator):
             for prim_path in self.model.get_prim_paths():
                 self.build_icon_by_path(prim_path, need_check)
 
-    def check_viewport_pos(self, position):
-        """Check if the world position is within the viewport screen space."""
+    def check_viewport_pos(self, position) -> bool:
+        """Check if the world position is within the viewport screen space.
+
+        Args:
+            position: The world position to check.
+
+        Returns:
+            True if the position is within the viewport screen space.
+        """
         viewport_api = vpUtil.get_active_viewport()
         if not viewport_api:
             return False
@@ -93,7 +140,12 @@ class IconManipulator(sc.Manipulator):
         return viewport is not None
 
     def build_icon_by_path(self, prim_path, need_check):
-        """Build the UI elements for a single icon at the given path."""
+        """Build the UI elements for a single icon at the given path.
+
+        Args:
+            prim_path: The path of the prim to build an icon for.
+            need_check: Whether to check if the icon position is within the viewport before building.
+        """
         icon_pos = self.model.get_position(prim_path)
         if not icon_pos:
             return
@@ -135,7 +187,11 @@ class IconManipulator(sc.Manipulator):
             icon_trans.visible = item.visible
 
     def update_icon_position(self, prim_path):
-        """Update the transform of an existing icon UI element."""
+        """Update the transform of an existing icon UI element.
+
+        Args:
+            prim_path: The path of the prim whose icon position should be updated.
+        """
         icon_pos = self.model.get_position(prim_path)
         if not icon_pos:
             return
@@ -143,7 +199,11 @@ class IconManipulator(sc.Manipulator):
             self._icons[prim_path].transform = sc.Matrix44.get_translation_matrix(*icon_pos)
 
     def on_model_updated(self, item):
-        """Callback when the model signals an item has changed."""
+        """Callback when the model signals an item has changed.
+
+        Args:
+            item: The item that changed in the model.
+        """
         if not item:
             # Model cleared or major change, rebuild everything
             self.invalidate()
@@ -171,7 +231,12 @@ class IconManipulator(sc.Manipulator):
                     self.build_icon_by_path(prim_path, False)
 
     def _icon_clicked(self, prim_path: Sdf.Path, shape: sc.AbstractShape):
-        """Handle click gestures on the icon image."""
+        """Handle click gestures on the icon image.
+
+        Args:
+            prim_path: The path of the prim whose icon was clicked.
+            shape: The scene shape that was clicked.
+        """
 
         async def delay_click():
             await omni.kit.app.get_app().next_update_async()

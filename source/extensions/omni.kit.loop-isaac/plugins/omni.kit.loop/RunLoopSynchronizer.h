@@ -51,7 +51,7 @@ public:
 
     /**
      * @brief Notifies the condition variable in `wait` that it has to wake up.
-     * Saves the syncronization point.
+     * Saves the synchronization point.
      */
     void presentPostNotify();
 

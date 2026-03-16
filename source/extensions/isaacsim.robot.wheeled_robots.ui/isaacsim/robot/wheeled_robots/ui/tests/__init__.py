@@ -14,4 +14,7 @@
 # limitations under the License.
 
 
+"""Tests for the wheeled robots UI module."""
+
+
 scan_for_test_modules = True

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.3] - 2025-12-20
+### Changed
+- Move import of kit loop runner to a try-except block to handle import exceptions if omni.kit.loop-isaac is not enabled
+
 ## [0.2.2] - 2025-11-28
 ### Fixed
 - Fix camera view test case by comparing whether the quaternions represent the same orientation

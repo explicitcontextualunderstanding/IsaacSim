@@ -22,6 +22,7 @@ import omni.syntheticdata
 import omni.syntheticdata._syntheticdata as sd
 from isaacsim.core.nodes import BaseWriterNode
 from isaacsim.ros2.core import collect_namespace
+from isaacsim.ros2.nodes.impl.ros2_common import CompressedImageManager
 from pxr import Usd
 
 
@@ -30,8 +31,14 @@ class OgnROS2CameraHelperInternalState(BaseWriterNode):
         self.rv = ""
         self.resetSimulationTimeOnStop = False
         self.publishStepSize = 1
-
+        self._h264_render_product = None
         super().__init__(initialize=False)
+
+    def custom_reset(self):
+        if self._h264_render_product is not None:
+            CompressedImageManager.detach(self._h264_render_product)
+            self._h264_render_product = None
+        super().custom_reset()
 
     def post_attach(self, writer, render_product):
         try:
@@ -96,6 +103,28 @@ class OgnROS2CameraHelper:
                             sd.SensorType.Rgb.name
                         )
                         writer = rep.writers.get(db.per_instance_state.rv + f"ROS2{time_type}PublishImage")
+                        writer.initialize(
+                            frameId=db.inputs.frameId,
+                            nodeNamespace=collect_namespace(db.inputs.nodeNamespace, db.inputs.renderProductPath),
+                            queueSize=db.inputs.queueSize,
+                            topicName=db.inputs.topicName,
+                            context=db.inputs.context,
+                            qosProfile=db.inputs.qosProfile,
+                        )
+
+                    elif sensor_type == "rgb_h264":
+                        db.per_instance_state.rv = omni.syntheticdata.SyntheticData.convert_sensor_type_to_rendervar(
+                            sd.SensorType.Rgb.name
+                        )
+
+                        from isaacsim.ros2.nodes.impl.ros2_common import CompressedImageManager
+
+                        CompressedImageManager.attach(render_product_path)
+                        db.per_instance_state._h264_render_product = render_product_path
+
+                        writer = CompressedImageManager.get_writer(
+                            render_product_path, use_system_time=db.inputs.useSystemTime
+                        )
                         writer.initialize(
                             frameId=db.inputs.frameId,
                             nodeNamespace=collect_namespace(db.inputs.nodeNamespace, db.inputs.renderProductPath),

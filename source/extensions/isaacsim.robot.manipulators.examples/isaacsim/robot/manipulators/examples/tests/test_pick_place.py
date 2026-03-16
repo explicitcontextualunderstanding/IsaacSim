@@ -15,19 +15,18 @@
 
 import asyncio
 
+import isaacsim.core.experimental.utils.app as app_utils
 import numpy as np
 import omni.kit.test
-import omni.timeline
 import omni.ui as ui
 import omni.usd
 from isaacsim.core.experimental.utils.stage import create_new_stage_async
-from isaacsim.robot.manipulators.examples.franka.interactive.pick_place.pick_place_example import (
+from isaacsim.robot.manipulators.examples.interactive.pick_place.pick_place_example import (
     FrankaPickPlaceInteractive,
 )
-from isaacsim.robot.manipulators.examples.franka.interactive.pick_place.pick_place_example_extension import (
+from isaacsim.robot.manipulators.examples.interactive.pick_place.pick_place_example_extension import (
     FrankaPickPlaceUI,
 )
-from omni.kit.app import get_app
 
 
 class TestPickPlace(omni.kit.test.AsyncTestCase):
@@ -42,10 +41,7 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
         """Set up test environment before each test."""
         await create_new_stage_async()
 
-        await get_app().next_update_async()
-
-        # Initialize timeline
-        self._timeline = omni.timeline.get_timeline_interface()
+        await app_utils.update_app_async()
 
         self.sample = FrankaPickPlaceInteractive()
         await self.sample.load_world_async()
@@ -62,7 +58,7 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
         self.ui_template.build_ui()
         self.task_ui_elements = self.ui_template.task_ui_elements
 
-        await get_app().next_update_async()
+        await app_utils.update_app_async()
 
         # Reset UI state to ensure consistent starting conditions
         self._reset_ui_state()
@@ -77,32 +73,31 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
     async def tearDown(self):
         """Clean up after each test."""
         # Stop timeline if running
-        if self._timeline.is_playing():
-            self._timeline.stop()
+        if app_utils.is_playing():
+            app_utils.stop()
 
         # Clean up physics callbacks if any
         if hasattr(self, "sample") and self.sample:
             self.sample.physics_cleanup()
 
-        await get_app().next_update_async()
+        await app_utils.update_app_async()
 
     async def test_load_button_click(self):
         """Test that the Load button properly sets up the scene."""
 
         self.ui_template._on_load_world()
 
-        await get_app().next_update_async()
+        await app_utils.update_app_async()
         await asyncio.sleep(0.5)
 
         self.ui_template.post_load_button_event()
 
-        for _ in range(30):
-            await get_app().next_update_async()
+        await app_utils.update_app_async(steps=30)
 
         # Verify simulation is set up by playing and pausing timeline
-        self._timeline.play()
+        app_utils.play()
         await asyncio.sleep(0.5)
-        self._timeline.pause()
+        app_utils.pause()
 
         # Verify scene was loaded
         self.assertTrue(self.sample.controller is not None, "Controller should be initialized after load")
@@ -133,11 +128,11 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
         await self.test_load_button_click()
         self.ui_template._on_reset()
 
-        await get_app().next_update_async()
+        await app_utils.update_app_async()
         await asyncio.sleep(0.5)
 
         # Use timeline to play and pause
-        self._timeline.play()
+        app_utils.play()
         await asyncio.sleep(0.5)  # Let physics initialize and settle
 
         # Get initial robot and cube positions
@@ -149,7 +144,7 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
 
         self.ui_template._on_reset()
 
-        self._timeline.play()
+        app_utils.play()
         await asyncio.sleep(0.5)
 
         current_robot_pos = self.sample.controller.robot.get_dof_positions().numpy()
@@ -186,9 +181,10 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
         self.assertFalse(self.sample.is_executing(), "Should not be executing initially")
         self.assertTrue(self.task_ui_elements["Start Pick Place"].enabled, "Button should be enabled")
 
-        # Call the Start Pick Place button's click handler
+        # Call the Start Pick Place button's click handler (schedules execute_pick_place_async via ensure_future)
         self.ui_template._on_pick_place_button_event()
-        await get_app().next_update_async()
+        # Allow the scheduled async task to run and start the timeline (Rule 5: use app_utils update loop)
+        await app_utils.update_app_async(steps=5)
 
         # Verify execution started
         self.assertTrue(self.sample.is_executing(), "Should be executing after function call")
@@ -196,8 +192,8 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
             self.task_ui_elements["Start Pick Place"].enabled, "Button should be disabled during execution"
         )
 
-        # Verify timeline is playing
-        self.assertTrue(self._timeline.is_playing(), "Timeline should be playing during execution")
+        # Verify timeline is playing (app_utils used in sample and test for consistency)
+        self.assertTrue(app_utils.is_playing(), "Timeline should be playing during execution")
 
     async def test_simulation_execution_50_frames(self):
         """Test running the simulation for 50 frames and verify state."""
@@ -205,14 +201,14 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
         await self.test_load_button_click()
         await self.test_start_pick_place_button_click()
 
-        # Run simulation for 50 frames
+        # Run simulation for 50 frames (Rule 5: use app_utils update loop per frame for assertions)
         for frame in range(50):
-            await get_app().next_update_async()
+            await app_utils.update_app_async()
 
             # Verify simulation is still running
             if frame < 40:  # Allow some time for completion
                 self.assertTrue(
-                    self.sample.is_executing() or self._timeline.is_playing(),
+                    self.sample.is_executing() or app_utils.is_playing(),
                     f"Simulation should still be running at frame {frame}",
                 )
 
@@ -231,10 +227,10 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
         target_position = self.sample.controller.target_position
         self.assertIsNotNone(target_position, "Target position should be set in controller")
 
-        # Run simulation until completion or timeout
+        # Run simulation until completion or timeout (Rule 5: use app_utils update loop)
         max_frames = 500  # Increased timeout for full pick-and-place operation
         for frame in range(max_frames):
-            await get_app().next_update_async()
+            await app_utils.update_app_async()
 
             # Check if execution is complete
             if not self.sample.is_executing():
@@ -248,7 +244,7 @@ class TestPickPlace(omni.kit.test.AsyncTestCase):
             # Verify simulation is still running
             if frame < 400:  # Allow more time for completion
                 self.assertTrue(
-                    self.sample.is_executing() or self._timeline.is_playing(),
+                    self.sample.is_executing() or app_utils.is_playing(),
                     f"Simulation should still be running at frame {frame}",
                 )
 

@@ -25,7 +25,8 @@ simulation_app.update()
 omni.usd.get_context().new_stage()
 simulation_app.update()
 
-from isaacsim.core.api.objects import VisualCuboid
+from isaacsim.core.experimental.objects import Cube
+from isaacsim.core.experimental.utils.semantics import add_labels
 from isaacsim.sensors.camera import Camera
 from omni.kit.viewport.utility import get_active_viewport
 
@@ -44,14 +45,13 @@ simulation_app.update()
 camera.initialize()
 
 
-VisualCuboid(
-    prim_path="/new_cube_1",
-    name="visual_cube",
-    position=np.array([5.0, 3, 1.0]),
-    scale=np.array([0.6, 0.5, 0.2]),
-    size=1.0,
-    color=np.array([255, 0, 0]),
+cube = Cube(
+    "/new_cube_1",
+    positions=[[5.0, 3, 1.0]],
+    scales=[[0.6, 0.5, 0.2]],
+    sizes=1.0,
 )
+add_labels(cube.prims[0], labels=["cube"], taxonomy="class")
 simulation_app.update()
 for annotator in [
     "pointcloud",

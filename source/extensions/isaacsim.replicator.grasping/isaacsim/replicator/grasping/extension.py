@@ -13,12 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for generating grasping-related synthetic data using Isaac Sim Replicator."""
+
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
+    """Extension for generating grasping-related synthetic data using Isaac Sim Replicator.
+
+    This extension provides tools and utilities for creating synthetic datasets focused on robotic
+    grasping scenarios. It integrates with Isaac Sim's Replicator framework to enable automated
+    generation of diverse grasping data for training and validation of robotic manipulation models.
+    """
+
+    def on_startup(self, ext_id: str):
+        """Called when the extension is starting up.
+
+        Args:
+            ext_id: The unique identifier of the extension being started.
+        """
         pass
 
     def on_shutdown(self):
+        """Called when the extension is shutting down."""
         pass

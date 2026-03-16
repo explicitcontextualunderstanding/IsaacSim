@@ -171,11 +171,6 @@ class DeformableMaterialView:
         carb.log_info("Deformable material View Device: {}".format(self._device))
         return
 
-    def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
-        return
-
     def set_dynamic_frictions(
         self,
         values: Optional[Union[np.ndarray, torch.Tensor]],

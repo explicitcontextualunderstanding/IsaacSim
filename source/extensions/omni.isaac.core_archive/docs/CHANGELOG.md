@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.3.0] - 2026-03-04
+### Changed
+- Added python_api.md
+
+## [5.2.0] - 2026-01-26
+### Changed
+- Update to llvmlite==0.46.0, nest_asyncio==1.6.0, matplotlib==3.10.8, contourpy==1.3.3, fonttools==4.61.1, pyparsing==3.3.2, cycler==0.12.1, kiwisolver==1.4.9, packaging==26.0, osqp==1.0.5, pyperclip==1.8.0, pyperclip==1.11.0
+
 ## [5.1.0] - 2025-12-09
 ### Changed
 - Update to kiwisolver-1.4.5

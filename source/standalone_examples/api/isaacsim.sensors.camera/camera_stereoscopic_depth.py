@@ -24,53 +24,52 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": args.test})
 
-import isaacsim.core.utils.numpy.rotations as rot_utils
 import numpy as np
 import omni
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import VisualCone, VisualCuboid
+from isaacsim.core.experimental.materials import OmniPbrMaterial
+from isaacsim.core.experimental.objects import Cone, Cube
+from isaacsim.core.experimental.utils.transform import euler_angles_to_quaternion
 from isaacsim.sensors.camera import SingleViewDepthSensor
 from isaacsim.storage.native.nucleus import get_assets_root_path
 
-# Create a world
-world = World(stage_units_in_meters=1.0)
-
 # Add two cubes and a cone
-cube_1 = world.scene.add(
-    VisualCuboid(
-        prim_path="/cube_1",
-        name="cube_1",
-        position=np.array([0.25, 0.25, 0.25]),
-        scale=np.array([0.5, 0.5, 0.5]),
-        size=1.0,
-        color=np.array([255, 0, 0]),
-    )
+cube_1 = Cube(
+    "/cube_1",
+    sizes=1.0,
+    positions=np.array([0.25, 0.25, 0.25]),
+    scales=np.array([0.5, 0.5, 0.5]),
 )
-cube_2 = world.scene.add(
-    VisualCuboid(
-        prim_path="/cube_2",
-        name="cube_2",
-        position=np.array([-1.0, -1.0, 0.25]),
-        scale=np.array([1.0, 1.0, 1.0]),
-        size=1.0,
-        color=np.array([0, 0, 255]),
-    )
+cube_1_material = OmniPbrMaterial("/World/Materials/cube_1")
+cube_1_material.set_input_values("diffuse_color_constant", [1.0, 0.0, 0.0])
+cube_1.apply_visual_materials(cube_1_material)
+
+cube_2 = Cube(
+    "/cube_2",
+    sizes=1.0,
+    positions=np.array([-1.0, -1.0, 0.25]),
+    scales=np.array([1.0, 1.0, 1.0]),
 )
-cone = world.scene.add(
-    VisualCone(
-        prim_path="/cone",
-        name="cone",
-        position=np.array([-0.1, -0.3, 0.2]),
-        scale=np.array([1.0, 1.0, 1.0]),
-        color=np.array([0, 255, 0]),
-    )
+cube_2_material = OmniPbrMaterial("/World/Materials/cube_2")
+cube_2_material.set_input_values("diffuse_color_constant", [0.0, 0.0, 1.0])
+cube_2.apply_visual_materials(cube_2_material)
+
+cone = Cone(
+    "/cone",
+    radii=0.5,
+    heights=1.0,
+    positions=np.array([-0.1, -0.3, 0.2]),
+    scales=np.array([1.0, 1.0, 1.0]),
 )
+cone_material = OmniPbrMaterial("/World/Materials/cone")
+cone_material.set_input_values("diffuse_color_constant", [0.0, 1.0, 0.0])
+cone.apply_visual_materials(cone_material)
+
 # Add a stereoscopic camera
 camera = SingleViewDepthSensor(
     prim_path="/World/camera",
     name="depth_camera",
     position=np.array([3.0, 0.0, 0.6]),
-    orientation=rot_utils.euler_angles_to_quats(np.array([0, 0, 180]), degrees=True),
+    orientation=euler_angles_to_quaternion(np.array([0, 0, 180]), degrees=True, extrinsic=False).numpy(),
     frequency=20,
     resolution=(1920, 1080),
 )
@@ -85,8 +84,10 @@ path_to = omni.kit.commands.execute(
     instanceable=False,
 )
 
-# Reset the world state
-world.reset()
+# Start the timeline and initialize the camera
+timeline = omni.timeline.get_timeline_interface()
+timeline.play()
+timeline.commit()
 
 # Initialize the camera, applying the appropriate schemas to the render product to enable depth sensing
 camera.initialize(attach_rgb_annotator=False)
@@ -114,7 +115,7 @@ camera.attach_annotator("distance_to_image_plane")
 # Run for 10 frames in test mode
 i = 0
 while simulation_app.is_running() and (not args.test or i < 10):
-    world.step(render=True)
+    simulation_app.update()
     i += 1
 
 # Saved the rendered frames as PNGs

@@ -25,6 +25,9 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
         self.original_dlss_exec_mode = carb.settings.get_settings().get("rtx/post/dlss/execMode")
+        self.original_write_to_fabric = carb.settings.get_settings().get(
+            "/exts/omni.replicator.core/enableWriteToFabric"
+        )
 
     async def tearDown(self):
         omni.usd.get_context().close_stage()
@@ -33,6 +36,10 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
         carb.settings.get_settings().set("rtx/post/dlss/execMode", self.original_dlss_exec_mode)
+        if self.original_write_to_fabric is not None:
+            carb.settings.get_settings().set(
+                "/exts/omni.replicator.core/enableWriteToFabric", self.original_write_to_fabric
+            )
 
     async def test_sdg_getting_started_01(self):
         import asyncio
@@ -380,3 +387,111 @@ class TestSDGGettingStarted(omni.kit.test.AsyncTestCase):
         out_dir = os.path.join(os.getcwd(), "_out_basic_writer_sim")
         folder_contents_success = validate_folder_contents(path=out_dir, expected_counts={"png": 12, "json": 6})
         self.assertTrue(folder_contents_success, f"Output directory contents validation failed for {out_dir}")
+
+    async def test_sdg_getting_started_05(self):
+        import asyncio
+        import os
+        import time
+
+        import carb.settings
+        import omni.replicator.core as rep
+        import omni.usd
+
+        NUM_CUBES = 100
+        NUM_CAPTURES = 10
+
+        async def run_example_async(wait_for_render, write_to_fabric):
+            print(f"\n[SDG] Running with wait_for_render={wait_for_render}, write_to_fabric={write_to_fabric}")
+            omni.usd.get_context().new_stage()
+            rep.orchestrator.set_capture_on_play(False)
+
+            settings = carb.settings.get_settings()
+            settings.set("rtx/post/dlss/execMode", 2)
+            settings.set("/exts/omni.replicator.core/enableWriteToFabric", write_to_fabric)
+
+            rng = rep.rng.ReplicatorRNG(seed=42)
+
+            # Setup stage with a dome light and batch-created cubes
+            rep.functional.create.xform(name="World")
+            rep.functional.create.dome_light(intensity=500, parent="/World", name="DomeLight")
+            cubes = rep.functional.create_batch.cube(
+                count=NUM_CUBES,
+                parent="/World",
+                name="Cube",
+                semantics={"class": "my_cube"},
+            )
+            rep.functional.modify.scale(cubes, (0.2, 0.2, 0.2))
+
+            # Create the camera and render product
+            cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+            rp = rep.create.render_product(cam, (512, 512))
+
+            # Write data using BasicWriter with rgb annotator
+            backend = rep.backends.get("DiskBackend")
+            out_dir = os.path.join(os.getcwd(), f"_out_fabric_{write_to_fabric}_wait_{wait_for_render}")
+            backend.initialize(output_dir=out_dir)
+            print(f"[SDG] Output directory: {out_dir}")
+            writer = rep.writers.get("BasicWriter")
+            writer.initialize(backend=backend, rgb=True)
+            writer.attach(rp)
+
+            # Randomize and capture, measuring timing for each phase
+            randomization_times_ms = []
+            capture_times_ms = []
+            total_start = time.perf_counter()
+
+            for i in range(NUM_CAPTURES):
+                random_positions = rng.generator.uniform((-3.0, -3.0, -3.0), (3.0, 3.0, 3.0), size=(NUM_CUBES, 3))
+                random_rotations = rng.generator.uniform((0.0, 0.0, 0.0), (360.0, 360.0, 360.0), size=(NUM_CUBES, 3))
+                random_scales = rng.generator.uniform(0.1, 0.4, size=(NUM_CUBES, 3))
+
+                rand_start = time.perf_counter()
+                rep.functional.modify.pose(
+                    cubes,
+                    position_value=random_positions,
+                    rotation_value=random_rotations,
+                    scale_value=random_scales,
+                )
+                rep.functional.randomizer.display_color(cubes, rng=rng)
+                rand_ms = (time.perf_counter() - rand_start) * 1000.0
+                randomization_times_ms.append(rand_ms)
+
+                cap_start = time.perf_counter()
+                await rep.orchestrator.step_async(wait_for_render=wait_for_render)
+                cap_ms = (time.perf_counter() - cap_start) * 1000.0
+                capture_times_ms.append(cap_ms)
+
+                print(f"[SDG] Step {i}: randomization {rand_ms:.1f} ms, capture {cap_ms:.1f} ms")
+
+            # Wait for all data to be written to disk
+            print("[SDG] Waiting for all data to be written to disk..")
+            await rep.orchestrator.wait_until_complete_async()
+            total_ms = (time.perf_counter() - total_start) * 1000.0
+
+            avg_rand = sum(randomization_times_ms) / len(randomization_times_ms)
+            avg_cap = sum(capture_times_ms) / len(capture_times_ms)
+            print(
+                f"[SDG] Avg randomization: {avg_rand:.1f} ms, avg capture: {avg_cap:.1f} ms, total: {total_ms:.1f} ms"
+            )
+
+            writer.detach()
+            rp.destroy()
+
+        async def run_examples_async():
+            # Run with different configurations to compare performance
+            await run_example_async(wait_for_render=True, write_to_fabric=False)
+            await run_example_async(wait_for_render=False, write_to_fabric=False)
+            await run_example_async(wait_for_render=False, write_to_fabric=True)
+
+        # asyncio.ensure_future(run_examples_async())
+
+        # Test the examples
+        await run_examples_async()
+        out_dir_1 = os.path.join(os.getcwd(), "_out_fabric_False_wait_True")
+        out_dir_2 = os.path.join(os.getcwd(), "_out_fabric_False_wait_False")
+        out_dir_3 = os.path.join(os.getcwd(), "_out_fabric_True_wait_False")
+
+        # Validate the output directory contents
+        for out_dir in [out_dir_1, out_dir_2, out_dir_3]:
+            folder_contents_success = validate_folder_contents(path=out_dir, expected_counts={"png": NUM_CAPTURES})
+            self.assertTrue(folder_contents_success, f"Output directory contents validation failed for {out_dir}")

@@ -36,14 +36,16 @@ public:
     /**
      * @brief Initialize the node instance.
      * @details
-     * Sets up the node state when the node is first created.
+     * Sets up the node state and reserves buffer for receiving messages.
      *
      * @param[in] nodeObj The node object
      * @param[in] instanceId The instance ID
      */
     static void initInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
     {
-        UCXSubscribeJointCommandNodeBase<OgnUCXSubscribeJointCommandDatabase>::initInstance(nodeObj, instanceId);
+        auto& state =
+            OgnUCXSubscribeJointCommandDatabase::sPerInstanceState<OgnUCXSubscribeJointCommand>(nodeObj, instanceId);
+        state.m_receiveBuffer.reserve(65536); // Reserve 64KB for receive buffer
     }
 
     /**
@@ -78,6 +80,54 @@ public:
         const uint32_t timeoutMs = db.inputs.timeoutMs();
 
         return state.computeImpl(db, port, tag, timeoutMs);
+    }
+
+protected:
+    /**
+     * @brief Parse joint command message from raw bytes.
+     * @details
+     * Parses the message buffer into a JointCommandData structure.
+     * Message format: timestamp(8) + num_dofs(4) + positions(double*num_dofs) +
+     *                 velocities(double*num_dofs) + efforts(double*num_dofs)
+     *
+     * @param[in] buffer Raw message buffer
+     * @return JointCommandData Parsed joint command data
+     */
+    JointCommandData parseMessage(const std::vector<uint8_t>& buffer) override
+    {
+        JointCommandData data;
+        data.valid = false;
+        data.numJoints = 0;
+
+        size_t offset = 0;
+
+        // Parse timestamp
+        std::memcpy(&data.timestamp, buffer.data() + offset, sizeof(double));
+        offset += sizeof(double);
+
+        // Parse number of DOFs
+        std::memcpy(&data.numJoints, buffer.data() + offset, sizeof(uint32_t));
+        offset += sizeof(uint32_t);
+
+        // Resize vectors
+        data.positionCommand.resize(data.numJoints);
+        data.velocityCommand.resize(data.numJoints);
+        data.effortCommand.resize(data.numJoints);
+
+        // Parse position commands
+        std::memcpy(data.positionCommand.data(), buffer.data() + offset, sizeof(double) * data.numJoints);
+        offset += sizeof(double) * data.numJoints;
+
+        // Parse velocity commands
+        std::memcpy(data.velocityCommand.data(), buffer.data() + offset, sizeof(double) * data.numJoints);
+        offset += sizeof(double) * data.numJoints;
+
+        // Parse effort commands
+        std::memcpy(data.effortCommand.data(), buffer.data() + offset, sizeof(double) * data.numJoints);
+        offset += sizeof(double) * data.numJoints;
+
+        data.valid = true;
+        return data;
     }
 };
 

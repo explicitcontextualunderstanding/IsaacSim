@@ -295,19 +295,37 @@ public:
             state.m_message->setUsePinnedBuffer(false);
             if (db.inputs.dataPtr() != 0)
             {
+                if (db.inputs.bufferSize() == 0)
+                {
+                    return false;
+                }
                 state.m_message->generateBuffer(db.inputs.timeStamp(), state.m_frameId, db.inputs.bufferSize(),
                                                 intensityPtr, timestampPtr, emitterIdPtr, channelIdPtr, materialIdPtr,
                                                 tickIdPtr, hitNormalPtr, velocityPtr, objectIdPtr, echoIdPtr,
                                                 tickStatePtr, radialVelocityMSPtr);
-                // Data is on host as ptr, buffer size matches
+                // Data is on host as ptr
+                if (state.m_message->getOrderedFields().empty())
                 {
+                    // Direct copy when no metadata interleaving is needed
                     memcpy(state.m_message->getBufferPtr(), reinterpret_cast<void*>(db.inputs.dataPtr()),
                            state.m_message->getTotalBytes());
+                }
+                else
+                {
+                    // Host interleave: fill buffer with xyz + metadata per point
+                    isaacsim::ros2::nodes::fillPointCloudBufferHost(
+                        reinterpret_cast<uint8_t*>(state.m_message->getBufferPtr()),
+                        reinterpret_cast<const float3*>(db.inputs.dataPtr()), state.m_message->getOrderedFields(),
+                        state.m_message->getPointStep(), state.m_message->getNumPoints());
                 }
             }
             else if (db.inputs.dataPtr() == 0)
             {
                 const size_t totalBytes = sizeof(GfVec3f) * db.inputs.data.size();
+                if (totalBytes == 0)
+                {
+                    return false;
+                }
                 state.m_message->generateBuffer(db.inputs.timeStamp(), state.m_frameId, totalBytes, intensityPtr,
                                                 timestampPtr, emitterIdPtr, channelIdPtr, materialIdPtr, tickIdPtr,
                                                 hitNormalPtr, velocityPtr, objectIdPtr, echoIdPtr, tickStatePtr,

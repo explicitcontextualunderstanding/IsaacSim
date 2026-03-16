@@ -39,6 +39,7 @@ include_physx()
 
 includedirs {
     "%{root}/source/extensions/isaacsim.core.includes/include",
+    "%{root}/source/extensions/isaacsim.core.experimental.prims/include",
     "%{root}/source/extensions/isaacsim.core.simulation_manager/include",
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include",
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include/boost",
@@ -62,7 +63,7 @@ links {
     "omni.usd",
 }
 
-extra_usd_libs = { "usdGeom" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

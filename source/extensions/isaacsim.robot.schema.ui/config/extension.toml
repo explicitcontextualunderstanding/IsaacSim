@@ -1,0 +1,42 @@
+[package]
+version = "0.3.1"
+category = "Simulation"
+title = "Isaac Sim Schema UI"
+description = "UI components to display and work with Robot assets, following the Robot schema definition"
+keywords = ["isaac", "schema", "ui"]
+changelog = "docs/CHANGELOG.md"
+readme = "docs/Overview.md"
+preview_image = "data/preview.png"
+icon = "data/icon.png"
+writeTarget.kit = true
+
+[dependencies]
+"isaacsim.robot.schema" = {}
+"omni.kit.context_menu" = {}
+"omni.kit.menu.utils" = {}
+"omni.kit.viewport.registry" = {}
+"omni.kit.viewport.utility" = {}
+"omni.kit.widget.context_menu" = {}
+"omni.kit.widget.stage" = {}
+"omni.timeline" = {}
+"omni.ui" = {}
+"omni.ui.scene" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "isaacsim.robot.schema.ui"
+
+[[python.module]]
+name = "isaacsim.robot.schema.ui.tests"
+
+[[test]]
+name = "startup"
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+[[test]]
+dependencies = ["isaacsim.storage.native", "omni.kit.ui_test"]
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

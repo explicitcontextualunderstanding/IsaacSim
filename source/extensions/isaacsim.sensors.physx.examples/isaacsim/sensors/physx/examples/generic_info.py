@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing the PhysX Generic Range Sensor example extension for Isaac Sim."""
+
+
 import asyncio
 import time
 import weakref
@@ -33,8 +36,32 @@ EXTENSION_NAME = "Generic Info"
 
 
 class Extension(omni.ext.IExt):
+    """Extension for demonstrating PhysX Generic Range Sensor functionality.
+
+    This extension provides an interactive example showcasing the Generic Range Sensor Python API in Isaac Sim.
+    It demonstrates how to create a Generic Range Sensor, configure its properties, set custom scanning patterns,
+    and stream data from the sensor. The extension includes UI controls for loading sensors, creating obstacle
+    scenes, setting custom sensor patterns, and saving pattern visualization images.
+
+    The extension registers with the Isaac Sim examples browser and provides a complete workflow for:
+    - Creating PhysX-based range sensors with custom scanning patterns
+    - Configuring sensor properties like range limits and sampling rates
+    - Setting up physics scenes with collision objects
+    - Streaming or batch processing sensor data
+    - Visualizing scanning patterns through point cloud data
+    - Saving pattern images for analysis
+
+    The Generic Range Sensor uses PhysX line tracing to detect collisions and measure distances, making it
+    suitable for applications requiring custom LIDAR-like sensing patterns. The extension supports both
+    streaming mode for continuous data flow and repeating mode for batch processing of predefined patterns.
+    """
+
     def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+        """Initialize extension and UI elements.
+
+        Args:
+            ext_id: Extension identifier string.
+        """
         self._ext_id = ext_id
         self.example_name = "Custom Pattern Range Sensor"
         self.category = "Sensors"
@@ -47,14 +74,16 @@ class Extension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Clean up extension resources and deregister example from browser."""
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
-        # self._sensor.release_generic_sensor_interface()
-        # self._generic = False
+        self._editor_event_subscription = None
 
     def build_window(self):
+        """Build the extension window interface."""
         pass
 
     def build_ui(self):
+        """Build the user interface with command panel and output controls for the Generic Range Sensor example."""
         self._sensor = _range_sensor.acquire_generic_sensor_interface()
         self._timeline = omni.timeline.get_timeline_interface()
 
@@ -137,6 +166,11 @@ class Extension(omni.ext.IExt):
                     btn_builder("", "button", "Save Pattern Image", "", self._on_save_pattern)
 
     async def _spawn_generic_function(self, task):
+        """Create a Generic Range Sensor in the stage with physics scene setup.
+
+        Args:
+            task: Asyncio task for stage creation completion.
+        """
         # Wait for stage clear to complete before creating Generic
         done, pending = await asyncio.wait({task})
         if task in done:
@@ -189,11 +223,13 @@ class Extension(omni.ext.IExt):
             )
 
     def _on_spawn_generic_button(self):
+        """Handle the Load Sensor button click to create a new stage and spawn the Generic Range Sensor."""
         # wait for new stage before creating sensor
         task = asyncio.ensure_future(omni.usd.get_context().new_stage_async())
         asyncio.ensure_future(self._spawn_generic_function(task))
 
     def _on_spawn_obstacles_button(self):
+        """Handle the Load Scene button click to create obstacles and lighting for the Range Sensor to detect."""
         stage = omni.usd.get_context().get_stage()
         self.CubePath = "/World/Wall"
         offset = Gf.Vec3f(2.00, 0.0, 0.0)
@@ -225,6 +261,7 @@ class Extension(omni.ext.IExt):
         UsdPhysics.CollisionAPI.Apply(self.cubePrim)
 
     def _set_sensor_pattern(self):
+        """Set the custom scanning pattern for the Range Sensor based on streaming or repeating mode."""
 
         if self._streaming:
             self.sensor_pattern, self.origin_offsets = self._test_streaming_data()
@@ -234,9 +271,11 @@ class Extension(omni.ext.IExt):
         self._pattern_set = True
 
     def _test_streaming_data(self):
-        """
-        custom generated data for testing streaming data mode
-        data profile: zigzag left to right, slowly going up and down
+        """Custom generated data for testing streaming data mode.
+            Data profile: zigzag left to right, slowly going up and down.
+
+        Returns:
+            A tuple containing the sensor pattern array and origin offsets array.
         """
         # send data in batch that are at least large enough to run a few rendering frames without running out of data.
         # if batch_size > (sampling rate/rendering rate), the sensor will process all of the batch and ask for the next batch right before it runs out.
@@ -272,10 +311,12 @@ class Extension(omni.ext.IExt):
         return sensor_pattern, origin_offsets
 
     def _test_repeating_data(self):
-        """
-        custom data to test repeating (non-streaming) mode
-        data profile: zigzag left and right, half of it scanning high in zenith, the other half scanning low
-        expected behavior: switch between the two sides scanning with no additional data being sent
+        """Custom data to test repeating (non-streaming) mode.
+            Data profile: zigzag left and right, half of it scanning high in zenith, the other half scanning low.
+            Expected behavior: switch between the two sides scanning with no additional data being sent.
+
+        Returns:
+            A tuple containing the sensor pattern array and origin offsets array.
         """
         batch_size = int(1e6)  # size of each batch of data being processed
         half_batch = int(batch_size / 2)
@@ -292,6 +333,14 @@ class Extension(omni.ext.IExt):
         return sensor_pattern, origin_offsets
 
     def _on_editor_step(self, step):
+        """Updates the range sensor data processing during timeline playback.
+
+        This method is called on each editor update step and handles sending new sensor pattern data batches when the
+        sensor runs out of data, and collects point cloud data for pattern plotting.
+
+        Args:
+            step: The editor step event data.
+        """
         if not self._timeline.is_playing():
             return
 
@@ -322,6 +371,11 @@ class Extension(omni.ext.IExt):
                     print("sensor not added or pattern not set")
 
     def _on_save_pattern(self):
+        """Initiates the collection and saving of sensor pattern data.
+
+        Starts recording point cloud data from the range sensor for the configured plot duration. The collected data
+        will be processed and saved as a pattern image when the recording period completes.
+        """
         if not self._timeline.is_playing():
             print("press play first")
             return
@@ -331,6 +385,14 @@ class Extension(omni.ext.IExt):
         self._record_start = time.perf_counter()
 
     def _plot_pattern(self, data):
+        """Creates and saves a visual representation of the sensor scanning pattern.
+
+        Processes the collected point cloud data to generate a 2D image showing where the sensor rays hit the wall,
+        then saves it as a PNG file to the specified output directory.
+
+        Args:
+            data: Point cloud data array containing the sensor hit points.
+        """
         import PIL.Image as Image
         import PIL.ImageDraw as ImageDraw
 
@@ -364,6 +426,17 @@ class Extension(omni.ext.IExt):
         im.save(filename)
 
     def data_processing(self, data):
+        """Filters point cloud data to extract points that hit the wall surface.
+
+        Calculates the wall surface location and filters the input data to return only the Y and Z coordinates
+        of points that hit the wall at the correct X position.
+
+        Args:
+            data: Point cloud data array containing sensor hit points.
+
+        Returns:
+            Array of Y-Z coordinates for points that hit the wall, or empty array if no hits are found.
+        """
         # only plotting when the wall is offsetted x as in the example no rotation or other axial offsets.
         # find where is the surface of the wall
         cube_pos = self.cubePrim.GetAttribute("xformOp:translate").Get()
@@ -378,3 +451,6 @@ class Extension(omni.ext.IExt):
         else:
             hit_pts = np.squeeze(data[hit_idx, 1:3])
             return hit_pts
+
+
+__all__ = []

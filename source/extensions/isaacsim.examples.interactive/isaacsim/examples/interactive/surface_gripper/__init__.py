@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive surface gripper example demonstrating contact-based grasping mechanics."""
+
+
 from isaacsim.examples.interactive.surface_gripper.surface_gripper import *
+
+__all__ = []

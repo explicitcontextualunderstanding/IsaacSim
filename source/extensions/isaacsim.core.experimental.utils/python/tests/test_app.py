@@ -19,7 +19,7 @@ import isaacsim.core.experimental.utils.app as app_utils
 import omni.kit.test
 import omni.timeline
 
-EXTENSION_NAME = "isaacsim.core.version"
+EXTENSION_NAME = "omni.pip.cloud"
 
 
 class TestApp(omni.kit.test.AsyncTestCase):

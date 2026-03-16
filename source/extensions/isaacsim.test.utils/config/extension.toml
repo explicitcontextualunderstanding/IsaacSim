@@ -1,25 +1,35 @@
 [package]
-version = "0.6.4"
+version = "0.11.1"
 category = "Internal"
 title = "Isaac Sim Test Utils"
 description = "Provides testing utilities including image capture, comparison, and validation functions along with file validation helpers for automated test workflows."
 keywords = ["isaac", "test", "utils"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
+"isaacsim.core.experimental.utils" = {}
 "isaacsim.storage.native" = {}
+"omni.kit.material.library" = {}
 "omni.kit.test" = {}
+"omni.kit.ui_test" = {}
 "omni.replicator.core" = {} # needed for image capture utils
+"omni.ui" = {}
 
 [[python.module]]
 name = "isaacsim.test.utils"
 
 [[python.module]]
 name = "isaacsim.test.utils.tests"
+
+[[test]]
+name = "startup"
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
 
 [[test]]
 
@@ -31,7 +41,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -47,6 +57,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -72,8 +83,5 @@ stdoutFailPatterns.exclude = [
     '*The NumPy module was reloaded*',
 ]
 
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

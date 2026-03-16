@@ -21,18 +21,45 @@
 #include <omni/graph/core/CppWrappers.h>
 #include <omni/graph/core/iComputeGraph.h>
 
+#include <array>
 #include <cstring>
+#include <string>
 #include <vector>
 
 using omni::graph::core::GraphInstanceID;
 using omni::graph::core::NodeObj;
+
+namespace isaacsim::ucx::nodes
+{
+
+/**
+ * @struct ImuData
+ * @brief Data structure for IMU message payload.
+ * @details
+ * Contains IMU sensor data including orientation, linear acceleration,
+ * and angular velocity with flags indicating which fields are valid.
+ */
+struct ImuData
+{
+    double timestamp; //!< Timestamp value in seconds
+    std::string frameId; //!< Frame ID for the IMU data
+    bool publishOrientation; //!< Flag to publish orientation data
+    bool publishLinearAcceleration; //!< Flag to publish linear acceleration data
+    bool publishAngularVelocity; //!< Flag to publish angular velocity data
+    std::array<double, 4> orientation; //!< Orientation quaternion (x, y, z, w)
+    std::array<double, 3> linearAcceleration; //!< Linear acceleration vector (x, y, z)
+    std::array<double, 3> angularVelocity; //!< Angular velocity vector (x, y, z)
+};
+
+} // namespace isaacsim::ucx::nodes
 
 /**
  * @class UCXPublishImuNodeBase
  * @brief Templated base class for UCX IMU data publishing nodes.
  * @details
  * This template provides common functionality for publishing IMU sensor data over UCX
- * with timeout support. Derived classes implement message generation logic via generateMessage().
+ * with timeout support. Derived classes implement message serialization via generateMessage().
+ * The base class handles data extraction via extractData().
  *
  * @tparam DatabaseT The OGN database type for the node
  */
@@ -58,7 +85,7 @@ protected:
      * @brief Common compute logic for IMU publishing nodes.
      * @details
      * Handles listener initialization, connection checking, and message publishing with timeout.
-     * Delegates to publishMessage() for actual message generation and sending.
+     * Extracts data using extractData() and serializes using generateMessage().
      * Sets execOut port on success.
      *
      * @param[in] db Database accessor for node inputs/outputs
@@ -79,7 +106,8 @@ protected:
             return true;
         }
 
-        bool success = publishMessage(db, tag, timeoutMs);
+        isaacsim::ucx::nodes::ImuData data = extractData(db);
+        bool success = this->publishMessage(db, generateMessage(data), tag, timeoutMs);
 
         if (success)
         {
@@ -90,37 +118,67 @@ protected:
     }
 
     /**
-     * @brief Generate message from node inputs.
+     * @brief Extract IMU data from node inputs.
      * @details
-     * Pure virtual function that derived classes must implement to create
-     * and serialize their IMU message data.
+     * Reads IMU sensor data from the database inputs. Can be overridden by
+     * derived classes if different extraction logic is needed.
      *
      * @param[in] db Database accessor for node inputs
-     * @return std::vector<uint8_t> Serialized message data
+     * @return ImuData Extracted IMU data
      */
-    virtual std::vector<uint8_t> generateMessage(DatabaseT& db) = 0;
-
-    /**
-     * @brief Publishes an IMU message over UCX with timeout.
-     * @details
-     * Generates the message by calling the derived class's virtual generateMessage(),
-     * then sends it using UCX tagged send and waits for completion with timeout.
-     *
-     * @param[in] db Database accessor for logging and inputs
-     * @param[in] tag UCX tag for message identification
-     * @param[in] timeoutMs Timeout in milliseconds for send request (0 = infinite)
-     * @return bool True if publish succeeded, false otherwise
-     */
-    bool publishMessage(DatabaseT& db, uint64_t tag, uint32_t timeoutMs)
+    virtual isaacsim::ucx::nodes::ImuData extractData(DatabaseT& db)
     {
-        std::vector<uint8_t> messageData = generateMessage(db);
+        isaacsim::ucx::nodes::ImuData data;
+        data.timestamp = db.inputs.timeStamp();
+        data.frameId = db.inputs.frameId();
+        data.publishOrientation = db.inputs.publishOrientation();
+        data.publishLinearAcceleration = db.inputs.publishLinearAcceleration();
+        data.publishAngularVelocity = db.inputs.publishAngularVelocity();
 
-        if (messageData.empty())
+        if (data.publishOrientation)
         {
-            db.logError("Failed to generate message");
-            return false;
+            auto& orientation = db.inputs.orientation();
+            data.orientation = { orientation.GetImaginary()[0], orientation.GetImaginary()[1],
+                                 orientation.GetImaginary()[2], orientation.GetReal() };
         }
 
-        return this->sendMessage(db, messageData, tag, timeoutMs);
+        if (data.publishLinearAcceleration)
+        {
+            auto& linearAcceleration = db.inputs.linearAcceleration();
+            data.linearAcceleration = { linearAcceleration[0], linearAcceleration[1], linearAcceleration[2] };
+        }
+
+        if (data.publishAngularVelocity)
+        {
+            auto& angularVelocity = db.inputs.angularVelocity();
+            data.angularVelocity = { angularVelocity[0], angularVelocity[1], angularVelocity[2] };
+        }
+
+        return data;
     }
+
+    /**
+     * @brief Generate message from IMU data.
+     * @details
+     * Pure virtual function that derived classes must implement to serialize
+     * IMU data into the appropriate message format.
+     *
+     * @param[in] data IMU data to serialize
+     * @return std::vector<uint8_t> Serialized message data
+     */
+    virtual std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::ImuData& data) = 0;
 };
+
+// NOTE: To use this base class:
+// 1. Derive your OGN node class from UCXPublishImuNodeBase<YourDatabase>
+// 2. Implement static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+//    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
+//    - Call state.reset()
+// 3. Implement static bool compute(YourDatabase& db) that:
+//    - Extracts inputs from db (port, tag, timeoutMs)
+//    - Gets the per-instance state: auto& state = db.template perInstanceState<YourClass>()
+//    - Calls state.computeImpl(db, port, tag, timeoutMs)
+// 4. Implement virtual std::vector<uint8_t> generateMessage(const ImuData& data) override
+//    - Serialize the IMU data into the message format
+// 5. Optionally override extractData() if different extraction logic is needed
+// 6. See OgnUCXPublishImu.cpp for examples

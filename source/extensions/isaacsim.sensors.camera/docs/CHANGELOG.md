@@ -1,4 +1,54 @@
 # Changelog
+
+## [1.7.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [1.6.6] - 2026-02-13
+### Changed
+- OMPE-78945: Split tests into two groups to avoid MMUFault|SMError|||imgui.pixel on Windows-Vk
+
+## [1.6.5] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [1.6.4] - 2026-02-06
+### Changed
+- omni:rtx:post:depthSensor:outlierRemovalEnabled is now a bool
+
+## [1.6.3] - 2026-02-03
+### Changed
+- Camera sensor: updated test camera orientation to use experimental rotation utils for euler angles to quaternion
+
+## [1.6.2] - 2026-01-20
+### Changed
+- Moved to experimental APIs in tests for visual objects and rotation utils
+
+### Fixed
+- TestSingleViewDepthSensor.test_getter_setter_methods uses correct initial value for confidenceThreshold.
+
+## [1.6.1] - 2026-01-14
+### Fixed
+- Cleanup annotators and state properly when the camera is destroyed
+
+## [1.6.0] - 2026-01-13
+### Changed
+- Camera sensor: switched to use "_fast" version of the annotators where available ("bounding_box_2d_tight_fast", "bounding_box_2d_loose_fast", "instance_segmentation_fast", "instance_id_segmentation_fast")
+- Tests: removed `World` from tests, using `timeline.play()` and `timeline.stop()` to provide sensors with data
+- Tests: changed to use `SimulationManager` for backend tests
+- Tests: changed to use `isaacsim.test.utils.image_comparison` for golden image comparison
+- Tests: changed the default environment from loading a USD to creating a simple plane and dome light for tests
+- Tests: updated and re-organized golden image data
+- Tests: kept debug pointcloud images for future reference
+
+## [1.5.5] - 2026-01-09
+### Fixed
+- Fixed camera_view.get_data() resolution order issue (height, width) -> (width, height)
+
+## [1.5.4] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
 ## [1.5.3] - 2025-12-10
 ### Fixed
 - Removed `do_array_copy=True` workaround in tiled sensor (fixed upstream in replicator.core 1.12.32 by changing strides type from int32 to int64 to avoid warp array arithemtic when getting annotator data)

@@ -14,13 +14,16 @@
 # limitations under the License.
 
 
+"""Tests for NVBlox functionality in Isaac Sim."""
+
+
 import carb
 
 # NOTE:
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-from isaacsim.core.utils.stage import open_stage_async
+from isaacsim.core.experimental.utils.stage import open_stage_async
 from isaacsim.storage.native import get_assets_root_path_async
 
 # Disabled test due to issues with sensor paths not working correctly in test setup.

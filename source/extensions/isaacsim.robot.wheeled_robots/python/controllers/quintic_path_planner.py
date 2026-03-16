@@ -59,6 +59,28 @@ MIN_T = 5.0  # minimum time to the goal[s]
 
 
 class QuinticPolynomial:
+    """A quintic polynomial for smooth trajectory generation between two points.
+
+    This class represents a fifth-order polynomial that generates smooth trajectories with continuous position,
+    velocity, and acceleration. It solves for the polynomial coefficients given boundary conditions at the start
+    and end points, ensuring smooth motion profiles suitable for robotic path planning.
+
+    The quintic polynomial has the form:
+        x(t) = a0 + a1*t + a2*t^2 + a3*t^3 + a4*t^4 + a5*t^5
+
+    The class provides methods to evaluate the polynomial and its derivatives at any time t, allowing calculation
+    of position, velocity, acceleration, and jerk along the trajectory.
+
+    Args:
+        xs: Start position.
+        vxs: Start velocity.
+        axs: Start acceleration.
+        xe: End position.
+        vxe: End velocity.
+        axe: End acceleration.
+        time: Total time duration for the trajectory.
+    """
+
     def __init__(self, xs, vxs, axs, xe, vxe, axe, time):
         # calc coefficient of quintic polynomial
         # See jupyter notebook document for derivation of this equation.
@@ -83,52 +105,102 @@ class QuinticPolynomial:
         self.a5 = x[2]
 
     def calc_point(self, t):
+        """Calculate the position on the quintic polynomial trajectory at time t.
+
+        Args:
+            t: Time parameter for evaluation.
+
+        Returns:
+            Position value at time t.
+        """
         xt = self.a0 + self.a1 * t + self.a2 * t**2 + self.a3 * t**3 + self.a4 * t**4 + self.a5 * t**5
 
         return xt
 
     def calc_first_derivative(self, t):
+        """Calculate the first derivative (velocity) of the quintic polynomial trajectory at time t.
+
+        Args:
+            t: Time parameter for evaluation.
+
+        Returns:
+            First derivative (velocity) value at time t.
+        """
         xt = self.a1 + 2 * self.a2 * t + 3 * self.a3 * t**2 + 4 * self.a4 * t**3 + 5 * self.a5 * t**4
 
         return xt
 
     def calc_second_derivative(self, t):
+        """Calculate the second derivative (acceleration) of the quintic polynomial trajectory at time t.
+
+        Args:
+            t: Time parameter for evaluation.
+
+        Returns:
+            Second derivative (acceleration) value at time t.
+        """
         xt = 2 * self.a2 + 6 * self.a3 * t + 12 * self.a4 * t**2 + 20 * self.a5 * t**3
 
         return xt
 
     def calc_third_derivative(self, t):
+        """Calculate the third derivative (jerk) of the quintic polynomial trajectory at time t.
+
+        Args:
+            t: Time parameter for evaluation.
+
+        Returns:
+            Third derivative (jerk) value at time t.
+        """
         xt = 6 * self.a3 + 24 * self.a4 * t + 60 * self.a5 * t**2
 
         return xt
 
 
-def quintic_polynomials_planner(sx, sy, syaw, sv, sa, gx, gy, gyaw, gv, ga, max_accel, max_jerk, dt):
-    """quintic polynomials planner
+def quintic_polynomials_planner(
+    sx: float,
+    sy: float,
+    syaw: float,
+    sv: float,
+    sa: float,
+    gx: float,
+    gy: float,
+    gyaw: float,
+    gv: float,
+    ga: float,
+    max_accel: float,
+    max_jerk: float,
+    dt: float,
+) -> tuple[list[float], list[float], list[float], list[float], list[float], list[float], list[float]]:
+    """Generates a smooth trajectory using quintic polynomials between start and goal states.
+
+    Finds the minimum time trajectory that satisfies acceleration and jerk constraints by
+    testing different time durations from MIN_T to MAX_T.
 
     Args:
-        sx (_type_): start x position [m]
-        sy (_type_): start y position [m]
-        syaw (_type_): start yaw angle [rad]
-        sv (_type_): start velocity [m/s]
-        sa (_type_): start accel [m/ss]
-        gx (_type_): goal x position [m]
-        gy (_type_): goal y position [m]
-        gyaw (_type_): goal yaw angle [rad]
-        gv (_type_): goal velocity [m/s]
-        ga (_type_): goal accel [m/ss]
-        max_accel (_type_): maximum accel [m/ss]
-        max_jerk (_type_): maximum jerk [m/sss]
-        dt (_type_): time tick [s]
+        sx: Start x position [m].
+        sy: Start y position [m].
+        syaw: Start yaw angle [rad].
+        sv: Start velocity [m/s].
+        sa: Start acceleration [m/s^2].
+        gx: Goal x position [m].
+        gy: Goal y position [m].
+        gyaw: Goal yaw angle [rad].
+        gv: Goal velocity [m/s].
+        ga: Goal acceleration [m/s^2].
+        max_accel: Maximum acceleration [m/s^2].
+        max_jerk: Maximum jerk [m/s^3].
+        dt: Time step [s].
 
     Returns:
-        time: time result
-        rx: x position result list
-        ry: y position result list
-        ryaw: yaw angle result list
-        rv: velocity result list
-        ra: accel result list
-
+        A tuple containing (time, rx, ry, ryaw, rv, ra, rj) where:
+        - time: Time values along the trajectory
+        - rx: X position trajectory
+        - ry: Y position trajectory
+        - ryaw: Yaw angle trajectory
+        - rv: Velocity trajectory
+        - ra: Acceleration trajectory
+        - rj: Jerk trajectory
     """
     vxs = sv * math.cos(syaw)
     vys = sv * math.sin(syaw)

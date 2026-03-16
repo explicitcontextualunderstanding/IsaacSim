@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""GUI module for content browser functionality in Isaac Sim."""
+
+
 from .impl import *
+
+__all__ = ["ExtendedFileInfo", "IsaacCollection"]

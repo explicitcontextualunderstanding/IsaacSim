@@ -23,18 +23,32 @@
 #include <cstring>
 #include <vector>
 
-namespace isaacsim
-{
-namespace ucx
-{
-namespace nodes
+namespace isaacsim::ucx::nodes
 {
 
+/**
+ * @struct JointCommandData
+ * @brief Data structure for joint command message payload.
+ * @details
+ * Contains robot joint command data including positions, velocities, and efforts
+ * for all joints in the articulation.
+ */
+struct JointCommandData
+{
+    double timestamp; //!< Timestamp value in seconds
+    uint32_t numJoints; //!< Number of joints
+    std::vector<double> positionCommand; //!< Joint position commands
+    std::vector<double> velocityCommand; //!< Joint velocity commands
+    std::vector<double> effortCommand; //!< Joint effort commands
+    bool valid; //!< Flag indicating if data was successfully parsed
+};
 
 /**
  * @brief Base class template for UCX joint state subscriber nodes.
  * @details
  * Provides common functionality for receiving joint command data via UCX.
+ * Derived classes implement message parsing via parseMessage().
+ * The base class handles setting outputs via setOutputs().
  *
  * @tparam DatabaseT The OmniGraph database type for the derived node
  */
@@ -48,15 +62,15 @@ public:
     /**
      * @brief Initialize the node instance.
      * @details
-     * Sets up the node state and initializes member variables.
+     * Default implementation - derived classes should override to initialize state.
      *
      * @param[in] nodeObj The node object
      * @param[in] instanceId The instance ID
      */
     static void initInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
     {
-        auto& state = DatabaseT::template sPerInstanceState<UCXSubscribeJointCommandNodeBase>(nodeObj, instanceId);
-        state.m_receiveBuffer.reserve(65536); // Reserve 64KB for receive buffer
+        // Default: no initialization needed
+        // Derived classes should override and reserve buffer if needed
     }
 
     /**
@@ -98,19 +112,18 @@ protected:
     }
 
     /**
-     * @brief Receive and deserialize joint command message.
+     * @brief Receive and process joint command message.
      * @details
-     * Receives a message via UCX and deserializes it into joint command outputs.
-     * If the request doesn't complete within the timeout, it is cancelled.
-     * Message format: timestamp(8) + num_dofs(4) + positions(double*num_dofs) +
-     *                 velocities(double*num_dofs) + efforts(double*num_dofs)
+     * Receives a message via UCX, parses it using parseMessage(), and sets
+     * outputs using setOutputs(). If the request doesn't complete within
+     * the timeout, it returns without error.
      *
      * @param[in,out] db Database accessor for node inputs/outputs
      * @param[in] tag UCX tag for message identification
      * @param[in] timeoutMs Timeout in milliseconds (0 = infinite)
      * @return bool True if receive succeeded, false otherwise
      */
-    virtual bool receiveMessage(DatabaseT& db, uint64_t tag, uint32_t timeoutMs)
+    bool receiveMessage(DatabaseT& db, uint64_t tag, uint32_t timeoutMs)
     {
         try
         {
@@ -137,31 +150,12 @@ protected:
                 return true;
             }
 
-            size_t offset = 0;
+            JointCommandData data = parseMessage(m_receiveBuffer);
 
-            double timestamp;
-            std::memcpy(&timestamp, m_receiveBuffer.data() + offset, sizeof(double));
-            offset += sizeof(double);
-
-            uint32_t numDofs;
-            std::memcpy(&numDofs, m_receiveBuffer.data() + offset, sizeof(uint32_t));
-            offset += sizeof(uint32_t);
-
-            db.outputs.positionCommand().resize(numDofs);
-            db.outputs.velocityCommand().resize(numDofs);
-            db.outputs.effortCommand().resize(numDofs);
-
-            std::memcpy(db.outputs.positionCommand().data(), m_receiveBuffer.data() + offset, sizeof(double) * numDofs);
-            offset += sizeof(double) * numDofs;
-
-            std::memcpy(db.outputs.velocityCommand().data(), m_receiveBuffer.data() + offset, sizeof(double) * numDofs);
-            offset += sizeof(double) * numDofs;
-
-            std::memcpy(db.outputs.effortCommand().data(), m_receiveBuffer.data() + offset, sizeof(double) * numDofs);
-            offset += sizeof(double) * numDofs;
-
-            db.outputs.timeStamp() = timestamp;
-            db.outputs.execOut() = kExecutionAttributeStateEnabled;
+            if (data.valid)
+            {
+                setOutputs(db, data);
+            }
 
             return true;
         }
@@ -172,9 +166,56 @@ protected:
         }
     }
 
-    std::vector<uint8_t> m_receiveBuffer;
+    /**
+     * @brief Parse joint command message from raw bytes.
+     * @details
+     * Pure virtual function that derived classes must implement to parse
+     * the raw message buffer into a JointCommandData structure.
+     *
+     * @param[in] buffer Raw message buffer
+     * @return JointCommandData Parsed joint command data with valid flag set
+     */
+    virtual JointCommandData parseMessage(const std::vector<uint8_t>& buffer) = 0;
+
+    /**
+     * @brief Set node outputs from joint command data.
+     * @details
+     * Sets the database outputs from the parsed joint command data structure.
+     *
+     * @param[in,out] db Database accessor for node outputs
+     * @param[in] data Joint command data to output
+     */
+    void setOutputs(DatabaseT& db, const JointCommandData& data)
+    {
+        db.outputs.positionCommand().resize(data.numJoints);
+        db.outputs.velocityCommand().resize(data.numJoints);
+        db.outputs.effortCommand().resize(data.numJoints);
+
+        std::memcpy(db.outputs.positionCommand().data(), data.positionCommand.data(), sizeof(double) * data.numJoints);
+        std::memcpy(db.outputs.velocityCommand().data(), data.velocityCommand.data(), sizeof(double) * data.numJoints);
+        std::memcpy(db.outputs.effortCommand().data(), data.effortCommand.data(), sizeof(double) * data.numJoints);
+
+        db.outputs.timeStamp() = data.timestamp;
+        db.outputs.execOut() = kExecutionAttributeStateEnabled;
+    }
+
+    std::vector<uint8_t> m_receiveBuffer; //!< Buffer for receiving messages
 };
 
-} // namespace nodes
-} // namespace ucx
-} // namespace isaacsim
+// NOTE: To use this base class:
+// 1. Derive your OGN node class from UCXSubscribeJointCommandNodeBase<YourDatabase>
+// 2. Implement static void initInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+//    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
+//    - Reserve receive buffer: state.m_receiveBuffer.reserve(65536)
+// 3. Implement static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+//    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
+//    - Call state.reset()
+// 4. Implement static bool compute(YourDatabase& db) that:
+//    - Extracts inputs from db (port, tag, timeoutMs)
+//    - Gets the per-instance state: auto& state = db.template perInstanceState<YourClass>()
+//    - Calls state.computeImpl(db, port, tag, timeoutMs)
+// 5. Implement virtual JointCommandData parseMessage(const std::vector<uint8_t>& buffer) override
+//    - Parse raw bytes into JointCommandData structure
+// 6. See OgnUCXSubscribeJointCommand.cpp for examples
+
+} // namespace isaacsim::ucx::nodes

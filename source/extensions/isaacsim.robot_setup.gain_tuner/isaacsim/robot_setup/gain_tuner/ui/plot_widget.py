@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""A customizable XY plot widget module for displaying multiple data series with enhanced visualization features."""
+
+
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
@@ -22,6 +26,21 @@ LABEL_HEIGHT = 14
 
 
 class CustomXYPlot(XYPlot):
+    """A customizable XY plot widget for displaying multiple data series with enhanced visualization features.
+
+    Extends the base XYPlot class to provide additional functionality for plotting grouped data series with
+    customizable colors, legends, and visibility controls. The plot supports interactive axis controls,
+    mouse hover tooltips, and selective data series visibility.
+
+    Args:
+        x_data: X-axis data points. Can be a single list of values or a list of lists for multiple series.
+        y_data: Y-axis data points. Can be a single list of values or a list of lists for multiple series.
+        header_count: Number of data group headers for organizing series into categories.
+        show_legend: Whether to display the legend panel with series visibility controls.
+        legends: Custom legend labels for the data series.
+        data_colors: RGB color values for each data series as lists of integers.
+    """
+
     def __init__(
         self,
         x_data: Union[List[List], List] = [],
@@ -42,10 +61,20 @@ class CustomXYPlot(XYPlot):
         )
 
     def set_data_colors(self, data_colors: List[int]):
+        """Sets the colors for plot data lines.
+
+        Args:
+            data_colors: List of color values for each data line in the plot.
+        """
         self._data_colors = data_colors
         self._container_frame.rebuild()
 
     def _build_widget(self):
+        """Constructs the complete plot widget with all UI components.
+
+        Builds the legend frame, plot area with data lines, axis controls, and interactive tooltip functionality.
+        Sets up event handlers for plot visibility toggles and axis range adjustments.
+        """
         self._plot_frames = []
         self._plots = []
 

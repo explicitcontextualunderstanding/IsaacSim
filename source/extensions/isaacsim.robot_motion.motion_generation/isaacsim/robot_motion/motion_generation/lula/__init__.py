@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Lula-based motion generation algorithms including kinematics solvers, motion policies, path planners, and trajectory generators."""
+
+
 from .kinematics import LulaKinematicsSolver
 from .motion_policies import RmpFlow
 from .path_planners import RRT

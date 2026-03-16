@@ -47,7 +47,7 @@ from isaacsim.replicator.behavior.utils.scene_utils import (
     set_transform_attributes,
 )
 from isaacsim.storage.native import get_assets_root_path_async
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, PhysicsSchemaTools, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade, UsdUtils
 
 
@@ -188,7 +188,6 @@ class VolumeStackRandomizer(BehaviorScript):
     def on_destroy(self):
         """Called when the script is unassigned from a prim."""
         # Unsubscribe from the event stream
-        self._event_sub.reset()
         self._event_sub = None
 
         asyncio.ensure_future(self._reset_async())

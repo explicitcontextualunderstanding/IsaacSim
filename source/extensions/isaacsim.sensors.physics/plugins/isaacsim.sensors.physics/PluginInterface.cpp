@@ -37,7 +37,6 @@
 #include <isaacsim/core/includes/Buffer.h>
 #include <isaacsim/sensors/physics/IPhysicsSensor.h>
 #include <omni/fabric/usd/PathConversion.h>
-#include <omni/graph/core/ogn/Registration.h>
 #include <omni/kit/IStageUpdate.h>
 #include <omni/physics/tensors/IRigidBodyView.h>
 #include <omni/physics/tensors/IRigidContactView.h>
@@ -57,12 +56,7 @@ CARB_PLUGIN_IMPL(g_kPluginDesc,
                  isaacsim::sensors::physics::ContactSensorInterface,
                  isaacsim::sensors::physics::ImuSensorInterface)
 
-CARB_PLUGIN_IMPL_DEPS(omni::physx::IPhysx,
-                      omni::physx::IPhysxSceneQuery,
-                      omni::kit::IStageUpdate,
-                      omni::graph::core::IGraphRegistry)
-
-DECLARE_OGN_NODES()
+CARB_PLUGIN_IMPL_DEPS(omni::physx::IPhysx, omni::physx::IPhysxSceneQuery, omni::kit::IStageUpdate)
 
 
 // private stuff
@@ -504,13 +498,11 @@ CARB_EXPORT void carbOnPluginStartup()
         CARB_LOG_ERROR("*** Failed to create stage update node\n");
         return;
     }
-    INITIALIZE_OGN_NODES()
 }
 
 
 CARB_EXPORT void carbOnPluginShutdown()
 {
-    RELEASE_OGN_NODES()
     g_isaacSensorManager.reset();
     g_stageUpdate->destroyStageUpdateNode(g_stageUpdateNode);
     g_physx->unsubscribePhysicsOnStepEvents(g_stepSubscription);

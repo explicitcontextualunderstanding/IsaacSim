@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .impl.commands import *
+from .impl.converter import URDFImporter, URDFImporterConfig
 from .impl.extension import *

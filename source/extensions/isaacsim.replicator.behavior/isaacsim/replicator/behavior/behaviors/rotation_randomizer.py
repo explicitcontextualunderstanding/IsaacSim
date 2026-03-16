@@ -28,7 +28,7 @@ from isaacsim.replicator.behavior.utils.scene_utils import (
     set_rotation_op_and_value,
     set_rotation_with_ops,
 )
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 

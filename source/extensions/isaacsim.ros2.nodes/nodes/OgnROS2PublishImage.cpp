@@ -26,7 +26,7 @@
 #include <carb/tasking/ITasking.h>
 #include <carb/tasking/TaskingUtils.h>
 #include <carb/thread/Mutex.h>
-#include <carb/thread/Util.h>
+#include <carb/thread/SetName.h>
 
 #include <isaacsim/core/includes/Buffer.h>
 #include <isaacsim/core/includes/ScopedCudaDevice.h>

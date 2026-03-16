@@ -41,7 +41,7 @@ libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
 }
 
-extra_usd_libs = { "usdUtils" }
+extra_usd_libs = { "usdUtils", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

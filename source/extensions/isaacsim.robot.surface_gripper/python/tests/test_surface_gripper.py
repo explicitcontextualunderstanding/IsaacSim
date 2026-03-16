@@ -13,8 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test suite for the surface gripper functionality in Isaac Sim."""
+
+
 import os
 
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
+import omni.kit.app
 import omni.kit.commands
 
 # NOTE:
@@ -23,15 +29,8 @@ import omni.kit.commands
 import omni.kit.test
 import omni.kit.usd
 import omni.physics.tensors
-from isaacsim.core.api import World
-from isaacsim.core.utils.extensions import get_extension_path_from_name
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.stage import (
-    add_reference_to_stage,
-    create_new_stage_async,
-    get_current_stage,
-    update_stage_async,
-)
+import omni.timeline
+import omni.usd
 from isaacsim.robot.surface_gripper import GripperView
 from isaacsim.robot.surface_gripper._surface_gripper import GripperStatus
 from pxr import Gf, PhysxSchema
@@ -40,17 +39,52 @@ from usd.schema.isaac import robot_schema
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
+    """Test suite for the surface gripper functionality in Isaac Sim.
+
+    This test class validates the behavior of surface grippers, which are robotic end-effectors that can
+    attach to and manipulate objects through surface contact forces. The tests cover gripper creation,
+    configuration, opening/closing operations, object grasping, force limits, and multi-gripper scenarios.
+
+    The test suite uses a gantry scene with multiple boxes positioned at different locations to test various
+    gripper interactions. Each test method focuses on specific aspects of gripper functionality:
+
+    - Creation and basic configuration of surface grippers
+    - Property setting and retrieval (grip distance, force limits, retry intervals)
+    - Open/close operations and status monitoring
+    - Single and multi-object grasping capabilities
+    - Distance thresholds for successful gripping
+    - Retry mechanisms when objects move into range
+    - Force-based grip breaking (both shear and coaxial forces)
+    - Multi-gripper coordination and independent control
+
+    The surface gripper uses attachment points defined by joints and applies configurable force limits
+    to determine when objects should be gripped or released. Force thresholds prevent damage to objects
+    while ensuring reliable grasping operations.
+    """
+
     async def load_gantry_scene(self):
+        """Loads the gantry scene with surface gripper from USD file.
+
+        Loads the SurfaceGripper_gantry.usda scene file and sets it as the default prim in the stage.
+        """
         usd_path = os.path.abspath(
             os.path.join(
-                get_extension_path_from_name("isaacsim.robot.surface_gripper"), "data", "SurfaceGripper_gantry.usda"
+                app_utils.get_extension_path("isaacsim.robot.surface_gripper"), "data", "SurfaceGripper_gantry.usda"
             )
         )
-        add_reference_to_stage(usd_path, "/World")
+        stage_utils.add_reference_to_stage(usd_path, "/World")
         self._stage.SetDefaultPrim(self._stage.GetPrimAtPath("/World"))
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
-    async def setup_gripper_view(self, count):
+    async def setup_gripper_view(self, count: int):
+        """Sets up surface gripper view with specified number of grippers.
+
+        Creates surface gripper prims, configures their attachment points, and initializes a GripperView
+        with default properties including grip distance, force limits, and retry interval.
+
+        Args:
+            count: Number of surface grippers to create and configure.
+        """
         # Create and configure the surface gripper(s)
         for i in range(count):
             if i == 0:
@@ -74,45 +108,77 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
             retry_interval=[1.0] * count,
         )
 
-    async def update_joint_target_positions(self, joint_x_target, joint_y_target, joint_z_target):
+    async def update_joint_target_positions(self, joint_x_target: float, joint_y_target: float, joint_z_target: float):
+        """Updates the target positions for gantry joints and simulates movement.
+
+        Sets target positions for x, y, and z joints sequentially, then simulates for 1 second
+        to allow the joints to reach their target positions.
+
+        Args:
+            joint_x_target: Target position for the x-axis joint.
+            joint_y_target: Target position for the y-axis joint.
+            joint_z_target: Target position for the z-axis joint.
+        """
         joint_x = self._stage.GetPrimAtPath("/World/Joints/x_joint")
         joint_x.GetAttribute("drive:linear:physics:targetPosition").Set(joint_x_target)
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         joint_y = self._stage.GetPrimAtPath("/World/Joints/y_joint")
         joint_y.GetAttribute("drive:linear:physics:targetPosition").Set(joint_y_target)
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         joint_z = self._stage.GetPrimAtPath("/World/Joints/z_joint")
         joint_z.GetAttribute("drive:linear:physics:targetPosition").Set(joint_z_target)
-        await update_stage_async()
-        await simulate_async(1)
+        await omni.kit.app.get_app().next_update_async()
+        # Simulate for 1 second (60 frames at 60fps)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
     async def setUp(self):
-        World.clear_instance()
-        await create_new_stage_async()
-        self._world = World(stage_units_in_meters=1.0)
-        await self._world.initialize_simulation_context_async()
-        self._stage = get_current_stage()
+        """Sets up the test environment before each test case.
+
+        Creates a new stage with meter units, loads the gantry scene, and initializes
+        the timeline interface for test execution.
+        """
+        await stage_utils.create_new_stage_async()
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        self._stage = stage_utils.get_current_stage()
         self._timeline = omni.timeline.get_timeline_interface()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         await self.load_gantry_scene()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
-        await update_stage_async()
+        """Cleans up the test environment after each test case.
+
+        Waits for stage loading to complete and performs necessary cleanup operations
+        to ensure a clean state for subsequent tests.
+        """
+        await omni.kit.app.get_app().next_update_async()
         # self._timeline.stop()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
-            await simulate_async(1.0)
-        await update_stage_async()
+            # Simulate for 1 second (60 frames at 60fps)
+            for _ in range(60):
+                await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
     async def test_create_surface_gripper(self):
+        """Tests the creation of a surface gripper.
+
+        Verifies that a single surface gripper can be created and initialized properly
+        with the timeline running.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
-        await simulate_async(0.125)
-        await update_stage_async()
+        for _ in range(8):
+            await omni.kit.app.get_app().next_update_async()
         pass
 
     async def test_configure_surface_gripper(self):
+        """Tests surface gripper property configuration.
+
+        Verifies that surface gripper properties (max grip distance, coaxial force limit,
+        shear force limit, and retry interval) are set correctly to their expected values.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         max_grip_distance, coaxial_force_limit, shear_force_limit, retry_interval = (
@@ -126,132 +192,167 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(retry_interval[0], expected_properties[3])
 
     async def test_close_open_close_surface_gripper(self):
+        """Tests the complete close-open-close cycle of surface gripper operation.
+
+        Positions the gripper over an object, tests closing to grip the object,
+        opening to release it, and closing again to re-grip the same object.
+        Verifies gripper status and gripped objects at each stage.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
         await self.update_joint_target_positions(0.0, 0.0, 0.140)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
 
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 1)
         self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Open the gripper
         self.gripper_view.apply_gripper_action([-0.5])
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(2.0)
+        for _ in range(120):
+            await omni.kit.app.get_app().next_update_async()
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
         self.assertEqual(len(gripped_object_list[0]), 1)
         self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
     async def test_multi_object_close(self):
+        """Tests surface gripper ability to grip multiple objects simultaneously.
+
+        Positions the gripper to interact with multiple objects, verifies it can
+        grip two objects at once, release them, and grip them again. Tests the
+        complete multi-object gripping cycle.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
         await self.update_joint_target_positions(0.175, 0.0, 0.140)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         expected_gripped_object_list = ["/World/Boxes/Cube_20", "/World/Boxes/Cube_24"]
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 2)
         self.assertTrue(sorted(set(gripped_object_list[0])) == sorted(set(expected_gripped_object_list)))
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Open the gripper
         self.gripper_view.apply_gripper_action([-0.5])
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 2)
         self.assertTrue(sorted(set(gripped_object_list[0])) == sorted(set(expected_gripped_object_list)))
 
     async def test_close_threshold(self):
+        """Tests surface gripper behavior when objects are beyond grip threshold.
+
+        Positions the gripper at a distance where objects are too far to be gripped,
+        verifies that close attempts fail and the gripper remains open with no
+        gripped objects throughout the test cycle.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
         await self.update_joint_target_positions(0.0, 0.0, 0.125)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
 
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Open the gripper
         self.gripper_view.apply_gripper_action([-0.5])
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
 
     async def test_retry_interval(self):
+        """Test the retry interval functionality of the surface gripper.
+
+        Verifies that a gripper in closing state will continue attempting to grip objects when moved into range
+        during the retry interval period.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
         await self.update_joint_target_positions(0.0, 0.0, 0.125)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Begin closing the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(0.1)
+        for _ in range(6):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closing)
 
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
 
         await self.update_joint_target_positions(0.0, 0.0, 0.140)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
         gripped_object_list = self.gripper_view.get_gripped_objects()
@@ -259,16 +360,22 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         self.assertEqual(gripped_object_list[0][0], "/World/Boxes/Cube_28")
 
     async def test_shear_break_forces(self):
+        """Test the shear force breaking functionality of the surface gripper.
+
+        Verifies that the gripper releases objects when shear forces exceed the configured limit.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
         await self.update_joint_target_positions(0.0, 0.0, 0.140)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Max shear force is 5
         # Box 28 has mass of 0.2
@@ -276,7 +383,7 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         box_28_prim = self._stage.GetPrimAtPath(box_28_prim_path)
         forceApi = PhysxSchema.PhysxForceAPI.Apply(box_28_prim)
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, -4, 0.0))
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
 
         gripped_object_list = self.gripper_view.get_gripped_objects()
@@ -284,23 +391,30 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         self.assertEqual(gripped_object_list[0][0], box_28_prim_path)
 
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, -500, 0.0))
-        await update_stage_async()
-        await simulate_async(1.0)
+        await omni.kit.app.get_app().next_update_async()
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
 
     async def test_coaxial_break_force(self):
+        """Test the coaxial force breaking functionality of the surface gripper.
+
+        Verifies that the gripper releases objects when coaxial forces exceed the configured limit.
+        """
         gripper_count = 1
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
 
         await self.update_joint_target_positions(0.0, 0.0, 0.140)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Close the gripper
         self.gripper_view.apply_gripper_action([0.5])
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         # Max coaxial force is 0.005
         # Box 28 has mass of 0.2
@@ -308,7 +422,7 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         box_28_prim = self._stage.GetPrimAtPath(box_28_prim_path)
         forceApi = PhysxSchema.PhysxForceAPI.Apply(box_28_prim)
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, 0.0, -0.003))
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Closed)
 
         gripped_object_list = self.gripper_view.get_gripped_objects()
@@ -316,16 +430,22 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         self.assertEqual(gripped_object_list[0][0], box_28_prim_path)
 
         await self.update_joint_target_positions(0.0, 0.0, 0.0)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         forceApi.GetForceAttr().Set(Gf.Vec3f(0.0, 0.0, -1000))
-        await update_stage_async()
-        await simulate_async(2.0)
+        await omni.kit.app.get_app().next_update_async()
+        for _ in range(120):
+            await omni.kit.app.get_app().next_update_async()
         self.assertEqual(GripperStatus(self.gripper_view.get_surface_gripper_status()[0]), GripperStatus.Open)
         gripped_object_list = self.gripper_view.get_gripped_objects()
         self.assertEqual(len(gripped_object_list[0]), 0)
 
     async def test_multi_gripper_scene(self):
+        """Test multiple surface grippers operating simultaneously in the same scene.
+
+        Verifies that two surface grippers can independently grip and release objects with different statuses.
+        """
         gripper_count = 2
         await self.setup_gripper_view(gripper_count)
         self._timeline.play()
@@ -334,7 +454,8 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         # First gripper should be "Closing" (Some gripper joints are off the box)
         # Second gripper should be "Closed"
         await self.update_joint_target_positions(0.0, 0.05, 0.14)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
 
         gripper_prim_paths = ["/World/SurfaceGripper", "/World/SurfaceGripper_01"]
 
@@ -343,7 +464,8 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         expected_statuses = [GripperStatus.Closing, GripperStatus.Closed]
 
         self.gripper_view.apply_gripper_action(actions)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         statuses = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
             self.assertEqual(GripperStatus(statuses[i]), expected_statuses[i])
@@ -361,7 +483,8 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         expected_statuses = [GripperStatus.Open, GripperStatus.Open]
 
         self.gripper_view.apply_gripper_action(actions)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         statuses = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
             self.assertEqual(GripperStatus(statuses[i]), expected_statuses[i])
@@ -377,7 +500,8 @@ class TestSurfaceGripper(omni.kit.test.AsyncTestCase):
         expected_statuses = [GripperStatus.Closing, GripperStatus.Closed]
 
         self.gripper_view.apply_gripper_action(actions)
-        await simulate_async(1.0)
+        for _ in range(60):
+            await omni.kit.app.get_app().next_update_async()
         statuses = self.gripper_view.get_surface_gripper_status()
         for i in range(gripper_count):
             self.assertEqual(GripperStatus(statuses[i]), expected_statuses[i])

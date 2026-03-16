@@ -59,6 +59,7 @@
                 "metadata": {
                     "allowedTokens": {
                         "rgb": "rgb",
+                        "rgb_h264": "rgb_h264",
                         "depth": "depth",
                         "depth_pcl": "depth_pcl",
                         "instance_segmentation": "instance_segmentation",

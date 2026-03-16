@@ -22,6 +22,9 @@
 #     cross(V,wheel_distances_to_com) @ x == w_input
 #
 
+"""Holonomic controller for mecanum wheel robots that computes joint drive commands to achieve commanded forward, lateral, and yaw speeds."""
+
+
 from typing import Optional, Tuple
 
 import carb
@@ -40,13 +43,11 @@ from scipy import sparse
 
 
 class HolonomicController(BaseController):
-    """
-
-    This controller computes the joint drive commands required to produce the commanded forward, lateral, and yaw speeds of the robot. The problem is framed as a quadratic program to minimize the residual "net force" acting on the center of mass.
+    """This controller computes the joint drive commands required to produce the commanded forward, lateral, and yaw speeds of the robot. The problem is framed as a quadratic program to minimize the residual "net force" acting on the center of mass.
 
     .. hint::
 
-        The wheel joints of the robot prim must have additional attributes to definine the roller angles and radii of the mecanum wheels.
+        The wheel joints of the robot prim must have additional attributes to define the roller angles and radii of the mecanum wheels.
 
         .. code-block:: python
 
@@ -57,20 +58,22 @@ class HolonomicController(BaseController):
 
         The :class:`HolonomicRobotUsdSetup` class automates this process.
 
-
     Args:
-        name (str): Name identifier for the controller.
-        wheel_radius (np.ndarray): radius of the wheels, array of 1 can be used if all wheels are the same size
-        wheel_positions (np.ndarray): position of the wheels relative to center of mass of the vehicle. number of wheels x [x,y,z]
-        wheel_orientations (np.ndarray): orientation of the wheels in quaternions relative to center of mass frame of the vehicle. number of wheels x [quaternions]
-        mecanum_angles (np.ndarray): mecanum wheel angles. Array of 1 can be used if all wheels have the same angle.
-        wheel_axis (np.ndarray): the spinning axis of the wheels. Defaults to [1,0,0]
-        up_axis (np.ndarray): Defaults to z- axis
-        max_linear_speed (float): maximum "forward" speed (default: 1.0e20)
-        max_angular_speed (float): maximum "turning" speed (default: 1.0e20)
-        max_wheel_speed (float): maximum "twisting" speed (default: 1.0e20)
-        linear_gain (float): Multiplicative factor. How much the solver should "care" about the linear components of the solution. (default: 1.0)
-        linear_gain (float): Multiplicative factor. How much the solver should "care" about the angular components of the solution. (default: 1.0)
+        name: Name identifier for the controller.
+        wheel_radius: Radius of the wheels, array of 1 can be used if all wheels are the same size.
+        wheel_positions: Position of the wheels relative to center of mass of the vehicle. Number of wheels x [x,y,z].
+        wheel_orientations: Orientation of the wheels in quaternions relative to center of mass frame of the vehicle.
+            Number of wheels x [quaternions].
+        mecanum_angles: Mecanum wheel angles. Array of 1 can be used if all wheels have the same angle.
+        wheel_axis: The spinning axis of the wheels.
+        up_axis: The up axis.
+        max_linear_speed: Maximum "forward" speed.
+        max_angular_speed: Maximum "turning" speed.
+        max_wheel_speed: Maximum "twisting" speed.
+        linear_gain: Multiplicative factor. How much the solver should "care" about the linear components of the
+            solution.
+        angular_gain: Multiplicative factor. How much the solver should "care" about the angular components of the
+            solution.
     """
 
     def __init__(
@@ -87,7 +90,7 @@ class HolonomicController(BaseController):
         max_wheel_speed: float = 1.0e20,
         linear_gain: float = 1.0,
         angular_gain: float = 1.0,
-    ) -> None:
+    ):
         super().__init__(name)
 
         self.num_wheels = len(wheel_positions)
@@ -113,6 +116,11 @@ class HolonomicController(BaseController):
         self.build_base()
 
     def build_base(self):
+        """Build the base constraint matrix and optimization problem setup for the holonomic controller.
+
+        Sets up the quadratic programming problem by computing wheel direction vectors, distance matrices,
+        and constraint matrices based on the mecanum wheel configuration.
+        """
         self.base_dir = np.zeros((3, self.num_wheels), dtype=float)
         self.wheel_dists_inv = np.zeros((3, self.num_wheels), dtype=float)
 
@@ -144,6 +152,7 @@ class HolonomicController(BaseController):
                 self.wheel_dists_inv[k, i] = p_0[k]
 
         self.P = sparse.csc_matrix(np.diag(self.wheel_radius) / np.linalg.norm(self.wheel_radius))
+        self.q = np.zeros(self.num_wheels)  # Linear cost term (zero for pure quadratic minimization)
         self.b = sparse.csc_matrix(np.zeros((6, 1)))
         V = self.base_dir
         W = np.cross(V, self.wheel_dists_inv, axis=0)
@@ -152,8 +161,7 @@ class HolonomicController(BaseController):
         self.u = np.array([0.0, 0.0, np.inf, np.inf, np.inf, 0.0])
 
         self.prob = osqp.OSQP()
-
-        self.prob.setup(self.P, A=self.A, l=self.l, u=self.u, verbose=False)
+        self.prob.setup(self.P, q=self.q, A=self.A, l=self.l, u=self.u, verbose=False)
 
         self.prob.solve()
 
@@ -161,10 +169,10 @@ class HolonomicController(BaseController):
         """Calculate wheel speeds given the desired signed vehicle speeds.
 
         Args:
-            command (np.ndarray): [forward speed, lateral speed, yaw speed].
+            command: [forward speed, lateral speed, yaw speed].
 
         Returns:
-            ArticulationAction: Action containing wheel joint velocities.
+            Action containing wheel joint velocities.
         """
         if isinstance(command, list):
             command = np.array(command)
@@ -205,6 +213,6 @@ class HolonomicController(BaseController):
                 self.joint_commands = [float(values[i]) for i in range(self.num_wheels)]
         return ArticulationAction(joint_velocities=list(self.joint_commands))
 
-    def reset(self) -> None:
+    def reset(self):
         """Reset the controller state."""
         return

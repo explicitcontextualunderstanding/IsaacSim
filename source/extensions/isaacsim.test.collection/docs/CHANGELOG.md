@@ -1,4 +1,29 @@
 # Changelog
+
+## [2.5.1] - 2026-03-07
+### Fixed
+- Add `omni.kit.material.library` as a test dependency so `CreateAndBindMdlMaterialFromLibrary` is available for material tests
+
+## [2.5.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [2.4.1] - 2026-02-05
+### Changed
+- Exclude NumPy module reload errors
+
+## [2.4.0] - 2026-02-04
+### Changed
+- Update dependencies to use new experimental extensions
+
+## [2.3.1] - 2026-02-02
+### Fixed
+- Add test for NaN issue in euler to quaternion conversion utils
+
+## [2.3.0] - 2026-01-27
+### Changed
+- Add test for euler to quaternion conversion utils
+
 ## [2.2.7] - 2025-12-03
 ### Changed
 - Remove TODOs.

@@ -39,6 +39,8 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         settings = carb.settings.get_settings()
         sim_period_denom = settings.get("/app/settings/fabricDefaultSimPeriodDenominator") or 60
         get_current_stage(backend="usd").SetTimeCodesPerSecond(sim_period_denom)
+        # Set physics dt to 1/60 for consistent timestep across engines
+        SimulationManager.set_physics_dt(1.0 / 60.0)
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):

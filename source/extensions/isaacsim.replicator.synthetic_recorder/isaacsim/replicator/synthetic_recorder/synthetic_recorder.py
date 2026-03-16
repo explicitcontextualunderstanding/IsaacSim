@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Handles synthetic data recording with state management and asynchronous recording operations."""
+
+
 import os
 from enum import Enum
 
@@ -44,9 +47,19 @@ SEMANTICS_ANNOTATORS = (
 
 # Possible states of the recorder
 class RecorderState(Enum):
+    """Enumeration representing the possible states of the synthetic data recorder.
+
+    This enum defines the three operational states that a SyntheticRecorder instance can be in
+    during its lifecycle. The states control the recording process flow and determine what
+    operations are available at any given time.
+    """
+
     STOPPED = 0
+    """Recorder is not active and not capturing data."""
     RUNNING = 1
+    """Recorder is actively capturing and processing frames."""
     PAUSED = 2
+    """Recorder is temporarily suspended but can be resumed."""
 
 
 class SyntheticRecorder:
@@ -76,12 +89,20 @@ class SyntheticRecorder:
         self._render_products = []
         self._original_capture_on_play = None
 
-    def get_state(self):
-        """Get the current state of the recorder."""
+    def get_state(self) -> RecorderState:
+        """Current state of the recorder.
+
+        Returns:
+            The current recorder state (STOPPED, RUNNING, or PAUSED).
+        """
         return self._state
 
     def subscribe_state_changed(self, callback):
-        """Subscribe to the recorder state changes."""
+        """Subscribe to the recorder state changes.
+
+        Args:
+            callback: Function to call when the recorder state changes.
+        """
         self._state_subscribers.append(callback)
 
     def _notify_state_subscribers(self):
@@ -89,13 +110,21 @@ class SyntheticRecorder:
         for callback in self._state_subscribers:
             callback()
 
-    def _set_state(self, state):
-        """Set the state of the recorder and notify any subscribers about the change."""
+    def _set_state(self, state: RecorderState):
+        """Set the state of the recorder and notify any subscribers about the change.
+
+        Args:
+            state: The new recorder state to set.
+        """
         self._state = state
         self._notify_state_subscribers()
 
-    def init_recorder(self):
-        """Initialize the recorder (create a new one) and attach the writer to the render products (newly created)."""
+    def init_recorder(self) -> bool:
+        """Initialize the recorder (create a new one) and attach the writer to the render products (newly created).
+
+        Returns:
+            True if initialization was successful, False otherwise.
+        """
         if self._writer is None:
             try:
                 self._writer = rep.WriterRegistry.get(self.writer_name)
@@ -252,8 +281,15 @@ class SyntheticRecorder:
         else:
             print(f"[SDR][Warn] Recorder is in an unexpected state ({self._state.name}), try again.")
 
-    def _check_if_valid_camera(self, path):
-        """Check if the camera path is valid for the render product."""
+    def _check_if_valid_camera(self, path) -> bool:
+        """Check if the camera path is valid for the render product.
+
+        Args:
+            path: The USD path to the camera prim.
+
+        Returns:
+            True if the camera path is valid, False otherwise.
+        """
         context = omni.usd.get_context()
         stage = context.get_stage()
         prim = stage.GetPrimAtPath(path)
@@ -268,8 +304,16 @@ class SyntheticRecorder:
             print(f"[SDR][Warn] {prim.GetPath()} is not a valid 'Camera' type.")
             return False
 
-    def _check_if_valid_resolution(self, width, height):
-        """Check if the resolution is valid for the render product."""
+    def _check_if_valid_resolution(self, width: int, height: int) -> bool:
+        """Check if the resolution is valid for the render product.
+
+        Args:
+            width: Width of the resolution in pixels.
+            height: Height of the resolution in pixels.
+
+        Returns:
+            True if the resolution is valid (both width and height > 0), False otherwise.
+        """
         if width > 0 and height > 0:
             if width > MAX_RESOLUTION_WARN and height > MAX_RESOLUTION_WARN:
                 print(f"[SDR][Warn] Using a large resolution {width}x{height} might lead to out of memory issues.")
@@ -279,7 +323,14 @@ class SyntheticRecorder:
         return False
 
     def _check_if_valid_rp_entry(self, entry):
-        """Check if the render product entry is valid."""
+        """Check if the render product entry is valid.
+
+        Args:
+            entry: Render product entry tuple containing (camera_path, width, height, custom_name).
+
+        Returns:
+            True if the entry is valid, False otherwise.
+        """
         return (
             len(entry) == 4  # (camera path, width, height, custom name="")
             and self._check_if_valid_camera(entry[0])
@@ -287,7 +338,11 @@ class SyntheticRecorder:
         )
 
     def _check_if_stage_is_semantically_labeled(self):
-        """Check if the stage has any semantically labeled prims."""
+        """Check if the stage has any semantically labeled prims.
+
+        Returns:
+            True if the stage has semantically labeled prims, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
         for prim in stage.Traverse():
             # Check the new semantics API
@@ -299,7 +354,11 @@ class SyntheticRecorder:
         return False
 
     def _check_if_stage_has_skeleton_prims(self):
-        """Check if the stage has any skeleton prims."""
+        """Check if the stage has any skeleton prims.
+
+        Returns:
+            True if the stage has skeleton prims, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
         for prim in stage.Traverse():
             if prim.IsA(UsdSkel.Skeleton):
@@ -307,7 +366,11 @@ class SyntheticRecorder:
         return False
 
     def _disable_semantics_annotators(self, writer_params):
-        """Disable semantics related annotators if the stage does not have semantically labeled prims."""
+        """Disable semantics related annotators if the stage does not have semantically labeled prims.
+
+        Args:
+            writer_params: Dictionary of writer parameters to modify by disabling semantics annotators.
+        """
         # Store the annotators that were disabled due to the stage not having semantically labeled prims
         disabled_annotators = []
         # Iterate over the semantics related annotators and disable them if they are enabled
@@ -320,7 +383,11 @@ class SyntheticRecorder:
             print(f"[SDR][Warn] Disabled the following semantics related annotators: {disabled_annotators}.")
 
     async def _run_recording_loop_async(self, num_frames):
-        """Run the recording loop for the specified number of frames."""
+        """Run the recording loop for the specified number of frames.
+
+        Args:
+            num_frames: Number of frames to record.
+        """
         timeline = omni.timeline.get_timeline_interface()
         while self._current_frame < num_frames:
             # Stop the recording loop if the state has been changed from RUNNING to PAUSED or STOPPED

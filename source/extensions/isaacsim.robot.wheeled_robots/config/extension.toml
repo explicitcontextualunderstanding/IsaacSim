@@ -1,5 +1,5 @@
 [package]
-version = "5.0.2"
+version = "5.1.2"
 category = "Simulation"
 title = "Wheeled Robots"
 description = "This extension provides wheeled robot utilities"
@@ -35,9 +35,22 @@ include = ["*.ogn", "*.py"]
 exclude = ["Ogn*Database.py"]
 
 [[test]]
-timeout = 900
+name = "startup"
 dependencies = [
     "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
+timeout = 900
+dependencies = [
+    "isaacsim.test.utils",
+    "omni.isaac.ml_archive"
 ]
 args = [
     "--enable",
@@ -47,7 +60,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -63,6 +76,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -86,17 +100,5 @@ args = [
 stdoutFailPatterns.exclude = [
     "*Invalid Bundle object in Py_Bundle in getPrimPath*", # Per node tests won't have valid bundles
     "*AttributeError: 'NoneType' object has no attribute 'GetPrimAtPath'*", # For ackermann node omnigraph tests
-    '*The NumPy module was reloaded*',
-]
-
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
-stdoutFailPatterns.exclude = [
     '*The NumPy module was reloaded*',
 ]

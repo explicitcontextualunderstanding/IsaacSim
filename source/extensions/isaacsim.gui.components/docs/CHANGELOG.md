@@ -1,4 +1,28 @@
 # Changelog
+## [1.7.2] - 2026-03-09
+### Fixed
+- Hardened subprocess calls to avoid shell=True with string concatenation
+
+## [1.7.1] - 2026-03-05
+### Fixed
+- Fixed incorrect type annotation for SearchWidget
+
+## [1.7.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, and update docstrings
+
+## [1.6.1] - 2026-02-23
+### Changed
+- Remove unused dependencies
+
+## [1.6.0] - 2026-02-07
+### Changed
+- Add menu.open_content_browser_to_path to open the Content Browser to a specific path
+
+## [1.5.0] - 2025-12-22
+### Added
+- Add menu.create_submenu to recursively build MenuItemDescription lists from dicts describing submenus
+
 ## [1.4.1] - 2025-11-27
 ### Changed
 - Add missing docstrings

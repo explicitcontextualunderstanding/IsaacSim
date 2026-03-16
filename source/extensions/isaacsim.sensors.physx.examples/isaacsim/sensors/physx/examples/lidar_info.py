@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Interactive demonstration extension for PhysX LIDAR sensors in Isaac Sim."""
+
+
 import asyncio
 import weakref
 
@@ -30,8 +34,29 @@ EXTENSION_NAME = "LIDAR Info"
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the PhysX LIDAR sensor example.
+
+    Provides an interactive demonstration of creating and configuring PhysX LIDAR sensors in Isaac Sim.
+    Users can load LIDAR sensors, configure their properties, create test environments with obstacles,
+    and view real-time data streams from active sensors.
+
+    The extension creates a UI panel with controls to:
+    - Load and configure LIDAR sensors with customizable parameters (FOV, resolution, range, rotation rate)
+    - Create obstacle environments for testing sensor functionality
+    - Display live data streams showing depth, azimuth, and zenith measurements in a formatted table
+    - Visualize LIDAR rays and detection points in the viewport
+
+    The LIDAR implementation uses PhysX line tracing for collision detection and requires a PhysicsScene
+    to be present in the stage. The extension automatically configures the stage with appropriate settings
+    including Z-up axis orientation and physics scene setup.
+    """
+
     def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+        """Initialize extension and UI elements
+
+        Args:
+            ext_id: Extension identifier.
+        """
         self._ext_id = ext_id
         self.example_name = "Physx Lidar Sensor"
         self.category = "Sensors"
@@ -44,9 +69,15 @@ class Extension(omni.ext.IExt):
         )
 
     def build_window(self):
+        """Build the main window for the extension."""
         pass
 
     def build_ui(self):
+        """Build the user interface components for the LIDAR sensor extension.
+
+        Creates command panel with buttons to load LIDAR sensor, spawn obstacles, and display data stream.
+        Sets up the UI headers and collapsible frame containing control buttons and data visualization components.
+        """
         # This just defines the window we will use to access the lidar_info GUI.  Note that clicking on the menu item
         # does not create an instance of lidar_info; that is done by the extension when it is loaded by kit.  All this
         # menu does is show or hide our GUI we will use for interacting with lidar_info
@@ -106,13 +137,23 @@ class Extension(omni.ext.IExt):
                     self._info_cb, self._info_label = combo_cb_scrolling_frame_builder(**dict)
 
     def on_shutdown(self):
+        """Perform cleanup when the extension shuts down.
+
+        Deregisters the example from the browser instance and clears event subscriptions.
+        """
         # Perform cleanup once the sample closes
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
-
         self._editor_event_subscription = None
-        # self._li.release_lidar_sensor_interface()
 
     async def _spawn_lidar_function(self, task):
+        """Create and configure a LIDAR sensor in the stage.
+
+        Sets up the physics scene, creates the LIDAR prim with specified attributes including field of view,
+        rotation rate, resolution, and range parameters. Configures the stage coordinate system and camera view.
+
+        Args:
+            task: Asyncio task for stage creation to wait for completion.
+        """
         # Wait for stage clear to complete before creating LIDAR
         # Disable buttons while waiting to avoid issues if user keeps clicking button
         self._load_lidar_button.enabled = False
@@ -176,6 +217,11 @@ class Extension(omni.ext.IExt):
             self._load_lidar_scene_button.enabled = True
 
     def _on_spawn_lidar_button(self):
+        """Handle the spawn LIDAR button click event.
+
+        Creates a new stage and spawns a LIDAR sensor. Sets up event subscription for editor updates
+        and clears the data stream display.
+        """
         # wait for new stage before creating lidar
         task = asyncio.ensure_future(omni.usd.get_context().new_stage_async())
         asyncio.ensure_future(self._spawn_lidar_function(task))
@@ -187,11 +233,15 @@ class Extension(omni.ext.IExt):
             on_event=self._on_editor_step,
             observer_name="isaacsim.sensors.physx.examples.lidar_info.Extension._on_editor_step",
         )
-        # self._editor_event_subscription = (
-        #     omni.kit.app.get_app().get_update_event_stream().create_subscription_to_pop(self._on_editor_step)
-        # )
 
     def _on_editor_step(self, step):
+        """Handle editor step updates to refresh LIDAR data display.
+
+        Updates the data stream display when the info checkbox is enabled and timeline is playing.
+
+        Args:
+            step: Editor step event information.
+        """
         if self._info_cb.get_value_as_bool():
             if self._timeline.is_playing():
                 self._get_info_function()
@@ -199,6 +249,11 @@ class Extension(omni.ext.IExt):
             self._info_label.text = ""
 
     def _on_spawn_obstacles_button(self):
+        """Handle the spawn obstacles button click event.
+
+        Creates a cube obstacle and distant light in the scene for the LIDAR to detect.
+        Applies collision API to the cube for physics interactions.
+        """
         stage = omni.usd.get_context().get_stage()
         self.CubePath = "/World/Cube"
         offset = Gf.Vec3f(-2.00, 0.0, 0.500)
@@ -229,6 +284,14 @@ class Extension(omni.ext.IExt):
         UsdPhysics.CollisionAPI.Apply(cubePrim)
 
     def _get_info_function(self, val=False):
+        """Retrieve and display LIDAR sensor data.
+
+        Gets depth, zenith, and azimuth data from the LIDAR sensor and formats it into a table
+        for display in the info label.
+
+        Args:
+            val: Optional boolean parameter for function behavior.
+        """
         if not self.lidar:
             return
         maxDepth = self.lidar.GetMaxRangeAttr().Get()
@@ -258,3 +321,6 @@ class Extension(omni.ext.IExt):
             tableString += rowString.format("{0:.5f}".format(azimuth[row]), " | ", *entry)
 
         self._info_label.text = tableString
+
+
+__all__ = []

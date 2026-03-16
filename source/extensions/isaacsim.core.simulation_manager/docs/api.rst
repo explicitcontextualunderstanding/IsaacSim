@@ -11,6 +11,9 @@ Python API
 .. autosummary::
     :nosignatures:
 
+    PhysicsScene
+    PhysxGpuCfg
+    PhysxScene
     SimulationEvent
     SimulationManager
     IsaacEvents
@@ -18,6 +21,24 @@ Python API
 |
 
 .. API
+
+.. autoclass:: isaacsim.core.simulation_manager.PhysicsScene
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :show-inheritance:
+
+.. autoclass:: isaacsim.core.simulation_manager.PhysxGpuCfg
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :show-inheritance:
+
+.. autoclass:: isaacsim.core.simulation_manager.PhysxScene
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :show-inheritance:
 
 .. autoclass:: isaacsim.core.simulation_manager.SimulationEvent
     :members:

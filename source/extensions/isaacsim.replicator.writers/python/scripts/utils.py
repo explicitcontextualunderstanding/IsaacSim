@@ -13,120 +13,207 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+"""Utility functions for 3D-to-2D point projection and camera coordinate transformations in replicator writers."""
+
 
 import numpy as np
 
 
-def get_semantics(
-    num_semantics,
-    num_semantic_tokens,
-    instance_semantic_map,
-    min_semantic_idx,
-    max_semantic_hierarchy_depth,
-    semantic_token_map,
-    required_semantic_types,
-):
+def project_point_to_screen(camera_point, camera_params):
+    """Project a 3D point from camera coordinates to 2D screen coordinates.
 
-    instance_to_semantic = instance_semantic_map - min_semantic_idx
+    Dispatches to the appropriate projection method based on the camera model.
+    Supported models: pinhole, pinholeOpenCV, fisheyePolynomial.
+    Unsupported models fall back to pinhole projection.
 
-    id_to_parents = {}
-    # Mapping from a semantic itself to its parents.
-    for i in range(0, len(instance_to_semantic), max_semantic_hierarchy_depth):
-        curr_semantic_id = instance_to_semantic[i]
-        id_to_parents[curr_semantic_id] = []
-        for j in range(1, max_semantic_hierarchy_depth):
-            parent_semantic_id = instance_to_semantic[i + j]
-            if parent_semantic_id != 65535:  # Avoid invalid data
-                id_to_parents[curr_semantic_id].append(parent_semantic_id)
-
-    # Mapping from index to semantic labels of each prim
-    index_to_labels = {}
-
-    # Iterate through all semantic tokens, and choose those who required by the semantic types.
-    valid_semantic_entity_count = 0
-    prim_paths = []
-
-    for i in range(num_semantics):
-        # TODO Is there a validity check that needs to be performed here?
-        is_valid = True
-        if is_valid:
-            index_to_labels[valid_semantic_entity_count] = {}
-
-            # Find labels of itself and parent labels
-            self_labels = semantic_token_map[i * num_semantic_tokens : (i + 1) * num_semantic_tokens]
-            parent_labels = []
-
-            if i in id_to_parents.keys():
-                for parent_semantic_id in id_to_parents[i]:
-                    parent_labels.extend(
-                        semantic_token_map[
-                            parent_semantic_id * num_semantic_tokens : (parent_semantic_id + 1) * num_semantic_tokens
-                        ]
-                    )
-
-            all_labels = self_labels + parent_labels
-
-            prim_paths.append(all_labels[0])
-            for label_string in all_labels:
-                for label in label_string.split(" "):
-                    if ":" not in label:
-                        continue
-                    semantic_type, semantic_data = label.split(":")
-                    if semantic_type in required_semantic_types:
-                        index_to_labels[valid_semantic_entity_count].setdefault(semantic_type, set()).add(semantic_data)
-            # TODO I don't remember why I put this todo here :(   Maybe the bouding box node this code is taken from would provide a clue? Maybe it has to do with semantic filtering?
-            valid_semantic_entity_count += 1
-
-    semantic_ids = []
-    labels_to_id = {}
-    id_to_labels = {}
-    id_count = 0
-
-    for index, labels in index_to_labels.items():
-        labels_str = str(labels)
-        if labels_str not in labels_to_id:
-            labels_to_id[labels_str] = id_count
-            id_to_labels[id_count] = {}
-
-            for label in labels:
-                id_to_labels[id_count] = {k: ",".join(sorted(v)) for k, v in labels.items()}
-
-            semantic_ids.append(id_count)
-            id_count += 1
-        else:
-            semantic_ids.append(labels_to_id[labels_str])
-
-    serialized_index_to_labels = json.dumps(id_to_labels)
-
-    return serialized_index_to_labels, semantic_ids, valid_semantic_entity_count, prim_paths
-
-
-def get_image_space_points(points, view_proj_matrix):
-    """
     Args:
-        points: numpy array of N points (N, 3) in the world space. Points will be projected into the image space.
-        view_proj_matrix: Desired view projection matrix, transforming points from world frame to image space of desired camera
+        camera_point: Numpy array (4,) representing [x, y, z, w] in camera coordinates.
+        camera_params: Dict containing camera parameters from the camera_params annotator.
+            Required keys vary by model but typically include:
+            - "cameraModel": str identifying the projection model
+            - "cameraProjection": 4x4 projection matrix (for pinhole)
+            - "renderProductResolution": [width, height] of the output image
+
     Returns:
-        numpy array of shape (N, 3) of points projected into the image space.
+        Tuple (x, y) of rounded pixel coordinates.
     """
+    camera_model = camera_params.get("cameraModel", "pinhole")
 
-    homo = np.pad(points, ((0, 0), (0, 1)), constant_values=1.0)
-    tf_points = np.dot(homo, view_proj_matrix)
-    tf_points = tf_points / (tf_points[..., -1:])
-    tf_points[..., :2] = 0.5 * (tf_points[..., :2] + 1)
-    image_space_points = tf_points[..., :3]
+    projection_methods = {
+        "pinhole": project_pinhole,
+        "pinholeOpenCV": project_pinhole_opencv,
+        "fisheyePolynomial": project_fisheye_polynomial,
+    }
 
-    return image_space_points
+    method = projection_methods.get(camera_model, project_pinhole)
+    return method(camera_point, camera_params)
+
+
+def project_pinhole(camera_point, camera_params):
+    """Project using standard pinhole model.
+
+    Args:
+        camera_point: Numpy array (4,) representing [x, y, z, w] in camera coordinates.
+        camera_params: Dict containing:
+            - "cameraProjection": flattened 4x4 projection matrix
+            - "renderProductResolution": [width, height]
+
+    Returns:
+        Tuple (x, y) of rounded pixel coordinates.
+    """
+    projection_matrix = camera_params["cameraProjection"].reshape((4, 4))
+    screen_size = camera_params["renderProductResolution"]
+
+    point_screen = camera_point @ projection_matrix
+    point_screen_normalized = point_screen / point_screen[3]
+
+    x = (point_screen_normalized[0] + 1) * screen_size[0] / 2
+    y = (1 - point_screen_normalized[1]) * screen_size[1] / 2
+
+    return round(x), round(y)
+
+
+def project_fisheye_polynomial(camera_point, camera_params):
+    """Project using fisheye polynomial model (f-theta).
+
+    The fisheye polynomial in Omniverse defines the INVERSE mapping (r -> theta):
+        theta = a + b*r + c*r^2 + d*r^3 + e*r^4 + f*r^5
+    For projection (theta -> r), we invert this numerically.
+
+    Args:
+        camera_point: Numpy array (4,) representing [x, y, z, w] in camera coordinates.
+        camera_params: Dict containing:
+            - "cameraFisheyePolynomial": [a, b, c, d, e, f] coefficients
+            - "cameraFisheyeOpticalCentre": [cx, cy] in pixels
+            - "cameraFisheyeNominalWidth": nominal image width
+            - "cameraFisheyeNominalHeight": nominal image height
+            - "renderProductResolution": [width, height]
+
+    Returns:
+        Tuple (x, y) of rounded pixel coordinates.
+    """
+    poly_coeffs = camera_params["cameraFisheyePolynomial"]
+    optical_center = camera_params["cameraFisheyeOpticalCentre"]
+    nominal_width = camera_params["cameraFisheyeNominalWidth"]
+    nominal_height = camera_params["cameraFisheyeNominalHeight"]
+    screen_size = camera_params["renderProductResolution"]
+
+    x_cam, y_cam, z_cam = camera_point[0], camera_point[1], camera_point[2]
+    r_cam = np.sqrt(x_cam**2 + y_cam**2)
+
+    if r_cam < 1e-10:
+        px = optical_center[0] * screen_size[0] / nominal_width
+        py = optical_center[1] * screen_size[1] / nominal_height
+        return round(px), round(py)
+
+    theta = np.arctan2(r_cam, -z_cam)
+    r_pixels = invert_fisheye_polynomial(theta, poly_coeffs)
+
+    dir_x = x_cam / r_cam
+    dir_y = y_cam / r_cam
+
+    px = optical_center[0] + r_pixels * dir_x
+    py = optical_center[1] - r_pixels * dir_y
+
+    px = px * screen_size[0] / nominal_width
+    py = py * screen_size[1] / nominal_height
+
+    return round(px), round(py)
+
+
+def project_pinhole_opencv(camera_point, camera_params):
+    """Project using OpenCV pinhole model with fx, fy, cx, cy.
+
+    Args:
+        camera_point: Numpy array (4,) representing [x, y, z, w] in camera coordinates.
+        camera_params: Dict from camera_params annotator containing:
+            - "cameraOpenCVFx": focal length in x (pixels)
+            - "cameraOpenCVFy": focal length in y (pixels)
+            - "cameraFisheyeOpticalCentre": [cx, cy] principal point (annotator uses this key for all models)
+            - "renderProductResolution": [width, height]
+
+    Returns:
+        Tuple (x, y) of rounded pixel coordinates.
+    """
+    fx = camera_params["cameraOpenCVFx"]
+    fy = camera_params["cameraOpenCVFy"]
+    optical_center = camera_params["cameraFisheyeOpticalCentre"]
+    screen_size = camera_params["renderProductResolution"]
+
+    nominal_width = camera_params.get("cameraFisheyeNominalWidth", 0)
+    nominal_height = camera_params.get("cameraFisheyeNominalHeight", 0)
+    if nominal_width == 0:
+        nominal_width = screen_size[0]
+    if nominal_height == 0:
+        nominal_height = screen_size[1]
+
+    cx = optical_center[0] if optical_center[0] != 0 else nominal_width / 2.0
+    cy = optical_center[1] if optical_center[1] != 0 else nominal_height / 2.0
+
+    x_cam, y_cam, z_cam = camera_point[0], camera_point[1], camera_point[2]
+
+    if abs(z_cam) < 1e-10:
+        return round(cx), round(cy)
+
+    px = fx * (x_cam / -z_cam) + cx
+    py = fy * (-y_cam / -z_cam) + cy
+
+    px = px * screen_size[0] / nominal_width
+    py = py * screen_size[1] / nominal_height
+
+    return round(px), round(py)
+
+
+def invert_fisheye_polynomial(theta, poly_coeffs, max_iterations=10, tolerance=1e-6):
+    """Invert the fisheye polynomial to solve for r given theta.
+
+    The polynomial is: theta = a + b*r + c*r^2 + d*r^3 + e*r^4 + f*r^5
+    We solve for r using Newton-Raphson iteration.
+
+    Args:
+        theta: The angle from optical axis in radians.
+        poly_coeffs: List/array of 6 coefficients [a, b, c, d, e, f].
+        max_iterations: Maximum Newton-Raphson iterations.
+        tolerance: Convergence tolerance.
+
+    Returns:
+        The radial distance r in pixels.
+    """
+    a, b, c, d, e, f = poly_coeffs
+
+    if abs(b) > 1e-10 and abs(c) < 1e-10 and abs(d) < 1e-10 and abs(e) < 1e-10 and abs(f) < 1e-10:
+        return (theta - a) / b
+
+    if abs(b) > 1e-10:
+        r = (theta - a) / b
+    else:
+        r = theta
+
+    for _ in range(max_iterations):
+        r2, r3, r4, r5 = r**2, r**3, r**4, r**5
+        f_r = a + b * r + c * r2 + d * r3 + e * r4 + f * r5 - theta
+        f_prime = b + 2 * c * r + 3 * d * r2 + 4 * e * r3 + 5 * f * r4
+
+        if abs(f_prime) < 1e-10:
+            break
+
+        r_new = r - f_r / f_prime
+
+        if abs(r_new - r) < tolerance:
+            return r_new
+
+        r = r_new
+
+    return r
 
 
 def calculate_truncation_ratio_simple(corners, img_width, img_height):
-    """
-    Calculate the truncation ratio of a cuboid using a simplified bounding box method.
+    """Calculate the truncation ratio of a cuboid using a simplified bounding box method.
+
     Args:
         corners: (9, 2) numpy array containing the projected corners of the cuboid.
-        img_width: width of image
-        img_height: height of image
+        img_width: Width of image.
+        img_height: Height of image.
 
     Returns:
         The truncation ratio of the cuboid.
@@ -155,8 +242,21 @@ def calculate_truncation_ratio_simple(corners, img_width, img_height):
     return truncation_ratio
 
 
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+def get_image_space_points(points, view_proj_matrix):
+    """Project world space points into image space using a view projection matrix.
+
+    Args:
+        points: Numpy array of N points (N, 3) in the world space. Points will be projected into the image space.
+        view_proj_matrix: Desired view projection matrix, transforming points from world frame to image space of desired camera.
+
+    Returns:
+        Numpy array of shape (N, 3) of points projected into the image space.
+    """
+
+    homo = np.pad(points, ((0, 0), (0, 1)), constant_values=1.0)
+    tf_points = np.dot(homo, view_proj_matrix)
+    tf_points = tf_points / (tf_points[..., -1:])
+    tf_points[..., :2] = 0.5 * (tf_points[..., :2] + 1)
+    image_space_points = tf_points[..., :3]
+
+    return image_space_points

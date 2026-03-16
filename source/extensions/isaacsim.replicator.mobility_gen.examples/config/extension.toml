@@ -1,11 +1,11 @@
 [package]
-version = "0.1.11"
+version = "0.2.0"
 category = "Simulation"
 title = "MobilityGen Examples"
 description = "Example robot and scenario implementations for MobilityGen"
 keywords = ["isaac", "mobility"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -27,6 +27,19 @@ name = "isaacsim.replicator.mobility_gen.examples"
 name = "isaacsim.replicator.mobility_gen.examples.tests"
 
 [[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
 dependencies = [
     "omni.isaac.ml_archive",
 ]
@@ -38,7 +51,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -54,6 +67,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -75,19 +89,9 @@ args = [
     "--/rtx/reservedDescriptors=900000",
 ]
 
-stdoutFailPatterns.exclude = [    
+stdoutFailPatterns.exclude = [
     '*The NumPy module was reloaded*',
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
-
-stdoutFailPatterns.exclude = [    
-    '*The NumPy module was reloaded*',
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

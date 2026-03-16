@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI element wrappers providing high-level interfaces for common Omni UI components and widgets."""
+
+
 from .base_ui_element_wrappers import UIWidgetWrapper
 from .ui_widget_wrappers import (
     Button,

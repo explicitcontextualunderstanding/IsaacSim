@@ -103,11 +103,14 @@ class TestExtension(omni.kit.test.AsyncTestCase):
         timeline = omni.timeline.get_timeline_interface()
         await create_new_stage_async()
 
+        # Set physics dt to 1/60 for consistent behavior across all physics engines
+        SimulationManager.set_physics_dt(1.0 / 60.0)
+
         self.assertEqual(SimulationManager.get_num_physics_steps(), 0)
         self.assertEqual(SimulationManager.get_simulation_time(), 0.0)
         self.assertEqual(SimulationManager.is_simulating(), False)
         self.assertEqual(SimulationManager.is_paused(), False)
-        self.assertEqual(SimulationManager.get_physics_dt(), 1.0 / 60.0)
+        self.assertAlmostEqual(SimulationManager.get_physics_dt(), 1.0 / 60.0, places=5)
 
         timeline.play()
         await omni.kit.app.get_app().next_update_async()

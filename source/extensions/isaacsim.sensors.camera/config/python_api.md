@@ -1,0 +1,139 @@
+# Public API for module isaacsim.sensors.camera:
+
+## Classes
+
+- class Camera(BaseSensor)
+  - def __init__(self, prim_path: str, name: str = 'camera', frequency: Optional[int] = None, dt: Optional[float] = None, resolution: Optional[Tuple[int, int]] = None, position: Optional[np.ndarray] = None, orientation: Optional[np.ndarray] = None, translation: Optional[np.ndarray] = None, render_product_path: str = None, annotator_device: str = None)
+  - def destroy(self)
+  - [property] def supported_annotators(self) -> List[str]
+  - def get_render_product_path(self) -> str
+  - def set_frequency(self, value: int)
+  - def get_frequency(self) -> float
+  - def set_dt(self, value: float)
+  - def get_dt(self) -> float
+  - def get_current_frame(self, clone = False) -> dict
+  - def initialize(self, physics_sim_view = None, attach_rgb_annotator = True)
+  - def post_reset(self)
+  - def resume(self)
+  - def pause(self)
+  - def is_paused(self) -> bool
+  - def set_resolution(self, value: Tuple[int, int], maintain_square_pixels: bool = True)
+  - def get_resolution(self) -> Tuple[int, int]
+  - def get_aspect_ratio(self) -> float
+  - def get_world_pose(self, camera_axes: str = 'world') -> Tuple[np.ndarray, np.ndarray]
+  - def set_world_pose(self, position: Optional[Sequence[float]] = None, orientation: Optional[Sequence[float]] = None, camera_axes: str = 'world')
+  - def get_local_pose(self, camera_axes: str = 'world') -> Tuple[np.ndarray, np.ndarray]
+  - def set_local_pose(self, translation: Optional[Sequence[float]] = None, orientation: Optional[Sequence[float]] = None, camera_axes: str = 'world')
+  - def attach_annotator(self, annotator_name: str, **kwargs)
+  - def detach_annotator(self, annotator_name: str)
+  - def add_rgb_to_frame(self, init_params: dict = {})
+  - def remove_rgb_from_frame(self)
+  - def add_normals_to_frame(self, init_params: dict = {})
+  - def remove_normals_from_frame(self)
+  - def add_motion_vectors_to_frame(self, init_params: dict = {})
+  - def remove_motion_vectors_from_frame(self)
+  - def add_occlusion_to_frame(self, init_params: dict = {})
+  - def remove_occlusion_from_frame(self)
+  - def add_distance_to_image_plane_to_frame(self, init_params: dict = {})
+  - def remove_distance_to_image_plane_from_frame(self)
+  - def add_distance_to_camera_to_frame(self, init_params: dict = {})
+  - def remove_distance_to_camera_from_frame(self)
+  - def add_bounding_box_2d_tight_to_frame(self, init_params: dict = {})
+  - def remove_bounding_box_2d_tight_from_frame(self)
+  - def add_bounding_box_2d_loose_to_frame(self, init_params: dict = {})
+  - def remove_bounding_box_2d_loose_from_frame(self)
+  - def add_bounding_box_3d_to_frame(self, init_params: dict = {})
+  - def remove_bounding_box_3d_from_frame(self)
+  - def add_semantic_segmentation_to_frame(self, init_params: dict = {})
+  - def remove_semantic_segmentation_from_frame(self)
+  - def add_instance_id_segmentation_to_frame(self, init_params: dict = {})
+  - def remove_instance_id_segmentation_from_frame(self)
+  - def add_instance_segmentation_to_frame(self, init_params: dict = {})
+  - def remove_instance_segmentation_from_frame(self)
+  - def add_pointcloud_to_frame(self, include_unlabelled: bool = True, init_params: dict = {})
+  - def remove_pointcloud_from_frame(self)
+  - def get_rgba(self, device: str = None) -> np.ndarray | wp.array
+  - def get_rgb(self, device: str = None) -> np.ndarray | wp.array
+  - def get_depth(self, device: str = None) -> np.ndarray | wp.array
+  - def get_pointcloud(self, device: str = None, world_frame: bool = True) -> np.ndarray | wp.array
+  - def get_focal_length(self) -> float
+  - def set_focal_length(self, value: float)
+  - def get_focus_distance(self) -> float
+  - def set_focus_distance(self, value: float)
+  - def get_lens_aperture(self) -> float
+  - def set_lens_aperture(self, value: float)
+  - def get_horizontal_aperture(self) -> float
+  - def set_horizontal_aperture(self, value: float, maintain_square_pixels: bool = True)
+  - def get_vertical_aperture(self) -> float
+  - def set_vertical_aperture(self, value: float, maintain_square_pixels: bool = True)
+  - def get_clipping_range(self) -> Tuple[float, float]
+  - def set_clipping_range(self, near_distance: Optional[float] = None, far_distance: Optional[float] = None)
+  - def get_projection_type(self) -> str
+  - def set_projection_type(self, value: str)
+  - def get_lens_distortion_model(self) -> str
+  - def set_lens_distortion_model(self, value: str)
+  - def get_projection_mode(self) -> str
+  - def set_projection_mode(self, value: str)
+  - def get_stereo_role(self) -> str
+  - def set_stereo_role(self, value: str)
+  - def set_fisheye_polynomial_properties(self, nominal_width: Optional[float], nominal_height: Optional[float], optical_centre_x: Optional[float], optical_centre_y: Optional[float], max_fov: Optional[float], polynomial: Optional[Sequence[float]])
+  - def set_matching_fisheye_polynomial_properties(self, nominal_width: float, nominal_height: float, optical_centre_x: float, optical_centre_y: float, max_fov: Optional[float], distortion_model: Sequence[float], distortion_fn: Callable)
+  - def set_rational_polynomial_properties(self, nominal_width: float, nominal_height: float, optical_centre_x: float, optical_centre_y: float, max_fov: Optional[float], distortion_model: Sequence[float])
+  - def set_kannala_brandt_properties(self, nominal_width: float, nominal_height: float, optical_centre_x: float, optical_centre_y: float, max_fov: Optional[float], distortion_model: Sequence[float])
+  - def get_fisheye_polynomial_properties(self) -> Tuple[float, float, float, float, float, List]
+  - def set_shutter_properties(self, delay_open: Optional[float] = None, delay_close: Optional[float] = None)
+  - def get_shutter_properties(self) -> Tuple[float, float]
+  - def get_view_matrix_ros(self, device: str = None, backend_utils_cls: type = None) -> np.ndarray | torch.Tensor | wp.array
+  - def get_intrinsics_matrix(self, device: str = None, backend_utils_cls: type = None) -> np.ndarray | torch.Tensor | wp.array
+  - def get_image_coords_from_world_points(self, points_3d: np.ndarray) -> np.ndarray
+  - def get_camera_points_from_image_coords(self, points_2d, depth, device: str = None, backend_utils_cls: type = None) -> np.ndarray | torch.Tensor | wp.array
+  - def get_world_points_from_image_coords(self, points_2d, depth, device: str = None, backend_utils_cls: type = None) -> np.ndarray | torch.Tensor | wp.array
+  - def get_horizontal_fov(self) -> float
+  - def get_vertical_fov(self) -> float
+  - def set_ftheta_properties(self, nominal_height: Optional[float] = None, nominal_width: Optional[float] = None, optical_center: Optional[Tuple[float, float]] = None, max_fov: Optional[float] = None, distortion_coefficients: Optional[Sequence[float]] = None)
+  - def get_ftheta_properties(self) -> Tuple[float, float, Tuple[float, float], float, List[float]]
+  - def set_kannala_brandt_k3_properties(self, nominal_height: Optional[float] = None, nominal_width: Optional[float] = None, optical_center: Optional[Tuple[float, float]] = None, max_fov: Optional[float] = None, distortion_coefficients: Optional[Sequence[float]] = None)
+  - def get_kannala_brandt_k3_properties(self) -> Tuple[float, float, Tuple[float, float], float, List[float]]
+  - def set_rad_tan_thin_prism_properties(self, nominal_height: Optional[float] = None, nominal_width: Optional[float] = None, optical_center: Optional[Tuple[float, float]] = None, max_fov: Optional[float] = None, distortion_coefficients: Optional[Sequence[float]] = None)
+  - def get_rad_tan_thin_prism_properties(self) -> Tuple[float, float, Tuple[float, float], float, List[float]]
+  - def set_lut_properties(self, nominal_height: Optional[float] = None, nominal_width: Optional[float] = None, optical_center: Optional[Tuple[float, float]] = None, ray_enter_direction_texture: Optional[str] = None, ray_exit_position_texture: Optional[str] = None)
+  - def get_lut_properties(self) -> Tuple[float, float, Tuple[float, float], str, str]
+  - def set_opencv_pinhole_properties(self, cx: Optional[float] = None, cy: Optional[float] = None, fx: Optional[float] = None, fy: Optional[float] = None, pinhole: Optional[List[float]] = None)
+  - def get_opencv_pinhole_properties(self) -> Tuple[float, float, float, float, List]
+  - def set_opencv_fisheye_properties(self, cx: Optional[float] = None, cy: Optional[float] = None, fx: Optional[float] = None, fy: Optional[float] = None, fisheye: Optional[List[float]] = None)
+  - def get_opencv_fisheye_properties(self) -> Tuple[float, float, float, float, List]
+
+- class CameraView(XFormPrim)
+  - def __init__(self, prim_paths_expr: str = None, name: str = 'camera_prim_view', camera_resolution: Tuple[int, int] = (256, 256), output_annotators: Optional[List[str]] = ['rgb', 'depth'], positions: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, translations: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, orientations: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, scales: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, visibilities: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, reset_xform_properties: bool = True)
+  - def destroy(self)
+  - def get_render_product_path(self) -> str
+  - def set_resolutions(self, resolution: Tuple[int, int])
+  - def get_resolutions(self) -> Tuple[int, int]
+  - def get_aspect_ratios(self) -> float
+  - def get_world_poses(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, camera_axes: str = 'world', usd: bool = True) -> Union[Tuple[np.ndarray, np.ndarray], Tuple[torch.Tensor, torch.Tensor], Tuple[wp.indexedarray, wp.indexedarray]]
+  - def set_world_poses(self, positions: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, orientations: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, camera_axes: str = 'world', usd: bool = True)
+  - def get_local_poses(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, camera_axes: str = 'world') -> Union[Tuple[np.ndarray, np.ndarray], Tuple[torch.Tensor, torch.Tensor], Tuple[wp.indexedarray, wp.indexedarray]]
+  - def set_local_poses(self, positions: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, orientations: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, camera_axes: str = 'world')
+  - def get_data(self, annotator_type: str) -> Tuple[wp.array, dict[str, Any]]
+  - def get_rgb_tiled(self, out = None, device = 'cpu') -> np.ndarray | torch.Tensor
+  - def get_depth_tiled(self, out = None, device = 'cpu') -> np.ndarray | torch.Tensor
+  - def get_rgb(self, out = None) -> torch.Tensor
+  - def get_depth(self, out = None) -> torch.Tensor
+  - def get_focal_lengths(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[float]
+  - def set_focal_lengths(self, values: List[float], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_focus_distances(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[float]
+  - def set_focus_distances(self, values: List[float], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_lens_apertures(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[float]
+  - def set_lens_apertures(self, values: List[float], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_horizontal_apertures(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[float]
+  - def set_horizontal_apertures(self, values: List[float], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_vertical_apertures(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[float]
+  - def set_vertical_apertures(self, values: List[float], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_projection_types(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[str]
+  - def set_projection_types(self, values: List[str], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_projection_modes(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[str]
+  - def set_projection_modes(self, values: List[str], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_stereo_roles(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[str]
+  - def set_stereo_roles(self, values: List[str], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)
+  - def get_shutter_properties(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> List[Tuple[float, float]]
+  - def set_shutter_properties(self, values: List[Tuple[float, float]], indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None)

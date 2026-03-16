@@ -19,7 +19,7 @@ import carb
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.usd
-from omni.physx.scripts.physicsUtils import add_ground_plane
+from isaacsim.core.experimental.objects import GroundPlane
 from PIL import Image
 from pxr import Gf, Sdf, UsdGeom, UsdLux, UsdPhysics
 
@@ -156,7 +156,12 @@ class HeightmapImporter:
         """
         ground_plane_size = max(image_width, image_height) * cell_scale / 2.0 + GROUND_PLANE_MARGIN
         ground_plane_position = Gf.Vec3f((image_width * cell_scale / 2), -(image_height * cell_scale / 2), 0.0)
-        add_ground_plane(self._stage, GROUND_PLANE_PATH, "Z", ground_plane_size, ground_plane_position, Gf.Vec3f(1.0))
+        GroundPlane(
+            GROUND_PLANE_PATH,
+            sizes=ground_plane_size,
+            positions=[[ground_plane_position[0], ground_plane_position[1], ground_plane_position[2]]],
+            colors=[1.0, 1.0, 1.0],
+        )
 
     def _create_lighting(self) -> None:
         """Create a distant light for the scene."""

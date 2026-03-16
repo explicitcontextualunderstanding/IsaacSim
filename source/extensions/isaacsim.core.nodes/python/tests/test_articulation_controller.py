@@ -15,15 +15,14 @@
 
 
 import asyncio
-from re import I
 
 import carb
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 import omni.graph.core.tests as ogts
 import omni.kit.test
-from isaacsim.core.api.robots import Robot
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.stage import open_stage_async
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.storage.native import get_assets_root_path_async
 
 
@@ -31,15 +30,12 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
     async def setUp(self):
         """Set up  test environment, to be torn down when done"""
         await omni.usd.get_context().new_stage_async()
-        self._timeline = omni.timeline.get_timeline_interface()
         # add franka robot for test
         assets_root_path = await get_assets_root_path_async()
         if assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
-        (result, error) = await open_stage_async(
-            assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
-        )
+        await stage_utils.open_stage_async(assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
 
     # ----------------------------------------------------------------------
     async def tearDown(self):
@@ -91,13 +87,12 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
         await og.Controller.evaluate(test_graph)
 
         # check where the joints are after evaluate
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(2)
-        robot.initialize()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=120)
 
-        self.assertAlmostEqual(robot.get_joint_positions()[1], -1.0, delta=0.001)
-        self.assertAlmostEqual(robot.get_joint_positions()[2], 1.2, delta=0.002)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 1], -1.0, delta=0.001)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 2], 1.2, delta=0.002)
 
     # ----------------------------------------------------------------------
     async def test_joint_index_ogn(self):
@@ -142,13 +137,12 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
         await og.Controller.evaluate(test_graph)
 
         # check where the joints are after evaluate
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(2)
-        robot.initialize()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=120)
 
-        self.assertAlmostEqual(robot.get_joint_positions()[1], -1.0, delta=0.002)
-        self.assertAlmostEqual(robot.get_joint_positions()[2], 1.2, delta=0.002)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 1], -1.0, delta=0.002)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 2], 1.2, delta=0.002)
 
     # ----------------------------------------------------------------------
     async def test_full_array_no_index_ogn(self):
@@ -184,13 +178,12 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
         await og.Controller.evaluate(test_graph)
 
         # check where the joints are after evaluate
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(2)
-        robot.initialize()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=120)
 
-        self.assertAlmostEqual(robot.get_joint_positions()[1], -1.0, delta=0.01)
-        self.assertAlmostEqual(robot.get_joint_positions()[2], 1.2, delta=0.003)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 1], -1.0, delta=0.01)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 2], 1.2, delta=0.003)
 
     # ----------------------------------------------------------------------
     async def test_single_joint_name_ogn(self):
@@ -225,13 +218,12 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
         await og.Controller.evaluate(test_graph)
 
         # check where the joints are after evaluate
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(2)
-        robot.initialize()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=120)
 
-        self.assertAlmostEqual(robot.get_joint_positions()[2], 1.7, delta=0.002)
-        self.assertGreater(abs(robot.get_joint_positions()[3] - 1.7), 0.1)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 2], 1.7, delta=0.002)
+        self.assertGreater(abs(robot.get_dof_positions().numpy()[0, 3] - 1.7), 0.1)
 
     # ----------------------------------------------------------------------
     async def test_single_joint_index_ogn(self):
@@ -266,13 +258,12 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
         await og.Controller.evaluate(test_graph)
 
         # check where the joints are after evaluate
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(2)
-        robot.initialize()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=120)
 
-        self.assertAlmostEqual(robot.get_joint_positions()[2], 1.7, delta=0.002)
-        self.assertGreater(abs(robot.get_joint_positions()[3] - 1.7), 0.002)
+        self.assertAlmostEqual(robot.get_dof_positions().numpy()[0, 2], 1.7, delta=0.002)
+        self.assertGreater(abs(robot.get_dof_positions().numpy()[0, 3] - 1.7), 0.002)
 
     # ----------------------------------------------------------------------
     async def test_joint_indices_different_shape(self):
@@ -305,14 +296,13 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
         )
 
         # Initialize robot
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
+        robot = Articulation("/panda")
+        app_utils.play()
         await og.Controller.evaluate(test_graph)
-        await simulate_async(2)
-        robot.initialize()
+        await app_utils.update_app_async(steps=120)
 
         # Store initial joint positions
-        initial_position = robot.get_joint_positions()[2]
+        initial_position = robot.get_dof_positions().numpy()[0, 2]
 
         # Access nodes directly by their paths
         articulation_controller_node = "/ActionGraph/ArticulationController"
@@ -329,9 +319,9 @@ class TestArticulationControllerNode(ogts.OmniGraphTestCase):
 
         # Evaluate the graph again with the updated values
         await og.Controller.evaluate(test_graph)
-        await simulate_async(2)
+        await app_utils.update_app_async(steps=120)
 
-        new_position = robot.get_joint_positions()[2]
+        new_position = robot.get_dof_positions().numpy()[0, 2]
 
         self.assertNotAlmostEqual(initial_position, new_position, delta=0.01)
         self.assertAlmostEqual(new_position, 0.5, delta=0.01)

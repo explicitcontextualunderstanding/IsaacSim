@@ -124,6 +124,12 @@ config = {
             ],
         },
     },
+    # Physics GPU memory settings for the simulation (override defaults if scenes are complex)
+    "physics": {
+        # GPU collision stack size in bytes (default: 300 MB, PhysX default is only 64 MB which is
+        # insufficient for infinigen scenes with many colliders)
+        "gpu_collision_stack_size": 314572800,
+    },
     # Hide ceilling to get a top-down view of the scene, move viewport camera to the top-down view
     "debug_mode": True,
 }
@@ -277,6 +283,13 @@ def run_sdg(config):
     print("[SDG] Registering replicator graph randomizers")
     infinigen_utils.register_dome_light_randomizer()
     infinigen_utils.register_shape_distractors_color_randomizer(shape_distractors)
+
+    # Configure the PhysX scene GPU memory settings before running any simulation.
+    # This prevents PxGpuDynamicsMemoryConfig::collisionStackSize buffer overflow errors
+    # when simulating complex scenes with many colliders (distractors, assets, environment meshes).
+    physics_config = config.get("physics", {})
+    print("[SDG] Configuring physics scene GPU memory settings")
+    infinigen_utils.configure_physics_scene(physics_config)
 
     # Check if the render mode needs to be switched to path tracing for the capture (by default: RealTimePathTracing)
     use_path_tracing = capture_config.get("path_tracing", False)

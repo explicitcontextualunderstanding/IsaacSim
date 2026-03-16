@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for validating all supported lidar configurations and variants in the isaacsim.sensors.rtx extension."""
+
+
 import asyncio
 import os
 import tempfile
@@ -29,8 +32,28 @@ from .common import create_sarcophagus
 
 
 class TestSupportedLidarConfigs(omni.kit.test.AsyncTestCase):
+    """Test class for validating all supported lidar configurations and variants in the isaacsim.sensors.rtx extension.
+
+    This test class dynamically generates test methods for each supported lidar configuration and variant combination
+    from SUPPORTED_LIDAR_CONFIGS. Each test method creates a lidar sensor prim using the IsaacSensorCreateRtxLidar
+    command and validates its parameters using the SensorCheckerUtil with the LidarCore model.
+
+    The class sets up a test environment with a new stage and a sarcophagus object for sensor validation. It uses
+    the SensorCheckerUtil to verify that each lidar configuration produces valid sensor parameters that conform to
+    the expected schema and model requirements.
+
+    Test methods are automatically generated at module load time using the _create_lidar_parameters_test function,
+    which creates individual test cases for each config-variant pair. Each generated test validates sensor creation,
+    parameter validation, and ensures the sensor prim has the correct type and valid parameters.
+    """
 
     async def setUp(self):
+        """Sets up the test environment for lidar configuration testing.
+
+        Creates a new USD stage, initializes a sarcophagus object with non-visual materials,
+        sets up the timeline interface, and configures a sensor checker utility with a generic
+        LidarCore model for parameter validation.
+        """
         await create_new_stage_async()
         await update_stage_async()
 
@@ -50,6 +73,12 @@ class TestSupportedLidarConfigs(omni.kit.test.AsyncTestCase):
         self._checker.init(model_info)
 
     async def tearDown(self):
+        """Cleans up the test environment after lidar configuration testing.
+
+        Removes the sensor checker, waits for any pending asset loading to complete,
+        and updates the stage to ensure a clean state for subsequent tests.
+        """
+        del self._checker
         await omni.kit.app.get_app().next_update_async()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             print("tearDown, assets still loading, waiting to finish...")
@@ -58,13 +87,20 @@ class TestSupportedLidarConfigs(omni.kit.test.AsyncTestCase):
 
 
 # Iterate over all supported lidar configs and variants, creating a test for each as sensor prims
-DISABLE_FOR_TEST = {
-    "/Isaac/Sensors/NVIDIA/Example_Solid_State.usda",
-    "/Isaac/Sensors/NVIDIA/Simple_Example_Solid_State.usda",
-}
-
-
 def _create_lidar_parameters_test(config_name, variant):
+    """Creates a test function for validating lidar sensor parameters with specified configuration and variant.
+
+    Generates an async test function that creates an RTX lidar sensor prim with the given configuration
+    and variant, then validates the sensor parameters using the sensor checker utility.
+
+    Args:
+        config_name: Name of the lidar configuration to test.
+        variant: Variant of the lidar configuration to test.
+
+    Returns:
+        An async test function that validates the lidar sensor parameters.
+    """
+
     async def test_function(self):
         # Create sensor prim
         kwargs = {
@@ -83,37 +119,24 @@ def _create_lidar_parameters_test(config_name, variant):
             sensor_type, "OmniLidar", f"Expected OmniLidar prim, got {sensor_type}. Was sensor prim created?"
         )
 
-        # Get the prim path
-        prim_path = str(self.sensor.GetPath())
+        error_string = self._checker.validateParams(self.sensor)
+        self.assertIsNone(
+            error_string,
+            f"Sensor parameter validation failed for config {config_name} variant {variant}: {error_string}",
+        )
 
-        # Save the current stage to a temporary file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_usd_path = os.path.join(temp_dir, "test_stage.usda")
-            save_result = save_stage(temp_usd_path, save_and_reload_in_place=False)
-            self.assertTrue(save_result, f"Failed to save stage to {temp_usd_path}")
-
-            # Validate parameters using sensor checker
-            error_string = self._checker.validateParams(temp_usd_path, prim_path)
-            self.assertIsNone(
-                error_string,
-                f"Sensor parameter validation failed for config {config_name} variant {variant}: {error_string}",
-            )
-
-            # Verify that validated parameters were cached
-            validated_params = self._checker.getValidatedParams()
-            self.assertIsNotNone(validated_params, "Failed to retrieve validated parameters")
-            self.assertGreater(
-                validated_params.numParams,
-                0,
-                f"Expected validated parameters, got {validated_params.numParams} parameters",
-            )
+        validated_params = self._checker.getValidatedParams()
+        self.assertIsNotNone(validated_params, "Failed to retrieve validated parameters")
+        self.assertGreater(
+            validated_params.numParams,
+            0,
+            f"Expected validated parameters, got {validated_params.numParams} parameters",
+        )
 
     return test_function
 
 
 for config_path in SUPPORTED_LIDAR_CONFIGS:
-    if config_path in DISABLE_FOR_TEST:
-        continue
     config_name = Path(config_path).stem
     for variant in SUPPORTED_LIDAR_CONFIGS[config_path] or [None]:
         test_name = f"test_lidar_parameters_{config_name}_{variant}"

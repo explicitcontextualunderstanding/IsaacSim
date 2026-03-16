@@ -220,18 +220,12 @@ print(f"Finished running the application for {NUM_APP_UPDATES} updates...")
 
 # Stop timeline and unsubscribe from all events
 timeline.stop()
-if app_sub:
-    app_sub.reset()
-    app_sub = None
-if stage_render_sub:
-    stage_render_sub.reset()
-    stage_render_sub = None
+app_sub = None
+stage_render_sub = None
 if physics_sub:
     physics_sub.unsubscribe()
     physics_sub = None
-if timeline_sub:
-    timeline_sub.reset()
-    timeline_sub = None
+timeline_sub = None
 
 
 # Print summary statistics

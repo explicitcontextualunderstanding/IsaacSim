@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for testing robot motion planning using Lula kinematics solvers and RmpFlow motion generation."""
+
+
 import asyncio
 import gc
 import os
@@ -52,29 +55,82 @@ EXTENSION_NAME = "Lula Test Widget"
 MAX_DOF_NUM = 100
 
 
-def is_yaml_file(path: str):
+def is_yaml_file(path: str) -> bool:
+    """Check if a file path has a YAML extension.
+
+    Args:
+        path: File path to check.
+
+    Returns:
+        True if the file has a .yaml or .YAML extension.
+    """
     _, ext = os.path.splitext(path.lower())
     return ext in [".yaml", ".YAML"]
 
 
-def is_urdf_file(path: str):
+def is_urdf_file(path: str) -> bool:
+    """Check if a file path has a URDF extension.
+
+    Args:
+        path: File path to check.
+
+    Returns:
+        True if the file has a .urdf or .URDF extension.
+    """
     _, ext = os.path.splitext(path.lower())
     return ext in [".urdf", ".URDF"]
 
 
 def on_filter_yaml_item(item) -> bool:
+    """Filter function for YAML file browser items.
+
+    Args:
+        item: File browser item to filter.
+
+    Returns:
+        True if the item should be displayed in the YAML file browser.
+    """
     if not item or item.is_folder:
         return not (item.name == "Omniverse" or item.path.startswith("omniverse:"))
     return is_yaml_file(item.path)
 
 
 def on_filter_urdf_item(item) -> bool:
+    """Filter function for URDF file browser items.
+
+    Args:
+        item: File browser item to filter.
+
+    Returns:
+        True if the item should be displayed in the URDF file browser.
+    """
     if not item or item.is_folder:
         return not (item.name == "Omniverse" or item.path.startswith("omniverse:"))
     return is_urdf_file(item.path)
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the Lula Test Widget.
+
+    This extension provides a comprehensive testing interface for robot motion planning using Lula kinematics
+    solvers and RmpFlow motion generation. It enables users to select articulated robots from the scene,
+    load robot configuration files, and test various motion planning scenarios including inverse kinematics,
+    trajectory generation, and RmpFlow-based motion control.
+
+    The extension creates a dockable UI window with panels for robot selection, kinematics testing, trajectory
+    generation, and RmpFlow configuration. Users can visualize end-effector poses, follow targets, generate
+    custom trajectories, and test sinusoidal motion patterns with configurable parameters.
+
+    Key features include:
+    - Interactive robot articulation selection from the current stage
+    - Support for YAML robot description and URDF file loading
+    - Inverse kinematics solver testing with target following
+    - Custom trajectory generation and playback
+    - RmpFlow motion planning with obstacle avoidance
+    - Real-time end-effector visualization
+    - Debugging mode for motion planning analysis
+    """
+
     def on_startup(self, ext_id: str):
         """Initialize extension and UI elements"""
 
@@ -432,7 +488,8 @@ class Extension(omni.ext.IExt):
         """Callback for Physics Step.
 
         Args:
-            step (float): Physics step size in seconds.
+            step: Physics step size in seconds.
+            context: Physics context information.
         """
         if self.articulation is not None:
             if not self.articulation.handles_initialized:
@@ -446,6 +503,11 @@ class Extension(omni.ext.IExt):
         return
 
     def _get_next_action(self):
+        """Calculates the next control action for the selected articulation.
+
+        Returns:
+            The control action to apply to the articulation controller.
+        """
         if self._test_scenarios.scenario_name == "Sinusoidal Target":
             w_xy = self._models["rmpflow_follow_sinusoid_w_xy"].get_value_as_float()
             w_z = self._models["rmpflow_follow_sinusoid_w_z"].get_value_as_float()
@@ -462,6 +524,7 @@ class Extension(omni.ext.IExt):
     ##################################
 
     def _build_info_ui(self):
+        """Builds the information panel UI section with title, documentation link, and overview text."""
         title = EXTENSION_NAME
         doc_link = (
             "https://docs.isaacsim.omniverse.nvidia.com/latest/manipulators/manipulators_configure_rmpflow_denso.html"
@@ -474,6 +537,9 @@ class Extension(omni.ext.IExt):
         setup_ui_headers(self._ext_id, __file__, title, doc_link, overview)
 
     def _build_selection_ui(self):
+        """Builds the selection panel UI with articulation dropdown, file pickers for robot description and URDF,
+        and end effector frame selection controls.
+        """
         frame = ui.CollapsableFrame(
             title="Selection Panel",
             height=0,
@@ -603,6 +669,7 @@ class Extension(omni.ext.IExt):
                     SimpleCheckBox(1, on_vis_ee_clicked_fn, model=cb)
 
     def _build_kinematics_ui(self):
+        """Builds the Lula Kinematics Solver UI panel with inverse kinematics target following controls."""
         frame = ui.CollapsableFrame(
             title="Lula Kinematics Solver",
             height=0,
@@ -632,6 +699,9 @@ class Extension(omni.ext.IExt):
                 )
 
     def _build_trajectory_generation_ui(self):
+        """Builds the Lula Trajectory Generator UI panel with custom trajectory creation and waypoint
+        management controls.
+        """
         frame = ui.CollapsableFrame(
             title="Lula Trajectory Generator",
             height=0,
@@ -706,6 +776,9 @@ class Extension(omni.ext.IExt):
                         )
 
     def _build_rmpflow_ui(self):
+        """Builds the RmpFlow UI panel with configuration file selection, target following controls,
+        and sinusoidal trajectory parameters.
+        """
         frame = ui.CollapsableFrame(
             title="RmpFlow",
             height=0,
@@ -846,6 +919,7 @@ class Extension(omni.ext.IExt):
                         )
 
     def _disable_lula_dropdowns(self):
+        """Disables and collapses the Lula kinematics, trajectory, and RmpFlow UI panels."""
         frame_names = ["kinematics_frame", "trajectory_frame", "rmpflow_frame", "trajectory_panel"]
         for n in frame_names:
             frame = self._models[n]
@@ -853,9 +927,13 @@ class Extension(omni.ext.IExt):
             frame.collapsed = True
 
     def _enable_load_button(self):
+        """Enables the config file load button when valid robot description file is selected."""
         self._models["load_config_btn"].enabled = True
 
     def _enable_lula_dropdowns(self):
+        """Enables the Lula kinematics, trajectory, and RmpFlow UI panels when articulation and
+        configuration files are loaded.
+        """
         if self.articulation is None or self._robot_description_file is None or self._robot_urdf_file is None:
             return
 
@@ -870,15 +948,28 @@ class Extension(omni.ext.IExt):
         if self._visualize_end_effector:
             self._test_scenarios.visualize_ee_frame(self.articulation, self._get_selected_ee_frame())
 
-    def _set_enable_trajectory_panel(self, enable):
+    def _set_enable_trajectory_panel(self, enable: bool):
+        """Enables or disables the trajectory panel frame.
+
+        Args:
+            enable: Whether to enable the trajectory panel.
+        """
         frame = self._models["trajectory_panel"]
         frame.enabled = enable
         frame.collapsed = not enable
 
-    def _set_enable_rmpflow_buttons(self, enable):
+    def _set_enable_rmpflow_buttons(self, enable: bool):
+        """Enables or disables the RmpFlow buttons.
+
+        Args:
+            enable: Whether to enable the RmpFlow buttons.
+        """
         self._models["rmpflow_follow_target_btn"].enabled = enable
         self._models["rmpflow_follow_sinusoid_btn"].enabled = enable
 
-    def _get_selected_ee_frame(self):
+    def _get_selected_ee_frame(self) -> str:
+        """Returns:
+        The selected end effector frame name from the dropdown options.
+        """
         name = "ee_frame"
         return self._ee_frame_options[self._models[name].get_item_value_model().as_int]

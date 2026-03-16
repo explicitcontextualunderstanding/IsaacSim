@@ -203,11 +203,6 @@ class RigidContactView(object):
         """
         return self._physics_view is not None
 
-    def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
-        return
-
     def initialize(self, physics_sim_view: omni.physics.tensors.SimulationView = None) -> None:
         """Create a physics simulation view if not passed and set other properties using the PhysX tensor API
 

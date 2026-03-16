@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Abstract base class for creating interactive Isaac Sim examples and samples."""
+
+
 import gc
 from abc import abstractmethod
 
@@ -22,7 +26,28 @@ from isaacsim.core.utils.viewports import set_camera_view
 
 
 class BaseSample(object):
-    def __init__(self) -> None:
+    """Abstract base class for creating interactive Isaac Sim examples and samples.
+
+    This class provides a standardized framework for building interactive demonstrations and examples in Isaac Sim.
+    It manages the simulation world lifecycle, handles common operations like loading, resetting, and clearing scenes,
+    and defines abstract methods that subclasses must implement to create specific sample content.
+
+    The class automatically manages world settings including physics timestep, stage units, and rendering timestep.
+    It provides async methods for world operations and integrates with the Isaac Sim task system for physics callbacks.
+    Subclasses need to implement scene setup, post-load initialization, pre/post reset handling, and cleanup logic.
+
+    Key lifecycle methods that subclasses must implement:
+    - setup_scene(): Configure the world with assets and tasks
+    - setup_post_load(): Initialize variables after first world reset
+    - setup_pre_reset(): Prepare for world reset (remove callbacks, reset controllers)
+    - setup_post_reset(): Handle post-reset operations
+    - setup_post_clear(): Clean up after clearing the world
+
+    The class handles camera positioning, physics callback management, and ensures proper cleanup during extension
+    hot reloading scenarios.
+    """
+
+    def __init__(self):
         self._world = None
         self._current_tasks = None
         self._world_settings = {"physics_dt": 1.0 / 60.0, "stage_units_in_meters": 1.0, "rendering_dt": 1.0 / 60.0}
@@ -30,9 +55,21 @@ class BaseSample(object):
         return
 
     def get_world(self):
+        """The current World instance.
+
+        Returns:
+            The World instance or None if not initialized.
+        """
         return self._world
 
     def set_world_settings(self, physics_dt=None, stage_units_in_meters=None, rendering_dt=None):
+        """Updates the world settings configuration.
+
+        Args:
+            physics_dt: Physics timestep in seconds.
+            stage_units_in_meters: Stage units conversion factor to meters.
+            rendering_dt: Rendering timestep in seconds.
+        """
         if physics_dt is not None:
             self._world_settings["physics_dt"] = physics_dt
         if stage_units_in_meters is not None:
@@ -73,35 +110,35 @@ class BaseSample(object):
 
     @abstractmethod
     def setup_scene(self, scene: Scene) -> None:
-        """used to setup anything in the world, adding tasks happen here for instance.
+        """Used to setup anything in the world, adding tasks happen here for instance.
 
         Args:
-            scene (Scene): The scene to set up with sample assets.
+            scene: The scene to set up with sample assets.
         """
         return
 
     @abstractmethod
     async def setup_post_load(self):
-        """called after first reset of the world when pressing load,
+        """Called after first reset of the world when pressing load,
         intializing provate variables happen here.
         """
         return
 
     @abstractmethod
     async def setup_pre_reset(self):
-        """called in reset button before resetting the world
+        """Called in reset button before resetting the world
         to remove a physics callback for instance or a controller reset
         """
         return
 
     @abstractmethod
     async def setup_post_reset(self):
-        """called in reset button after resetting the world which includes one step with rendering"""
+        """Called in reset button after resetting the world which includes one step with rendering"""
         return
 
     @abstractmethod
     async def setup_post_clear(self):
-        """called after clicking clear button
+        """Called after clicking clear button
         or after creating a new stage and clearing the instance of the world with its callbacks
         """
         return
@@ -111,6 +148,7 @@ class BaseSample(object):
     #     return
 
     def _world_cleanup(self):
+        """Cleans up the world instance by stopping simulation and clearing callbacks."""
         if self._world is not None:
             self._world.stop()
             self._world.clear_all_callbacks()
@@ -119,16 +157,23 @@ class BaseSample(object):
         return
 
     def world_cleanup(self):
-        """Function called when extension shutdowns and starts again, (hot reloading feature)"""
+        """Function called when extension shutdowns and starts again, (hot reloading feature)."""
         return
 
     async def clear_async(self):
-        """Function called when clicking clear buttton"""
-        await create_new_stage_async()
+        """Function called when clicking clear button."""
         if self._world is not None:
+            # Ensure the simulation is fully stopped and the app processes at least one update
+            # before we start tearing down callbacks and/or closing the stage.
+            await self._world.stop_async()
+            await update_stage_async()
             self._world_cleanup()
             self._world.clear_instance()
             self._world = None
             gc.collect()
+        # Create a fresh stage after cleaning up the existing World/callbacks.
+        # Creating a new stage first can invalidate the World/SimulationContext while callbacks
+        # are still live, which risks use-after-free during stage teardown.
+        await create_new_stage_async()
         await self.setup_post_clear()
         return

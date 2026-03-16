@@ -54,7 +54,7 @@ add_ogn_dependencies(ogn)
 links { "physxSchema", "omni.usd" }
 
 -- Specifies the external libraries required by the nodes
-extra_usd_libs = { "usdGeom", "usdShade", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdShade", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

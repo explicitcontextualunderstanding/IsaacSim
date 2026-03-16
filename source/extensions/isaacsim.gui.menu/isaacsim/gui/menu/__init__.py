@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Menu system for Isaac Sim GUI providing File, Edit, Create, Tools, Help, and other application menus."""
+
+
 from .extension import *
+
+__all__ = ["HookMenuHandler"]

@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.4.0] - 2026-02-27
+### Changed
+- Migrate Odometry and joint name resolved nodes to use core experimental prims APIs
+
+## [5.3.0] - 2026-01-27
+### Added
+- IsaacAttachHydraTexture node allows user to add HydraTextures and RenderVars on demand to RenderProduct prims already in the stage
+
+## [5.2.0] - 2025-12-15
+### Changed
+- Migrate extension implementation to core experimental API
+
 ## [5.1.3] - 2025-12-06
 ### Changed
 - Migrate OgnOnPhysicsStep to Events 2.0.

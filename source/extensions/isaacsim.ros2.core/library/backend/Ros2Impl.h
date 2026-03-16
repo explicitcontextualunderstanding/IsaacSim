@@ -38,6 +38,7 @@
 #include "rosidl_typesupport_introspection_c/field_types.h"
 #include "rosidl_typesupport_introspection_c/message_introspection.h"
 #include "rosidl_typesupport_introspection_c/service_introspection.h"
+#include "sensor_msgs/msg/compressed_image.h"
 #include "sensor_msgs/msg/image.h"
 #include "sensor_msgs/msg/imu.h"
 #include "sensor_msgs/msg/joint_state.h"
@@ -238,6 +239,42 @@ public:
                                 const uint32_t width,
                                 const std::string& encoding,
                                 bool usePinnedMemory);
+};
+
+/**
+ * @class Ros2CompressedImageMessageImpl
+ * @brief Implementation of ROS 2 Compressed Image message
+ * @details
+ * Handles the creation and manipulation of sensor_msgs/msg/CompressedImage messages,
+ * which contain compressed image data (e.g., H264, HEVC encoded bitstreams).
+ */
+class Ros2CompressedImageMessageImpl : public Ros2CompressedImageMessage, Ros2MessageInterfaceImpl
+{
+public:
+    Ros2CompressedImageMessageImpl();
+    virtual ~Ros2CompressedImageMessageImpl();
+    virtual const void* getTypeSupportHandle();
+
+    /**
+     * @brief Writes the message header
+     * @param[in] timeStamp Time in seconds
+     * @param[in] frameId Frame ID for the image
+     */
+    virtual void writeHeader(const double timeStamp, const std::string& frameId);
+
+    /**
+     * @brief Writes the compressed image data
+     * @param[in] data Pointer to the compressed image data
+     * @param[in] dataSize Size of the data in bytes
+     * @param[in] format Compression format string (e.g., "h264", "hevc")
+     */
+    virtual void writeData(const uint8_t* data, size_t dataSize, const std::string& format);
+
+protected:
+    /**
+     * @brief Buffer for the compressed data.
+     */
+    std::vector<uint8_t> m_dataBuffer;
 };
 
 /**
@@ -464,6 +501,17 @@ public:
                            std::vector<float>& jointEfforts,
                            std::vector<uint8_t>& dofTypes,
                            const double& stageUnits);
+
+    /**
+     * @brief Sets the joint state data from arrays (no articulation/stage).
+     */
+    virtual void writeData(const double& timeStamp,
+                           const std::vector<std::string>& jointNames,
+                           const std::vector<double>& jointPositions,
+                           const std::vector<double>& jointVelocities,
+                           const std::vector<double>& jointEfforts,
+                           const std::vector<uint8_t>& dofTypes,
+                           double stageMetersPerUnit);
 
     /**
      * @brief Reads the joint state data

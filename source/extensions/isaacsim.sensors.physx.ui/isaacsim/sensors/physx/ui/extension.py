@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""UI extension for PhysX sensors that adds sensor functionality to the Kit interface."""
+
+
 from functools import partial
 
 import carb
@@ -25,7 +28,21 @@ from .menu import RangeSensorMenu
 
 
 class Extension(omni.ext.IExt):
+    """Isaac Sim PhysX sensors UI extension.
+
+    Provides user interface components and menu integration for PhysX-based sensors in Isaac Sim. This extension
+    registers UI elements for managing and configuring range sensors including lidar and generic sensor types through
+    the property panel and context menus.
+    """
+
     def on_startup(self, ext_id: str):
+        """Called when the extension is starting up.
+
+        Initializes the range sensor interfaces, creates the menu, and sets up hooks for property menu registration.
+
+        Args:
+            ext_id: The unique identifier of the extension being started.
+        """
         self._lidar = _range_sensor.acquire_lidar_sensor_interface()
         self._generic = _range_sensor.acquire_generic_sensor_interface()
 
@@ -40,6 +57,10 @@ class Extension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Called when the extension is shutting down.
+
+        Cleans up resources by unregistering the property menu, shutting down the menu, and releasing sensor interfaces.
+        """
         self._hook = None
         if self._registered:
             self._unregister_property_menu()
@@ -50,6 +71,10 @@ class Extension(omni.ext.IExt):
         _range_sensor.release_generic_sensor_interface(self._generic)
 
     def _register_property_menu(self):
+        """Registers the property menu for the extension.
+
+        Marks the menu as registered and sets up context menu items if the context menu is available.
+        """
         self._registered = True
         # +add menu item(s)
 
@@ -59,12 +84,24 @@ class Extension(omni.ext.IExt):
             return None
 
     def _unregister_property_menu(self):
+        """Unregisters the property menu for the extension.
+
+        Marks the menu as unregistered and prevents multiple unregistration attempts.
+        """
         # prevent unregistering multiple times
         if self._registered is False:
             return
         self._registered = False
 
-    def _is_material(self, objects):
+    def _is_material(self, objects) -> bool:
+        """Checks if any of the provided objects contains material prims.
+
+        Args:
+            objects: Dictionary containing prim_list and stage information.
+
+        Returns:
+            True if any prim in the list is a UsdShade.Material, False otherwise.
+        """
         if not "prim_list" in objects:
             return False
         prim_list = objects["prim_list"]

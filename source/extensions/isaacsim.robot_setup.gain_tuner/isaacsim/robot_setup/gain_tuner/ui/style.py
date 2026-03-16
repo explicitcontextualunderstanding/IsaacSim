@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Style configuration module for the robot gain tuner UI extension."""
+
+
 import pathlib
 
 import carb.settings
@@ -46,7 +49,16 @@ HEADER_FONT_SIZE = 16
 FONT_SIZE = 14
 
 
-def get_style():
+def get_style() -> dict[str, dict[str, any]]:
+    """UI style configuration for the robot gain tuner extension.
+
+    Provides comprehensive styling for various UI components including buttons, fields, labels, treeview elements,
+    and other interface widgets with custom colors, fonts, and layout properties.
+
+    Returns:
+        A style dictionary containing component styling configurations with properties like colors, fonts,
+        backgrounds, and layout settings.
+    """
     style = {
         "Button::reset": {"background_color": 0x0, "border_radius": 1},
         "Button::reset:disabled": {"background_color": 0x0, "color": 0x0, "border_radius": 1},

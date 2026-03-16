@@ -29,13 +29,9 @@ class UR10FollowTarget:
     This class provides a complete follow target implementation for UR10 robot
     without inheriting from any base classes. It manages the robot, target cube, and
     provides the necessary interface for the simulation.
-
-    Args:
-        name (str, optional): Task name. Defaults to "ur10_follow_target".
-        target_position (Optional[np.ndarray], optional): Target position [x, y, z]. Defaults to None.
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize the UR follow target task."""
 
         # Initialize robot and target references
@@ -45,7 +41,7 @@ class UR10FollowTarget:
     def setup_scene(
         self,
         target_position: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         """Set up the scene with robot, target cube, and environment.
 
         Args:
@@ -121,7 +117,7 @@ class UR10FollowTarget:
         distance = np.linalg.norm(target_pos - ee_pos)
         return distance < threshold
 
-    def move_to_target(self, ik_method: str = "damped-least-squares") -> None:
+    def move_to_target(self, ik_method: str = "damped-least-squares"):
         """Move the robot end effector towards the target position.
 
         Args:
@@ -134,7 +130,7 @@ class UR10FollowTarget:
                 position=target_pos, orientation=[[0.0, 1.0, 0.0, 0.0]], ik_method=ik_method
             )
 
-    def reset_robot(self) -> None:
+    def reset_robot(self):
         """Reset the robot to its default pose."""
         if self.robot is not None:
             self.robot.reset_to_default_pose()

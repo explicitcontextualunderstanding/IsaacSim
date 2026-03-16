@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension that provides a Hello World example demonstrating basic Isaac Sim scripting concepts through interactive tutorials."""
+
+
 import os
 
 import omni.ext
@@ -22,7 +25,24 @@ from isaacsim.examples.interactive.hello_world import HelloWorld
 
 
 class HelloWorldExtension(omni.ext.IExt):
+    """Extension providing a Hello World example for Isaac Sim.
+
+    This extension demonstrates basic Isaac Sim scripting concepts through an interactive example that teaches
+    users fundamental operations in asynchronous mode. The extension creates a UI template with comprehensive
+    documentation and registers itself with the examples browser for easy access.
+
+    The Hello World example serves as an entry point for users to learn Isaac Sim's core API functionality
+    through practical demonstrations and hands-on interaction.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initialize the Hello World extension.
+
+        Sets up the example UI template and registers it with the examples browser.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self.example_name = "Hello World"
         self.category = "General"
 
@@ -45,4 +65,8 @@ class HelloWorldExtension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Clean up the Hello World extension.
+
+        Deregisters the example from the examples browser.
+        """
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)

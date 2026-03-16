@@ -306,3 +306,42 @@ class TestPrim(omni.kit.test.AsyncTestCase):
                 # - non-link prims
                 self.assertFalse(prim_utils.is_prim_non_root_articulation_link("/franka/panda_hand/geometry"))
                 self.assertFalse(prim_utils.is_prim_non_root_articulation_link("/franka/rootJoint"))
+
+    async def test_get_prim_attribute_value(self):
+        # create a Cube prim (has scalar 'size' attribute)
+        prim = stage_utils.define_prim("/World/Cube", "Cube")
+        # create custom vector attribute to test vector-to-list conversion
+        prim_utils.create_prim_attribute("/World/Cube", name="testVec3f", type_name=Sdf.ValueTypeNames.Float3)
+        prim.GetAttribute("testVec3f").Set((1.0, 2.0, 3.0))
+        # test cases for all backends
+        for backend in ["usd", "usdrt", "fabric"]:
+            with backend_utils.use_backend(backend):
+                # - scalar attribute (size)
+                size = prim_utils.get_prim_attribute_value("/World/Cube", "size")
+                self.assertEqual(size, 2.0)
+                # - vector attribute (float3) - should be returned as list
+                vec_value = prim_utils.get_prim_attribute_value("/World/Cube", "testVec3f")
+                self.assertEqual(list(vec_value), [1.0, 2.0, 3.0])
+                # - using prim instance instead of path
+                size = prim_utils.get_prim_attribute_value(prim_utils.get_prim_at_path("/World/Cube"), "size")
+                self.assertEqual(size, 2.0)
+        # - exception: non-existent attribute
+        with self.assertRaises(ValueError):
+            prim_utils.get_prim_attribute_value("/World/Cube", "nonexistent_attr")
+
+    async def test_get_prim_attribute_names(self):
+        for backend in ["usd", "usdrt", "fabric"]:
+            with backend_utils.use_backend(backend):
+                prim_type = "Xform" if backend == "usdrt" else "Cube"
+                prim_path = f"/World/AttrPrim_{backend}"
+                prim = stage_utils.define_prim(prim_path, prim_type)
+                attr_name = f"customAttr_{backend}"
+                prim_utils.create_prim_attribute(prim_path, name=attr_name, type_name=usdrt.Sdf.ValueTypeNames.Float)
+                prim.GetAttribute(attr_name).Set(1.25)
+
+                attribute_names = prim_utils.get_prim_attribute_names(prim_path)
+
+                if backend not in ["usdrt", "fabric"]:
+                    self.assertIn("size", attribute_names)
+                    self.assertIn("extent", attribute_names)
+                self.assertIn(attr_name, attribute_names)

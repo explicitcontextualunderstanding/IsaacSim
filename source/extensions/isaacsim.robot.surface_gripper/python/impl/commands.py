@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Commands for creating and managing surface gripper components in Isaac Sim."""
+
+
 import omni.kit.commands
 from usd.schema.isaac import robot_schema
 
@@ -28,6 +31,9 @@ class CreateSurfaceGripper(omni.kit.commands.Command):
                 "CreateSurfaceGripper",
                 prim_path="/SurfaceGripper",
             )
+
+    Args:
+        prim_path: Path where the surface gripper will be created.
     """
 
     def __init__(self, prim_path: str = ""):
@@ -55,10 +61,20 @@ class CreateSurfaceGripper(omni.kit.commands.Command):
         pass
 
     def do(self):
+        """Creates the Surface Gripper prim at the specified path.
+
+        Returns:
+            The created Surface Gripper prim.
+        """
         self._prim = robot_schema.CreateSurfaceGripper(self._stage, self._prim_path)
         return self._prim
 
     def undo(self):
+        """Removes the created Surface Gripper prim from the stage.
+
+        Returns:
+            True if the prim was successfully removed, False otherwise.
+        """
         if self._prim:
             return self._stage.RemovePrim(self._prim_path)
         pass

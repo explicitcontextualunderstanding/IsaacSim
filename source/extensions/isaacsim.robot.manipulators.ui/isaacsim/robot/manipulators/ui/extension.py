@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Provides user interface components for robotic manipulator control through OmniGraph controllers."""
+
+
 import omni.ext
 from omni.kit.menu.utils import MenuHelperExtensionFull
 
@@ -21,7 +24,31 @@ from .menu_graphs import ArticulationPositionWindow, ArticulationVelocityWindow,
 
 
 class Extension(omni.ext.IExt, MenuHelperExtensionFull):
+    """Extension class for the isaacsim.robot.manipulators.ui extension.
+
+    This extension provides user interface components for robotic manipulator control through OmniGraph controllers.
+    It creates menu entries and windows for three different types of robot controllers: articulation position control,
+    articulation velocity control, and gripper control.
+
+    The extension adds the following UI components to the Tools/Robotics/OmniGraph Controllers menu:
+
+    - Articulation Position Controller: Provides joint position control interface
+    - Articulation Velocity Controller: Provides joint velocity control interface
+    - Gripper Controller: Provides open loop gripper control interface
+
+    Each controller window offers a graphical interface for configuring and managing the corresponding OmniGraph
+    controller nodes for robotic manipulators in Isaac Sim.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the extension by creating menu entries for OmniGraph robot controllers.
+
+        Sets up menu items for Articulation Position Controller, Articulation Velocity Controller,
+        and Gripper Controller under the Tools/Robotics/OmniGraph Controllers menu path.
+
+        Args:
+            ext_id: The extension identifier.
+        """
 
         # Create menu using MenuHelperExtensionFull
         self.menu_startup(
@@ -41,4 +68,5 @@ class Extension(omni.ext.IExt, MenuHelperExtensionFull):
         )
 
     def on_shutdown(self):
+        """Cleans up the extension by removing all menu entries."""
         self.menu_shutdown()

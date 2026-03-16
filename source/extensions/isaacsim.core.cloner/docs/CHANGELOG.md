@@ -1,4 +1,8 @@
 # Changelog
+## [1.6.4] - 2026-02-28
+### Changed
+- Updated tests to use new omni.physics.core API (`IPhysicsSimulation.initialize`/`close` replaces removed `attach_stage`/`detach_stage`)
+
 ## [1.6.3] - 2025-12-07
 ### Changed
 - Fix clang tidy issues in cpp code

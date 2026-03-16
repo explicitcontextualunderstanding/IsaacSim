@@ -59,6 +59,7 @@ void fillPointCloudBuffer(uint8_t* __restrict__ buffer, const float3* __restrict
         fillBufferKernel<<<nb, nt, 0, stream>>>(buffer, reinterpret_cast<const uint8_t*>(data), size, offset, numPoints, pointWidth);
     }
 }
+
 }
 }
 }

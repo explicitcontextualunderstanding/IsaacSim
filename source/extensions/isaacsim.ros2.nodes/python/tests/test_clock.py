@@ -30,21 +30,11 @@ from isaacsim.core.utils.physics import simulate_async
 from .common import ROS2TestCase, get_qos_profile
 
 
-# Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2NodeCommands(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
-        await omni.usd.get_context().new_stage_async()
         self._stage = omni.usd.get_context().get_stage()
 
-        await omni.kit.app.get_app().next_update_async()
-        self._stage = omni.usd.get_context().get_stage()
-
-        await omni.kit.app.get_app().next_update_async()
-        pass
-
-    # After running each test
     async def tearDown(self):
 
         self._stage = None
@@ -79,7 +69,7 @@ class TestRos2NodeCommands(ROS2TestCase):
         clock_sub = self.create_subscription(node, Clock, "clock", clock_callback, get_qos_profile())
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         self._timeline.play()
 
@@ -119,7 +109,7 @@ class TestRos2NodeCommands(ROS2TestCase):
         clock_sub = self.create_subscription(node, Clock, "clock", clock_callback, get_qos_profile())
 
         def spin():
-            rclpy.spin_once(node, timeout_sec=0.1)
+            rclpy.spin_once(node, timeout_sec=0.01)
 
         await simulate_async(0.1, callback=spin)
         self._timeline.play()

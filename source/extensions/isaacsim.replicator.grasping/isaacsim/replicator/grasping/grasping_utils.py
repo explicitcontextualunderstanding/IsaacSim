@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Utilities for physics simulation, grasping operations, and USD manipulation in Isaac Sim replicator grasping workflows."""
+
+
 import os
 
 import carb
@@ -27,7 +30,15 @@ from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysi
 
 
 def create_or_get_physics_scene(stage: Usd.Stage, path: str) -> UsdPhysics.Scene | None:
-    """Get the PhysicsScene prim at the given path, creating it if it doesn't exist."""
+    """Get the PhysicsScene prim at the given path, creating it if it doesn't exist.
+
+    Args:
+        stage: The USD stage to operate on.
+        path: The stage path where the physics scene should be located.
+
+    Returns:
+        The UsdPhysics.Scene at the specified path, or None if creation/retrieval fails.
+    """
     scene_prim = stage.GetPrimAtPath(path)
     if scene_prim:
         if scene_prim.IsA(UsdPhysics.Scene):
@@ -46,7 +57,15 @@ def create_or_get_physics_scene(stage: Usd.Stage, path: str) -> UsdPhysics.Scene
 
 
 def get_physics_scene(stage: Usd.Stage, path: str) -> UsdPhysics.Scene | None:
-    """Get the PhysicsScene prim at the given path if it exists and is of the correct type."""
+    """Get the PhysicsScene prim at the given path if it exists and is of the correct type.
+
+    Args:
+        stage: The USD stage.
+        path: The absolute path for the physics scene prim.
+
+    Returns:
+        The UsdPhysics.Scene at the path, or None if not found or invalid.
+    """
     if not Sdf.Path.IsValidPathString(path):
         carb.log_warn(f"Invalid physics scene path string provided: '{path}'.")
         return None
@@ -61,12 +80,11 @@ def get_physics_scene(stage: Usd.Stage, path: str) -> UsdPhysics.Scene | None:
 
 
 def remove_physics_scene(stage: Usd.Stage, physics_scene_path: str) -> bool:
-    """
-    Removes a UsdPhysics.Scene prim at the specified path.
+    """Removes a UsdPhysics.Scene prim at the specified path.
 
     Args:
         stage: The USD stage.
-        path: The absolute path for the physics scene prim.
+        physics_scene_path: The absolute path for the physics scene prim.
 
     Returns:
         True if successful, False otherwise.
@@ -86,7 +104,7 @@ def set_rigid_body_simulation_owner(
     """Sets the simulationOwner for a prim and all its descendants to the given physics scene.
 
     Args:
-        prim: The prim or list of prims to set the simulation owner for.
+        prims: The prim or list of prims to set the simulation owner for.
         physics_scene_prim: The physics scene to set the simulation owner for.
         include_descendants: Whether to include the descendants of the prim in the simulation owner set.
 
@@ -131,8 +149,12 @@ def remove_rigid_body_simulation_owner(
     """Removes the simulationOwner for a prim and all its descendants from the given physics scene.
 
     Args:
-        prim: The prim or list of prims to remove the simulation owner for.
+        prims: The prim or list of prims to remove the simulation owner for.
         physics_scene_prim: The physics scene to remove the simulation owner for.
+        include_descendants: Whether to include the descendants of the prim in the simulation owner removal.
+
+    Returns:
+        A list of rigid body prims that were successfully removed as owners.
     """
     physics_scene_path = physics_scene_prim.GetPath()
     removed_prims = []
@@ -180,15 +202,15 @@ def set_joint_drive_parameters(
     for a joint, handling both revolute and prismatic joints appropriately.
 
     Args:
-        joint_prim: The USD joint prim to set drive parameters for
-        target_value: The target value to set
-        target_type: The type of target to set ("position" or "velocity")
-        stiffness: Optional stiffness value for the drive
-        damping: Optional damping value for the drive
-        max_force: Optional maximum force value for the drive
+        joint_prim: The USD joint prim to set drive parameters for.
+        target_value: The target value to set.
+        target_type: The type of target to set ("position" or "velocity").
+        stiffness: Optional stiffness value for the drive.
+        damping: Optional damping value for the drive.
+        max_force: Optional maximum force value for the drive.
 
     Returns:
-        True if successful, False otherwise
+        True if successful, False otherwise.
     """
     if not joint_prim.IsValid():
         return False
@@ -256,9 +278,12 @@ def set_joint_state(joint_prim: Usd.Prim, position_value: float = 0.0, velocity_
     """Set the joint state parameters for a joint. Applies PhysxSchema.JointStateAPI if missing.
 
     Args:
-        joint_prim: The USD joint prim to set joint state parameters for
-        position_value: The position value to set
-        velocity_value: The velocity value to set
+        joint_prim: The USD joint prim to set joint state parameters for.
+        position_value: The position value to set.
+        velocity_value: The velocity value to set.
+
+    Returns:
+        True if successful, False otherwise.
     """
     if not joint_prim.IsValid():
         return False
@@ -350,7 +375,7 @@ def get_joint_state(joint_prim: Usd.Prim) -> tuple[float, float]:
 
 async def simulate_physics_async(
     num_frames: int, step_dt: float, physics_scene: UsdPhysics.Scene | None = None, render: bool = False
-) -> None:
+):
     """Simulate physics for a fixed number of frames asynchronously.
 
     Args:
@@ -402,7 +427,7 @@ async def simulate_physics_with_forces_async(
     physx_dt: float,
     physics_scene: UsdPhysics.Scene | None = None,
     render: bool = True,
-) -> None:
+):
     """Apply forces to assets at specified positions and simulate physics asynchronously.
 
     Can simulate either the default physics context or a specific physics scene.
@@ -506,7 +531,14 @@ def stop_timeline():
 
 
 def find_first_mesh_in_hierarchy(prim: Usd.Prim) -> UsdGeom.Mesh | None:
-    """Find the first UsdGeom.Mesh schema under the given prim (including itself and descendants)."""
+    """Find the first UsdGeom.Mesh schema under the given prim (including itself and descendants).
+
+    Args:
+        prim: The root prim to search from.
+
+    Returns:
+        The first UsdGeom.Mesh found, or None if no mesh is found.
+    """
     if prim.IsA(UsdGeom.Mesh):
         return UsdGeom.Mesh(prim)
     for descendant in Usd.PrimRange(prim, Usd.TraverseInstanceProxies(Usd.PrimAllPrimsPredicate)):
@@ -568,7 +600,15 @@ def duplicate_prim(stage: Usd.Stage, source_prim_path: str, destination_prim_pat
 
 
 def get_gripper_joints_info(gripper_prim_path: str) -> list[dict]:
-    """Get all the joints from the gripper prim at the given path with their relevant information."""
+    """Get all the joints from the gripper prim at the given path with their relevant information.
+
+    Args:
+        gripper_prim_path: The stage path to the gripper prim.
+
+    Returns:
+        List of dictionaries containing joint information including path, mimic status, drive status,
+        and validity for grasping operations.
+    """
     stage = omni.usd.get_context().get_stage()
     if not stage:
         carb.log_warn("Cannot get gripper joints info: Stage is not set.")
@@ -602,8 +642,13 @@ def get_gripper_joints_info(gripper_prim_path: str) -> list[dict]:
     return joint_info_list
 
 
-def apply_joint_pregrasp_state(joint_path: str, position_value: float) -> None:
-    """Applies the pregrasp state to the given joint prim."""
+def apply_joint_pregrasp_state(joint_path: str, position_value: float):
+    """Applies the pregrasp state to the given joint prim.
+
+    Args:
+        joint_path: The stage path to the joint prim.
+        position_value: The position value to set for the joint.
+    """
     stage = omni.usd.get_context().get_stage()
     if not stage:
         carb.log_warn("Cannot apply joint pregrasp state: Stage is not set.")
@@ -625,8 +670,12 @@ def apply_joint_pregrasp_state(joint_path: str, position_value: float) -> None:
         carb.log_warn(f"Failed to apply pregrasp state to joint {joint_path}.")
 
 
-def apply_joint_pregrasp_states(joint_pregrasp_states: dict[str, float]) -> None:
-    """Applies the pregrasp states to the given joint prims."""
+def apply_joint_pregrasp_states(joint_pregrasp_states: dict[str, float]):
+    """Applies the pregrasp states to the given joint prims.
+
+    Args:
+        joint_pregrasp_states: Dictionary mapping joint paths to their position values.
+    """
     for joint_path, position_value in joint_pregrasp_states.items():
         apply_joint_pregrasp_state(joint_path, position_value)
 
@@ -663,8 +712,13 @@ def isolate_prims_to_scene(prims_to_isolate: list[Usd.Prim], physics_scene: UsdP
     return isolated_rigid_body_prims
 
 
-def clear_isolated_simulation_owners(rigid_body_prims: list[Usd.Prim], physics_scene: UsdPhysics.Scene | None) -> None:
-    """Clears the simulation owners for the given rigid body prims from the specified physics scene."""
+def clear_isolated_simulation_owners(rigid_body_prims: list[Usd.Prim], physics_scene: UsdPhysics.Scene | None):
+    """Clears the simulation owners for the given rigid body prims from the specified physics scene.
+
+    Args:
+        rigid_body_prims: List of rigid body prims to remove from the physics scene.
+        physics_scene: The physics scene to remove the simulation owners from.
+    """
     if not physics_scene:
         carb.log_warn("Cannot clear isolated simulation owners: Physics scene is not set.")
         return

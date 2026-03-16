@@ -166,7 +166,14 @@ public:
     /** @brief Remove all components. */
     virtual void deleteAllComponents() override;
 
+    /**
+     * @brief Executes queued PhysX actions for all managed grippers.
+     */
     void executePhysxActions();
+
+    /**
+     * @brief Executes queued USD actions for all managed grippers.
+     */
     void executeUsdActions();
 
 private:

@@ -15,9 +15,9 @@
 
 
 import carb
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.test
 from isaacsim.core.simulation_manager import SimulationManager
-from isaacsim.core.utils.stage import open_stage_async
 from isaacsim.storage.native import get_assets_root_path_async
 
 
@@ -30,9 +30,7 @@ class TestCoreNodes(omni.kit.test.AsyncTestCase):
         if assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
-        (result, error) = await open_stage_async(
-            assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
-        )
+        await stage_utils.open_stage_async(assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
 
     # ----------------------------------------------------------------------
     async def tearDown(self):

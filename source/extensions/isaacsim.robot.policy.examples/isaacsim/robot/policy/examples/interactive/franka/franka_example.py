@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example demonstration of a Franka robot performing an open drawer task using a policy-based approach."""
+
+
 import numpy as np
 from isaacsim.core.experimental.prims import Articulation
 from isaacsim.core.experimental.utils.stage import add_reference_to_stage
@@ -23,7 +26,22 @@ from isaacsim.storage.native import get_assets_root_path
 
 
 class FrankaExample(BaseSample):
-    def __init__(self) -> None:
+    """Example demonstration of a Franka robot performing an open drawer task using a policy-based approach.
+
+    This class creates a complete simulation scene with a Franka Emika Panda robot and a cabinet, where the robot
+    autonomously attempts to open a cabinet drawer using a learned policy. The scene includes a ground plane,
+    a Sektion cabinet positioned in front of the robot, and the Franka robot equipped with an open drawer policy.
+
+    The simulation runs with physics at 200 Hz and rendering at 60 Hz. The robot is initialized on the first
+    physics step after play begins, and then continuously executes its policy to interact with the cabinet drawer.
+    The simulation automatically resets every 10 seconds to demonstrate the task repeatedly.
+
+    The class manages the complete lifecycle of the simulation, including scene setup, robot initialization,
+    physics stepping, and cleanup. It uses the SimulationManager to register physics callbacks for real-time
+    control and provides automatic reset functionality for continuous demonstration.
+    """
+
+    def __init__(self):
         super().__init__()
         self._world_settings["stage_units_in_meters"] = 1.0
         self._world_settings["physics_dt"] = 1.0 / 200.0
@@ -35,7 +53,7 @@ class FrankaExample(BaseSample):
         self._physics_callback_id = None
         self._time_elapsed = 0.0
 
-    def setup_scene(self) -> None:
+    def setup_scene(self):
         """Set up the scene with robot, cabinet, and environment."""
         # Add ground plane
         add_reference_to_stage(
@@ -60,7 +78,7 @@ class FrankaExample(BaseSample):
         self.franka = FrankaOpenDrawerPolicy(prim_path="/World/franka", cabinet=self.cabinet)
         print("Scene setup complete with Franka robot and cabinet")
 
-    async def setup_post_load(self) -> None:
+    async def setup_post_load(self):
         """Setup physics callback after initial load."""
         self._physics_ready = False
 
@@ -73,13 +91,13 @@ class FrankaExample(BaseSample):
             )
         print("Franka open drawer scene loaded successfully")
 
-    async def setup_pre_reset(self) -> None:
+    async def setup_pre_reset(self):
         """Called before world reset."""
         # Reset physics ready flag before reset
         self._physics_ready = False
         self._time_elapsed = 0.0
 
-    async def setup_post_reset(self) -> None:
+    async def setup_post_reset(self):
         """Called after world reset."""
         # Reset physics ready flag after reset so robot reinitializes on next play
         self._physics_ready = False
@@ -89,7 +107,7 @@ class FrankaExample(BaseSample):
             # Reset previous action for clean state
             self.franka.previous_action = np.zeros(9)
 
-    async def setup_post_clear(self) -> None:
+    async def setup_post_clear(self):
         """Called after clearing the scene."""
         # Deregister physics callback
         if self._physics_callback_id is not None:
@@ -104,8 +122,13 @@ class FrankaExample(BaseSample):
         self._physics_ready = False
         self._time_elapsed = 0.0
 
-    def on_physics_step(self, dt, context) -> None:
-        """Physics step callback - initialize on first step, then run policy."""
+    def on_physics_step(self, dt, context):
+        """Physics step callback - initialize on first step, then run policy.
+
+        Args:
+            dt: Time delta for the physics step.
+            context: Physics step context information.
+        """
         if not self.franka:
             return
 

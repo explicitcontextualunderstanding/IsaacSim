@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive path planning controller module for robotic motion generation using RRT algorithms and trajectory optimization."""
+
+
 import os
 from typing import Optional
 
@@ -32,6 +35,25 @@ from isaacsim.robot_motion.motion_generation.path_planning_interface import Path
 
 
 class PathPlannerController(BaseController):
+    """A controller that uses path planning algorithms to generate motion plans for robotic articulations.
+
+    This controller integrates RRT-based path planning with trajectory generation to enable robots to navigate
+    from their current configuration to target end-effector poses while avoiding obstacles. It converts RRT
+    waypoints into smooth trajectories using spline-based interpolation and executes them as articulation
+    actions.
+
+    The controller maintains state between planning cycles, using the final position of the previous plan as
+    the starting point for new plans. It supports dynamic obstacle addition and removal during operation.
+
+    Args:
+        name: Name identifier for the controller instance.
+        path_planner_visualizer: Visualizer that provides access to the robot articulation and path planner.
+        cspace_trajectory_generator: Generator that converts RRT waypoints into smooth cspace trajectories.
+        physics_dt: Physics simulation timestep for trajectory timing.
+        rrt_interpolation_max_dist: Maximum distance between interpolated waypoints when converting RRT plans
+            to trajectories.
+    """
+
     def __init__(
         self,
         name: str,
@@ -55,6 +77,14 @@ class PathPlannerController(BaseController):
         self._rrt_interpolation_max_dist = rrt_interpolation_max_dist
 
     def _convert_rrt_plan_to_trajectory(self, rrt_plan):
+        """Converts RRT path waypoints to a smooth articulation trajectory using spline interpolation.
+
+        Args:
+            rrt_plan: The RRT path plan containing waypoints to convert.
+
+        Returns:
+            Action sequence for executing the planned trajectory.
+        """
         # This example uses the LulaCSpaceTrajectoryGenerator to convert RRT waypoints to a cspace trajectory.
         # In general this is not theoretically guaranteed to work since the trajectory generator uses spline-based
         # interpolation and RRT only guarantees that the cspace position of the robot can be linearly interpolated between
@@ -70,6 +100,12 @@ class PathPlannerController(BaseController):
     def _make_new_plan(
         self, target_end_effector_position: np.ndarray, target_end_effector_orientation: Optional[np.ndarray] = None
     ) -> None:
+        """Generates a new RRT path plan to reach the target end effector pose.
+
+        Args:
+            target_end_effector_position: Target position for the end effector.
+            target_end_effector_orientation: Target orientation for the end effector.
+        """
         self._path_planner.set_end_effector_target(target_end_effector_position, target_end_effector_orientation)
         self._path_planner.update_world()
 
@@ -96,6 +132,15 @@ class PathPlannerController(BaseController):
     def forward(
         self, target_end_effector_position: np.ndarray, target_end_effector_orientation: Optional[np.ndarray] = None
     ) -> ArticulationAction:
+        """Computes the next action in the motion plan toward the target end effector pose.
+
+        Args:
+            target_end_effector_position: Target position for the end effector.
+            target_end_effector_orientation: Target orientation for the end effector.
+
+        Returns:
+            The next articulation action in the planned sequence.
+        """
         if self._action_sequence is None:
             # This will only happen the first time the forward function is used
             self._make_new_plan(target_end_effector_position, target_end_effector_orientation)
@@ -113,22 +158,55 @@ class PathPlannerController(BaseController):
         return self._action_sequence.pop(0)
 
     def add_obstacle(self, obstacle: isaacsim.core.api.objects, static: bool = False) -> None:
+        """Adds an obstacle to the path planning environment.
+
+        Args:
+            obstacle: The obstacle object to add to path planning.
+            static: Whether the obstacle is static or dynamic.
+        """
         self._path_planner.add_obstacle(obstacle, static)
 
     def remove_obstacle(self, obstacle: isaacsim.core.api.objects) -> None:
+        """Removes an obstacle from the path planning environment.
+
+        Args:
+            obstacle: The obstacle object to remove from path planning.
+        """
         self._path_planner.remove_obstacle(obstacle)
 
-    def reset(self) -> None:
+    def reset(self):
+        """Resets the controller state by clearing the current plan and last solution."""
         # PathPlannerController will make one plan per reset
         self._path_planner.reset()
         self._action_sequence = None
         self._last_solution = None
 
     def get_path_planner(self) -> PathPlanner:
+        """The underlying path planner instance used for motion planning.
+
+        Returns:
+            The path planner instance.
+        """
         return self._path_planner
 
 
 class FrankaRrtController(PathPlannerController):
+    """A specialized path planning controller for Franka robots using RRT (Rapidly-exploring Random Tree) algorithm.
+
+    This controller extends PathPlannerController to provide motion planning capabilities specifically
+    tailored for Franka robotic arms. It automatically configures RRT path planning with conservative
+    collision spheres and trajectory generation optimized for Franka robots.
+
+    The controller uses inflated collision spheres for safe path planning and includes jerk and
+    acceleration limits to ensure generated trajectories can be followed accurately by the simulated robot.
+    It loads Franka-specific configuration files and sets up the necessary components for robust motion
+    planning in cluttered environments.
+
+    Args:
+        name: Unique identifier for the controller instance.
+        robot_articulation: The Franka robot articulation to be controlled.
+    """
+
     def __init__(
         self,
         name,

@@ -66,7 +66,7 @@ links {
     "physxSchema",
 }
 
-extra_usd_libs = { "usdGeom", "usdPhysics", "usdUtils" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "usdUtils", "ts" }
 add_usd(extra_usd_libs)
 
 -- Platform specific configurations

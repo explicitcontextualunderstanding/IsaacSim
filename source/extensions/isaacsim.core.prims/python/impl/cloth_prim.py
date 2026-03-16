@@ -59,6 +59,7 @@ class ClothPrim(XFormPrim):
         This object wraps all matching Cloth Prims found at the regex provided at the prim_paths_expr.
 
         Note: - if the prim does not already have a rigid body api applied to it before init, it will apply it.
+
         Args:
             prim_paths_expr(str): Prim paths regex to encapsulate all prims that match it.
             name(str): Shortname to be used as a key by Scene class.
@@ -156,6 +157,13 @@ class ClothPrim(XFormPrim):
             on_event=self._invalidate_physics_handle_callback,
             observer_name="isaacsim.core.prims.ClothPrim.initialize._invalidate_physics_handle_callback",
         )
+
+    def __del__(self):
+        XFormPrim.__del__(self)
+        if hasattr(self, "_physics_view"):
+            del self._physics_view
+        self._invalidate_physics_handle_event = None
+        return
 
     """
     Properties.

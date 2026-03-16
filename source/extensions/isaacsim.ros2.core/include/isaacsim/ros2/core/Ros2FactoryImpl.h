@@ -119,6 +119,8 @@ public:
     virtual std::shared_ptr<Ros2ImuMessage> createImuMessage(); /**< Creates an IMU message */
     virtual std::shared_ptr<Ros2CameraInfoMessage> createCameraInfoMessage(); /**< Creates a Camera Info message */
     virtual std::shared_ptr<Ros2ImageMessage> createImageMessage(); /**< Creates an Image message */
+    virtual std::shared_ptr<Ros2CompressedImageMessage> createCompressedImageMessage(); /**< Creates a Compressed Image
+                                                                                            message */
     virtual std::shared_ptr<Ros2NitrosBridgeImageMessage> createNitrosBridgeImageMessage(); /**< Creates a Nitros Bridge
                                                                                                Image message */
     virtual std::shared_ptr<Ros2BoundingBox2DMessage> createBoundingBox2DMessage(); /**< Creates a 2D Bounding Box

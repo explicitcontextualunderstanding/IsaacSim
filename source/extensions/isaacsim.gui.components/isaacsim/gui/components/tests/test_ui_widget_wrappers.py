@@ -499,7 +499,7 @@ class TestUI(omni.kit.test.AsyncTestCase):
         for i in range(6):
             await update_stage_async()
 
-        self.assertTrue(self.physics_step_count == 9, "An unexpected number of physics step counts occured")
+        self.assertEqual(self.physics_step_count, 9, "An unexpected number of physics step counts occured")
         self.assertTrue(self.btn_clicks == [2, 1])
 
         self.assertTrue(state_button.get_current_text() == "B")

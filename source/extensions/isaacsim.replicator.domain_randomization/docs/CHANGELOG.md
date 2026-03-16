@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2026-03-04
+### Changed
+- Added python_api.md and updated docstrings
+
 ## [1.1.0] - 2025-10-27
 ### Changed
 - Replace import statements with the deprecation function when importing PyTorch

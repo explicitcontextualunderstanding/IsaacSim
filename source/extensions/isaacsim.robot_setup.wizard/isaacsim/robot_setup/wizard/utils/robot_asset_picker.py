@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides UI components for selecting robot assets from USD stages with type filtering and selection constraints."""
+
+
 import weakref
 from functools import partial
 from typing import Optional
@@ -25,6 +29,19 @@ from ..style import get_asset_picker_style
 
 
 def filter_prims(stage, prim_list, type_list):
+    """Filter prims from a list based on their USD schema types.
+
+    Checks each prim in the list against the provided type list and returns only those that match at least one type.
+    If the type list is empty, returns the original prim list unchanged.
+
+    Args:
+        stage: The USD stage containing the prims.
+        prim_list: List of prim items to filter.
+        type_list: List of USD schema types to filter by.
+
+    Returns:
+        Filtered list of prims that match the specified types, or the original list if no filtering is needed.
+    """
     if len(type_list) != 0:
         filtered_selection = []
         for item in prim_list:
@@ -40,6 +57,19 @@ def filter_prims(stage, prim_list, type_list):
 
 
 class SelectionWatch:
+    """Monitors and manages prim selection changes in a USD stage with filtering and limit constraints.
+
+    This class provides functionality to watch for selection changes in a stage tree view, apply type-based
+    filtering to selected prims, enforce selection limits, and trigger callbacks when valid selections occur.
+    It integrates with Omniverse Kit's stage widget system to provide controlled selection behavior.
+
+    Args:
+        stage: The USD stage to monitor for prim selections.
+        on_selection_changed_fn: Callback function invoked when the selection changes with valid prim paths.
+        filter_type_list: List of USD prim types to filter selections by.
+        targets_limit: Maximum number of prims that can be selected simultaneously.
+    """
+
     def __init__(self, stage, on_selection_changed_fn, filter_type_list=[], targets_limit=0):
         self._stage = stage
         self._last_selected_prim_paths = None
@@ -49,15 +79,26 @@ class SelectionWatch:
         self._tree_view = None
 
     def reset(self, stage):
+        """Reset the selection watch with a new stage.
+
+        Args:
+            stage: The USD stage to watch for selections.
+        """
         self.clear_selection()
         self._stage = weakref.ref(stage)
 
     def set_tree_view(self, tree_view):
+        """Set the tree view widget for selection monitoring.
+
+        Args:
+            tree_view: The tree view widget to monitor for selection changes.
+        """
         self._tree_view = tree_view
         self._tree_view.set_selection_changed_fn(self._on_widget_selection_changed)
         self._last_selected_prim_paths = None
 
     def clear_selection(self):
+        """Clear the current selection in the tree view."""
         if not self._tree_view:
             return
 
@@ -67,6 +108,11 @@ class SelectionWatch:
             self._on_selection_changed_fn([])
 
     def _on_widget_selection_changed(self, selection):
+        """Handle selection changes from the tree view widget.
+
+        Args:
+            selection: The new selection from the tree view.
+        """
         stage = self._stage()
         if not stage:
             return
@@ -95,18 +141,42 @@ class SelectionWatch:
             self._on_selection_changed_fn(self._last_selected_prim_paths)
 
     def enable_filtering_checking(self, enable: bool):
-        """
-        It is used to prevent selecting the prims that are filtered out but
-        still displayed when such prims have filtered children. When `enable`
-        is True, SelectionWatch should consider filtering when changing Kit's
-        selection.
+        """It is used to prevent selecting the prims that are filtered out but
+            still displayed when such prims have filtered children. When `enable`
+            is True, SelectionWatch should consider filtering when changing Kit's
+            selection.
+
+        Args:
+            enable: Whether to enable filtering checking during selection changes.
         """
 
     def set_filtering(self, filter_string: Optional[str]):
+        """Set the filter string for prim selection.
+
+        Args:
+            filter_string: The filter string to apply, or None to clear filtering.
+        """
         pass
 
 
 class RobotAssetPicker:
+    """A UI widget for selecting robot assets from a USD stage.
+
+    Provides an interactive window with a stage browser that allows users to select robot prims based on type
+    filtering and target limits. The picker displays the current selection and provides a select button to confirm
+    the choice.
+
+    Args:
+        title: Window title for the asset picker dialog.
+        stage: The USD stage to browse for robot assets.
+        filter_type_list: List of USD prim types to filter by. Only prims matching these types will be selectable.
+        on_targets_selected: Callback function invoked when assets are selected. Receives a list of selected prim
+            paths.
+        modal_window: Whether to display the picker as a modal dialog.
+        targets_limit: Maximum number of assets that can be selected simultaneously.
+        target_name: Display name for the selected assets shown in the UI labels.
+    """
+
     def __init__(
         self,
         title,
@@ -142,6 +212,10 @@ class RobotAssetPicker:
         self._window.frame.set_build_fn(self._build_frame)
 
     def _build_frame(self):
+        """Builds the UI frame for the robot asset picker.
+
+        Sets up the stage widget for asset selection and creates the control buttons and labels.
+        """
         with ui.VStack():
             with ui.Frame():
                 self._stage_widget = StageWidget(None, columns_enabled=["Type"])
@@ -160,7 +234,14 @@ class RobotAssetPicker:
                 ui.Spacer(height=4)
             self.on_window_visibility_changed(True)
 
-    def on_window_visibility_changed(self, visible):
+    def on_window_visibility_changed(self, visible: bool):
+        """Handles window visibility changes for the robot asset picker.
+
+        Manages stage attachment and filtering based on window visibility state.
+
+        Args:
+            visible: Whether the window is visible.
+        """
         # the _stage_widget not build yet, will call again in build frame
         if not self._stage_widget:
             return
@@ -178,6 +259,7 @@ class RobotAssetPicker:
                 self._stage_widget._filter_button.enable_filters(self._filter_type_list)
 
     def destroy(self):
+        """Destroys the robot asset picker window and cleans up resources."""
         if self._window:
             self._window.destroy()
         self._window = None
@@ -185,6 +267,13 @@ class RobotAssetPicker:
 
     @staticmethod
     def _on_select(weak_self: callable):
+        """Handles the select button click event.
+
+        Triggers the selection callback with currently selected paths and hides the window.
+
+        Args:
+            weak_self: Weak reference to the RobotAssetPicker instance.
+        """
         # pylint: disable=protected-access
         weak_self = weak_self()
         if not weak_self:
@@ -195,9 +284,18 @@ class RobotAssetPicker:
         weak_self._window.visible = False
 
     def set_on_selected(self, on_select):
+        """Sets the callback function to be invoked when targets are selected.
+
+        Args:
+            on_select: Callback function to execute when selection is confirmed.
+        """
         self._on_targets_selected = on_select
 
     def clean(self):
+        """Cleans up all resources and references used by the robot asset picker.
+
+        Clears callbacks, destroys widgets, and resets internal state.
+        """
         self._window.set_visibility_changed_fn(None)
         self._window = None
         self._selection_watch = None
@@ -208,14 +306,26 @@ class RobotAssetPicker:
         self._on_targets_selected = None
 
     @property
-    def visible(self):
+    def visible(self) -> bool:
+        """Window visibility state of the robot asset picker.
+
+        Returns:
+            True if the picker window is visible.
+        """
         return self._window.visible
 
     @visible.setter
     def visible(self, visible):
         self._window.visible = visible
 
-    def _on_selection_changed(self, paths):
+    def _on_selection_changed(self, paths: list[str]):
+        """Handles selection changes in the stage widget.
+
+        Updates the UI elements and internal state based on the selected asset paths.
+
+        Args:
+            paths: List of selected asset paths.
+        """
         self._selected_paths = paths
         if self._button:
             self._button.enabled = len(self._selected_paths) > 0

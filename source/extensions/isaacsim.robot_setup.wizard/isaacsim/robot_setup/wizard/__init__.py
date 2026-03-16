@@ -12,4 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides a wizard interface for setting up robots in Isaac Sim with step-by-step configuration tools."""
+
+
 from .extension import *
+
+__all__ = ["RobotWizardWindow", "get_window"]

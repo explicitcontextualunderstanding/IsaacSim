@@ -99,6 +99,18 @@ struct ISimulationManager
     DLL_EXPORT virtual void reset() = 0;
 
     /**
+     * @brief Removes any tracked physics scenes with invalid prims.
+     * @details
+     * Iterates through the internally tracked physics scenes and removes any
+     * whose underlying USD prim is no longer valid. This handles cases where
+     * physics scene prims become invalid without triggering USD notices
+     * (e.g., layer removal operations).
+     *
+     * @return The paths of physics scenes that were removed.
+     */
+    DLL_EXPORT virtual std::vector<std::string> cleanupInvalidPhysicsScenes() = 0;
+
+    /**
      * @brief Gets the current callback iteration counter.
      * @return Reference to the current callback iteration counter.
      */

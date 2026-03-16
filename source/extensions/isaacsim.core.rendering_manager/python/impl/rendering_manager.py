@@ -20,7 +20,6 @@ import weakref
 import carb
 import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.kit.app
-import omni.kit.loop._loop as kit_loop
 import omni.timeline
 import omni.usd
 from pxr import Usd
@@ -49,6 +48,8 @@ class RenderingManager:
     _event_dispatcher = carb.eventdispatcher.get_eventdispatcher()
     _timeline = omni.timeline.get_timeline_interface()
     try:
+        import omni.kit.loop._loop as kit_loop
+
         _loop_runner = kit_loop.acquire_loop_interface()
     except Exception as e:
         carb.log_warn(f"Isaac Sim's loop runner not found. Its functionalities will not be used: {e}")

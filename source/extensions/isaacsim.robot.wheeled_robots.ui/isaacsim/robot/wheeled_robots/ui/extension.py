@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Extension for Isaac Sim wheeled robots user interface components and differential drive controller configuration."""
+
+
 import gc
 
 import omni.ext
@@ -23,7 +26,21 @@ from .menu_graphs import DifferentialControllerWindow
 
 
 class Extension(omni.ext.IExt, MenuHelperExtensionFull):
+    """Extension for the Isaac Sim Wheeled Robots UI.
+
+    This extension provides user interface components for working with wheeled robots in Isaac Sim.
+    It adds a "Differential Controller" menu item under "Tools/Robotics/OmniGraph Controllers"
+    that opens a window for configuring differential drive controllers for wheeled robots.
+    """
+
     def on_startup(self, ext_id: str):
+        """Called when the extension starts up.
+
+        Creates menu entry for the Differential Controller window under Tools/Robotics/OmniGraph Controllers.
+
+        Args:
+            ext_id: The extension identifier.
+        """
 
         # Create menu using MenuHelperExtensionFull
         self.menu_startup(
@@ -34,5 +51,9 @@ class Extension(omni.ext.IExt, MenuHelperExtensionFull):
         )
 
     def on_shutdown(self):
+        """Called when the extension shuts down.
+
+        Cleans up menu entries and performs garbage collection.
+        """
         self.menu_shutdown()
         gc.collect()

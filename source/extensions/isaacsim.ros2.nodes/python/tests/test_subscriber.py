@@ -18,25 +18,24 @@ import json
 
 import omni.graph.core as og
 import omni.kit.test
-from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import create_new_stage_async
 
 from .common import ROS2TestCase
 
 
 class TestRos2Subscriber(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
         await create_new_stage_async()
 
-    # After running each test
     async def tearDown(self):
         await super().tearDown()
 
     # ----------------------------------------------------------------------
     async def test_subscriber(self):
+        import math
+
         import builtin_interfaces.msg
         import geometry_msgs.msg
         import rclpy
@@ -63,6 +62,14 @@ class TestRos2Subscriber(ROS2TestCase):
 
         ros2_publisher = None
         ros2_node = self.create_node("isaac_sim_test_subscriber")
+
+        def spin():
+            # Keep ROS communications responsive while the timeline is running.
+            try:
+                rclpy.spin_once(ros2_node, timeout_sec=0.0)
+            except Exception:
+                # Spin is a best-effort helper here; discovery may still succeed without it.
+                pass
 
         # define messages
         messages = []
@@ -155,13 +162,59 @@ class TestRos2Subscriber(ROS2TestCase):
             og.Controller.attribute("inputs:messagePackage", subscriber_node).set(message_package)
             og.Controller.attribute("inputs:messageSubfolder", subscriber_node).set(message_subfolder)
             og.Controller.attribute("inputs:messageName", subscriber_node).set(message_name)
-
             self._timeline.play()
-            await simulate_async(0.5)
+
+            # Wait until the publisher sees an active subscription before publishing.
+            # This helps avoid dropping the message due to DDS discovery timing.
+            subscription_ready = await self.simulate_until_condition(
+                lambda: ros2_publisher.get_subscription_count() > 0,
+                max_frames=300,
+                per_frame_callback=spin,
+            )
+            self.assertTrue(
+                subscription_ready,
+                f"Timed out waiting for ROS2 subscription discovery for {message_type}",
+            )
 
             # publish value
             ros2_publisher.publish(message_value)
-            await simulate_async(0.5)
+
+            # Wait for node output to update (instead of fixed sleeps).
+            if message_type.startswith("tf2_msgs"):
+
+                def condition():
+                    transforms = og.Controller.attribute("outputs:transforms", subscriber_node).get()
+                    return transforms is not None and len(transforms) == len(message_value.transforms)
+
+                condition_met = await self.simulate_until_condition(condition, max_frames=900, per_frame_callback=spin)
+            elif message_type.endswith("Array"):
+
+                def condition():
+                    data = og.Controller.attribute("outputs:data", subscriber_node).get()
+                    layout_data_offset = og.Controller.attribute("outputs:layout:data_offset", subscriber_node).get()
+                    layout_dim = og.Controller.attribute("outputs:layout:dim", subscriber_node).get()
+                    return (
+                        data is not None
+                        and layout_dim is not None
+                        and len(data) == len(message_value.data)
+                        and layout_data_offset == message_value.layout.data_offset
+                        and len(layout_dim) == len(message_value.layout.dim)
+                    )
+
+                condition_met = await self.simulate_until_condition(condition, max_frames=600, per_frame_callback=spin)
+            else:
+
+                def condition():
+                    data = og.Controller.attribute("outputs:data", subscriber_node).get()
+                    if message_type == "std_msgs.msg.Byte":
+                        return data == ord(message_value.data.decode())
+                    if message_type == "std_msgs.msg.Float32":
+                        return data is not None and math.isfinite(data) and abs(message_value.data - data) < 1e-6
+                    return data == message_value.data
+
+                condition_met = await self.simulate_until_condition(condition, max_frames=600, per_frame_callback=spin)
+
+            self.assertTrue(condition_met, f"Timed out waiting for subscriber output for {message_type}")
 
             # check node output
             # - tf2_msgs

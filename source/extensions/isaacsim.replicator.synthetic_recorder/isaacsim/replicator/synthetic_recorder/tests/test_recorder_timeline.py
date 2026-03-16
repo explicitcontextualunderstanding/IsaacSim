@@ -32,7 +32,9 @@ class TestRecorderData(omni.kit.test.AsyncTestCase):
     """
 
     async def setUp(self):
-        pass
+        await omni.kit.app.get_app().next_update_async()
+        omni.usd.get_context().new_stage()
+        await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
         await omni.kit.app.get_app().next_update_async()

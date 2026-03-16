@@ -4,18 +4,19 @@ reloadable = false
 order = -100
 
 [package]
-version = "4.0.3"
+version = "5.1.0"
 category = "Simulation"
 title = "Isaac USD schema"
-description="Extension used to host all USD schemas made for robots. Provides the generated schema USDA. and a few utility functions used for informal schemas."
+description = "Extension used to host all USD schemas made for robots. Provides the generated schema USDA. and a few utility functions used for informal schemas."
 keywords = ["isaac", "usd", "schema"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
+"omni.usd" = {}
 "omni.usd.libs" = {}
 
 [[python.module]]
@@ -29,6 +30,9 @@ path = "./plugins"
 [[python.module]]
 name = "usd.schema.isaac"
 
+[[python.module]]
+name = "isaacsim.robot.schema.tests"
+
 [[native.library]]
 "filter:platform"."linux-x86_64"."path" = "plugins/lib/${lib_prefix}rangeSensorSchema${lib_ext}"
 "filter:platform"."linux-aarch64"."path" = "plugins/lib/${lib_prefix}rangeSensorSchema${lib_ext}"
@@ -39,3 +43,9 @@ name = "usd.schema.isaac"
 "filter:platform"."linux-x86_64"."path" = "plugins/lib/${lib_prefix}isaacSensorSchema${lib_ext}"
 "filter:platform"."linux-aarch64"."path" = "plugins/lib/${lib_prefix}isaacSensorSchema${lib_ext}"
 "filter:platform"."windows-x86_64"."path" = "plugins/bin/${lib_prefix}isaacSensorSchema${lib_ext}"
+
+[documentation]
+pages = ["docs/Overview.md","docs/USD_SCHEMAS.md", "docs/CHANGELOG.md"]
+
+[[test]]
+dependencies = ["omni.isaac.ml_archive"]

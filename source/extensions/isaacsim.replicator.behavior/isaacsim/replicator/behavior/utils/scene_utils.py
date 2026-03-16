@@ -553,10 +553,10 @@ def create_collision_walls(
 
 async def run_simulation_async(sim_steps: int, physx_dt: float, render: bool = True) -> None:
     """Run the simulation for the specified number of steps. Optionally render the simulation by advancing the app."""
-    physics_sim_interface = omni.physics.core.get_physics_simulation_interface()
+    physx_sim_interface = omni.physx.get_physx_simulation_interface()
     for _ in range(sim_steps):
-        physics_sim_interface.simulate(physx_dt, 0)
-        physics_sim_interface.fetch_results()
+        physx_sim_interface.simulate(physx_dt, 0)
+        physx_sim_interface.fetch_results()
         if render:
             await omni.kit.app.get_app().next_update_async()
 
@@ -571,19 +571,16 @@ async def apply_forces_and_simulate_async(
     render: bool = True,
 ) -> None:
     """Apply forces to assets at the specified positions, and simulate for the given number of steps."""
-    # Physx APIs to apply the forces and to advance the simulation
-    physics_sim_interface = omni.physics.core.get_physics_simulation_interface()
+    physx_sim_interface = omni.physx.get_physx_simulation_interface()
 
     # Apply the forces
     for body_id, force, position in zip(body_ids, forces, positions):
-        physics_sim_interface.add_force_at_pos(
-            stage_id, body_id, carb.Float3(*force), carb.Float3(*position), omni.physics.core.ForceMode.FORCE
-        )
+        physx_sim_interface.apply_force_at_pos(stage_id, body_id, carb.Float3(*force), carb.Float3(*position))
 
     # Run the simulation for the specified number of steps
     for _ in range(sim_steps):
-        physics_sim_interface.simulate(physx_dt, 0)
-        physics_sim_interface.fetch_results()
+        physx_sim_interface.simulate(physx_dt, 0)
+        physx_sim_interface.fetch_results()
         if render:
             await omni.kit.app.get_app().next_update_async()
 

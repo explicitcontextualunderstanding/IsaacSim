@@ -101,15 +101,15 @@ def get_world_from_local(parent_transforms, translations, orientations, device):
     calculated_translations = torch.zeros(size=(translations.shape[0], 3), dtype=torch.float32, device=device)
     calculated_orientations = torch.zeros(size=(translations.shape[0], 4), dtype=torch.float32, device=device)
 
-    if isinstance(parent_transforms, wp.types.array):
+    if isinstance(parent_transforms, wp.array):
         parent_torch = wp.to_torch(parent_transforms)
     else:
         parent_torch = parent_transforms
-    if isinstance(translations, wp.types.array):
+    if isinstance(translations, wp.array):
         translations_torch = wp.to_torch(translations)
     else:
         translations_torch = translations
-    if isinstance(orientations, wp.types.array):
+    if isinstance(orientations, wp.array):
         orientations_torch = wp.to_torch(orientations)
     else:
         orientations_torch = orientations

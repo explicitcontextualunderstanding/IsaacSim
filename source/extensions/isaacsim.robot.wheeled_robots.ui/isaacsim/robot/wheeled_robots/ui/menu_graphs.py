@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing menu helper windows for creating and managing wheeled robot control graphs."""
+
+
 from pathlib import Path
 
 import omni.graph.core as og
@@ -33,7 +36,7 @@ OG_DOCS_LINK = "https://docs.isaacsim.omniverse.nvidia.com/latest/omnigraph/omni
 
 
 class DifferentialControllerWindow(MenuHelperWindow):
-    """Window for creating differential controller graphs"""
+    """Window for creating differential controller graphs."""
 
     def __init__(self):
         super().__init__("Differential Controller", width=400, height=500)
@@ -54,7 +57,7 @@ class DifferentialControllerWindow(MenuHelperWindow):
         self._build_ui()
 
     def _build_ui(self):
-        """Build the window UI"""
+        """Build the window UI."""
         og_path_def = ParamWidget.FieldDef(
             name="og_path", label="graph path", type=ui.StringField, default=self._og_path
         )
@@ -147,6 +150,12 @@ class DifferentialControllerWindow(MenuHelperWindow):
         return
 
     def make_graph(self):
+        """Create and configure the differential controller OmniGraph with necessary nodes and connections.
+
+        Creates a new graph or adds to an existing one with differential controller, articulation controller,
+        and optional keyboard control nodes. Configures wheel parameters, joint mappings, and node connections
+        based on user input parameters.
+        """
         # stop the simulation before adding nodes
         self._timeline = omni.timeline.get_timeline_interface()
         self._timeline.stop()
@@ -315,6 +324,11 @@ class DifferentialControllerWindow(MenuHelperWindow):
             )
 
     def _on_ok(self):
+        """Handle OK button click by validating parameters and creating the graph.
+
+        Collects values from UI inputs, validates parameters, and creates the differential controller
+        graph if validation passes. Hides the window on success or shows a warning notification on failure.
+        """
         self._og_path = self.og_path_input.get_value()
         self._robot_prim_path = self.robot_prim_input.get_value()
         self._wheel_radius = self.wheel_radius_input.get_value()
@@ -332,9 +346,19 @@ class DifferentialControllerWindow(MenuHelperWindow):
             post_notification("Parameter check failed", status=NotificationStatus.WARNING)
 
     def _on_cancel(self):
+        """Handle Cancel button click by hiding the window without making changes."""
         self.visible = False
 
-    def _check_params(self):
+    def _check_params(self) -> bool:
+        """Validate the input parameters for creating the differential controller graph.
+
+        Checks if the existing graph path is valid when adding to existing graph, verifies that
+        exactly one articulation root prim exists under the specified robot prim, and updates
+        the articulation root path.
+
+        Returns:
+            True if all parameters are valid, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
 
         if self._add_to_existing_graph:
@@ -364,7 +388,17 @@ class DifferentialControllerWindow(MenuHelperWindow):
         return True
 
     def _on_use_existing_graph(self, check_state):
+        """Handle checkbox state change for using existing graph option.
+
+        Args:
+            check_state: The new checkbox state indicating whether to add to existing graph.
+        """
         self._add_to_existing_graph = check_state
 
     def _on_use_keyboard(self, check_state):
+        """Handle checkbox state change for keyboard control option.
+
+        Args:
+            check_state: The new checkbox state indicating whether to enable WASD keyboard control.
+        """
         self._use_keyboard = check_state

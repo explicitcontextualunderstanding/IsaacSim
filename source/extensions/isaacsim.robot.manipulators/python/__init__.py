@@ -14,3 +14,5 @@
 # limitations under the License.
 from .impl import Extension
 from .manipulators.single_manipulator import SingleManipulator
+
+__all__ = ["SingleManipulator"]

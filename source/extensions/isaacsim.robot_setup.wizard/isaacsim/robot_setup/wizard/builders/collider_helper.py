@@ -42,7 +42,19 @@ MESH_APPROXIMATIONS = {
 }
 
 
-def apply_collider(link_name, approximation_type):
+def apply_collider(link_name: str, approximation_type: str):
+    """Applies collision detection to a mesh prim based on the specified approximation type.
+
+    Retrieves the mesh prim from the colliders path and applies the appropriate collision APIs,
+    including specialized approximation methods like convex hull or triangle mesh.
+
+    Args:
+        link_name: Name of the robot link to apply collision to.
+        approximation_type: Type of collision approximation to use (e.g., "triangleMesh", "convexHull").
+
+    Raises:
+        ValueError: If the mesh prim does not exist at the expected path.
+    """
     # get the prim from the link name, if doesn't exist, throw an error for now,
     ## TODO: in the future, you can create a new one of a limit shape (need to add scale accordingly) and redo the referencing inside the robot prim
     stage = omni.usd.get_context().get_stage()
@@ -65,7 +77,15 @@ def apply_collider(link_name, approximation_type):
 
 
 ### copied from omni.extensions.runtime: /omni/physx/utils.py
-def remove_collider(prim):
+def remove_collider(prim: Usd.Prim):
+    """Removes all collision-related APIs from a USD prim.
+
+    Removes the CollisionAPI, PhysxCollisionAPI, and any mesh-specific collision APIs
+    like convex hull or triangle mesh collision from the specified prim.
+
+    Args:
+        prim: The USD prim to remove collision APIs from.
+    """
     ret = prim.RemoveAPI(UsdPhysics.CollisionAPI)
     prim.RemoveAPI(PhysxSchema.PhysxCollisionAPI)
     if prim.IsA(UsdGeom.Mesh):

@@ -2,21 +2,20 @@
 [[dependency]]
 python = "../_build/target-deps/python"
 packages = [
-    "aioboto3==15.2.0",             # SWIPAT filed under: https://nvbugs/4895046 # Used by: (none found)
-    "aiobotocore==2.24.2",          # SWIPAT filed under: https://nvbugs/4576936 # Used by: (dependency of aioboto3)
-    "boto3==1.40.18",               # SWIPAT filed under: https://nvbugs/3697913 # Used by: (none found)
-    "botocore==1.40.18",            # SWIPAT filed under: https://nvbugs/5303107 # Used by: (none found)
+    "aioboto3==15.5.0",             # SWIPAT filed under: https://nvbugs/4895046 # Used by: (none found)
+    "boto3==1.40.61",               # SWIPAT filed under: https://nvbugs/3697913 # Used by: (none found)
+    "botocore==1.40.61",            # SWIPAT filed under: https://nvbugs/5303107 # Used by: (dependency of aiobotocore, boto3, s3transfer)
     "awscrt==0.23.8",               # SWIPAT filed under: https://nvbugs/4603906 # Used by: (none found)
-    "s3transfer==0.13.1",           # SWIPAT filed under: https://nvbugs/3738087 # Used by: (dependency of boto3)
+    "s3transfer==0.14.0",           # SWIPAT filed under: https://nvbugs/3738087 # Used by: (dependency of boto3)
     "azure-storage-blob==12.17.0",  # SWIPAT filed under: https://nvbugs/4221315 # Used by: (none found)
     "azure-identity==1.13.0",       # SWIPAT filed under: https://nvbugs/4221323 # Used by: (none found)
     "requests==2.32.3",             # SWIPAT filed under: https://nvbugs/3430668 # Used by: isaacsim.gui.menu, omni.cuopt.examples
     "oauthlib==3.2.2",              # SWIPAT filed under: https://nvbugs/3433846 # Used by: (dependency of requests-oauthlib)
     "requests-oauthlib==1.3.1",     # SWIPAT filed under: https://nvbugs/3433849 # Used by: (none found)
     "isodate==0.6.1",               # SWIPAT filed under: https://nvbugs/5326903 # Used by: (dependency of azure-storage-blob)
-    "cryptography==44.0.0",         # SWIPAT filed under: https://nvbugs/5326914 # Used by: (none found)
-    "azure-core==1.28.0",           # SWIPAT filed under: https://nvbugs/5326927 # Used by: (dependency of azure-identity, azure-storage-blob)
-    "msal==1.29.0",                 # SWIPAT filed under: https://nvbugs/5326933 # Used by: (dependency of azure-identity, msal-extensions)
+    "cryptography==46.0.5",         # SWIPAT filed under: https://nvbugs/5326914 # Used by: (dependency of azure-identity, azure-storage-blob, msal)
+    "azure-core==1.38.0",           # SWIPAT filed under: https://nvbugs/5326927 # Used by: (dependency of azure-identity, azure-storage-blob)
+    "msal==1.35.1",                 # SWIPAT filed under: https://nvbugs/5326933 # Used by: (dependency of azure-identity, msal-extensions)
     "msal-extensions==1.3.1",       # SWIPAT filed under: https://nvbugs/5326943 # Used by: (dependency of azure-identity)
     "portalocker==2.7.0",           # SWIPAT filed under: https://nvbugs/5326953 # Used by: (dependency of msal-extensions)
     "jmespath==1.0.1",              # SWIPAT filed under: https://nvbugs/5303117 # Used by: (dependency of aiobotocore, boto3, botocore)

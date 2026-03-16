@@ -1,4 +1,31 @@
 # Changelog
+
+## [3.2.1] - 2026-03-09
+### Changed
+- update urdf-usd-converter to v0.1.0
+
+## [3.2.0] - 2026-03-04
+### Changed
+- urdf converter version bump to v0.1.0rc2
+
+## [3.1.0] - 2026-02-26
+### Changed
+- Added mjc / newton to physx attribute conversion for multi-physics engine asset support
+
+## [3.0.0] - 2026-02-01
+### Changed
+- USD exchange based backend
+- Unified UI
+- Asset structure 3
+
+## [2.5.0] - 2026-01-10
+### Removed
+- Removed UI elements from the URDF importer, moved to isaacsim.asset.importer.urdf.ui extension
+
+## [2.4.37] - 2026-01-05
+### Fixed
+- Updated configuring of mimic joints to be processed after all joints are created to avoid issues with lexicographical order of siblings
+
 ## [2.4.36] - 2025-12-07
 ### Changed
 - Update description

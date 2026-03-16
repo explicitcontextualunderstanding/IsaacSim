@@ -19,6 +19,7 @@ from isaacsim.core.experimental.prims import Articulation, DeformablePrim, GeomP
 from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.storage.native import get_assets_root_path_async
 
+from . import common
 from .test_deformable_prim import _define_tetmesh
 
 
@@ -58,6 +59,7 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
         # test case
         await self.assertDocTests(GeomPrim)
 
+    @common.requires_engines(supported_engines=["physx"])
     async def test_rigid_prim_docstrings(self):
         # define prims
         for i in range(3):
@@ -66,6 +68,7 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
         # test case
         await self.assertDocTests(RigidPrim)
 
+    @common.requires_engines(supported_engines=["physx"])
     async def test_articulation_docstrings(self):
         # get assets root path
         assets_root_path = await get_assets_root_path_async()
@@ -79,6 +82,7 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
         # test case
         await self.assertDocTests(Articulation, stop_on_failure=False)
 
+    @common.requires_engines(supported_engines=["physx"])
     async def test_deformable_prim_docstrings(self):
         # define prims
         for i in range(3):

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import asyncio
+import threading
 
 import carb
 import omni
@@ -44,6 +45,8 @@ class ROS2TestCase(TimedAsyncTestCase):
         self._ros2_nodes = []
         self._ros2_publishers = []
         self._ros2_subscribers = []
+        self._ros2_executors = {}  # node -> (executor, thread)
+        self._ros2_callback_groups = {}  # node -> ReentrantCallbackGroup
 
         import rclpy
 
@@ -97,6 +100,10 @@ class ROS2TestCase(TimedAsyncTestCase):
     def create_subscription(self, node, msg_type, topic_name, callback, qos_profile=10):
         """Create a ROS2 subscription and track it for automatic cleanup.
 
+        When the node has a background executor (via start_async_spinning), a
+        ReentrantCallbackGroup is used automatically so multiple subscriptions
+        can fire in parallel.
+
         Args:
             node: The ROS2 node to create the subscription on.
             msg_type: The message type for the subscription.
@@ -107,7 +114,8 @@ class ROS2TestCase(TimedAsyncTestCase):
         Returns:
             The created ROS2 subscription.
         """
-        subscription = node.create_subscription(msg_type, topic_name, callback, qos_profile)
+        cb_group = self._ros2_callback_groups.get(node)
+        subscription = node.create_subscription(msg_type, topic_name, callback, qos_profile, callback_group=cb_group)
         self._ros2_subscribers.append((node, subscription))
         return subscription
 
@@ -141,6 +149,72 @@ class ROS2TestCase(TimedAsyncTestCase):
         except Exception as e:
             print(f"Warning: Failed to destroy publisher: {e}")
 
+    def start_async_spinning(self, node):
+        """Start a background executor that continuously spins the node.
+
+        Callbacks on this node will fire automatically in a background thread,
+        removing the need for manual spin_once() calls in frame loops.
+        A ReentrantCallbackGroup is created so subscriptions added via
+        create_subscription can fire in parallel.
+
+        Args:
+            node: The ROS2 node to spin.
+        """
+        from rclpy.callback_groups import ReentrantCallbackGroup
+        from rclpy.executors import MultiThreadedExecutor
+
+        if node in self._ros2_executors:
+            print(f"Warning: node {node.get_name()} is already spinning, skipping")
+            return
+
+        self._ros2_callback_groups[node] = ReentrantCallbackGroup()
+
+        executor = MultiThreadedExecutor()
+        executor.add_node(node)
+        thread = threading.Thread(target=executor.spin, daemon=True)
+        thread.start()
+        self._ros2_executors[node] = (executor, thread)
+
+    def stop_async_spinning(self, node):
+        """Stop the background executor for a node.
+
+        Args:
+            node: The ROS2 node to stop spinning.
+        """
+        if node not in self._ros2_executors:
+            return
+        executor, thread = self._ros2_executors.pop(node)
+        self._ros2_callback_groups.pop(node, None)
+        executor.shutdown()
+        thread.join(timeout=5.0)
+
+    async def simulate_until_condition(
+        self, condition_func, max_frames=180, frames_per_step=1, per_frame_callback=None
+    ):
+        """Simulate until condition is met or maximum frames reached.
+
+        This method runs simulation in steps until a specified condition function
+        returns True or the maximum frame limit is exceeded.
+
+        Args:
+            condition_func: Function that returns True when condition is met.
+            max_frames: Maximum number of simulation frames to run.
+            frames_per_step: Number of frames to simulate in each step.
+            per_frame_callback: Optional callback to execute each frame (e.g., for spinning ROS nodes).
+
+        Returns:
+            True if condition was met, False if max frames reached.
+        """
+        frames_run = 0
+        while frames_run < max_frames:
+            await omni.kit.app.get_app().next_update_async()
+            if per_frame_callback is not None:
+                per_frame_callback()
+            frames_run += frames_per_step
+            if condition_func():
+                return True
+        return False
+
     async def tearDown(self):
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
@@ -149,7 +223,16 @@ class ROS2TestCase(TimedAsyncTestCase):
             await asyncio.sleep(1.0)
 
         # Clean up ROS2 resources in the correct order
-        # First destroy publishers
+        # First stop any background executors
+        for node, (executor, thread) in list(self._ros2_executors.items()):
+            try:
+                executor.shutdown()
+                thread.join(timeout=5.0)
+            except Exception as e:
+                print(f"Warning: Failed to stop executor: {e}")
+        self._ros2_executors.clear()
+
+        # Then destroy publishers
         for node, publisher in self._ros2_publishers:
             try:
                 node.destroy_publisher(publisher)

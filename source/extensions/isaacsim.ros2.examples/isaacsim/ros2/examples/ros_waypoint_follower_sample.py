@@ -502,26 +502,21 @@ class Extension(omni.ext.IExt):
                         ("MakeArrayOrientation", "omni.graph.nodes.ConstructArray"),
                         ("Branch", "omni.graph.action.Branch"),
                         ("ResetBranch", "omni.graph.action.Branch"),
-                        ("TranslateStringConstant", "omni.graph.nodes.ConstantToken"),
-                        ("OrientStringConstant", "omni.graph.nodes.ConstantToken"),
                         ("FrameIdConstant", "omni.graph.nodes.ConstantToken"),
                         ("WaypointPrimPath", "omni.graph.nodes.ConstantString"),
                         ("WaypointCountConstant", "omni.graph.nodes.ConstantInt"),
-                        ("TranslateReadPrimAttribute", "omni.graph.nodes.ReadPrimAttribute"),
-                        ("OrientReadPrimAttribute", "omni.graph.nodes.ReadPrimAttribute"),
-                        ("IsaacReadSimulationTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+                        ("ReadPrimLocalTransform", "omni.graph.nodes.ReadPrimLocalTransform"),
+                        ("TokenToTarget", "omni.graph.nodes.ToTarget"),
+                        ("GetTranslation", "omni.graph.nodes.GetMatrix4Translation"),
+                        ("GetRotationQuaternion", "omni.graph.nodes.GetMatrix4Quaternion"),
                         ("ForEach", "omni.graph.action.ForEach"),
                         ("GetPrimPaths", "omni.graph.nodes.GetPrimPaths"),
                         ("GetPrims", "omni.replicator.core.OgnGetPrims"),
                     ],
                     keys.SET_VALUES: [
                         ("WaypointPrimPath.inputs:value", self._goal_parent_prim + "/"),
-                        ("TranslateStringConstant.inputs:value", "xformOp:translate"),
-                        ("OrientStringConstant.inputs:value", "xformOp:orient"),
                         ("FrameIdConstant.inputs:value", self._frame_id),
                         ("WaypointCountConstant.inputs:value", self._number_of_waypoints),
-                        ("TranslateReadPrimAttribute.inputs:usePath", True),
-                        ("OrientReadPrimAttribute.inputs:usePath", True),
                         ("GetPrims.inputs:cachePrims", False),
                         ("GetPrims.inputs:ignoreCase", False),
                         ("WaypointScriptNode.inputs:script", WAYPOINT_SCRIPT),
@@ -549,20 +544,12 @@ class Extension(omni.ext.IExt):
                         ("GetPrims.outputs:prims", "GetPrimPaths.inputs:prims"),
                         ("GetPrimPaths.outputs:primPaths", "ForEach.inputs:arrayIn"),
                         ("ForEach.outputs:loopBody", "GatherWaypointsScriptNode.inputs:execIn"),
-                        ("ForEach.outputs:element", "TranslateReadPrimAttribute.inputs:primPath"),
-                        ("ForEach.outputs:element", "OrientReadPrimAttribute.inputs:primPath"),
-                        ("TranslateStringConstant.inputs:value", "TranslateReadPrimAttribute.inputs:name"),
-                        ("OrientStringConstant.inputs:value", "OrientReadPrimAttribute.inputs:name"),
-                        (
-                            "IsaacReadSimulationTime.outputs:simulationTime",
-                            "TranslateReadPrimAttribute.inputs:usdTimecode",
-                        ),
-                        (
-                            "IsaacReadSimulationTime.outputs:simulationTime",
-                            "OrientReadPrimAttribute.inputs:usdTimecode",
-                        ),
-                        ("TranslateReadPrimAttribute.outputs:value", "MakeArrayTranslation.inputs:input0"),
-                        ("OrientReadPrimAttribute.outputs:value", "MakeArrayOrientation.inputs:input0"),
+                        ("ForEach.outputs:element", "TokenToTarget.inputs:value"),
+                        ("TokenToTarget.outputs:converted", "ReadPrimLocalTransform.inputs:prim"),
+                        ("ReadPrimLocalTransform.outputs:value", "GetTranslation.inputs:matrix"),
+                        ("ReadPrimLocalTransform.outputs:value", "GetRotationQuaternion.inputs:matrix"),
+                        ("GetTranslation.outputs:translation", "MakeArrayTranslation.inputs:input0"),
+                        ("GetRotationQuaternion.outputs:quaternion", "MakeArrayOrientation.inputs:input0"),
                         ("MakeArrayTranslation.outputs:array", "GatherWaypointsScriptNode.inputs:translation"),
                         ("MakeArrayOrientation.outputs:array", "GatherWaypointsScriptNode.inputs:orientation"),
                         ("WaypointCountConstant.inputs:value", "GatherWaypointsScriptNode.inputs:waypoint_count"),
@@ -600,6 +587,7 @@ class Extension(omni.ext.IExt):
 
         translation = Gf.Vec3f(0.0, 0.0, 0.0)
         quaternion = Gf.Quatf(1.0, 0.0, 0.0, 0.0)
+        quaternion = quaternion.GetNormalized()
         scale = Gf.Vec3f(1.0, 1.0, 1.0)
 
         xform_prim.AddTranslateOp().Set(translation)

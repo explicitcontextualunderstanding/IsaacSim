@@ -75,7 +75,7 @@ if os.target() == "linux" then
         "rapids_logger",
     }
 
-    extra_usd_libs = { "usdGeom", "usdPhysics" }
+    extra_usd_libs = { "usdGeom", "usdPhysics", "ts" }
 
     -- Begin OpenUSD
     add_usd(extra_usd_libs)

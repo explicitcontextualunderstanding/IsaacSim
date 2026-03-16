@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""A world interface implementation that uses Lula for collision detection and obstacle management in robot motion planning."""
+
+
 from typing import List, Optional, Union
 
 import carb
@@ -27,6 +31,25 @@ from .utils import get_pose3, get_prim_pose_in_meters_rel_robot_base
 
 
 class LulaWorld(WorldInterface):
+    """A world interface implementation that uses Lula for collision detection and obstacle management.
+
+    This class provides collision avoidance capabilities for robot motion planning by maintaining an internal
+    representation of the world using the Lula library. It tracks both static and dynamic obstacles, automatically
+    updating their positions relative to the robot's frame of reference during motion planning.
+
+    The class supports adding various geometric primitives as obstacles including cuboids, spheres, capsules, and
+    ground planes. Obstacles can be classified as static (never change pose) or dynamic (positions updated during
+    world updates). Static obstacles are only repositioned when the robot base moves, while dynamic obstacles are
+    updated more frequently.
+
+    Key features:
+    - Automatic coordinate transformation from USD stage units to meters
+    - Relative positioning of obstacles with respect to robot base frame
+    - Support for enabling/disabling obstacles without removal
+    - Ground plane simulation using expansive cuboid approximation
+    - Efficient tracking of obstacle state changes
+    """
+
     def __init__(self):
         self._world = lula.create_world()
         self._dynamic_obstacles = dict()
@@ -42,14 +65,17 @@ class LulaWorld(WorldInterface):
         robot_pos: Optional[np.array] = np.zeros(3),
         robot_rot: Optional[np.array] = np.eye(3),
         robot_base_moved: bool = False,
-    ) -> None:
+    ):
         """Update the internal world state of Lula.
         This function automatically tracks the positions of obstacles that have been added with add_obstacle()
 
         Args:
-            updated_obstacles (List[core.objects], optional): Obstacles that have been added by add_obstacle() that need to be updated.
+            updated_obstacles: Obstacles that have been added by add_obstacle() that need to be updated.
                 If not specified, all non-static obstacle positions will be updated.
                 If specified, only the obstacles that have been listed will have their positions updated
+            robot_pos: Robot position in world coordinates.
+            robot_rot: Robot rotation matrix in world coordinates.
+            robot_base_moved: Whether the robot base has moved since last update.
         """
         if updated_obstacles is None or robot_base_moved:
             # assume that all obstacle poses need to be updated
@@ -80,19 +106,20 @@ class LulaWorld(WorldInterface):
         static: Optional[bool] = False,
         robot_pos: Optional[np.array] = np.zeros(3),
         robot_rot: Optional[np.array] = np.eye(3),
-    ):
+    ) -> bool:
         """Add a block obstacle.
 
         Args:
-            cuboid (core.objects.cuboid): Wrapper object for handling rectangular prism Usd Prims.
-            static (bool, optional): If True, indicate that cuboid will never change pose, and may be ignored in internal
+            cuboid: Wrapper object for handling rectangular prism Usd Prims.
+            static: If True, indicate that cuboid will never change pose, and may be ignored in internal
                 world updates. Since Lula specifies object positions relative to the robot's frame
                 of reference, static obstacles will have their positions queried any time that
-                set_robot_base_pose() is called.  Defaults to False.
-
+                set_robot_base_pose() is called.
+            robot_pos: Robot position in world coordinates.
+            robot_rot: Robot rotation matrix in world coordinates.
 
         Returns:
-            bool: Always True, indicating that this adder has been implemented
+            Always True, indicating that this adder has been implemented
         """
 
         if cuboid in self._static_obstacles or cuboid in self._dynamic_obstacles:
@@ -129,15 +156,16 @@ class LulaWorld(WorldInterface):
         """Add a sphere obstacle.
 
         Args:
-            sphere (core.objects.sphere): Wrapper object for handling sphere Usd Prims.
-            static (bool, optional): If True, indicate that sphere will never change pose, and may be ignored in internal
+            sphere: Wrapper object for handling sphere Usd Prims.
+            static: If True, indicate that sphere will never change pose, and may be ignored in internal
                 world updates. Since Lula specifies object positions relative to the robot's frame
                 of reference, static obstacles will have their positions queried any time that
-                set_robot_base_pose() is called.  Defaults to False.
-
+                set_robot_base_pose() is called.
+            robot_pos: Robot position in world coordinates.
+            robot_rot: Robot rotation matrix in world coordinates.
 
         Returns:
-            bool: Always True, indicating that this adder has been implemented
+            Always True, indicating that this adder has been implemented
         """
         if sphere in self._static_obstacles or sphere in self._dynamic_obstacles:
             carb.log_warn(
@@ -170,14 +198,16 @@ class LulaWorld(WorldInterface):
         """Add a capsule obstacle.
 
         Args:
-            capsule (core.objects.capsule): Wrapper object for handling capsule Usd Prims.
-            static (bool, optional): If True, indicate that capsule will never change pose, and may be ignored in internal
+            capsule: Wrapper object for handling capsule Usd Prims.
+            static: If True, indicate that capsule will never change pose, and may be ignored in internal
                 world updates. Since Lula specifies object positions relative to the robot's frame
                 of reference, static obstacles will have their positions queried any time that
-                set_robot_base_pose() is called.  Defaults to False.
+                set_robot_base_pose() is called.
+            robot_pos: Robot position in world coordinates.
+            robot_rot: Robot rotation matrix in world coordinates.
 
         Returns:
-            bool: Always True, indicating that this function has been implemented
+            Always True, indicating that this function has been implemented
         """
 
         # As of Lula 0.5.0, what Lula calls a "cylinder" is actually a capsule (i.e., the surface
@@ -217,11 +247,11 @@ class LulaWorld(WorldInterface):
         expansive face (dimensions 200x200 stage units) coplanar to the ground_plane.
 
         Args:
-            ground_plane (core.objects.ground_plane.GroundPlane): Wrapper object for handling ground_plane Usd Prims.
-            plane_width (Optional[float]): The width of the ground plane (in meters) that Lula creates to constrain this robot.  Defaults to 50.0 m
+            ground_plane: Wrapper object for handling ground_plane Usd Prims.
+            plane_width: The width of the ground plane (in meters) that Lula creates to constrain this robot.
 
         Returns:
-            bool: Always True, indicating that this adder has been implemented
+            Always True, indicating that this adder has been implemented
         """
         if ground_plane in self._ground_plane_map:
             carb.log_warn(
@@ -254,10 +284,10 @@ class LulaWorld(WorldInterface):
         """Disable collision avoidance for obstacle.
 
         Args:
-            obstacle (core.objects): obstacle to be disabled.
+            obstacle: obstacle to be disabled.
 
         Returns:
-            bool: Return True if obstacle was identified and successfully disabled.
+            Return True if obstacle was identified and successfully disabled.
         """
         if obstacle in self._dynamic_obstacles:
             obstacle_handle = self._dynamic_obstacles[obstacle]
@@ -274,10 +304,10 @@ class LulaWorld(WorldInterface):
         """Enable collision avoidance for obstacle.
 
         Args:
-            obstacle (core.objects): obstacle to be enabled.
+            obstacle: obstacle to be enabled.
 
         Returns:
-            bool: Return True if obstacle was identified and successfully enabled.
+            Return True if obstacle was identified and successfully enabled.
         """
         if obstacle in self._dynamic_obstacles:
             obstacle_handle = self._dynamic_obstacles[obstacle]
@@ -295,10 +325,10 @@ class LulaWorld(WorldInterface):
         removal.
 
         Args:
-            obstacle (core.objects): obstacle to be removed.
+            obstacle: obstacle to be removed.
 
         Returns:
-            bool: Return True if obstacle was identified and successfully removed.
+            Return True if obstacle was identified and successfully removed.
         """
         if obstacle in self._dynamic_obstacles:
             obstacle_handle = self._dynamic_obstacles[obstacle]
@@ -317,7 +347,7 @@ class LulaWorld(WorldInterface):
         self._world.remove_obstacle(obstacle_handle)
         return True
 
-    def reset(self) -> None:
+    def reset(self):
         """reset the world to its initial state"""
         self._world = lula.create_world()
         self._dynamic_obstacles = dict()

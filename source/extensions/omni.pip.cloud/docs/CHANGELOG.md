@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.1] - 2026-03-06
+### Changed
+- Update cryptography to 46.0.5
+- Update azure-core to 1.38.0
+- Update msal to 1.35.1
+
+## [1.5.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.4.5] - 2026-02-22
+### Changed
+- Downgrage boto3 to 1.40.61
+- Downgrage botocore to 1.40.61
+- Downgrage s3transfer to 0.14.0
+- Update aioboto3 to 15.5.0
+
 ## [1.4.4] - 2025-11-25
 ### Changed
 - Update to aioboto3==15.2.0

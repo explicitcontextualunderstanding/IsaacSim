@@ -26,6 +26,7 @@ import time
 import carb.settings
 import numpy as np
 import omni.replicator.core as rep
+import omni.usd
 import warp as wp
 from isaacsim.core.utils.stage import open_stage
 from isaacsim.storage.native import get_assets_root_path
@@ -38,12 +39,13 @@ parser.add_argument(
     help="Use warp augmentations instead of numpy",
 )
 parser.add_argument("--resolution", nargs=2, type=int, default=[512, 512], help="Camera resolution")
+parser.add_argument("--env_url", type=str, default="", help="USD environment URL (empty for basic scene)")
 args, unknown = parser.parse_known_args()
 
 num_frames = args.num_frames
 use_warp = args.use_warp
 resolution = args.resolution
-ENV_URL = "/Isaac/Environments/Grid/default_environment.usd"
+env_url = args.env_url or None
 SEED = 42
 
 # Enable warp scripts
@@ -121,15 +123,20 @@ rep.AnnotatorRegistry.register_augmentation(
 )
 
 
-# Run the capture pipeline using step() to trigger a randomization and data capture
-def run_example(num_frames: int, resolution: tuple[int, int], use_warp: bool) -> float:
+def run_example(num_frames: int, resolution: tuple[int, int], use_warp: bool, env_url: str | None = None) -> float:
+    """Run the capture pipeline using step() to trigger a randomization and data capture."""
     print(f"Running example with num_frames: {num_frames}, resolution: {resolution}, use_warp: {use_warp}")
 
-    # Open a new stage
-    assets_root_path = get_assets_root_path()
-    stage_path = assets_root_path + ENV_URL
-    print(f"Opening stage: {stage_path}")
-    open_stage(stage_path)
+    if env_url is not None and env_url != "":
+        assets_root_path = get_assets_root_path()
+        stage_path = assets_root_path + env_url
+        print(f"Opening stage: {stage_path}")
+        open_stage(stage_path)
+    else:
+        omni.usd.get_context().new_stage()
+        rep.functional.create.dome_light(intensity=1000, rotation=(270, 0, 0))
+        ground_plane = rep.functional.create.plane(scale=(10, 10, 1), position=(0, 0, 0))
+        rep.functional.physics.apply_collider(ground_plane)
 
     # Use a fixed global seed for reproducibility
     rep.set_global_seed(SEED)
@@ -151,7 +158,7 @@ def run_example(num_frames: int, resolution: tuple[int, int], use_warp: bool) ->
     gn_depth_augm = rep.annotators.get_augmentation("gn_depth_wp" if use_warp else "gn_depth_np")
 
     # Create a writer and apply the augmentations to its corresponding annotators
-    out_dir = os.path.join(os.getcwd(), "_out_augm_writer")
+    out_dir = os.path.join(os.getcwd(), f"_out_augm_writer_{'warp' if use_warp else 'numpy'}")
     backend = rep.backends.get("DiskBackend")
     backend.initialize(output_dir=out_dir)
     print(f"Writing data to: {out_dir}")
@@ -191,7 +198,7 @@ def run_example(num_frames: int, resolution: tuple[int, int], use_warp: bool) ->
     return time.time() - capture_start
 
 
-duration = run_example(num_frames, resolution, use_warp)
+duration = run_example(num_frames, resolution, use_warp, env_url)
 average = duration / num_frames if num_frames else 0.0
 mode_label = "warp" if use_warp else "numpy"
 print(

@@ -25,7 +25,7 @@ from isaacsim.replicator.behavior.utils.behavior_utils import (
     get_exposed_variable,
     remove_exposed_variables,
 )
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdLux
 
 

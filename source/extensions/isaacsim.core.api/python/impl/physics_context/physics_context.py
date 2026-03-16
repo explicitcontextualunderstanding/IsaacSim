@@ -120,10 +120,6 @@ class PhysicsContext(object):
                 up_axis = UsdGeom.GetStageUpAxis(get_current_stage())
                 self.set_gravity(sim_params["gravity"][AXES_INDICES[up_axis]])
 
-            self._physx_residual_api = None
-            if "enable_solver_residuals" in sim_params.keys():
-                self.enable_residual_reporting(sim_params["enable_solver_residuals"])
-
             if "substeps" in sim_params.keys():
                 substeps = sim_params["substeps"]
             else:
@@ -309,59 +305,6 @@ class PhysicsContext(object):
             Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
         """
         SimulationManager.enable_ccd(flag=flag)
-
-    def enable_residual_reporting(self, flag: bool):
-        """Set the physx scene flag to enable/disable solver residual reporting.
-
-        Args:
-            flag (bool): enables or disables scene residuals on the PhysicsScene
-
-        Raises:
-            Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
-        """
-        if not is_prim_path_valid(self._prim_path):
-            raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
-        self._physx_residual_api = PhysxSchema.PhysxResidualReportingAPI.Apply(self.get_current_physics_scene_prim())
-        if self._physx_scene_api.GetEnableResidualReportingAttr().Get() is None:
-            self._physx_scene_api.CreateEnableResidualReportingAttr(flag)
-        else:
-            self._physx_scene_api.GetEnableResidualReportingAttr().Set(flag)
-
-    def get_solver_velocity_residual(self, report_max: bool = True):
-        """Enable physics scene residual reporting API and chooses between RMS vs Max criteri for velocity residuals.
-
-        Args:
-            report_max (bool): Use the max residual criterion if True, otherwise use the RMS criterion.
-
-        Raises:
-            Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
-        """
-        if not is_prim_path_valid(self._prim_path):
-            raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
-        if self._physx_residual_api is None:
-            self.enable_residual_reporting(True)
-        if report_max:
-            return self._physx_residual_api.GetPhysxResidualReportingMaxResidualVelocityIterationAttr().Get()
-        else:
-            return self._physx_residual_api.GetPhysxResidualReportingRmsResidualVelocityIterationAttr().Get()
-
-    def get_solver_position_residual(self, report_max: bool = True):
-        """Enable physics scene residual reporting API and chooses between RMS vs Max criteri for position residuals.
-
-        Args:
-            report_max (bool): Use the max residual criterion if True, otherwise use the RMS criterion.
-
-        Raises:
-            Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
-        """
-        if not is_prim_path_valid(self._prim_path):
-            raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
-        if self._physx_residual_api is None:
-            self.enable_residual_reporting(True)
-        if report_max:
-            return self._physx_residual_api.GetPhysxResidualReportingMaxResidualPositionIterationAttr().Get()
-        else:
-            return self._physx_residual_api.GetPhysxResidualReportingRmsResidualPositionIterationAttr().Get()
 
     def is_ccd_enabled(self) -> bool:
         """Checks if ccd is enabled.

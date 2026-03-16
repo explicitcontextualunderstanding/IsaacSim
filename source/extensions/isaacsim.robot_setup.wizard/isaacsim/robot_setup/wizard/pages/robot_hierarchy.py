@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Robot hierarchy wizard page for organizing robot meshes into hierarchical link structures."""
+
+
 import asyncio
 import os
 import weakref
@@ -34,6 +38,23 @@ from ..utils.utils import copy_prim_hierarchy
 
 
 class RobotHierarchy:
+    """User interface for organizing robot meshes into a hierarchical link structure.
+
+    Provides an interactive interface where users can reorganize robot components by creating and managing links,
+    then assigning mesh objects to appropriate links through drag-and-drop operations. The interface displays
+    two main areas: a "New Link Structure" section for building the desired hierarchy, and a robot browser
+    below showing available mesh components that can be assigned to links.
+
+    Users can add or remove links, parent mesh objects to specific links, and apply the new structure to
+    update the robot's organization. The interface includes buttons for parenting/unparenting objects,
+    clearing the structure, and copying existing hierarchies.
+
+    Args:
+        visible: Whether the UI frame is initially visible.
+        *args: Variable length argument list passed to parent initialization.
+        **kwargs: Additional keyword arguments passed to parent initialization.
+    """
+
     def __init__(self, visible, *args, **kwargs):
         self._robot = None
         self._next_step_button = None
@@ -52,6 +73,7 @@ class RobotHierarchy:
         self._initial_robot_window_height = 150
 
     def destroy(self):
+        """Destroy the robot hierarchy widget and clean up resources."""
         self.frame.destroy()
         self._robot = None
         if self._link_popup_window:
@@ -59,6 +81,7 @@ class RobotHierarchy:
             self._link_popup_window = None
 
     def clean(self):
+        """Clean up stage widgets, selection watches, and reset internal state."""
         self._links_selection_watch = None
         self._links_stage_widget.open_stage(None)
         self._links_stage_widget.destroy()
@@ -73,6 +96,7 @@ class RobotHierarchy:
         self._reference_mesh = {}
 
     def _build_frame(self):
+        """Build the UI frame for the robot hierarchy widget."""
         with ui.CollapsableFrame("Robot Hierarchy", build_header_fn=custom_header):
             with ui.ScrollingFrame():
                 with ui.VStack(spacing=2, name="margin_vstack"):
@@ -194,9 +218,19 @@ class RobotHierarchy:
         self._populate_robot_stage()
 
     def _on_link_splitter_dragged(self, position_y):
+        """Handle dragging of the link splitter to adjust the link stage window height.
+
+        Args:
+            position_y: The new Y position of the splitter.
+        """
         self._links_splitter.offset_y = max(self._initial_link_window_height, position_y.value)
 
     def _on_robot_splitter_dragged(self, position_y):
+        """Handle dragging of the robot splitter to adjust the robot stage window height.
+
+        Args:
+            position_y: The new Y position of the splitter.
+        """
         self._robot_splitter.offset_y = max(self._initial_robot_window_height, position_y.value)
 
     def _clear_link_stage(self):
@@ -232,6 +266,7 @@ class RobotHierarchy:
         self._links_stage_widget.set_selection_watch(self._links_selection_watch)
 
     def _populate_robot_stage(self):
+        """Populate the robot stage by copying the selected robot prim to a temporary stage."""
         # make a copy of the selected robot prim on this stage, copy only path names, no attributes
         if not self._robot:
             return
@@ -253,6 +288,11 @@ class RobotHierarchy:
         self._robot_stage_widget.set_selection_watch(self._robot_selection_watch)
 
     def _attach_stage(self, stage):
+        """Attaches a USD stage to the current USD context asynchronously.
+
+        Args:
+            stage: The USD stage to attach to the context.
+        """
         usd_context = omni.usd.get_context()
         # it will refresh the default kit stage, is this expected?
         asyncio.ensure_future(
@@ -260,12 +300,22 @@ class RobotHierarchy:
         )  ## seems necessary for the copy and clear buttons to work
 
     def set_visible(self, visible):
+        """Sets the visibility of the robot hierarchy widget.
+
+        Args:
+            visible: Whether the widget should be visible.
+        """
         if self.frame:
             self.frame.visible = visible
             if visible:
                 self._robot = RobotRegistry().get()
 
     def _add_link_item(self, link_name=None):
+        """Opens a dialog to add a new link to the robot hierarchy.
+
+        Args:
+            link_name: Initial name for the link.
+        """
         if not self._links_temp_stage:
             return
 
@@ -305,6 +355,7 @@ class RobotHierarchy:
         self._link_popup_window.show()
 
     def _delete_link_item(self):
+        """Deletes the currently selected links from the temporary stage."""
         if len(self._links_selected) == 0:
             return
 
@@ -312,6 +363,7 @@ class RobotHierarchy:
             self._links_temp_stage.RemovePrim(Sdf.Path(path))
 
     def _parent_button_clicked(self):
+        """Handles parenting selected robot objects to the selected link in the new hierarchy."""
         step_path = self._step_selected
         link_path = self._links_selected[0]
         for step in step_path:
@@ -324,6 +376,7 @@ class RobotHierarchy:
             self._robot_temp_stage.RemovePrim(Sdf.Path(step))
 
     def _unparent_button_clicked(self):
+        """Handles unparenting selected links by moving them back to the robot stage and removing them from history."""
         # need to remove the link from history
         for link_selected in self._links_selected:
             # Find the link path (key) that corresponds to the selected link (value)
@@ -361,10 +414,16 @@ class RobotHierarchy:
         self._delete_link_item()
 
     def _on_links_selection_changed(self, selection):
+        """Handles selection changes in the links stage widget.
+
+        Args:
+            selection: List of selected link paths in the links stage.
+        """
         self._links_selected = selection
         self._update_parent_button_enabled()
 
     def _update_parent_button_enabled(self):
+        """Updates the enabled state of parent and unparent buttons based on current selections."""
         if len(self._links_selected) > 0 and len(self._step_selected) > 0:
             self._parent_button.enabled = True
             self._unparent_button.enabled = True
@@ -373,10 +432,16 @@ class RobotHierarchy:
             self._unparent_button.enabled = False
 
     def _on_robot_selection_changed(self, selection):
+        """Handles selection changes in the robot stage widget.
+
+        Args:
+            selection: List of selected object paths in the robot stage.
+        """
         self._step_selected = selection
         self._update_parent_button_enabled()
 
     def _apply_new_structure(self):
+        """Applies the new link structure to the robot by updating links and applying the hierarchy changes."""
         self._robot = RobotRegistry().get()
 
         if not self._robot or not self._history:

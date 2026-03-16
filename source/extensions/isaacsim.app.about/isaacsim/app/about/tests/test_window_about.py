@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""UI tests for the About dialog window."""
+
 from pathlib import Path
 
 import carb
@@ -22,8 +24,11 @@ from omni.ui.tests.test_base import OmniUiTest
 
 
 class TestAboutWindow(OmniUiTest):
+    """Tests that validate the About window rendering."""
+
     # Before running each test
-    async def setUp(self):
+    async def setUp(self) -> None:
+        """Set up the test environment."""
         await super().setUp()
 
         EXTENSION_FOLDER_PATH = Path(
@@ -33,16 +38,31 @@ class TestAboutWindow(OmniUiTest):
         self._golden_img_dir = TEST_DATA_PATH.absolute().joinpath("golden_img").absolute()
 
     # After running each test
-    async def tearDown(self):
+    async def tearDown(self) -> None:
+        """Clean up the test environment."""
         await super().tearDown()
 
-    async def test_about_ui(self):
+    async def test_about_ui(self) -> None:
+        """Validate the About dialog UI."""
+
         class FakePluginImpl:
-            def __init__(self, name):
+            """Fake plugin implementation used for UI tests.
+
+            Args:
+                name: Name assigned to the implementation.
+            """
+
+            def __init__(self, name: str) -> None:
                 self.name = name
 
         class FakePlugin:
-            def __init__(self, name):
+            """Fake plugin metadata used for UI tests.
+
+            Args:
+                name: Name assigned to the plugin.
+            """
+
+            def __init__(self, name: str) -> None:
                 self.libPath = "Lib Path " + name
                 self.impl = FakePluginImpl("Impl " + name)
                 self.interfaces = "Interface " + name
@@ -60,5 +80,5 @@ class TestAboutWindow(OmniUiTest):
         try:
             await self.docked_test_window(window=about_window, width=400, height=510)
             await self.finalize_test(golden_img_dir=self._golden_img_dir, golden_img_name="test_about_ui.png")
-        except:
-            carb.log_warn("Could not run test because carb::windowing is not available")
+        except Exception as e:
+            carb.log_warn(f"Could not run test because carb::windowing is not available: {e}")

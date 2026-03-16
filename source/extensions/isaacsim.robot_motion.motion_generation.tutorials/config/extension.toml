@@ -4,13 +4,13 @@
 #
 
 [package]
-version = "0.1.1"
+version = "0.2.0"
 category = "Simulation"
 title = "Motion Generation Tutorials"
 description = "Tutorials for using the Lula planning library under motion generation."
 keywords = ["lula","motion","generation","rmp","rmpflow","flow","rrt","trajectory"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 
@@ -41,12 +41,23 @@ name = "isaacsim.robot_motion.motion_generation.tutorials.kinematics"
 name = "isaacsim.robot_motion.motion_generation.tutorials.trajectory_generator"
 
 [[test]]
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-
-[[test]]
 name = "startup"
 dependencies = [
     "omni.isaac.ml_archive",
 ]
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

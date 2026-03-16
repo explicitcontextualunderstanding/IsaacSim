@@ -14,8 +14,6 @@
 # limitations under the License.
 
 
-import carb
-import numpy as np
 import omni.graph.core as og
 import omni.kit.commands
 import omni.kit.test
@@ -25,26 +23,12 @@ import usdrt.Sdf
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import open_stage_async
 from pxr import Gf, Sdf
+from sensor_msgs_py.point_cloud2 import read_points
 
-from .common import ROS2TestCase, add_carter, add_carter_ros, add_cube, fields_to_dtype, get_qos_profile
+from .common import ROS2TestCase, add_carter, add_carter_ros, add_cube, get_qos_profile
 
 
-# Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2PointCloud(ROS2TestCase):
-    # Before running each test
-    async def setUp(self):
-        await super().setUp()
-
-        await omni.usd.get_context().new_stage_async()
-
-        await omni.kit.app.get_app().next_update_async()
-
-        pass
-
-    # After running each test
-    async def tearDown(self):
-        await super().tearDown()
-
     async def test_physx_lidar(self):
         import rclpy
         from sensor_msgs.msg import PointCloud2
@@ -102,7 +86,9 @@ class TestRos2PointCloud(ROS2TestCase):
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(
+            lambda: self._point_cloud_data is not None, max_frames=60, per_frame_callback=spin
+        )
 
         # If 3D point cloud (highLOD enabled)
         self.assertIsNotNone(self._point_cloud_data)
@@ -115,12 +101,11 @@ class TestRos2PointCloud(ROS2TestCase):
             len(self._point_cloud_data.data) / self._point_cloud_data.row_step, self._point_cloud_data.height
         )
 
-        ff = fields_to_dtype(self._point_cloud_data.fields, self._point_cloud_data.point_step)
-        arr = np.frombuffer(self._point_cloud_data.data, ff)
+        points = read_points(self._point_cloud_data)
 
-        self.assertAlmostEqual(arr[100][0], -45.083733, delta=0.01)
-        self.assertAlmostEqual(arr[100][1], -7.949485, delta=0.01)
-        self.assertAlmostEqual(arr[100][2], -0.7990794, delta=0.01)
+        self.assertAlmostEqual(points["x"][100], -45.083733, delta=0.01)
+        self.assertAlmostEqual(points["y"][100], -7.949485, delta=0.01)
+        self.assertAlmostEqual(points["z"][100], -0.7990794, delta=0.01)
         self.assertEqual(self._point_cloud_data.fields[0].datatype, 7)
         self.assertEqual(self._point_cloud_data.fields[1].datatype, 7)
         self.assertEqual(self._point_cloud_data.fields[2].datatype, 7)
@@ -179,7 +164,9 @@ class TestRos2PointCloud(ROS2TestCase):
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, spin)
+        await self.simulate_until_condition(
+            lambda: self._point_cloud_data is not None, max_frames=60, per_frame_callback=spin
+        )
 
         # If flat point cloud (highLOD disabled)
         self.assertIsNotNone(self._point_cloud_data)
@@ -190,12 +177,11 @@ class TestRos2PointCloud(ROS2TestCase):
             self._point_cloud_data.row_step / self._point_cloud_data.point_step, self._point_cloud_data.width
         )
 
-        ff = fields_to_dtype(self._point_cloud_data.fields, self._point_cloud_data.point_step)
-        arr = np.frombuffer(self._point_cloud_data.data, ff)
+        points = read_points(self._point_cloud_data)
 
-        self.assertAlmostEqual(arr[50][0], 1.257611, delta=0.01)
-        self.assertAlmostEqual(arr[50][1], 0.149961, delta=0.01)
-        self.assertAlmostEqual(arr[50][2], -0.000000, delta=0.01)
+        self.assertAlmostEqual(points["x"][50], 1.257611, delta=0.01)
+        self.assertAlmostEqual(points["y"][50], 0.149961, delta=0.01)
+        self.assertAlmostEqual(points["z"][50], -0.000000, delta=0.01)
 
         self.assertEqual(self._point_cloud_data.fields[0].datatype, 7)
         self.assertEqual(self._point_cloud_data.fields[1].datatype, 7)
@@ -303,23 +289,17 @@ class TestRos2PointCloud(ROS2TestCase):
                 self._point_cloud_data.row_step / self._point_cloud_data.point_step, self._point_cloud_data.width
             )
 
-            ff = fields_to_dtype(self._point_cloud_data.fields, self._point_cloud_data.point_step)
-            arr = np.frombuffer(self._point_cloud_data.data, ff)
+            points = read_points(self._point_cloud_data)
 
             self.assertEqual(self._point_cloud_data.fields[0].datatype, 7)
             self.assertEqual(self._point_cloud_data.fields[1].datatype, 7)
             self.assertEqual(self._point_cloud_data.fields[2].datatype, 7)
 
-            def fix_data(arr):
-                dat = []
-                for x in arr:
-                    dat.append((x[0], x[1], x[2]))
-                return dat
-
-            arr = fix_data(arr)
+            # Create tuples of (x, y, z) for uniqueness check
+            point_tuples = list(zip(points["x"], points["y"], points["z"]))
 
             # Check to see if number of points matches number of beams in full scan
-            self.assertEqual(len(set(arr)), HORIZONTAL_FOV / HORIZONTAL_RESOLUTION)
+            self.assertEqual(len(set(point_tuples)), HORIZONTAL_FOV / HORIZONTAL_RESOLUTION)
 
         # Check with lidar 0.0 rotation rate
         omni.kit.commands.execute(
@@ -331,12 +311,20 @@ class TestRos2PointCloud(ROS2TestCase):
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(2.0, 60, spin)
+
+        # Wait for point cloud data
+        condition_met = await self.simulate_until_condition(
+            lambda: self._point_cloud_data is not None, max_frames=120, per_frame_callback=spin  # 2.0s at 60fps
+        )
+        self.assertTrue(condition_met, "Failed to receive point cloud data within timeout")
 
         standard_checks()
 
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
+
+        # Reset for next test
+        self._point_cloud_data = None
 
         # 21.0 Hz Lidar rotation
         omni.kit.commands.execute(
@@ -347,7 +335,12 @@ class TestRos2PointCloud(ROS2TestCase):
         )
 
         self._timeline.play()
-        await simulate_async(2.0, 60, spin)
+
+        # Wait for point cloud data
+        condition_met = await self.simulate_until_condition(
+            lambda: self._point_cloud_data is not None, max_frames=120, per_frame_callback=spin  # 2.0s at 60fps
+        )
+        self.assertTrue(condition_met, "Failed to receive point cloud data within timeout")
 
         standard_checks()
         self._timeline.stop()

@@ -23,4 +23,4 @@ simulation scenarios.
 # Import the extension class to ensure it's registered
 from .extension import UCXBridgeExtension
 
-__all__ = ["UCXBridgeExtension"]
+__all__ = []

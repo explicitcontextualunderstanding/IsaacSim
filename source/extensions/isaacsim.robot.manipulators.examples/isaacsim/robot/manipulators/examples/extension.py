@@ -16,8 +16,21 @@ import omni.ext
 
 
 class Extension(omni.ext.IExt):
+    """An extension that provides examples and demonstrations for robot manipulator functionality in Isaac Sim.
+
+    This extension serves as a collection of practical examples showcasing how to work with robot manipulators
+    within the Isaac Sim environment. It demonstrates various manipulator operations, configurations, and
+    interactions that can be used as reference implementations or starting points for robotics applications.
+    """
+
     def on_startup(self, ext_id):
+        """Called when the extension starts up.
+
+        Args:
+            ext_id: The extension ID.
+        """
         pass
 
     def on_shutdown(self):
+        """Called when the extension shuts down."""
         pass

@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides wizard page components for the robot setup workflow in Isaac Sim."""
+
+
 from .add_colliders import AddColliders
 from .add_robot import AddRobot
 from .joints_and_drives import JointsandDrives

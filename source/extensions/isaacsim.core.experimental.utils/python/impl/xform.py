@@ -30,7 +30,7 @@ from . import stage as stage_utils
 
 
 def get_local_pose(
-    prim: str | Usd.Prim | usdrt.Usd.Prim, *, device: str | wp.context.Device | None = None
+    prim: str | Usd.Prim | usdrt.Usd.Prim, *, device: str | wp.Device | None = None
 ) -> tuple[wp.array, wp.array]:
     """Get the local pose of a prim.
 
@@ -143,7 +143,7 @@ def set_local_pose(
 
 
 def get_world_pose(
-    prim: str | Usd.Prim | usdrt.Usd.Prim, *, device: str | wp.context.Device | None = None
+    prim: str | Usd.Prim | usdrt.Usd.Prim, *, device: str | wp.Device | None = None
 ) -> tuple[wp.array, wp.array]:
     """Get the world pose of a prim.
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.0.4] - 2026-02-28
+### Changed
+- Updated test to use new omni.physics.core API (`IPhysicsStageUpdate.on_attach` replaces removed `IPhysicsSimulation.attach_stage`)
+
+## [4.0.3] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [4.0.2] - 2026-02-02
+### Changed
+- Fix quaternion order issue in torch transformation utils
+- Added test cases for torch transformation utils for the broken function
+
 ## [4.0.1] - 2025-12-09
 ### Changed
 - set_camera_prim_path now also applies the OmniRtxCameraExposureAPI_1 schema to the camera prim

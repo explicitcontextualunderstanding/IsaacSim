@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides a wrapper class for computing robot kinematics that integrates with simulated robot articulations."""
+
+
 from typing import Optional, Tuple
 
 import carb
@@ -30,9 +33,10 @@ class ArticulationKinematicsSolver:
     recognized by the robot Articulation
 
     Args:
-        robot_articulation (SingleArticulation): Initialized robot Articulation object representing the simulated USD robot
-        kinematics_solver (KinematicsSolver): An instance of a class that implements the KinematicsSolver
-        end_effector_frame_name (str): The name of the robot's end effector frame.  This frame must appear in kinematics_solver.get_all_frame_names()
+        robot_articulation: Initialized robot Articulation object representing the simulated USD robot.
+        kinematics_solver: An instance of a class that implements the KinematicsSolver.
+        end_effector_frame_name: The name of the robot's end effector frame. This frame must appear in
+            kinematics_solver.get_all_frame_names().
     """
 
     def __init__(
@@ -44,17 +48,17 @@ class ArticulationKinematicsSolver:
         self._joints_view = ArticulationSubset(robot_articulation, kinematics_solver.get_joint_names())
         return
 
-    def compute_end_effector_pose(self, position_only=False) -> Tuple[np.array, np.array]:
-        """Compute the pose of the robot end effector using the simulated robot's current joint positions
+    def compute_end_effector_pose(self, position_only: bool = False) -> Tuple[np.array, np.array]:
+        """Compute the pose of the robot end effector using the simulated robot's current joint positions.
 
         Args:
-            position_only (bool): If True, only the frame positions need to be calculated.  The returned rotation may be left undefined.
+            position_only: If True, only the frame positions need to be calculated. The returned rotation may be
+                left undefined.
 
         Returns:
-            Tuple[np.array,np.array]:
-            position: Translation vector describing the translation of the robot end effector relative to the USD global frame (in stage units)
-
-            rotation: (3x3) rotation matrix describing the rotation of the frame relative to the USD stage global frame
+            A tuple containing (position, rotation) where position is translation vector describing the translation
+            of the robot end effector relative to the USD global frame (in stage units) and rotation is (3x3)
+            rotation matrix describing the rotation of the frame relative to the USD stage global frame.
         """
         joint_positions = self._joints_view.get_joint_positions()
         if joint_positions is None:
@@ -78,17 +82,17 @@ class ArticulationKinematicsSolver:
         in an articulation action that can be directly applied to the robot.
 
         Args:
-            target_position (np.array): target translation of the target frame (in stage units) relative to the USD stage origin
-            target_orientation (np.array): target orientation of the target frame relative to the USD stage global frame. Defaults to None.
-            position_tolerance (float): l-2 norm of acceptable position error (in stage units) between the target and achieved translations. Defaults to None.
-            orientation tolerance (float): magnitude of rotation (in radians) separating the target orientation from the achieved orienatation.
-                orientation_tolerance is well defined for values between 0 and pi. Defaults to None.
+            target_position: Target translation of the target frame (in stage units) relative to the USD stage origin.
+            target_orientation: Target orientation of the target frame relative to the USD stage global frame.
+            position_tolerance: l-2 norm of acceptable position error (in stage units) between the target and achieved
+                translations.
+            orientation_tolerance: Magnitude of rotation (in radians) separating the target orientation from the
+                achieved orientation. orientation_tolerance is well defined for values between 0 and pi.
 
         Returns:
-            Tuple[ArticulationAction, bool]:
-            ik_result: An ArticulationAction that can be applied to the robot to move the end effector frame to the desired position.
-
-            success: Solver converged successfully
+            A tuple containing (ik_result, success) where ik_result is an ArticulationAction that can be applied to
+            the robot to move the end effector frame to the desired position and success indicates if solver
+            converged successfully.
         """
 
         warm_start = self._joints_view.get_joint_positions()
@@ -103,11 +107,12 @@ class ArticulationKinematicsSolver:
 
         return self._joints_view.make_articulation_action(ik_result, None), succ
 
-    def set_end_effector_frame(self, end_effector_frame_name: str) -> None:
-        """Set the name for the end effector frame.  If the frame is not recognized by the internal KinematicsSolver instance, an error will be thrown
+    def set_end_effector_frame(self, end_effector_frame_name: str):
+        """Set the name for the end effector frame. If the frame is not recognized by the internal KinematicsSolver
+        instance, an error will be thrown.
 
         Args:
-            end_effector_frame_name (str): Name of the robot end effector frame.
+            end_effector_frame_name: Name of the robot end effector frame.
         """
         if end_effector_frame_name not in self._kinematics_solver.get_all_frame_names():
             carb.log_error(
@@ -119,17 +124,18 @@ class ArticulationKinematicsSolver:
         self._ee_frame = end_effector_frame_name
 
     def get_end_effector_frame(self) -> str:
-        """Get the end effector frame
+        """Get the end effector frame name.
 
         Returns:
-            str: Name of the end effector frame
+            Name of the end effector frame.
         """
         return self._ee_frame
 
     def get_joints_subset(self) -> ArticulationSubset:
-        """
+        """A wrapper class for querying USD robot joint states in the order expected by the kinematics solver.
+
         Returns:
-            ArticulationSubset: A wrapper class for querying USD robot joint states in the order expected by the kinematics solver
+            A wrapper class for querying USD robot joint states in the order expected by the kinematics solver.
         """
         return self._joints_view
 
@@ -137,6 +143,6 @@ class ArticulationKinematicsSolver:
         """Get the underlying KinematicsSolver instance used by this class.
 
         Returns:
-            KinematicsSolver: A class that can solve forward and inverse kinematics for a specified robot.
+            A class that can solve forward and inverse kinematics for a specified robot.
         """
         return self._kinematics_solver

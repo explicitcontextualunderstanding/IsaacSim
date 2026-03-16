@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides single view depth sensor functionality extending camera capabilities with depth sensing."""
+
+
 from typing import List, Optional
 
 import carb
@@ -26,9 +29,31 @@ from pxr import Gf, Usd
 
 
 class SingleViewDepthSensor(Camera):
-    _render_product_prim = None
+    """A single view depth sensor that extends the Camera class with depth sensing capabilities.
 
-    def initialize(self, physics_sim_view=None, attach_rgb_annotator=False) -> None:
+    This class provides depth sensing functionality by applying the OmniSensorDepthSensorSingleViewAPI to the
+    render product. It allows configuration of various depth sensor parameters including baseline distance,
+    confidence threshold, focal length, disparity settings, noise parameters, and outlier removal.
+
+    The sensor supports multiple annotators for different types of depth data:
+    - DepthSensorDistance: Provides distance measurements
+    - DepthSensorPointCloudPosition: Generates 3D point cloud positions
+    - DepthSensorPointCloudColor: Provides color information for point clouds
+    - DepthSensorImager: Handles imaging functionality
+
+    The depth sensor simulates realistic depth sensing with configurable noise, confidence thresholds, and
+    outlier removal to match real-world depth sensor characteristics. Parameters like baseline distance and
+    focal length can be adjusted to simulate different depth sensor configurations.
+    """
+
+    _render_product_prim = None
+    """The USD prim representing the render product associated with this depth sensor.
+
+This prim has the OmniSensorDepthSensorSingleViewAPI applied to it and contains all the depth sensor
+configuration attributes. It is used to set and get depth sensor parameters such as baseline distance,
+confidence threshold, focal length, and other sensor properties."""
+
+    def initialize(self, physics_sim_view=None, attach_rgb_annotator=False):
         """Initialize the depth camera.
 
         Calls the parent class's initialize method, then retrieves the render product prim
@@ -39,6 +64,10 @@ class SingleViewDepthSensor(Camera):
         - DepthSensorPointCloudPosition
         - DepthSensorPointCloudColor
         - DepthSensorImager
+
+        Args:
+            physics_sim_view: Physics simulation view.
+            attach_rgb_annotator: Whether to attach RGB annotator.
         """
         super().initialize(physics_sim_view=physics_sim_view, attach_rgb_annotator=attach_rgb_annotator)
         # Retrieve the render product prim and apply the appropriate schema to it
@@ -52,184 +81,296 @@ class SingleViewDepthSensor(Camera):
 
         self.set_enabled(enabled=True)
 
-    def set_baseline_mm(self, baseline_mm: float = 55) -> None:
-        """Set the baseline distance in millimeters."""
+    def set_baseline_mm(self, baseline_mm: float = 55):
+        """Set the baseline distance in millimeters.
+
+        Args:
+            baseline_mm: Baseline distance in millimeters.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:baselineMM").Set(baseline_mm)
 
     def get_baseline_mm(self) -> float:
-        """Get the baseline distance in millimeters."""
+        """Baseline distance in millimeters.
+
+        Returns:
+            The baseline distance in millimeters, or None if not available.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute("omni:rtx:post:depthSensor:baselineMM"):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:baselineMM").Get()
         return None
 
-    def set_confidence_threshold(self, confidence_threshold: float = 0.95) -> None:
-        """Set the confidence threshold for the depth sensor."""
+    def set_confidence_threshold(self, confidence_threshold: float = 0.95):
+        """Set the confidence threshold for the depth sensor.
+
+        Args:
+            confidence_threshold: Confidence threshold for the depth sensor.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:confidenceThreshold").Set(
                 confidence_threshold
             )
 
     def get_confidence_threshold(self) -> float:
-        """Get the confidence threshold for the depth sensor."""
+        """Confidence threshold for the depth sensor.
+
+        Returns:
+            The confidence threshold for the depth sensor, or None if not available.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:confidenceThreshold"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:confidenceThreshold").Get()
         return None
 
-    def set_enabled(self, enabled: bool = False) -> None:
-        """Enable or disable the depth sensor."""
+    def set_enabled(self, enabled: bool = False):
+        """Enable or disable the depth sensor.
+
+        Args:
+            enabled: Whether to enable the depth sensor.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:enabled").Set(enabled)
 
     def get_enabled(self) -> bool:
-        """Get whether the depth sensor is enabled."""
+        """Whether the depth sensor is enabled.
+
+        Returns:
+            True if the depth sensor is enabled, False otherwise, or None if not available.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute("omni:rtx:post:depthSensor:enabled"):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:enabled").Get()
         return None
 
-    def set_focal_length_pixel(self, focal_length_pixel: float = 897) -> None:
-        """Set the focal length in pixels."""
+    def set_focal_length_pixel(self, focal_length_pixel: float = 897):
+        """Set the focal length in pixels.
+
+        Args:
+            focal_length_pixel: Focal length in pixels.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:focalLengthPixel").Set(focal_length_pixel)
 
     def get_focal_length_pixel(self) -> float:
-        """Get the focal length in pixels."""
+        """Focal length in pixels.
+
+        Returns:
+            The focal length in pixels, or None if not available.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:focalLengthPixel"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:focalLengthPixel").Get()
         return None
 
-    def set_max_disparity_pixel(self, max_disparity_pixel: float = 110) -> None:
-        """Set the maximum disparity in pixels."""
+    def set_max_disparity_pixel(self, max_disparity_pixel: float = 110):
+        """Set the maximum disparity in pixels.
+
+        Args:
+            max_disparity_pixel: Maximum disparity in pixels.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:maxDisparityPixel").Set(
                 max_disparity_pixel
             )
 
     def get_max_disparity_pixel(self) -> float:
-        """Get the maximum disparity in pixels."""
+        """Maximum disparity in pixels.
+
+        Returns:
+            The maximum disparity in pixels.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:maxDisparityPixel"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:maxDisparityPixel").Get()
         return None
 
-    def set_max_distance(self, max_distance: float = 10000000) -> None:
-        """Set the maximum distance for disparity generation."""
+    def set_max_distance(self, max_distance: float = 10000000):
+        """Set the maximum distance for disparity generation.
+
+        Args:
+            max_distance: Maximum distance for disparity generation.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:maxDistance").Set(max_distance)
 
     def get_max_distance(self) -> float:
-        """Get the maximum distance for disparity generation."""
+        """Maximum distance for disparity generation.
+
+        Returns:
+            The maximum distance for disparity generation.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:maxDistance"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:maxDistance").Get()
         return None
 
-    def set_min_distance(self, min_distance: float = 0.5) -> None:
-        """Set the minimum distance for disparity generation."""
+    def set_min_distance(self, min_distance: float = 0.5):
+        """Set the minimum distance for disparity generation.
+
+        Args:
+            min_distance: Minimum distance for disparity generation.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:minDistance").Set(min_distance)
 
     def get_min_distance(self) -> float:
-        """Get the minimum distance for disparity generation."""
+        """Minimum distance for disparity generation.
+
+        Returns:
+            The minimum distance for disparity generation.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:minDistance"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:minDistance").Get()
         return None
 
-    def set_noise_downscale_factor_pixel(self, noise_downscale_factor_pixel: float = 1) -> None:
-        """Set the noise downscale factor in pixels."""
+    def set_noise_downscale_factor_pixel(self, noise_downscale_factor_pixel: float = 1):
+        """Set the noise downscale factor in pixels.
+
+        Args:
+            noise_downscale_factor_pixel: Noise downscale factor in pixels.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:noiseDownscaleFactorPixel").Set(
                 noise_downscale_factor_pixel
             )
 
     def get_noise_downscale_factor_pixel(self) -> float:
-        """Get the noise downscale factor in pixels."""
+        """Noise downscale factor in pixels.
+
+        Returns:
+            The noise downscale factor in pixels.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:noiseDownscaleFactorPixel"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:noiseDownscaleFactorPixel").Get()
         return None
 
-    def set_noise_mean(self, noise_mean: float = 0.25) -> None:
-        """Set the noise mean."""
+    def set_noise_mean(self, noise_mean: float = 0.25):
+        """Set the noise mean.
+
+        Args:
+            noise_mean: Noise mean value.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:noiseMean").Set(noise_mean)
 
     def get_noise_mean(self) -> float:
-        """Get the noise mean."""
+        """Noise mean value.
+
+        Returns:
+            The noise mean.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute("omni:rtx:post:depthSensor:noiseMean"):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:noiseMean").Get()
         return None
 
-    def set_noise_sigma(self, noise_sigma: float = 0.25) -> None:
-        """Set the noise sigma."""
+    def set_noise_sigma(self, noise_sigma: float = 0.25):
+        """Set the noise sigma.
+
+        Args:
+            noise_sigma: Noise sigma value.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:noiseSigma").Set(noise_sigma)
 
     def get_noise_sigma(self) -> float:
-        """Get the noise sigma."""
+        """Noise sigma for the depth sensor.
+
+        Returns:
+            The noise sigma value.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute("omni:rtx:post:depthSensor:noiseSigma"):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:noiseSigma").Get()
         return None
 
-    def set_outlier_removal_enabled(self, outlier_removal_enabled: int = 3) -> None:
-        """Set the outlier removal enabled attribute. Samples separated by this range (in pixels) will be removed."""
+    def set_outlier_removal_enabled(self, outlier_removal_enabled: bool = True):
+        """Set the outlier removal enabled attribute. Samples separated by this range (in pixels) will be removed.
+
+        Args:
+            outlier_removal_enabled: Whether to enable outlier removal.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:outlierRemovalEnabled").Set(
                 outlier_removal_enabled
             )
 
-    def get_outlier_removal_enabled(self) -> int:
-        """Get the outlier removal enabled attribute. Samples separated by this range (in pixels) will be removed."""
+    def get_outlier_removal_enabled(self) -> bool:
+        """Outlier removal enabled attribute. Samples separated by this range (in pixels) will be removed.
+
+        Returns:
+            Whether outlier removal is enabled.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:outlierRemovalEnabled"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:outlierRemovalEnabled").Get()
         return None
 
-    def set_rgb_depth_output_mode(self, rgb_depth_output_mode: int = 0) -> None:
-        """Set the RGB depth output mode."""
+    def set_rgb_depth_output_mode(self, rgb_depth_output_mode: int = 0):
+        """Set the RGB depth output mode.
+
+        Args:
+            rgb_depth_output_mode: The RGB depth output mode to set.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:rgbDepthOutputMode").Set(
                 rgb_depth_output_mode
             )
 
     def get_rgb_depth_output_mode(self) -> int:
-        """Get the RGB depth output mode."""
+        """RGB depth output mode.
+
+        Returns:
+            The RGB depth output mode value.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:rgbDepthOutputMode"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:rgbDepthOutputMode").Get()
         return None
 
-    def set_sensor_size_pixel(self, sensor_size_pixel: int = 1280) -> None:
-        """Set the sensor size in pixels."""
+    def set_sensor_size_pixel(self, sensor_size_pixel: int = 1280):
+        """Set the sensor size in pixels.
+
+        Args:
+            sensor_size_pixel: The sensor size in pixels to set.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:sensorSizePixel").Set(sensor_size_pixel)
 
     def get_sensor_size_pixel(self) -> int:
-        """Get the sensor size in pixels."""
+        """Sensor size in pixels.
+
+        Returns:
+            The sensor size in pixels.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:sensorSizePixel"
         ):
             return self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:sensorSizePixel").Get()
         return None
 
-    def set_show_distance(self, show_distance: bool = False) -> None:
-        """Set whether to show the distance."""
+    def set_show_distance(self, show_distance: bool = False):
+        """Set whether to show the distance.
+
+        Args:
+            show_distance: Whether to show the distance.
+        """
         if self._render_product_prim:
             self._render_product_prim.GetAttribute("omni:rtx:post:depthSensor:showDistance").Set(show_distance)
 
     def get_show_distance(self) -> bool:
-        """Get whether to show the distance."""
+        """Whether to show the distance.
+
+        Returns:
+            True if distance is shown, False otherwise.
+        """
         if self._render_product_prim and self._render_product_prim.HasAttribute(
             "omni:rtx:post:depthSensor:showDistance"
         ):
@@ -253,9 +394,9 @@ class SingleViewDepthSensorAsset:
     Args:
         prim_path: The USD prim path where the asset will be placed.
         asset_path: The relative path to the USD asset file within the assets root.
-        position: World position of the asset as a numpy array [x, y, z]. Defaults to None.
-        translation: Local translation of the asset as a numpy array [x, y, z]. Defaults to None.
-        orientation: Quaternion orientation as a numpy array [w, x, y, z]. Defaults to [1.0, 0.0, 0.0, 0.0].
+        position: World position of the asset as a numpy array [x, y, z].
+        translation: Local translation of the asset as a numpy array [x, y, z].
+        orientation: Quaternion orientation as a numpy array [w, x, y, z].
 
     Example:
 
@@ -272,7 +413,7 @@ class SingleViewDepthSensorAsset:
         ...     orientation=np.array([1.0, 0.0, 0.0, 0.0])
         ... )
         >>>
-        >>> # Initialize all the depth sensors inthe asset
+        >>> # Initialize all the depth sensors in the asset
         >>> depth_sensor_asset.initialize()
         >>>
         >>> # Get a specific depth sensor by camera prim path
@@ -286,7 +427,7 @@ class SingleViewDepthSensorAsset:
         position: Optional[np.ndarray] = None,
         translation: Optional[np.ndarray] = None,
         orientation: Optional[np.ndarray] = np.array([1.0, 0.0, 0.0, 0.0]),
-    ) -> None:
+    ):
 
         # Map template render product paths to SingleViewDepthSensor objects created using the corresponding camera prim
         self._depth_sensor_templates = {}
@@ -352,7 +493,7 @@ class SingleViewDepthSensorAsset:
             resolution=resolution,
         )
 
-    def initialize(self, physics_sim_view=None, attach_rgb_annotator=False) -> None:
+    def initialize(self, physics_sim_view=None, attach_rgb_annotator=False):
         """Initialize all child depth sensors in the asset.
 
         This method initializes each depth sensor template and copies depth sensor
@@ -362,8 +503,8 @@ class SingleViewDepthSensorAsset:
         Each depth sensor will be enabled, even if the template render product is disabled.
 
         Args:
-            physics_sim_view: Optional physics simulation view. Defaults to None.
-            attach_rgb_annotator: Whether to attach RGB annotator. Defaults to False.
+            physics_sim_view: Optional physics simulation view.
+            attach_rgb_annotator: Whether to attach RGB annotator.
 
         Example:
 
@@ -397,11 +538,19 @@ class SingleViewDepthSensorAsset:
             depth_sensor.set_enabled(enabled=True)
 
     def get_all_depth_sensors(self) -> List[SingleViewDepthSensor]:
-        """Get all depth sensors in the asset."""
+        """Get all depth sensors in the asset.
+
+        Returns:
+            List of all SingleViewDepthSensor instances in the asset.
+        """
         return list(self._camera_prim_to_depth_sensor.values())
 
     def get_all_depth_sensor_paths(self) -> List[str]:
-        """Get all depth sensor paths in the asset."""
+        """Get all depth sensor paths in the asset.
+
+        Returns:
+            List of all camera prim paths associated with depth sensors in the asset.
+        """
         return list(self._camera_prim_to_depth_sensor.keys())
 
     def get_child_depth_sensor(self, camera_prim_path: str) -> SingleViewDepthSensor:
@@ -457,6 +606,9 @@ class SingleViewDepthSensorAsset:
                 If the path ends with "/", it will be automatically removed.
             camera_prim_path: The USD path to the camera prim that will be associated with the render product.
             **kwargs: Additional keyword arguments to pass to the RenderProduct prim as attributes.
+
+        Returns:
+            The created RenderProduct prim, or an invalid prim if creation failed.
 
         Raises:
             RuntimeError: If the USD stage cannot be accessed.

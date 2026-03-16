@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for generating grasping-related synthetic data using Isaac Sim Replicator."""
+
+
 from .extension import *
 from .grasping_manager import GraspingManager, GraspPhase
+
+__all__ = ["GraspingManager", "GraspPhase"]

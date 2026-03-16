@@ -32,7 +32,6 @@ from .common import ROS2TestCase
 
 
 class TestRos2Subscribers(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
@@ -48,7 +47,6 @@ class TestRos2Subscribers(ROS2TestCase):
         self.sub_node_time_attribute_path = None
         pass
 
-    # After running each test
     async def tearDown(self):
 
         await super().tearDown()
@@ -75,29 +73,6 @@ class TestRos2Subscribers(ROS2TestCase):
         queue_size = random.randint(1, self.MAX_COUNT - self.MAX_OFFSET)
         print("Choosing queue size of", queue_size)
         return queue_size
-
-    async def simulate_until_condition(self, condition_func, max_frames=180, frames_per_step=1):
-        """Simulate until condition is met or maximum frames reached.
-
-        This method runs simulation in steps until a specified condition function
-        returns True or the maximum frame limit is exceeded.
-
-        Args:
-            condition_func: Function that returns True when condition is met.
-            max_frames: Maximum number of simulation frames to run.
-            frames_per_step: Number of frames to simulate in each step.
-
-        Returns:
-            True if condition was met, False if max frames reached.
-        """
-        frames_run = 0
-        while frames_run < max_frames:
-            await omni.kit.app.get_app().next_update_async()
-            self.spin()
-            frames_run += frames_per_step
-            if condition_func():
-                return True
-        return False
 
     async def test_joint_state_subscriber_queue(self):
 
@@ -166,6 +141,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -193,6 +169,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -273,6 +250,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -300,6 +278,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -377,6 +356,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -404,6 +384,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -484,6 +465,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -511,6 +493,7 @@ class TestRos2Subscribers(ROS2TestCase):
         # Wait until we receive enough data or timeout
         condition_met = await self.simulate_until_condition(
             lambda: len(self.sub_data) >= self.queue_size,
+            per_frame_callback=self.spin,
         )
 
         self._timeline.stop()
@@ -611,7 +594,7 @@ class TestRos2Subscribers(ROS2TestCase):
                 rot_match = np.linalg.norm(r - rot) < 1e-5 or np.linalg.norm(r + rot) < 1e-5
                 return pos_match and rot_match
 
-            condition_met = await self.simulate_until_condition(pose_condition)
+            condition_met = await self.simulate_until_condition(pose_condition, per_frame_callback=self.spin)
 
             self.assertTrue(
                 condition_met,
@@ -711,7 +694,7 @@ class TestRos2Subscribers(ROS2TestCase):
                 rot_match = np.linalg.norm(r - rot) < 1e-5 or np.linalg.norm(r + rot) < 1e-5
                 return pos_match and rot_match
 
-            condition_met = await self.simulate_until_condition(pose_condition)
+            condition_met = await self.simulate_until_condition(pose_condition, per_frame_callback=self.spin)
 
             self.assertTrue(
                 condition_met,

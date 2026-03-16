@@ -546,6 +546,81 @@ def randomize_poses(
         rep.functional.modify.pose(prim, position_value=rand_loc, rotation_value=rand_rot, scale_value=rand_scale)
 
 
+def get_or_create_physx_scene(prim_path: str = "/PhysicsScene") -> PhysxSchema.PhysxSceneAPI:
+    """Get the existing PhysX scene or create a new one at the given prim path.
+
+    Searches the current stage for an existing UsdPhysics.Scene prim. If found, applies
+    and returns the PhysxSceneAPI on it. If not found, creates a new physics scene at the
+    given prim path and returns the PhysxSceneAPI.
+
+    Args:
+        prim_path: The prim path to create a new physics scene at if none exists.
+
+    Returns:
+        The PhysxSceneAPI applied to the physics scene prim.
+    """
+    stage = omni.usd.get_context().get_stage()
+    for prim in stage.Traverse():
+        if prim.IsA(UsdPhysics.Scene):
+            return PhysxSchema.PhysxSceneAPI.Apply(prim)
+
+    UsdPhysics.Scene.Define(stage, prim_path)
+    return PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath(prim_path))
+
+
+# Default GPU collision stack size for the infinigen SDG pipeline (300 MB).
+# The PhysX default (64 MB) is insufficient for scenes with many colliders (e.g. 30+ shape
+# distractors, 10+ mesh distractors, labeled assets, and environment collision meshes).
+# The error message from PhysX recommends at least ~272 MB for a typical infinigen scene,
+# so 300 MB provides a comfortable margin.
+INFINIGEN_DEFAULT_GPU_COLLISION_STACK_SIZE = 314572800
+
+
+def configure_physics_scene(physics_config: dict | None = None) -> None:
+    """Configure the PhysX scene GPU memory settings for the infinigen SDG pipeline.
+
+    This must be called before running any physics simulation. It sets the GPU collision
+    stack size and other GPU memory parameters on the PhysX scene to prevent buffer overflow
+    errors when simulating complex scenes with many colliders.
+
+    Args:
+        physics_config: Optional dictionary with physics configuration overrides.
+            Supported keys (all optional):
+            - gpu_collision_stack_size (int): GPU collision stack size in bytes.
+              Defaults to INFINIGEN_DEFAULT_GPU_COLLISION_STACK_SIZE (300 MB).
+            - gpu_found_lost_pairs_capacity (int): GPU found/lost pairs capacity.
+            - gpu_found_lost_aggregate_pairs_capacity (int): GPU found/lost aggregate pairs capacity.
+            - gpu_total_aggregate_pairs_capacity (int): GPU total aggregate pairs capacity.
+            - gpu_max_rigid_contact_count (int): Maximum rigid body contact count on GPU.
+            - gpu_max_rigid_patch_count (int): Maximum rigid body contact patches on GPU.
+            - gpu_heap_capacity (int): GPU heap capacity in bytes.
+            - gpu_temp_buffer_capacity (int): GPU temporary buffer capacity in bytes.
+    """
+    physics_config = physics_config or {}
+    physx_scene = get_or_create_physx_scene()
+
+    gpu_collision_stack_size = physics_config.get(
+        "gpu_collision_stack_size", INFINIGEN_DEFAULT_GPU_COLLISION_STACK_SIZE
+    )
+    physx_scene.GetGpuCollisionStackSizeAttr().Set(gpu_collision_stack_size)
+
+    # Apply other GPU memory settings if provided
+    gpu_settings_map = {
+        "gpu_found_lost_pairs_capacity": physx_scene.GetGpuFoundLostPairsCapacityAttr,
+        "gpu_found_lost_aggregate_pairs_capacity": physx_scene.GetGpuFoundLostAggregatePairsCapacityAttr,
+        "gpu_total_aggregate_pairs_capacity": physx_scene.GetGpuTotalAggregatePairsCapacityAttr,
+        "gpu_max_rigid_contact_count": physx_scene.GetGpuMaxRigidContactCountAttr,
+        "gpu_max_rigid_patch_count": physx_scene.GetGpuMaxRigidPatchCountAttr,
+        "gpu_heap_capacity": physx_scene.GetGpuHeapCapacityAttr,
+        "gpu_temp_buffer_capacity": physx_scene.GetGpuTempBufferCapacityAttr,
+    }
+    for key, attr_getter in gpu_settings_map.items():
+        if key in physics_config:
+            attr_getter().Set(physics_config[key])
+
+    print(f"[SDG] Configured PhysX scene GPU collision stack size: {gpu_collision_stack_size} bytes")
+
+
 def run_simulation(num_frames: int, render: bool = True) -> None:
     """Run a simulation for a specified number of frames, optionally without rendering."""
     if render:
@@ -560,18 +635,7 @@ def run_simulation(num_frames: int, render: bool = True) -> None:
         timeline.pause()
     else:
         # Run the physics simulation steps without advancing the app
-        stage = omni.usd.get_context().get_stage()
-        physx_scene = None
-
-        # Search for or create a physics scene
-        for prim in stage.Traverse():
-            if prim.IsA(UsdPhysics.Scene):
-                physx_scene = PhysxSchema.PhysxSceneAPI.Apply(prim)
-                break
-
-        if physx_scene is None:
-            physics_scene = UsdPhysics.Scene.Define(stage, "/PhysicsScene")
-            physx_scene = PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/PhysicsScene"))
+        physx_scene = get_or_create_physx_scene()
 
         # Get simulation parameters
         physx_dt = 1 / physx_scene.GetTimeStepsPerSecondAttr().Get()

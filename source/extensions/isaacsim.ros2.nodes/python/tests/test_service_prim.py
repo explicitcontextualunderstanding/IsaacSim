@@ -13,14 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import json
 
 import numpy as np
 import omni.graph.core as og
 import omni.kit.test
 import omni.usd
-from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import create_new_stage_async
 from pxr import Sdf
 
@@ -28,12 +26,10 @@ from .common import ROS2TestCase
 
 
 class TestRos2ServicePrim(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
         await create_new_stage_async()
 
-    # After running each test
     async def tearDown(self):
         await super().tearDown()
 
@@ -206,20 +202,23 @@ class TestRos2ServicePrim(ROS2TestCase):
         ros2_node = self.create_node("isaac_sim_test_service")
         client = ros2_node.create_client(isaac_ros2_messages.srv.GetPrims, "/get_prims")
 
+        def spin():
+            rclpy.spin_once(ros2_node, timeout_sec=0)
+
         self._timeline.play()
-        await asyncio.sleep(1.0)
+        await self.simulate_until_condition(client.service_is_ready, max_frames=300, per_frame_callback=spin)
 
         request = isaac_ros2_messages.srv.GetPrims.Request()
         request.path = "/ActionGraph"
         future = client.call_async(request)
 
-        await asyncio.sleep(1.0)
-        rclpy.spin_until_future_complete(ros2_node, future, timeout_sec=0)
+        condition_met = await self.simulate_until_condition(future.done, max_frames=300, per_frame_callback=spin)
         result = future.result()
 
         print("request:", request)
         print("result:", result)
 
+        self.assertTrue(condition_met, "Timed out waiting for GetPrims response")
         self.assertIsNotNone(result)
         self.assertTrue(result.success)
         self.assertEqual(result.message, "")
@@ -255,20 +254,23 @@ class TestRos2ServicePrim(ROS2TestCase):
         ros2_node = self.create_node("isaac_sim_test_service")
         client = ros2_node.create_client(isaac_ros2_messages.srv.GetPrimAttributes, "/get_prim_attributes")
 
+        def spin():
+            rclpy.spin_once(ros2_node, timeout_sec=0)
+
         self._timeline.play()
-        await asyncio.sleep(1.0)
+        await self.simulate_until_condition(client.service_is_ready, max_frames=300, per_frame_callback=spin)
 
         request = isaac_ros2_messages.srv.GetPrimAttributes.Request()
         request.path = "/ActionGraph"
         future = client.call_async(request)
 
-        await asyncio.sleep(1.0)
-        rclpy.spin_until_future_complete(ros2_node, future, timeout_sec=0)
+        condition_met = await self.simulate_until_condition(future.done, max_frames=300, per_frame_callback=spin)
         result = future.result()
 
         print("request:", request)
         print("result:", result)
 
+        self.assertTrue(condition_met, "Timed out waiting for GetPrimAttributes response")
         self.assertIsNotNone(result)
         self.assertTrue(result.success)
         self.assertEqual(result.message, "")
@@ -308,8 +310,15 @@ class TestRos2ServicePrim(ROS2TestCase):
         client_get = ros2_node.create_client(isaac_ros2_messages.srv.GetPrimAttribute, "/get_prim_attribute")
         client_set = ros2_node.create_client(isaac_ros2_messages.srv.SetPrimAttribute, "/set_prim_attribute")
 
+        def spin():
+            rclpy.spin_once(ros2_node, timeout_sec=0)
+
         self._timeline.play()
-        await asyncio.sleep(1.0)
+        await self.simulate_until_condition(
+            lambda: client_get.service_is_ready() and client_set.service_is_ready(),
+            max_frames=300,
+            per_frame_callback=spin,
+        )
 
         for spec in specs:
             print("---")
@@ -322,14 +331,16 @@ class TestRos2ServicePrim(ROS2TestCase):
 
             future = client_set.call_async(request_set)
 
-            for _ in range(2):
-                await omni.kit.app.get_app().next_update_async()
-                rclpy.spin_once(ros2_node, timeout_sec=0)
-                rclpy.spin_until_future_complete(ros2_node, future, timeout_sec=0)
+            condition_met = await self.simulate_until_condition(future.done, max_frames=300, per_frame_callback=spin)
             result_set = future.result()
 
             print("(set) request:", request_set)
             print("(set) result:", result_set)
+
+            self.assertTrue(condition_met, f"Timed out waiting for SetPrimAttribute response for {spec[0]}")
+            self.assertIsNotNone(result_set)
+            self.assertTrue(result_set.success)
+            self.assertEqual(result_set.message, "")
 
             # get the attribute
             request_get = isaac_ros2_messages.srv.GetPrimAttribute.Request()
@@ -338,20 +349,13 @@ class TestRos2ServicePrim(ROS2TestCase):
 
             future = client_get.call_async(request_get)
 
-            for _ in range(2):
-                await omni.kit.app.get_app().next_update_async()
-                rclpy.spin_once(ros2_node, timeout_sec=0)
-                rclpy.spin_until_future_complete(ros2_node, future, timeout_sec=0)
+            condition_met = await self.simulate_until_condition(future.done, max_frames=300, per_frame_callback=spin)
             result_get = future.result()
 
             print("(get) request:", request_get)
             print("(get) result:", result_get)
 
-            # check
-            self.assertIsNotNone(result_set)
-            self.assertTrue(result_set.success)
-            self.assertEqual(result_set.message, "")
-
+            self.assertTrue(condition_met, f"Timed out waiting for GetPrimAttribute response for {spec[0]}")
             self.assertIsNotNone(result_get)
             self.assertTrue(result_get.success)
             self.assertEqual(result_get.message, "")

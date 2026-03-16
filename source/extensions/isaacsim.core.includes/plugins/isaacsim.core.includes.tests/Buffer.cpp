@@ -77,17 +77,23 @@ TEST_SUITE("isaacsim.core.includes.tests")
         // Synchronous
         buffer.resize(3);
         CHECK_EQ(buffer.size(), 3);
+        CHECK_EQ(buffer.capacity(), 3);
         CHECK_UNARY(buffer.data() != nullptr);
+
         buffer.resize(0);
         CHECK_EQ(buffer.size(), 0);
+        CHECK_EQ(buffer.capacity(), 0);
         CHECK_UNARY(buffer.data() == nullptr);
 
         // Asynchronous
         buffer.resizeAsync(4);
         CHECK_EQ(buffer.size(), 4);
+        CHECK_EQ(buffer.capacity(), 4);
         CHECK_UNARY(buffer.data() != nullptr);
+
         buffer.resizeAsync(0);
         CHECK_EQ(buffer.size(), 0);
+        CHECK_EQ(buffer.capacity(), 0);
         CHECK_UNARY(buffer.data() == nullptr);
     }
 
@@ -129,6 +135,108 @@ TEST_SUITE("isaacsim.core.includes.tests")
         buffer.setDevice(0);
         CHECK_EQ(buffer.type(), isaacsim::core::includes::MemoryType::eDevice);
         testResize(buffer);
+    }
+
+    TEST_CASE("GenericBufferBase::resize capacity and pointer stability")
+    {
+        auto testCapacityAndPointer = [](isaacsim::core::includes::GenericBufferBase<int>& buffer)
+        {
+            // Initial allocation
+            buffer.resize(10);
+            CHECK_EQ(buffer.size(), 10);
+            CHECK_EQ(buffer.capacity(), 10);
+            int* const ptrAfterGrow = buffer.data();
+            CHECK_UNARY(ptrAfterGrow != nullptr);
+
+            // Shrink: must not reallocate (pointer and capacity unchanged)
+            buffer.resize(5);
+            CHECK_EQ(buffer.size(), 5);
+            CHECK_EQ(buffer.capacity(), 10);
+            CHECK_EQ(buffer.data(), ptrAfterGrow);
+
+            // Grow within capacity: must not reallocate
+            buffer.resize(8);
+            CHECK_EQ(buffer.size(), 8);
+            CHECK_EQ(buffer.capacity(), 10);
+            CHECK_EQ(buffer.data(), ptrAfterGrow);
+
+            // Shrink again: still no reallocation
+            buffer.resize(1);
+            CHECK_EQ(buffer.size(), 1);
+            CHECK_EQ(buffer.capacity(), 10);
+            CHECK_EQ(buffer.data(), ptrAfterGrow);
+
+            // Grow beyond capacity: reallocate (size and capacity increase; pointer may or may not change)
+            buffer.resize(20);
+            CHECK_EQ(buffer.size(), 20);
+            CHECK_EQ(buffer.capacity(), 20);
+            CHECK_UNARY(buffer.data() != nullptr);
+
+            // clear() resets size and capacity
+            buffer.clear();
+            CHECK_EQ(buffer.size(), 0);
+            CHECK_EQ(buffer.capacity(), 0);
+            CHECK_UNARY(buffer.data() == nullptr);
+        };
+
+        isaacsim::core::includes::GenericBufferBase<int> buffer(0);
+        buffer.setDevice(-1);
+        testCapacityAndPointer(buffer);
+
+        buffer.resize(0);
+        buffer.setDevice(0);
+        testCapacityAndPointer(buffer);
+    }
+
+    TEST_CASE("GenericBufferBase::resizeAsync capacity and pointer stability")
+    {
+        auto testCapacityAndPointerAsync = [](isaacsim::core::includes::GenericBufferBase<int>& buffer)
+        {
+            // Initial allocation
+            buffer.resizeAsync(10);
+            CHECK_EQ(buffer.size(), 10);
+            CHECK_EQ(buffer.capacity(), 10);
+            int* const ptrAfterGrow = buffer.data();
+            CHECK_UNARY(ptrAfterGrow != nullptr);
+
+            // Shrink: must not reallocate (pointer and capacity unchanged)
+            buffer.resizeAsync(5);
+            CHECK_EQ(buffer.size(), 5);
+            CHECK_EQ(buffer.capacity(), 10);
+            CHECK_EQ(buffer.data(), ptrAfterGrow);
+
+            // Grow within capacity: must not reallocate
+            buffer.resizeAsync(8);
+            CHECK_EQ(buffer.size(), 8);
+            CHECK_EQ(buffer.capacity(), 10);
+            CHECK_EQ(buffer.data(), ptrAfterGrow);
+
+            // Shrink again: still no reallocation
+            buffer.resizeAsync(1);
+            CHECK_EQ(buffer.size(), 1);
+            CHECK_EQ(buffer.capacity(), 10);
+            CHECK_EQ(buffer.data(), ptrAfterGrow);
+
+            // Grow beyond capacity: reallocate (size and capacity increase; pointer may or may not change)
+            buffer.resizeAsync(20);
+            CHECK_EQ(buffer.size(), 20);
+            CHECK_EQ(buffer.capacity(), 20);
+            CHECK_UNARY(buffer.data() != nullptr);
+
+            // clear() resets size and capacity
+            buffer.clear();
+            CHECK_EQ(buffer.size(), 0);
+            CHECK_EQ(buffer.capacity(), 0);
+            CHECK_UNARY(buffer.data() == nullptr);
+        };
+
+        isaacsim::core::includes::GenericBufferBase<int> buffer(0);
+        buffer.setDevice(-1);
+        testCapacityAndPointerAsync(buffer);
+
+        buffer.resize(0);
+        buffer.setDevice(0);
+        testCapacityAndPointerAsync(buffer);
     }
 
     TEST_CASE("GenericBufferBase::setDevice")

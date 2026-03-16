@@ -242,7 +242,7 @@ def torch2warp(tensor: "torch.Tensor") -> "warp.array":
         >>> torch_tensor = torch.zeros((100, 10), dtype=torch.float32, device=torch.device("cuda:0"))
         >>> warp_array = interops_utils.torch2warp(torch_tensor)
         >>> type(warp_array)
-        <class 'warp.types.array'>
+        <class 'warp._src.types.array'>
     """
     global torch2warp, _torch_to_warp, _torch_to_dlpack, _warp_from_dlpack
     # warp-torch interop
@@ -396,7 +396,7 @@ def jax2warp(array: "jax.Array") -> "warp.array":
         ...
         >>> warp_array = interops_utils.jax2warp(jax_array)
         >>> type(warp_array)
-        <class 'warp.types.array'>
+        <class 'warp._src.types.array'>
     """
     global jax2warp, _jax_to_dlpack, _warp_from_dlpack
     # get source dlpack function
@@ -552,7 +552,7 @@ def tensorflow2warp(tensor: "tensorflow.Tensor") -> "warp.array":
         ...
         >>> warp_array = interops_utils.tensorflow2warp(tensorflow_tensor)
         >>> type(warp_array)
-        <class 'warp.types.array'>
+        <class 'warp._src.types.array'>
     """
     global tensorflow2warp, _tensorflow_to_dlpack, _warp_from_dlpack
     # get source dlpack function
@@ -725,7 +725,7 @@ def numpy2warp(array: "numpy.ndarray") -> "warp.array":
         >>> numpy_array = np.zeros((100, 10), dtype=np.float32)
         >>> warp_array = interops_utils.numpy2warp(numpy_array)
         >>> type(warp_array)
-        <class 'warp.types.array'>
+        <class 'warp._src.types.array'>
     """
     global numpy2warp, _numpy_to_warp, _numpy_to_warp_dtype
     # get conversion function
@@ -733,7 +733,7 @@ def numpy2warp(array: "numpy.ndarray") -> "warp.array":
         import warp
 
         _numpy_to_warp = warp.from_numpy
-        _numpy_to_warp_dtype = warp.types.np_dtype_to_warp_type
+        _numpy_to_warp_dtype = warp._src.types.np_dtype_to_warp_type
 
     numpy2warp = lambda array: _numpy_to_warp(array, dtype=_numpy_to_warp_dtype.get(array.dtype), device="cpu")
     return numpy2warp(array)

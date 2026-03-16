@@ -6,4 +6,10 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+
+"""Provides an Isaac Sim extension for robot motion generation tutorials using RMP Flow algorithms."""
+
+
 from .extension import *
+
+__all__ = ["UIBuilder", "Extension"]

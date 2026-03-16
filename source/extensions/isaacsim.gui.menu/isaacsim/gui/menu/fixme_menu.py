@@ -12,21 +12,51 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Temporary FixMe menu for legacy or placeholder entries."""
 import omni.kit.menu.utils
 import omni.ui as ui
 from omni.kit.menu.utils import LayoutSourceSearch, MenuAlignment, MenuItemDescription, MenuLayout
 
 
 class FixmeMenuExtension:
+    """Build and manage the FixMe menu.
+
+    Args:
+        ext_id: Extension identifier provided by the extension manager.
+    """
+
     class MenuDelegate(ui.MenuDelegate):
-        def get_menu_alignment(self):
+        """Menu delegate used to hide FixMe entries."""
+
+        def get_menu_alignment(self) -> MenuAlignment:
+            """Return the menu alignment for the FixMe delegate.
+
+            Returns:
+                The alignment to use for the menu.
+
+            Example:
+                .. code-block:: python
+
+                    alignment = FixmeMenuExtension.MenuDelegate().get_menu_alignment()
+            """
             return MenuAlignment.RIGHT
 
         # override build fn to not show menu item...
         def build_item(self, item: ui.MenuHelper):
+            """Override item rendering to hide the menu item.
+
+            Args:
+                item: Menu helper instance provided by the UI framework.
+
+            Example:
+                .. code-block:: python
+
+                    delegate = FixmeMenuExtension.MenuDelegate()
+                    delegate.build_item(item)
+            """
             pass
 
-    def __init__(self, ext_id):
+    def __init__(self, ext_id: str):
         self._menu_placeholder = [MenuItemDescription(name="FixMe!!!", show_fn=lambda: False)]
         omni.kit.menu.utils.add_menu_items(self._menu_placeholder, "FixMe", delegate=FixmeMenuExtension.MenuDelegate())
 
@@ -77,5 +107,13 @@ class FixmeMenuExtension:
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
     def shutdown(self):
+        """Remove menu layouts and placeholders.
+
+        Example:
+            .. code-block:: python
+
+                menu = FixmeMenuExtension("ext.id")
+                menu.shutdown()
+        """
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
         omni.kit.menu.utils.remove_menu_items(self._menu_placeholder, "FixMe")

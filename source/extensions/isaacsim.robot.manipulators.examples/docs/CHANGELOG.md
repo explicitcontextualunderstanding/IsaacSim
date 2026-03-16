@@ -1,4 +1,31 @@
 # Changelog
+## [1.6.1] - 2026-03-05
+### Changed
+- Experimental API alignment: app_utils for timeline control and SimulationEvent for physics callbacks in follow-target and pick-place examples.
+
+## [1.6.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.5.0] - 2026-03-02
+### Added
+- UR (Universal Robots) stacking example
+
+## [1.4.1] - 2026-02-11
+### Changed
+- Supported multiple Franka robots for pick and place task
+
+## [1.4.0] - 2026-01-10
+### Changed
+- Updated the folder structure of the extension
+
+### Added
+- A simplified stacking class based on core_experimental (NVIDIA Warp APIs)
+
+## [1.3.0] - 2025-12-22
+### Changed
+- Simplify bin filling example and improve stability, example cubes instead of various parts
+
 ## [1.2.4] - 2025-12-07
 ### Changed
 - Updated description
@@ -113,3 +140,4 @@
 ## [0.1.0] - 2024-08-09
 ### Added
 - Franka and universal_robots folder
+

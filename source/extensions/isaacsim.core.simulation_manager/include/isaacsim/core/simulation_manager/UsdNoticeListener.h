@@ -12,6 +12,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+#pragma once
+
+// clang-format off
 #include <pch/UsdPCH.h>
 // clang-format on
 #include <physxSchema/physxSceneAPI.h>
@@ -39,6 +43,11 @@ namespace simulation_manager
 class UsdNoticeListener : public pxr::TfWeakBase
 {
 public:
+    /**
+     * @brief Default constructor.
+     * @details
+     * Initializes the callback iterator to 0 and enables the listener by default.
+     */
     UsdNoticeListener();
 
     /**
@@ -100,6 +109,6 @@ private:
     bool m_enableFlag;
 };
 
-} // namespace isaacsim
-} // namespace core
 } // namespace simulation_manager
+} // namespace core
+} // namespace isaacsim

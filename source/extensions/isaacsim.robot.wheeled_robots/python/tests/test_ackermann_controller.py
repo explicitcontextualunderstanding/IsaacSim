@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Unit tests for the Ackermann controller used in wheeled robot simulations."""
+
+
 import asyncio
 import sys
 
@@ -34,17 +38,51 @@ from pxr import Gf
 
 
 class TestAckermannController(omni.kit.test.AsyncTestCase):
+    """Test case for validating the AckermannController functionality.
+
+    This class provides comprehensive unit tests for the AckermannController to ensure accurate steering
+    angles and wheel velocities under various scenarios. It verifies the controller's ability to compute
+    correct Ackermann steering geometry for different forward velocities, turning radii, and angular
+    velocities.
+
+    The tests validate that the controller properly calculates differential wheel speeds for the inner and
+    outer wheels during turns, ensuring realistic vehicle dynamics. It also tests the controller's behavior
+    when transitioning between different desired states with specified steering velocity and acceleration
+    constraints.
+
+    Key test scenarios include:
+
+    - Instantaneous steering control with zero steering velocity
+    - Gradual steering angle transitions with specified steering velocity
+    - Velocity control with acceleration limits
+    - Various turning radius configurations
+    - Left and right turn validation
+
+    Each test compares the controller's output joint positions and velocities against expected values
+    calculated using Ackermann steering geometry principles, ensuring the controller maintains proper
+    vehicle kinematics during motion.
+    """
+
     async def setUp(self):
+        """Set up the test environment before each test case."""
         pass
 
     # ----------------------------------------------------------------------
 
     async def tearDown(self):
+        """Clean up the test environment after each test case."""
         pass
 
     # ----------------------------------------------------------------------
 
     async def test_ackermann_steering_control(self):
+        """Test Ackermann steering control calculations with instant steering angle setting.
+
+        Verifies that the AckermannController correctly calculates steering angles and wheel velocities
+        for two test cases with different angular velocities. Tests both the geometric relationships
+        for steering angles and the velocity calculations for all four wheels in an Ackermann steering
+        system.
+        """
 
         # First case check that it snaps to correct angle, no steering velocity
 
@@ -114,6 +152,13 @@ class TestAckermannController(omni.kit.test.AsyncTestCase):
         )
 
     async def test_ackermann_steering_velocity_drive_acceleration(self):
+        """Test Ackermann controller with gradual steering velocity and acceleration.
+
+        Verifies that the AckermannController correctly handles gradual changes in steering angle
+        and forward velocity over time. Tests three different scenarios with varying steering
+        velocities, accelerations, and time steps to ensure the controller reaches target values
+        within expected iterations.
+        """
 
         # First case check that it snaps to correct angle, no steering velocity
 
@@ -308,8 +353,24 @@ class TestAckermannController(omni.kit.test.AsyncTestCase):
 
 
 class TestAckermannControllerOgn(ogts.OmniGraphTestCase):
+    """Test suite for validating Ackermann controller functionality in OmniGraph environments.
+
+    This class provides comprehensive testing of the AckermannController OmniGraph node through multiple
+    scenarios including basic steering control, acceleration dynamics, and steering velocity behavior.
+    Tests utilize a forklift robot model to validate controller performance in realistic simulation
+    conditions with proper physics integration.
+
+    The test suite covers three main areas:
+    1. Basic Ackermann steering control with circular motion validation
+    2. Acceleration control testing for gradual speed changes
+    3. Steering velocity control for smooth angle transitions
+
+    All tests verify that the controller produces expected joint positions and velocities while
+    maintaining proper kinematic relationships for Ackermann steering geometry.
+    """
+
     async def setUp(self):
-        """Set up  test environment, to be torn down when done"""
+        """Set up test environment, to be torn down when done."""
 
         await create_new_stage_async()
         await self.setup_environment()
@@ -320,6 +381,11 @@ class TestAckermannControllerOgn(ogts.OmniGraphTestCase):
     # ----------------------------------------------------------------------
 
     async def setup_environment(self):
+        """Initialize the simulation world and environment for testing.
+
+        Creates a World instance with specified physics and rendering parameters, adds a default ground plane,
+        sets up timeline interface, and retrieves the Isaac Sim assets root path.
+        """
         self.my_world = World(stage_units_in_meters=1.0, physics_dt=1.0 / 60, rendering_dt=1.0 / 60)
         self.my_world.scene.add_default_ground_plane(z_position=-0.03)
 
@@ -335,6 +401,11 @@ class TestAckermannControllerOgn(ogts.OmniGraphTestCase):
 
     # ----------------------------------------------------------------------
     async def setup_ogn(self):
+        """Set up OmniGraph nodes and paths for the test.
+
+        Defines the action graph path and robot prim path, and removes any existing graph prim to ensure a clean
+        test environment.
+        """
         self.graph_path = "/ActionGraph"
         self.prim_path = "/World/Forklift"
 
@@ -344,13 +415,20 @@ class TestAckermannControllerOgn(ogts.OmniGraphTestCase):
     # ----------------------------------------------------------------------
 
     async def tearDown(self):
-        """Get rid of temporary data used by the test"""
+        """Get rid of temporary data used by the test."""
         await omni.kit.stage_templates.new_stage_async()
         self._timeline = None
 
     # ----------------------------------------------------------------------
 
     async def test_ackermann_controller_robot(self):
+        """Test the Ackermann controller with a robot in circular motion.
+
+        Creates a forklift robot and sets up an OmniGraph with Ackermann controller nodes. Tests the robot's
+        ability to follow circular paths by commanding forward velocity and steering angle, then verifies the
+        robot's position, orientation, linear velocity, and angular velocity match expected values for quarter
+        and full circle turns.
+        """
         # Add forklift USD
         create_prim(
             "/World/Forklift",
@@ -500,6 +578,13 @@ class TestAckermannControllerOgn(ogts.OmniGraphTestCase):
     # ----------------------------------------------------------------------
 
     async def test_ackermann_controller_robot_acceleration(self):
+        """Test the Ackermann controller's acceleration behavior.
+
+        Creates a forklift robot with an Ackermann controller and tests the robot's acceleration response.
+        Verifies that the robot gradually accelerates to the desired velocity and that the linear acceleration
+        matches the commanded acceleration during the ramp-up phase, then drops to zero once the target
+        velocity is reached.
+        """
         # Add forklift USD
         create_prim(
             "/World/Forklift",
@@ -605,6 +690,13 @@ class TestAckermannControllerOgn(ogts.OmniGraphTestCase):
         self.assertAlmostEqual(curr_accel[0], 0.0, delta=0.1)
 
     async def test_ackermann_controller_robot_steer_velocity(self):
+        """Test the Ackermann controller's steering velocity behavior.
+
+        Creates a forklift robot with an Ackermann controller and tests the robot's steering response with
+        specified steering angle velocity. Verifies that the steering joints gradually rotate to the desired
+        angle at the commanded velocity rate, testing both positive and negative steering angles with different
+        steering velocities.
+        """
         # Add forklift USD
         create_prim(
             "/World/Forklift",

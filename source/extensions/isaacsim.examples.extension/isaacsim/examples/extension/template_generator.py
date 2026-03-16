@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides template generation functionality for creating Isaac Sim extension templates from predefined source files."""
+
+
 import os
 import shutil
 from datetime import datetime
@@ -22,19 +25,46 @@ import omni.kit.app
 
 
 class TemplateGenerator:
+    """Generates Isaac Sim extension templates from predefined source files.
+
+    This class provides methods to create different types of extension templates by copying template source files,
+    replacing placeholder keywords with user-specified values, and organizing the generated files into proper
+    extension directory structures. It supports creating configuration tooling, loaded scenario, scripting, and
+    component library extension templates.
+
+    The generator automatically handles file system operations including directory creation, file copying,
+    and keyword replacement in template files. It converts extension titles to valid Python package names
+    and maintains consistent extension metadata across all generated templates.
+    """
+
     def __init__(self):
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_extension_id_by_module("isaacsim.examples.extension")
         self._extension_path = ext_manager.get_extension_path(ext_id)
 
-    def _write_string_to_file(self, file_path, file_string):
+    def _write_string_to_file(self, file_path: str, file_string: str):
+        """Writes a string to a file, creating directories as needed.
+
+        Args:
+            file_path: Path to the target file.
+            file_string: Content to write to the file.
+        """
         Path(os.path.dirname(file_path)).mkdir(parents=True, exist_ok=True)
 
         f = open(file_path, "w+")
         f.write(file_string)
         f.close()
 
-    def _copy_directory_contents(self, source_dir, target_dir):
+    def _copy_directory_contents(self, source_dir: str, target_dir: str) -> list[str]:
+        """Recursively copies all files and directories from source to target directory.
+
+        Args:
+            source_dir: Path to the source directory.
+            target_dir: Path to the target directory.
+
+        Returns:
+            List of paths to all copied files.
+        """
         new_paths = []
 
         for file_name in os.listdir(source_dir):
@@ -52,7 +82,13 @@ class TemplateGenerator:
 
         return new_paths
 
-    def _replace_keywords(self, replace_dict, file_paths):
+    def _replace_keywords(self, replace_dict: dict[str, str], file_paths: list[str]):
+        """Replaces keywords in template files with specified values.
+
+        Args:
+            replace_dict: Dictionary mapping keywords to replacement values.
+            file_paths: List of file paths to process for keyword replacement.
+        """
         for file_path in file_paths:
             if file_path[-4:] == ".png":
                 continue
@@ -66,7 +102,14 @@ class TemplateGenerator:
 
             self._write_string_to_file(file_path, file_string)
 
-    def _write_common_data(self, file_path, extension_title, extension_description):
+    def _write_common_data(self, file_path: str, extension_title: str, extension_description: str):
+        """Copies common template files and replaces standard keywords.
+
+        Args:
+            file_path: Target directory path for the template files.
+            extension_title: Title of the extension.
+            extension_description: Description of the extension.
+        """
         source_dir = os.path.join(self._extension_path, "template_source_files", "common")
         new_paths = self._copy_directory_contents(source_dir, file_path)
 
@@ -81,7 +124,15 @@ class TemplateGenerator:
         }
         self._replace_keywords(replace_keywords, new_paths)
 
-    def _get_python_package_name(self, extension_name):
+    def _get_python_package_name(self, extension_name: str) -> str:
+        """Converts extension name to a valid Python package name.
+
+        Args:
+            extension_name: Name of the extension.
+
+        Returns:
+            Valid Python package name with special characters replaced by underscores and '_python' suffix.
+        """
         # Convert all special characters in extension_name to underscores to make a valid python package name
         package_name = ""
         for c in extension_name:
@@ -95,7 +146,14 @@ class TemplateGenerator:
 
         return package_name
 
-    def generate_configuration_tooling_template(self, file_path, extension_title, extension_description):
+    def generate_configuration_tooling_template(self, file_path: str, extension_title: str, extension_description: str):
+        """Generates a configuration tooling workflow template.
+
+        Args:
+            file_path: Target directory path for the generated template.
+            extension_title: Title of the extension.
+            extension_description: Description of the extension.
+        """
         self._write_common_data(file_path, extension_title, extension_description)
 
         python_package_name = self._get_python_package_name(extension_title)
@@ -112,7 +170,14 @@ class TemplateGenerator:
 
         self._replace_keywords(replace_keywords, [os.path.join(target_dir, "global_variables.py")])
 
-    def generate_loaded_scenario_template(self, file_path, extension_title, extension_description):
+    def generate_loaded_scenario_template(self, file_path: str, extension_title: str, extension_description: str):
+        """Generates a loaded scenario workflow template.
+
+        Args:
+            file_path: Target directory path for the generated template.
+            extension_title: Title of the extension.
+            extension_description: Description of the extension.
+        """
         self._write_common_data(file_path, extension_title, extension_description)
 
         python_package_name = self._get_python_package_name(extension_title)
@@ -129,7 +194,14 @@ class TemplateGenerator:
 
         self._replace_keywords(replace_keywords, [os.path.join(target_dir, "global_variables.py")])
 
-    def generate_scripting_template(self, file_path, extension_title, extension_description):
+    def generate_scripting_template(self, file_path: str, extension_title: str, extension_description: str):
+        """Generates a scripting workflow template.
+
+        Args:
+            file_path: Target directory path for the generated template.
+            extension_title: Title of the extension.
+            extension_description: Description of the extension.
+        """
         self._write_common_data(file_path, extension_title, extension_description)
 
         python_package_name = self._get_python_package_name(extension_title)
@@ -146,7 +218,14 @@ class TemplateGenerator:
 
         self._replace_keywords(replace_keywords, [os.path.join(target_dir, "global_variables.py")])
 
-    def generate_component_library_template(self, file_path, extension_title, extension_description):
+    def generate_component_library_template(self, file_path: str, extension_title: str, extension_description: str):
+        """Generates a UI component library template.
+
+        Args:
+            file_path: Target directory path for the generated template.
+            extension_title: Title of the extension.
+            extension_description: Description of the extension.
+        """
         self._write_common_data(file_path, extension_title, extension_description)
 
         python_package_name = self._get_python_package_name(extension_title)

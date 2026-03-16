@@ -15,12 +15,14 @@
 
 
 import weakref
+from functools import partial
 
 import carb
 import omni.ext
 import omni.kit.actions.core
 import omni.usd
 from isaacsim.core.utils.viewports import set_camera_view
+from isaacsim.gui.components.menu import open_content_browser_to_path
 from isaacsim.storage.native.nucleus import get_assets_root_path
 from omni.kit.menu.utils import MenuHelperExtensionFull, MenuItemDescription, add_menu_items, remove_menu_items
 
@@ -99,10 +101,15 @@ class Ros2ShortcutsMenuExtension(omni.ext.IExt, MenuHelperExtensionFull):
         )
 
         # ROS 2 Assets
+        action_registry.register_action(
+            self._ext_id,
+            "open_content_browser_ros2",
+            partial(open_content_browser_to_path, "/Isaac/Samples/ROS2"),
+            description="Open the Content Browser to the ROS 2 assets folder",
+        )
+
         ros_assets_sub_menu = [
-            MenuItemDescription(
-                name="Asset Browser", onclick_action=("isaacsim.asset.browser", "open_isaac_sim_asset_browser")
-            ),
+            MenuItemDescription(name="Asset Browser", onclick_action=(self._ext_id, "open_content_browser_ros2")),
             MenuItemDescription(
                 name="Nova Carter",
                 onclick_action=(self._ext_id, "create_nova_carter_ros"),
@@ -173,6 +180,7 @@ class Ros2ShortcutsMenuExtension(omni.ext.IExt, MenuHelperExtensionFull):
         action_registry.deregister_action(self._ext_id, "create_nova_carter_ros")
         action_registry.deregister_action(self._ext_id, "create_leatherback_ros")
         action_registry.deregister_action(self._ext_id, "create_iw_hub_ros")
+        action_registry.deregister_action(self._ext_id, "open_content_browser_ros2")
         # remove_layout(self.__ros_menu_layout)
 
     #     if self.window_handle:

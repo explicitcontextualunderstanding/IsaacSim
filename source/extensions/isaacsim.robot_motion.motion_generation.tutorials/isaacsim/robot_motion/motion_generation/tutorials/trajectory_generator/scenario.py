@@ -1,11 +1,20 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto. Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Demonstrates trajectory generation capabilities for the UR10 robot using Lula motion planning in Isaac Sim."""
+
 
 import os
 
@@ -28,6 +37,37 @@ from isaacsim.storage.native import get_assets_root_path
 
 
 class UR10TrajectoryGenerationExample:
+    """Demonstrates trajectory generation capabilities for the UR10 robot using Lula motion planning.
+
+    This class provides comprehensive examples of generating and executing robot trajectories using both
+    configuration space (C-space) and task space planning approaches. It showcases the integration of
+    Lula's trajectory generation capabilities with Isaac Sim's articulation system.
+
+    The class demonstrates three main trajectory generation methods:
+
+    1. **C-space trajectory generation**: Plans trajectories directly in joint space using predefined
+       joint configurations, with support for both time-optimal and timestamped trajectories.
+
+    2. **Task space trajectory generation**: Plans trajectories in Cartesian space by specifying
+       end-effector positions and orientations, automatically handling inverse kinematics.
+
+    3. **Advanced trajectory generation**: Combines C-space and task space planning using composite
+       path specifications with various motion primitives including linear paths, arcs, and rotations.
+
+    The example includes visualization of target poses using reference frames and provides a complete
+    workflow from trajectory computation to robot execution through articulation actions.
+
+    Key features:
+    - Integration with LulaCSpaceTrajectoryGenerator and LulaTaskSpaceTrajectoryGenerator
+    - Forward kinematics computation for pose visualization
+    - Trajectory execution at 60 Hz physics timesteps
+    - Automatic trajectory looping with pause intervals
+    - Robot state management and reset functionality
+
+    The class is designed as a tutorial example for the isaacsim.robot_motion.motion_generation.tutorials
+    extension, demonstrating practical usage patterns for robot motion planning in Isaac Sim.
+    """
+
     def __init__(self):
         self._c_space_trajectory_generator = None
         self._taskspace_trajectory_generator = None
@@ -39,6 +79,11 @@ class UR10TrajectoryGenerationExample:
         self._articulation = None
 
     def load_example_assets(self):
+        """Loads the UR10 robot asset into the stage and initializes the articulation.
+
+        Returns:
+            List containing the loaded articulation asset for registration with the core.World.
+        """
         # Add the Franka and target to the stage
         # The position in which things are loaded is also the position in which they
 
@@ -52,6 +97,11 @@ class UR10TrajectoryGenerationExample:
         return [self._articulation]
 
     def setup(self):
+        """Initializes trajectory generators and kinematics solver for the UR10 robot.
+
+        Sets up the C-space trajectory generator, task-space trajectory generator, and kinematics solver using
+        configuration files from the motion_generation extension.
+        """
         # Config files for supported robots are stored in the motion_generation extension under "/motion_policy_configs"
         mg_extension_path = get_extension_path_from_name("isaacsim.robot_motion.motion_generation")
         rmp_config_dir = os.path.join(mg_extension_path, "motion_policy_configs")
@@ -75,6 +125,11 @@ class UR10TrajectoryGenerationExample:
         self._end_effector_name = "ee_link"
 
     def setup_cspace_trajectory(self):
+        """Sets up a configuration space trajectory with predefined waypoints.
+
+        Creates both time-optimal and timestamped C-space trajectories and visualizes the waypoints in task space
+        using frame markers. Generates action sequences for both trajectories to be executed sequentially.
+        """
         c_space_points = np.array(
             [
                 [
@@ -148,6 +203,11 @@ class UR10TrajectoryGenerationExample:
             self._action_sequence.extend(articulation_trajectory_timestamped.get_action_sequence())
 
     def setup_taskspace_trajectory(self):
+        """Sets up a task space trajectory with position and orientation targets.
+
+        Creates a trajectory that moves the end-effector through a rectangular path in task space and visualizes
+        the target positions with frame markers. Generates an action sequence for trajectory execution.
+        """
         task_space_position_targets = np.array(
             [[0.3, -0.3, 0.1], [0.3, 0.3, 0.1], [0.3, 0.3, 0.5], [0.3, -0.3, 0.5], [0.3, -0.3, 0.1]]
         )
@@ -177,6 +237,12 @@ class UR10TrajectoryGenerationExample:
             self._action_sequence = articulation_trajectory.get_action_sequence()
 
     def setup_advanced_trajectory(self):
+        """Sets up an advanced composite trajectory combining C-space and task-space movements.
+
+        Demonstrates various trajectory types including linear interpolation, pure translation/rotation,
+        three-point arcs, and tangent arcs. Uses CompositePathSpec to combine multiple movement primitives
+        into a single complex trajectory.
+        """
         # The following code demonstrates how to specify a complicated cspace and taskspace path
         # using the lula.CompositePathSpec object
 
@@ -269,6 +335,14 @@ class UR10TrajectoryGenerationExample:
             self._action_sequence = articulation_trajectory.get_action_sequence()
 
     def update(self, step: float):
+        """Updates the trajectory execution by applying the next action in the sequence.
+
+        Teleports the robot to the initial position when starting a trajectory and applies actions sequentially.
+        Automatically repeats the trajectory sequence with a 10-frame pause between cycles.
+
+        Args:
+            step: Current simulation timestep.
+        """
         if len(self._action_sequence) == 0:
             return
 
@@ -288,6 +362,10 @@ class UR10TrajectoryGenerationExample:
         self._action_sequence_index %= len(self._action_sequence) + 10  # Wait 10 frames before repeating trajectories
 
     def reset(self):
+        """Resets the trajectory execution state and cleans up visualization frames.
+
+        Clears the action sequence, resets the action index, and removes any frame markers from the stage.
+        """
         # Delete any visualized frames
         if get_prim_at_path("/visualized_frames"):
             delete_prim("/visualized_frames")
@@ -296,6 +374,14 @@ class UR10TrajectoryGenerationExample:
         self._action_sequence_index = 0
 
     def _teleport_robot_to_position(self, articulation_action):
+        """Teleports the robot to the specified joint configuration instantly.
+
+        Sets joint positions and velocities based on the articulation action to position the robot
+        at the trajectory starting point.
+
+        Args:
+            articulation_action: Action containing joint indices and target positions for teleportation.
+        """
         initial_positions = np.zeros(self._articulation.num_dof)
         initial_positions[articulation_action.joint_indices] = articulation_action.joint_positions
 

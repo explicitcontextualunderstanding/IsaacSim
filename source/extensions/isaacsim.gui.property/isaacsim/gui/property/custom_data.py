@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+"""Property widget for viewing and editing prim custom data as JSON."""
 
 import carb
 import numpy as np
@@ -32,7 +32,12 @@ from omni.kit.window.property.templates import (
 from pxr import Gf, Sdf, Tf, Usd
 
 
-def iterate_custom_data(custom_data):
+def iterate_custom_data(custom_data: dict):
+    """Recursively convert numpy arrays in custom data to plain Python lists.
+
+    Args:
+        custom_data: The custom data dictionary to convert in-place.
+    """
     for key, value in custom_data.items():
         if isinstance(value, dict):
             iterate_custom_data(value)
@@ -41,18 +46,32 @@ def iterate_custom_data(custom_data):
 
 
 class CustomDataWidget(SimplePropertyWidget):
+    """Property widget for displaying and editing prim custom data as JSON."""
+
     def _get_prim(self, prim_path):
+        """Gets the prim at the specified path from the current stage.
+
+        Args:
+            prim_path: Path to the prim.
+
+        Returns:
+            The prim at the given path, or None if the path is invalid or stage is unavailable.
+        """
         if prim_path:
             stage = self._payload.get_stage()
             if stage:
                 return stage.GetPrimAtPath(prim_path)
         return None
 
-    def on_new_payload(self, payload):
-        """
-        See PropertyWidget.on_new_payload
-        """
+    def on_new_payload(self, payload: list) -> bool:
+        """See ``PropertyWidget.on_new_payload``.
 
+        Args:
+            payload: The new prim selection payload.
+
+        Returns:
+            Whether the widget should be visible for this payload.
+        """
         if not super().on_new_payload(payload):
             return False
 
@@ -66,13 +85,14 @@ class CustomDataWidget(SimplePropertyWidget):
         return True
 
     def build_items(self):
+        """Build the JSON editor UI for custom data."""
         import json
 
         def dupe_checking_hook(pairs):
-            result = dict()
+            result = {}
             for key, val in pairs:
                 if key in result:
-                    raise KeyError("Duplicate key specified: %s" % key)
+                    raise KeyError(f"Duplicate key specified: {key}")
                 result[key] = val
             return result
 
@@ -106,6 +126,13 @@ class CustomDataWidget(SimplePropertyWidget):
 
         pass
 
-    def build_property_item(self, stage, ui_prop: UsdPropertyUiEntry, prim_paths: List[Sdf.Path]):
+    def build_property_item(self, stage: Usd.Stage, ui_prop: UsdPropertyUiEntry, prim_paths: list[Sdf.Path]):
+        """Build the UI for a single property item.
+
+        Args:
+            stage: The USD stage.
+            ui_prop: The property UI entry.
+            prim_paths: The prim paths being inspected.
+        """
         if ui_prop.prim_paths:
             prim_paths = ui_prop.prim_paths

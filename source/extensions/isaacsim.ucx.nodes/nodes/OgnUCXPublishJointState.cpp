@@ -102,32 +102,29 @@ public:
 
 protected:
     /**
-     * @brief Generate message from node inputs.
+     * @brief Extract joint state data from articulation.
      * @details
-     * Reads joint state data from the articulation and serializes it.
-     * Message format:
-     * - timestamp (double, 8 bytes)
-     * - num_joints (uint32_t, 4 bytes)
-     * - For each joint:
-     *   - position (float, 4 bytes)
-     *   - velocity (float, 4 bytes)
-     *   - effort (float, 4 bytes)
+     * Reads joint state data from the articulation using tensor API.
      *
      * @param[in] db Database accessor for node inputs
-     * @return std::vector<uint8_t> Serialized message data
+     * @return JointStateData Extracted joint state data
      */
-    std::vector<uint8_t> generateMessage(OgnUCXPublishJointStateDatabase& db) override
+    isaacsim::ucx::nodes::JointStateData extractData(OgnUCXPublishJointStateDatabase& db) override
     {
+        isaacsim::ucx::nodes::JointStateData data;
+        data.timestamp = db.inputs.timeStamp();
+        data.numJoints = 0;
+
         if (!m_articulation)
         {
-            return {};
+            return data;
         }
 
-        const double timestamp = db.inputs.timeStamp();
         double stageUnits = 1.0 / m_unitScale;
 
         // Get number of DOFs
         uint32_t numDofs = m_articulation->getMaxDofs();
+        data.numJoints = numDofs;
 
         // Resize vectors
         m_jointPositions.resize(numDofs);
@@ -149,49 +146,83 @@ protected:
         if (!m_articulation->getDofPositions(&positionTensor))
         {
             db.logError("Failed to get DOF positions");
-            return {};
+            data.numJoints = 0;
+            return data;
         }
         if (!m_articulation->getDofVelocities(&velocityTensor))
         {
             db.logError("Failed to get DOF velocities");
-            return {};
+            data.numJoints = 0;
+            return data;
         }
         if (!m_articulation->getDofProjectedJointForces(&effortTensor))
         {
             db.logError("Failed to get DOF forces");
+            data.numJoints = 0;
+            return data;
+        }
+
+        // Convert to doubles with unit scaling
+        data.positions.resize(numDofs);
+        data.velocities.resize(numDofs);
+        data.efforts.resize(numDofs);
+
+        for (uint32_t i = 0; i < numDofs; ++i)
+        {
+            data.positions[i] = static_cast<double>(m_jointPositions[i]) * stageUnits;
+            data.velocities[i] = static_cast<double>(m_jointVelocities[i]) * stageUnits;
+            data.efforts[i] = static_cast<double>(m_jointEfforts[i]);
+        }
+
+        return data;
+    }
+
+    /**
+     * @brief Generate message from joint state data.
+     * @details
+     * Serializes joint state data into message format.
+     * Message format:
+     * - timestamp (double, 8 bytes)
+     * - num_joints (uint32_t, 4 bytes)
+     * - For each joint:
+     *   - position (double, 8 bytes)
+     *   - velocity (double, 8 bytes)
+     *   - effort (double, 8 bytes)
+     *
+     * @param[in] data Joint state data to serialize
+     * @return std::vector<uint8_t> Serialized message data
+     */
+    std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::JointStateData& data) override
+    {
+        if (data.numJoints == 0)
+        {
             return {};
         }
 
         // Calculate message size (using doubles for better precision)
-        const size_t messageSize = sizeof(double) + sizeof(uint32_t) + numDofs * (sizeof(double) * 3);
+        const size_t messageSize = sizeof(double) + sizeof(uint32_t) + data.numJoints * (sizeof(double) * 3);
 
         std::vector<uint8_t> messageData(messageSize);
         size_t offset = 0;
 
         // Write timestamp
-        std::memcpy(messageData.data() + offset, &timestamp, sizeof(double));
+        std::memcpy(messageData.data() + offset, &data.timestamp, sizeof(double));
         offset += sizeof(double);
 
         // Write number of joints
-        std::memcpy(messageData.data() + offset, &numDofs, sizeof(uint32_t));
+        std::memcpy(messageData.data() + offset, &data.numJoints, sizeof(uint32_t));
         offset += sizeof(uint32_t);
 
-        // Write joint data (using doubles for better precision)
-        for (uint32_t i = 0; i < numDofs; ++i)
+        // Write joint data (interleaved position, velocity, effort)
+        for (uint32_t i = 0; i < data.numJoints; ++i)
         {
-            // Position (convert to meters if needed)
-            double position = static_cast<double>(m_jointPositions[i]) * stageUnits;
-            std::memcpy(messageData.data() + offset, &position, sizeof(double));
+            std::memcpy(messageData.data() + offset, &data.positions[i], sizeof(double));
             offset += sizeof(double);
 
-            // Velocity
-            double velocity = static_cast<double>(m_jointVelocities[i]) * stageUnits;
-            std::memcpy(messageData.data() + offset, &velocity, sizeof(double));
+            std::memcpy(messageData.data() + offset, &data.velocities[i], sizeof(double));
             offset += sizeof(double);
 
-            // Effort
-            double effort = static_cast<double>(m_jointEfforts[i]);
-            std::memcpy(messageData.data() + offset, &effort, sizeof(double));
+            std::memcpy(messageData.data() + offset, &data.efforts[i], sizeof(double));
             offset += sizeof(double);
         }
 

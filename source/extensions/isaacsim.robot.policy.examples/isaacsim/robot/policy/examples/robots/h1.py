@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""H1 humanoid robot policy examples for flat terrain locomotion."""
+
+
 import isaacsim.core.experimental.utils.transform as transform_utils
 import warp as wp
 from isaacsim.core.deprecation_manager import import_module
@@ -23,7 +26,15 @@ torch = import_module("torch")
 
 
 class H1FlatTerrainPolicy(PolicyController):
-    """The H1 Humanoid running Flat Terrain Policy Locomotion Policy"""
+    """The H1 Humanoid running Flat Terrain Policy Locomotion Policy.
+
+    Args:
+        prim_path: The prim path of the robot on the stage.
+        root_path: The path to the articulation root of the robot.
+        usd_path: The robot usd filepath in the directory.
+        position: The position of the robot.
+        orientation: The orientation of the robot.
+    """
 
     def __init__(
         self,
@@ -32,7 +43,7 @@ class H1FlatTerrainPolicy(PolicyController):
         usd_path: str | None = None,
         position: list[float] | None = None,
         orientation: list[float] | None = None,
-    ) -> None:
+    ):
         """
         Initialize H1 robot and import flat terrain policy.
 
@@ -56,8 +67,7 @@ class H1FlatTerrainPolicy(PolicyController):
         self._policy_counter = 0
 
     def _compute_observation(self, command):
-        """
-        Compute the observation vector for the policy.
+        """Compute the observation vector for the policy.
 
         The observation includes base linear/angular velocities, gravity direction,
         command velocities, joint positions/velocities, and previous actions.
@@ -103,8 +113,7 @@ class H1FlatTerrainPolicy(PolicyController):
         return obs
 
     def forward(self, dt, command):
-        """
-        Compute the desired joint positions and apply them to the robot.
+        """Compute the desired joint positions and apply them to the robot.
 
         Uses the policy to compute joint position targets that achieve the desired
         command velocities for humanoid locomotion, with position control at the joint level.
@@ -125,8 +134,6 @@ class H1FlatTerrainPolicy(PolicyController):
         self._policy_counter += 1
 
     def initialize(self):
-        """
-        Overloads the default initialize function to use default articulation root properties in the USD
-        """
+        """Overloads the default initialize function to use default articulation root properties in the USD"""
         self._policy_counter = 0
         super().initialize(set_articulation_props=False)

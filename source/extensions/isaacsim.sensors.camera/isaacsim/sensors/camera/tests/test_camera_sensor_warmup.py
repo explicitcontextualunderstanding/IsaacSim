@@ -19,6 +19,7 @@ from unittest.mock import patch
 import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
+from isaacsim.core.experimental.objects import DomeLight, GroundPlane
 from isaacsim.sensors.camera import Camera
 
 
@@ -43,10 +44,9 @@ class TestCameraSensor(omni.kit.test.AsyncTestCase):
 
         # Create scene
         rep.functional.create.xform(name="World")
-        rep.functional.create.dome_light(intensity=500, parent="/World", name="DomeLight")
-        rep.functional.create.plane(
-            scale=(100, 100, 1), parent="/World", name="GroundPlane", semantics=[("class", "ground")]
-        )
+        dome_light = DomeLight("/World/DomeLight")
+        dome_light.set_intensities(500)
+        GroundPlane("/World/defaultGroundPlane", sizes=100.0)
         rep.functional.create.camera(position=(0, 0, 3), look_at=(0, 0, 0), parent="/World", name="Camera")
 
         # Initialize camera with annotators

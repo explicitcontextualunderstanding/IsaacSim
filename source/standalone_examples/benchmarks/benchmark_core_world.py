@@ -27,7 +27,6 @@ parser.add_argument(
 args, unknown = parser.parse_known_args()
 
 n_envs = args.num_envs
-n_gpu = args.num_gpus
 
 from isaacsim import SimulationApp
 
@@ -45,15 +44,14 @@ from isaacsim.benchmark.services import BaseIsaacBenchmark
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid, VisualCuboid
 from isaacsim.core.cloner import GridCloner
-from isaacsim.core.prims import Articulation, GeometryPrim, RigidPrim, XFormPrim
-from isaacsim.core.utils.prims import define_prim
-from isaacsim.core.utils.stage import add_reference_to_stage
+from isaacsim.core.experimental.prims import Articulation, GeomPrim, RigidPrim, XformPrim
+from isaacsim.core.experimental.utils.stage import add_reference_to_stage, define_prim
 from isaacsim.storage.native import get_assets_root_path
 
 
 def define_environment():
-    define_prim(prim_path="/World/env_0", prim_type="Xform")
-    XFormPrim("/World/env_0", positions=np.array([[0.0, 0.0, 0.0]]))
+    define_prim(path="/World/env_0", type_name="Xform")
+    XformPrim("/World/env_0", positions=np.array([[0.0, 0.0, 0.0]]), reset_xform_op_properties=True)
     cube_1 = VisualCuboid(
         prim_path="/World/env_0/new_cube_1",
         name="visual_cube",
@@ -88,14 +86,14 @@ def define_environment():
         sys.exit()
 
     asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
-    robot1 = add_reference_to_stage(usd_path=asset_path, prim_path="/World/env_0/Franka_1")
+    robot1 = add_reference_to_stage(usd_path=asset_path, path="/World/env_0/Franka_1")
     robot1.GetVariantSet("Gripper").SetVariantSelection("AlternateFinger")
     robot1.GetVariantSet("Mesh").SetVariantSelection("Quality")
-    robot2 = add_reference_to_stage(usd_path=asset_path, prim_path="/World/env_0/Franka_2")
+    robot2 = add_reference_to_stage(usd_path=asset_path, path="/World/env_0/Franka_2")
     robot2.GetVariantSet("Gripper").SetVariantSelection("AlternateFinger")
     robot2.GetVariantSet("Mesh").SetVariantSelection("Quality")
-    XFormPrim("/World/env_0/Franka_1", name="my_franka_1", positions=np.array([[0.0, 2.0, 0.0]]))
-    XFormPrim("/World/env_0/Franka_2", name="my_franka_2", positions=np.array([[0.0, -2.0, 0.0]]))
+    XformPrim("/World/env_0/Franka_1", positions=np.array([[0.0, 2.0, 0.0]]), reset_xform_op_properties=True)
+    XformPrim("/World/env_0/Franka_2", positions=np.array([[0.0, -2.0, 0.0]]), reset_xform_op_properties=True)
 
 
 def clone_environments():
@@ -106,29 +104,17 @@ def clone_environments():
 
 
 def create_cube_views():
-    my_world.scene.add(
-        GeometryPrim(
-            prim_paths_expr="/World/env_*/new_cube_1",
-            name="visual_cube_view",
-        )
-    )
-    my_world.scene.add(RigidPrim(prim_paths_expr="/World/env_*/new_cube_2", name="rigid_cube_view_1"))
-    my_world.scene.add(RigidPrim(prim_paths_expr="/World/env_*/new_cube_3", name="rigid_cube_view_2"))
+    # Experimental prims don't need to be added to the scene registry
+    visual_cube_view = GeomPrim(paths="/World/env_.*/new_cube_1")
+    rigid_cube_view_1 = RigidPrim(paths="/World/env_.*/new_cube_2")
+    rigid_cube_view_2 = RigidPrim(paths="/World/env_.*/new_cube_3")
 
 
 def create_articulation_views():
-    my_world.scene.add(
-        Articulation(
-            prim_paths_expr="/World/env_*/Franka_1",
-            name="articulation_view_1",
-        )
-    )
-    my_world.scene.add(
-        Articulation(
-            prim_paths_expr="/World/env_*/Franka_2",
-            name="articulation_view_2",
-        )
-    )
+    global articulation_view_1
+    # Experimental prims don't need to be added to the scene registry
+    articulation_view_1 = Articulation(paths="/World/env_.*/Franka_1")
+    articulation_view_2 = Articulation(paths="/World/env_.*/Franka_2")
 
 
 # Create the benchmark
@@ -162,7 +148,6 @@ create_articulation_views()
 benchmark.store_measurements()
 
 benchmark.set_phase("get_world_pose_articulation_no_sim", start_recording_frametime=False, start_recording_runtime=True)
-articulation_view_1 = my_world.scene.get_object("articulation_view_1")
 articulation_view_1.get_world_poses()
 benchmark.store_measurements()
 
@@ -172,13 +157,13 @@ benchmark.store_measurements()
 
 benchmark.set_phase("world_step_w_render", start_recording_frametime=True, start_recording_runtime=False)
 for i in range(100):
-    articulation_view_1.set_joint_position_targets(positions=np.random.randn(n_envs, 9))
+    articulation_view_1.set_dof_position_targets(positions=np.random.randn(n_envs, 9))
     my_world.step(render=True)
 benchmark.store_measurements()
 
 benchmark.set_phase("world_step_no_render", start_recording_frametime=True, start_recording_runtime=False)
 for i in range(100):
-    articulation_view_1.set_joint_position_targets(positions=np.random.randn(n_envs, 9))
+    articulation_view_1.set_dof_position_targets(positions=np.random.randn(n_envs, 9))
     my_world.step(render=False)
 benchmark.store_measurements()
 

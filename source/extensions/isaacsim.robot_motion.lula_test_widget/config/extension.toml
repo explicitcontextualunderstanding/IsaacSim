@@ -1,11 +1,11 @@
 [package]
-version = "1.1.3"
+version = "1.2.0"
 category = "Simulation"
 title = "Lula Test Widget"
 description = "Run Simple Tests Using Lula Algorithms"
 keywords = ["isaac", "lula"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -23,6 +23,7 @@ writeTarget.kit = true
 name = "isaacsim.robot_motion.lula_test_widget"
 
 [[test]]
+name = "startup"
 dependencies = [
     "omni.isaac.ml_archive",
 ]
@@ -32,7 +33,6 @@ stdoutFailPatterns.exclude = [
 ]
 
 [[test]]
-name = "startup"
 dependencies = [
     "omni.isaac.ml_archive",
 ]
@@ -40,3 +40,6 @@ dependencies = [
 stdoutFailPatterns.exclude = [    
     '*The NumPy module was reloaded*',
 ]
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

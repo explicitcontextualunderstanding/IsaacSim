@@ -43,7 +43,7 @@ Ensure your system is set up with the following before building Isaac Sim:
 - **Operating System**: Windows 10/11 or Linux (Ubuntu 22.04)
 
   > **(Linux) Ubuntu 24.04**
-  > Ubuntu 24.04 is not fully supported at this time. Building with Ubuntu 24.04 requires GCC/G++ 11 to be installed, GCC/G++ 12+ is not supported.
+  > Building with Ubuntu 24.04 requires GCC/G++ 11 to be installed, GCC/G++ 12+ is not supported.
 
 - **GPU**: For additional information on GPU features and requirements, see [NVIDIA GPU Requirements](https://docs.omniverse.nvidia.com/dev-guide/latest/common/technical-requirements.html)
 
@@ -73,13 +73,14 @@ Ensure your system is set up with the following before building Isaac Sim:
 
 - [**Git LFS**](https://git-lfs.com/): For managing large files within the repository
 
-- **(Windows - C++ Only) Microsoft Visual Studio 2022**: 
+- **(Windows - C++ Only) Microsoft Visual Studio 2022 or 2026**: 
 
-- Install Visual Studio 2022, Windows SDK, MSVC using Winget by running the following command in PowerShell:
+- Install Visual Studio 2026, Windows SDK, MSVC using Winget by running the following command in PowerShell:
 
   ```powershell
-  winget install --id=Microsoft.VisualStudio.2022.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+  winget install --id=Microsoft.VisualStudio.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
   ```
+  
   [Additional information on Windows development configuration](docs/readme/windows_developer_configuration.md)
 
 
@@ -95,6 +96,12 @@ Ensure your system is set up with the following before building Isaac Sim:
   > sudo apt-get install gcc-11 g++-11
   > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200
   > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 200
+  > ```
+
+  > **(Linux aarch64) ⚠️**
+  > On aarch64 hosts (e.g. DGX Spark), X11 development headers are required to build Python packages that lack pre-built wheels:
+  > ```bash
+  > sudo apt-get install -y libx11-dev xorg-dev
   > ```
 
   > **Compiler Version Check ⚠️**
@@ -116,7 +123,7 @@ This section guides you through building Isaac Sim from source code.
 
 
 ```bash
-git clone https://github.com/isaac-sim/IsaacSim.git isaacsim
+git clone -b develop https://github.com/isaac-sim/IsaacSim.git isaacsim
 cd isaacsim
 git lfs install
 git lfs pull
@@ -212,6 +219,34 @@ Isaac Sim uses a custom build system with the following key options:
 
 ## Usage
 Congratulations on installing Isaac Sim! To get started with using Isaac Sim, follow these [Quick Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html). For more information, visit our full [documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
+
+## Additional Build Tools
+
+Beyond building and running from source (see [Quick Start](#quick-start)), Isaac Sim can also be packaged as a standalone binary archive or deployed as a Docker container.
+
+### Binary Package
+
+Build a standalone redistributable binary package from source. A successful [build](#quick-start) is required before packaging.
+
+**Linux:**
+
+```bash
+./repo.sh package --config release -m isaac-sim-standalone
+```
+
+> **Note:** The same command works on both x86_64 and aarch64 hosts. The build system detects the platform automatically.
+
+**Windows:**
+
+```powershell
+.\repo.bat package --config release -m isaac-sim-standalone
+```
+
+The packaged archive is written to the `_build/packages/` directory.
+
+### Container (Docker)
+
+For building a Docker image, running with Docker Compose, and web-based streaming, see [tools/docker/README.md](tools/docker/README.md).
 
 
 ## Troubleshooting

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for Spot robot policy examples."""
+
+
 import asyncio
 
 import isaacsim.core.experimental.utils.prim as prim_utils
@@ -36,11 +39,37 @@ torch = import_module("torch")
 
 
 class TestSpotCPU(omni.kit.test.AsyncTestCase):
-    def get_device(self):
-        """Return the device to use for tensors. Override in subclasses."""
+    """Test suite for the Spot robot policy on CPU using Isaac Sim.
+
+    This test class validates the functionality of the SpotFlatTerrainPolicy by running comprehensive tests
+    for robot spawning, movement commands, and physics simulation on CPU. It inherits from AsyncTestCase
+    to support asynchronous test execution.
+
+    The test suite includes:
+    - Spawning and validating the Spot robot in the simulation environment
+    - Testing forward movement commands and verifying displacement
+    - Testing turning commands and verifying rotational changes
+    - Physics simulation integration with proper setup and teardown
+
+    Each test creates a new stage with physics scene, spawns the Spot robot, and runs physics
+    simulation to verify expected behaviors. The tests use tensor operations on CPU and measure
+    actual robot pose changes to validate command execution.
+    """
+
+    def get_device(self) -> torch.device:
+        """Return the device to use for tensors. Override in subclasses.
+
+        Returns:
+            The PyTorch device for tensor operations.
+        """
         return torch.device("cpu")
 
     async def setUp(self):
+        """Set up the test environment with physics scene and ground plane.
+
+        Initializes a new USD stage, configures physics simulation parameters, spawns a ground plane,
+        and sets up the simulation manager with CPU device configuration.
+        """
         await stage_utils.create_new_stage_async()
         # This needs to be set so that kit updates match physics updates
         self._physics_rate = 500
@@ -67,6 +96,11 @@ class TestSpotCPU(omni.kit.test.AsyncTestCase):
         self._timeline = omni.timeline.get_timeline_interface()
 
     async def tearDown(self):
+        """Clean up the test environment.
+
+        Stops the timeline, deregisters physics callbacks, and waits for all assets to finish loading
+        before completing teardown.
+        """
         await omni.kit.app.get_app().next_update_async()
         self._timeline.stop()
         SimulationManager.deregister_callback(self._physics_callback_id)
@@ -76,6 +110,11 @@ class TestSpotCPU(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     async def test_spot_add(self):
+        """Test spawning a Spot robot and verify its configuration.
+
+        Verifies that the robot has the expected 12 degrees of freedom and that the robot prim
+        exists in the stage with proper ArticulationRootAPI.
+        """
         await self.spawn_spot()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._spot.robot.num_dofs, 12)
@@ -90,6 +129,11 @@ class TestSpotCPU(omni.kit.test.AsyncTestCase):
         )
 
     async def test_robot_move_forward_command(self):
+        """Test robot forward movement command.
+
+        Commands the robot to move forward and verifies that it moves the expected distance
+        within reasonable bounds after 1 second of simulation.
+        """
         await self.spawn_spot()
         await omni.kit.app.get_app().next_update_async()
 
@@ -114,6 +158,11 @@ class TestSpotCPU(omni.kit.test.AsyncTestCase):
         self.assertLess(delta, 2.0)
 
     async def test_robot_turn_command(self):
+        """Test robot turn command.
+
+        Commands the robot to turn and verifies that it rotates at least 90 degrees
+        after 2 seconds of simulation.
+        """
         await self.spawn_spot()
         await omni.kit.app.get_app().next_update_async()
 
@@ -149,7 +198,15 @@ class TestSpotCPU(omni.kit.test.AsyncTestCase):
         # should have turned at least 90 deg
         self.assertGreater(heading_delta, 1.5)
 
-    async def spawn_spot(self, name="spot"):
+    async def spawn_spot(self, name: str = "spot"):
+        """Spawn a Spot robot in the simulation.
+
+        Creates a SpotFlatTerrainPolicy instance, starts the timeline, initializes the robot,
+        and registers a physics callback for robot control.
+
+        Args:
+            name: The name for the robot prim in the stage.
+        """
         self._prim_path = "/World/" + name
 
         self._spot = SpotFlatTerrainPolicy(prim_path=self._prim_path, position=[0, 0, 0.7])
@@ -164,11 +221,39 @@ class TestSpotCPU(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     def on_physics_step(self, step_size, context):
+        """Physics step callback to control the Spot robot.
+
+        Called on each physics simulation step to send movement commands to the robot.
+
+        Args:
+            step_size: The physics simulation step size.
+            context: The simulation context.
+        """
         if self._spot:
             self._spot.forward(step_size, self._base_command)
 
 
 class TestSpotGPU(TestSpotCPU):
+    """GPU-based test suite for the Spot quadruped robot policy examples.
+
+    This test class extends TestSpotCPU to run all Spot robot policy tests on GPU using CUDA acceleration.
+    It inherits comprehensive test coverage for robot spawning, movement commands, and turning behaviors
+    while leveraging GPU compute for improved performance with tensor operations.
+
+    The test suite validates:
+    - Robot spawning and DOF configuration
+    - Forward movement commands and position tracking
+    - Turning commands and orientation changes
+    - Physics simulation integration with GPU tensors
+
+    All tests use CUDA device for tensor computations, making it suitable for performance testing
+    and validation of GPU-accelerated robot policy implementations.
+    """
+
     def get_device(self):
-        """Return the device to use for tensors"""
+        """Return the device to use for tensors.
+
+        Returns:
+            The CUDA device for tensor operations.
+        """
         return torch.device("cuda")

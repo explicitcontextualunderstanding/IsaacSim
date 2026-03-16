@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for H1 humanoid robot policy examples in Isaac Sim."""
+
+
 import asyncio
 
 import isaacsim.core.experimental.utils.prim as prim_utils
@@ -37,11 +40,31 @@ torch = import_module("torch")
 
 
 class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
+    """Test case for the H1 humanoid robot policy examples.
+
+    This class provides comprehensive testing for the H1FlatTerrainPolicy, validating robot spawning,
+    movement commands, and basic locomotion behaviors. The tests ensure the H1 robot can be properly
+    instantiated in the simulation environment and respond correctly to movement commands.
+
+    The test suite includes verification of:
+    - Robot spawning and articulation setup with proper degrees of freedom
+    - Forward movement commands and position validation
+    - Turning commands and orientation changes
+    - Physics simulation integration and callback registration
+
+    Tests run on CPU by default but can be overridden for GPU execution through device selection.
+    """
+
     def get_device(self):
-        """Return the device to use for tensors. Override in subclasses."""
+        """Return the device to use for tensors. Override in subclasses.
+
+        Returns:
+            The device to use for tensors.
+        """
         return torch.device("cpu")
 
     async def setUp(self):
+        """Set up the test environment with physics scene and ground plane."""
         await stage_utils.create_new_stage_async()
         # This needs to be set so that kit updates match physics updates
         self._physics_rate = 200
@@ -69,6 +92,7 @@ class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
+        """Clean up the test environment by stopping timeline and deregistering callbacks."""
         await omni.kit.app.get_app().next_update_async()
         self._timeline.stop()
         if self._physics_callback_id is not None:
@@ -84,6 +108,7 @@ class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     async def test_h1_add(self):
+        """Test spawning H1 robot and verify it has correct number of DOFs and valid physics setup."""
         await self.spawn_h1()
         await omni.kit.app.get_app().next_update_async()
         self.assertEqual(self._h1.robot.num_dofs, 19)
@@ -98,6 +123,7 @@ class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
         )
 
     async def test_robot_move_forward_command(self):
+        """Test robot forward movement command and verify position change is within expected range."""
         await self.spawn_h1()
         await omni.kit.app.get_app().next_update_async()
 
@@ -123,6 +149,7 @@ class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
         self.assertLess(delta, 2.0)
 
     async def test_robot_turn_command(self):
+        """Test robot turn command and verify heading change is at least 90 degrees."""
         await self.spawn_h1()
         await omni.kit.app.get_app().next_update_async()
 
@@ -158,7 +185,12 @@ class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
         # should have turned at least 90 deg
         self.assertGreater(heading_delta, 1.5)
 
-    async def spawn_h1(self, name="h1"):
+    async def spawn_h1(self, name: str = "h1"):
+        """Spawn H1 robot in the scene and initialize physics simulation.
+
+        Args:
+            name: Name for the robot prim in the scene.
+        """
         self._prim_path = "/World/" + name
 
         self._h1 = H1FlatTerrainPolicy(prim_path=self._prim_path, position=[0, 0, 1.05])
@@ -172,12 +204,34 @@ class TestH1ExampleExtension(omni.kit.test.AsyncTestCase):
         )
         await omni.kit.app.get_app().next_update_async()
 
-    def on_physics_step(self, step_size, context):
+    def on_physics_step(self, step_size: float, context):
+        """Physics step callback that applies base command to the H1 robot.
+
+        Args:
+            step_size: Time step size for physics simulation.
+            context: Physics simulation context.
+        """
         if self._h1:
             self._h1.forward(step_size, self._base_command)
 
 
 class TestH1GPU(TestH1ExampleExtension):
+    """GPU-accelerated test suite for the H1 humanoid robot using PyTorch CUDA backend.
+
+    This test class extends the base H1 robot test functionality to run on GPU using CUDA,
+    providing accelerated tensor operations and physics computations. It inherits all test
+    methods from TestH1ExampleExtension while configuring the robot to use GPU device for
+    enhanced performance in simulation scenarios.
+
+    The class automatically configures PyTorch tensors and robot operations to use CUDA
+    device, enabling faster execution of robot control policies and physics simulations
+    compared to CPU-based testing.
+    """
+
     def get_device(self):
-        """Return the device to use for tensors"""
+        """Return the device to use for tensors.
+
+        Returns:
+            The torch device to use for tensor operations.
+        """
         return torch.device("cuda")

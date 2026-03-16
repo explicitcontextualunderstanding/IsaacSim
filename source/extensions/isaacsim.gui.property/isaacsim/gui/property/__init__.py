@@ -13,4 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides specialized property widgets for Isaac Sim's USD-based robotics workflows including robot schema management, array attribute editing, and custom data handling."""
+
+
 from .widgets import *
+
+__all__ = [
+    "ArrayPropertiesWidget",
+    "CustomDataWidget",
+    "MotionPlanningAPIWidget",
+    "NameOverrideWidget",
+    "NamespaceWidget",
+    "JointAPIWidget",
+    "LinkAPIWidget",
+    "RobotAPIWidget",
+    "IsaacPropertyWidgets",
+]

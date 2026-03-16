@@ -40,7 +40,7 @@ libdirs {
 }
 links { "octomap", "octomath" }
 
-extra_usd_libs = { "usdPhysics" }
+extra_usd_libs = { "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -93,7 +93,7 @@ libdirs {
 }
 links { "isaacsim.util.debug_draw.primitive_drawing", "isaacsim.asset.gen.omap.generator", "omni.usd" }
 
-extra_usd_libs = { "usdUtils" }
+extra_usd_libs = { "usdUtils", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -158,14 +158,17 @@ libdirs {
 }
 links { "isaacsim.asset.gen.omap.generator" }
 
-extra_usd_libs = { "usdUtils" }
+extra_usd_libs = { "usdUtils", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
 -- End OpenUSD
 
-filter { "system:linux" }
+filter { "system:linux", "configurations:release" }
 links { "tbb", "pthread" }
+buildoptions { "-pthread" }
+filter { "system:linux", "configurations:debug" }
+links { "tbb_debug", "pthread" }
 buildoptions { "-pthread" }
 includedirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include",

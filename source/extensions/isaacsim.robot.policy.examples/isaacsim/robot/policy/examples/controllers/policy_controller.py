@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains the base PolicyController class for loading and executing robot control policies."""
+
+
 import io
 from abc import ABC
 from typing import Literal
@@ -31,8 +34,7 @@ torch = import_module("torch")
 
 
 class PolicyController(ABC):
-    """
-    A controller that loads and executes a policy from a file.
+    """A controller that loads and executes a policy from a file.
 
     Args:
         prim_path: The path to the prim in the stage
@@ -40,9 +42,6 @@ class PolicyController(ABC):
         usd_path: The path to the USD file
         position: The initial position of the robot
         orientation: The initial orientation of the robot
-
-    Attributes:
-        robot: The robot articulation
     """
 
     def __init__(
@@ -52,7 +51,7 @@ class PolicyController(ABC):
         usd_path: str | None = None,
         position: list[float] | None = None,
         orientation: list[float] | None = None,
-    ) -> None:
+    ):
         prim = get_prim_at_path(prim_path)
 
         if not prim.IsValid():
@@ -67,9 +66,8 @@ class PolicyController(ABC):
         else:
             self.robot = Articulation(paths=root_path, positions=position, orientations=orientation)
 
-    def load_policy(self, policy_file_path, policy_env_path) -> None:
-        """
-        Loads a policy from a file.
+    def load_policy(self, policy_file_path, policy_env_path):
+        """Loads a policy from a file.
 
         Args:
             policy_file_path: The path to the policy file
@@ -90,9 +88,8 @@ class PolicyController(ABC):
         set_gains: bool = True,
         set_limits: bool = True,
         set_articulation_props: bool = True,
-    ) -> None:
-        """
-        Initializes the robot and sets up the controller.
+    ):
+        """Initializes the robot and sets up the controller.
 
         Args:
             physics_sim_view: The physics simulation view
@@ -132,10 +129,8 @@ class PolicyController(ABC):
         if set_articulation_props:
             self._set_articulation_props()
 
-    def _set_articulation_props(self) -> None:
-        """
-        Sets the articulation root properties from the policy environment parameters.
-        """
+    def _set_articulation_props(self):
+        """Sets the articulation root properties from the policy environment parameters."""
         articulation_prop = get_articulation_props(self.policy_env_params)
 
         solver_position_iteration_count = articulation_prop.get("solver_position_iteration_count")
@@ -160,8 +155,7 @@ class PolicyController(ABC):
             self.robot.set_sleep_thresholds([sleep_threshold])
 
     def _compute_action(self, obs: torch.Tensor) -> torch.Tensor:
-        """
-        Compute the action from the observation using the loaded policy.
+        """Compute the action from the observation using the loaded policy.
 
         This method runs the policy network in inference mode to convert
         the current observation into an action command.
@@ -177,8 +171,7 @@ class PolicyController(ABC):
         return action
 
     def _compute_observation(self) -> NotImplementedError:
-        """
-        Compute the current observation vector for the policy.
+        """Compute the current observation vector for the policy.
 
         This method must be implemented by derived classes to construct
         the observation vector in the format specified by env.yaml.
@@ -193,10 +186,9 @@ class PolicyController(ABC):
         )
 
     def forward(self) -> NotImplementedError:
-        """
-        Execute one step of the policy controller.
+        r"""Execute one step of the policy controller.
 
-        This method must be implemented by derived classes to:
+        This method must be implemented by derived classes to\:
         1. Compute the current observation
         2. Run the policy to get an action
         3. Apply the action to the robot
@@ -211,8 +203,6 @@ class PolicyController(ABC):
             "Forward needs to be implemented to compute and apply robot control from observations"
         )
 
-    def post_reset(self) -> None:
-        """
-        Called after the controller is reset.
-        """
+    def post_reset(self):
+        """Called after the controller is reset."""
         self.robot.reset_to_default_state()

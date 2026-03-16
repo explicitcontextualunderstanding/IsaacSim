@@ -3,13 +3,13 @@ reloadable = false
 order = 0
 
 [package]
-version = "2.14.1"
+version = "2.16.1"
 category = "Simulation"
 title = "Isaac Sim Kit Helpers"
 description = "This Extension that provides a way to launch a python app"
 keywords = ["isaac", "kit", "python"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -20,3 +20,6 @@ toggleable = false
 
 [[python.module]]
 name = "isaacsim.simulation_app"
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

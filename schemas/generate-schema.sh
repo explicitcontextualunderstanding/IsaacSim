@@ -66,4 +66,5 @@ if [[ -n "$pip_archive_path" ]]; then
 fi
 
 export PYTHONPATH="${pythonpath}"
-exec "${repo_root}"/_build/target-deps/python/python "${repo_root}"/_build/target-deps/usd/${config}/bin/usdGenSchema "${repo_root}/source/extensions/isaacsim.robot.schema/robot_schema/RobotSchema.usda" "${repo_root}/source/extensions/isaacsim.robot.schema/robot_schema"
+"${repo_root}"/_build/target-deps/python/python "${repo_root}"/_build/target-deps/usd/${config}/bin/usdGenSchema "${repo_root}/source/extensions/isaacsim.robot.schema/robot_schema/RobotSchema.usda" "${repo_root}/source/extensions/isaacsim.robot.schema/robot_schema"
+"${repo_root}"/_build/target-deps/python/python "${repo_root}"/_build/target-deps/usd/${config}/bin/usdGenSchema "${repo_root}/source/extensions/isaacsim.robot_motion.schema/robot_motion_schema/RobotMotionSchema.usda" "${repo_root}/source/extensions/isaacsim.robot_motion.schema/robot_motion_schema"

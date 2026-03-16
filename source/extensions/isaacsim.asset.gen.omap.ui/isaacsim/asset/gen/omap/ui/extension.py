@@ -204,6 +204,11 @@ class OccupancyMapWindow(MenuHelperWindow):
         self._om = _omap.acquire_omap_interface()
         self._layers = omni.kit.usd.layers.get_layers()
         self._filepicker: Optional[object] = None
+        self._yaml_filepicker: Optional[object] = None
+        self._ros_yaml_text: Optional[str] = None
+        self._map_bottom_left: Optional[object] = None
+        self._map_scale: Optional[float] = None
+        self._map_scale_to_meters: Optional[float] = None
         self._models = {}
         self._stage_open_callback: Optional[object] = None
         self._image: Optional[List[int]] = None
@@ -648,12 +653,22 @@ class OccupancyMapWindow(MenuHelperWindow):
 
         scale_to_meters = 1.0 / stage_utils.get_stage_units()[0]
 
+        self._map_bottom_left = bottom_left
+        self._map_scale = scale
+        self._map_scale_to_meters = scale_to_meters
+
         stage = omni.usd.get_context().get_stage()
         root = stage.GetRootLayer()
-        default_image_name = root.GetDisplayName().rsplit(".", 1)[0]
-        default_image_name += ".png"
+        default_image_stem = root.GetDisplayName().rsplit(".", 1)[0]
 
-        ros_yaml_file_text = "image: " + default_image_name
+        image_name_model = self._models.get("image_name")
+        if image_name_model is not None:
+            stem = image_name_model.as_string.strip()
+            image_name = (stem if stem else default_image_stem) + ".png"
+        else:
+            image_name = default_image_stem + ".png"
+
+        ros_yaml_file_text = "image: " + image_name
         ros_yaml_file_text += f"\nresolution: {float(scale / scale_to_meters)}"
         ros_yaml_file_text += (
             f"\norigin: [{float(bottom_left[0] / scale_to_meters)}, {float(bottom_left[1] / scale_to_meters)}, 0.0000]"
@@ -662,11 +677,40 @@ class OccupancyMapWindow(MenuHelperWindow):
         ros_yaml_file_text += f"\noccupied_thresh: {ROS_OCCUPIED_THRESHOLD}"
         ros_yaml_file_text += f"\nfree_thresh: {ROS_FREE_THRESHOLD}"
 
+        self._ros_yaml_text = ros_yaml_file_text
+
         current_data_output_index = self._models["config_type"].get_item_value_model().as_int
         if current_data_output_index == 0:
             self._models["config_data"].set_value(ros_yaml_file_text)
         elif current_data_output_index == 1:
             self._models["config_data"].set_value(image_details_text)
+
+    def _update_yaml(self) -> None:
+        """Rebuilds the YAML text using the current image filename field value.
+
+        Warns if the filename field is empty. Does not regenerate the image.
+        """
+        if self._map_bottom_left is None:
+            carb.log_warn("No map data available. Please generate the image first.")
+            return
+
+        stem = self._models["image_name"].as_string.strip()
+        if not stem:
+            carb.log_warn("Image filename is empty. Please enter a filename before updating the YAML.")
+            return
+
+        ros_yaml_file_text = "image: " + stem + ".png"
+        ros_yaml_file_text += f"\nresolution: {float(self._map_scale / self._map_scale_to_meters)}"
+        ros_yaml_file_text += f"\norigin: [{float(self._map_bottom_left[0] / self._map_scale_to_meters)}, {float(self._map_bottom_left[1] / self._map_scale_to_meters)}, 0.0000]"
+        ros_yaml_file_text += "\nnegate: 0"
+        ros_yaml_file_text += f"\noccupied_thresh: {ROS_OCCUPIED_THRESHOLD}"
+        ros_yaml_file_text += f"\nfree_thresh: {ROS_FREE_THRESHOLD}"
+
+        self._ros_yaml_text = ros_yaml_file_text
+
+        current_data_output_index = self._models["config_type"].get_item_value_model().as_int
+        if current_data_output_index == 0:
+            self._models["config_data"].set_value(ros_yaml_file_text)
 
     def save_image(self, file: str, folder: str) -> None:
         """Saves the occupancy map image to a PNG file.
@@ -719,6 +763,59 @@ class OccupancyMapWindow(MenuHelperWindow):
             item_filter_options=[".png Files (*.png, *.PNG)"],
             item_filter_fn=_on_filter_png_files,
         )
+        stage = omni.usd.get_context().get_stage()
+        default_stem = stage.GetRootLayer().GetDisplayName().rsplit(".", 1)[0]
+        image_name_model = self._models.get("image_name")
+        if image_name_model is not None:
+            stem = image_name_model.as_string.strip() or default_stem
+        else:
+            stem = default_stem
+        self._filepicker.set_filename(stem)
+
+    def save_yaml(self, file: str, folder: str) -> None:
+        """Saves the ROS occupancy map YAML parameters to a file.
+
+        Args:
+            file: The filename for the saved YAML (will add .yaml extension if not present).
+            folder: The directory path where the YAML file should be saved.
+        """
+        if self._ros_yaml_text is None:
+            carb.log_warn("No YAML data available. Please generate visualization first.")
+            return
+
+        try:
+            if os.path.splitext(file)[1].lower() not in (".yaml", ".yml"):
+                file = "{}.yaml".format(file)
+            save_path = os.path.join(folder, file)
+            carb.log_info(f"Saving occupancy map YAML to {save_path}")
+            with open(save_path, "w") as f:
+                f.write(self._ros_yaml_text)
+            carb.log_info("YAML saved successfully")
+        except Exception as e:
+            carb.log_error(f"Failed to save YAML: {e}")
+        finally:
+            if self._yaml_filepicker is not None:
+                self._yaml_filepicker.hide()
+
+    def save_yaml_file(self) -> None:
+        """Opens a file picker dialog for saving the occupancy map YAML parameters file."""
+        from omni.kit.widget.filebrowser import FileBrowserItem
+        from omni.kit.window.filepicker import FilePickerDialog
+
+        def _on_filter_yaml_files(item: FileBrowserItem) -> bool:
+            if not item or item.is_folder:
+                return True
+            return os.path.splitext(item.path)[1].lower() in (".yaml", ".yml")
+
+        self._yaml_filepicker = None
+        self._yaml_filepicker = FilePickerDialog(
+            "Save .yaml file",
+            allow_multi_selection=False,
+            apply_button_label="Save",
+            click_apply_handler=self.save_yaml,
+            item_filter_options=[".yaml Files (*.yaml, *.yml)"],
+            item_filter_fn=_on_filter_yaml_files,
+        )
 
     def rebuild_frame(self) -> None:
         """Rebuilds the image visualization frame.
@@ -729,7 +826,9 @@ class OccupancyMapWindow(MenuHelperWindow):
         if self._image is not None:
             with ui.VStack():
                 omni.ui.ImageWithProvider(self._rgb_byte_provider)
-                ui.Button("Save Image", clicked_fn=self.save_file, height=0)
+                with ui.HStack(height=0):
+                    ui.Button("Save Image", clicked_fn=self.save_file, height=0)
+                    ui.Button("Save YAML", clicked_fn=self.save_yaml_file, height=0)
 
     def _generate_image(self) -> None:
         """Creates the visualization window for the occupancy map.
@@ -746,6 +845,10 @@ class OccupancyMapWindow(MenuHelperWindow):
                 "Occupancy map is empty, press CALCULATE first and make sure there is collision geometry in the mapping bounds"
             )
             return
+        stage = omni.usd.get_context().get_stage()
+        root = stage.GetRootLayer()
+        default_image_stem = root.GetDisplayName().rsplit(".", 1)[0]
+
         self._rgb_byte_provider = omni.ui.ByteImageProvider()
         self.visualize_window = omni.ui.Window("Visualization", width=500, height=600)
         with self.visualize_window.frame:
@@ -770,6 +873,22 @@ class OccupancyMapWindow(MenuHelperWindow):
                     self._models["generate"] = btn_builder(
                         label="Occupancy map", text="Re-Generate Image", on_clicked_fn=self._fill_image
                     )
+                    with ui.HStack(height=0, spacing=5):
+                        ui.Label(
+                            "Image File Name",
+                            width=120,
+                            alignment=ui.Alignment.LEFT_CENTER,
+                            tooltip="Stem of the image filename written into the YAML 'image' field. Save your PNG with this same name.",
+                        )
+                        self._models["image_name"] = ui.StringField(
+                            name="StringField",
+                            width=ui.Fraction(1),
+                            height=0,
+                            alignment=ui.Alignment.LEFT_CENTER,
+                        ).model
+                        self._models["image_name"].set_value(default_image_stem)
+                        ui.Label(".png", width=0, alignment=ui.Alignment.LEFT_CENTER)
+                        ui.Button("Update YAML", clicked_fn=self._update_yaml, height=0, width=110)
                     self._models["config_data"] = ui.StringField(height=100, multiline=True).model
                 self._image_frame = ui.Frame()
                 self._image_frame.set_build_fn(self.rebuild_frame)
@@ -792,6 +911,13 @@ class OccupancyMapWindow(MenuHelperWindow):
         if self._filepicker is not None:
             self._filepicker.hide()
             self._filepicker = None
+        if self._yaml_filepicker is not None:
+            self._yaml_filepicker.hide()
+            self._yaml_filepicker = None
+        self._ros_yaml_text = None
+        self._map_bottom_left = None
+        self._map_scale = None
+        self._map_scale_to_meters = None
         self._models = {}
         self._image = None
 

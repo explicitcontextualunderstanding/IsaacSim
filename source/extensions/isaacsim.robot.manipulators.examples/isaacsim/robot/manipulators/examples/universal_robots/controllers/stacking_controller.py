@@ -40,7 +40,7 @@ class StackingController(manipulators_controllers.StackingController):
         robot_articulation: SingleArticulation,
         picking_order_cube_names: List[str],
         robot_observation_name: str,
-    ) -> None:
+    ):
         manipulators_controllers.StackingController.__init__(
             self,
             name=name,
@@ -62,8 +62,8 @@ class StackingController(manipulators_controllers.StackingController):
 
         Args:
             observations: Dictionary of observations including cube positions.
-            end_effector_orientation: Orientation for end effector. Defaults to None.
-            end_effector_offset: Offset for end effector. Defaults to None.
+            end_effector_orientation: Orientation for end effector.
+            end_effector_offset: Offset for end effector.
 
         Returns:
             The articulation action to execute.

@@ -13,27 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import carb
+"""Helper functions for robot simulation tests."""
+
 import omni.graph.core as og
-
-# NOTE:
-#   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
-#   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
-import omni.kit.test
+import omni.kit.app
 import usdrt.Sdf
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.extensions import get_extension_path_from_name
-from isaacsim.core.utils.rotations import quat_to_euler_angles
-from isaacsim.core.utils.stage import open_stage_async
-from isaacsim.storage.native import get_assets_root_path_async
+from isaacsim.core.experimental.prims import Articulation
+from isaacsim.core.experimental.utils.stage import open_stage_async
 
 
-async def init_robot_sim(art_path, graph_path="/ActionGraph"):
-    art = SingleArticulation(art_path)
-    art._articulation_view.initialize()
-    # reset
-    art.set_world_pose(position=[0, 0, 0.1], orientation=[0, 0, 0, 1])
-    art.set_world_velocity([0, 0, 0, 0, 0, 0])
+async def init_robot_sim(art_path: str, graph_path: str = "/ActionGraph"):
+    """Initialize robot simulation by resetting pose and velocities.
+
+    Creates an articulation at the given path, resets its position, orientation,
+    and velocities, then resets the differential controller inputs.
+
+    Args:
+        art_path: USD path to the robot articulation prim.
+        graph_path: USD path to the OmniGraph containing the controller.
+    """
+    art = Articulation(art_path)
+    # Wait for physics to be ready (replaces _articulation_view.initialize())
+    await omni.kit.app.get_app().next_update_async()
+    # reset position and orientation (wxyz format for experimental API)
+    art.set_world_poses(positions=[[0, 0, 0.1]], orientations=[[1, 0, 0, 0]])
+    # reset velocities
+    art.set_velocities(linear_velocities=[[0, 0, 0]], angular_velocities=[[0, 0, 0]])
     # reset controller
     og.Controller.attribute(graph_path + "/DifferentialController.inputs:linearVelocity").set(0)
     og.Controller.attribute(graph_path + "/DifferentialController.inputs:angularVelocity").set(0)
@@ -44,7 +49,31 @@ async def init_robot_sim(art_path, graph_path="/ActionGraph"):
     return
 
 
-def setup_robot_og(graph_path, lwheel_name, rwheel_name, robot_path, wheel_rad, wheel_dist):
+def setup_robot_og(
+    graph_path: str,
+    lwheel_name: str,
+    rwheel_name: str,
+    robot_path: str,
+    wheel_rad: float,
+    wheel_dist: float,
+):
+    """Set up OmniGraph for differential drive robot control.
+
+    Creates an action graph with playback tick, differential controller,
+    articulation controller, and odometry computation nodes.
+
+    Args:
+        graph_path: USD path where the graph will be created.
+        lwheel_name: Name of the left wheel joint.
+        rwheel_name: Name of the right wheel joint.
+        robot_path: USD path to the robot prim.
+        wheel_rad: Wheel radius in meters.
+        wheel_dist: Distance between wheels in meters.
+
+    Returns:
+        Tuple of (graph, odom_node) where graph is the created OmniGraph
+        and odom_node is the odometry computation node.
+    """
     keys = og.Controller.Keys
     (graph, nodes, _, _) = og.Controller.edit(
         {"graph_path": graph_path, "evaluator_name": "execution"},
@@ -72,9 +101,3 @@ def setup_robot_og(graph_path, lwheel_name, rwheel_name, robot_path, wheel_rad, 
     )
 
     return graph, nodes[3]
-
-
-def set_physics_frequency(frequency=60):
-    carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", True)
-    carb.settings.get_settings().set_int("/app/runLoops/main/rateLimitFrequency", int(frequency))
-    carb.settings.get_settings().set_int("/persistent/simulation/minFrameRate", int(frequency))

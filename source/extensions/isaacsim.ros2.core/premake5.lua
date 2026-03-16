@@ -97,7 +97,7 @@ for _, ros_distro in ipairs(ros_distributions) do
         -- "ackermann_msgs__rosidl_typesupport_c", "ackermann_msgs__rosidl_generator_c"
     }
 
-    extra_usd_libs = { "usdPhysics" }
+    extra_usd_libs = { "usdPhysics", "ts" }
 
     -- Begin OpenUSD
     add_usd(extra_usd_libs)
@@ -183,7 +183,7 @@ libdirs {
 -- }
 links { "isaacSensorSchema", "physxSchema", "omni.usd" }
 
-extra_usd_libs = { "usdGeom", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -191,7 +191,7 @@ add_usd(extra_usd_libs)
 
 filter { "system:linux" }
 disablewarnings { "error=narrowing", "error=unused-but-set-variable", "error=unused-variable" }
-links { "boost_system", "stdc++fs" }
+links { "stdc++fs" }
 filter { "system:windows" }
 filter {}
 
@@ -286,7 +286,7 @@ add_usd()
 add_cuda_dependencies()
 filter { "system:linux" }
 disablewarnings { "error=narrowing", "error=unused-but-set-variable", "error=unused-variable" }
-links { "boost_system", "stdc++fs" }
+links { "stdc++fs" }
 filter { "system:windows" }
 filter {}
 

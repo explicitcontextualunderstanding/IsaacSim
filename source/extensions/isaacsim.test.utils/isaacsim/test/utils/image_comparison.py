@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Image comparison utilities for testing and validation."""
+
+
 import os
 import re
 
@@ -36,12 +39,12 @@ def compute_difference_metrics(
     of requested percentiles of absolute differences.
 
     Args:
-        param golden_array: Reference image array.
-        param test_array: Test image array to compare.
-        param percentiles: Sequence of percentiles to compute for absolute differences.
-        param allclose_rtol: Relative tolerance for the allclose metric.
-        param allclose_atol: Absolute tolerance for the allclose metric.
-        param ignore_blank_pixels: If True, ignore blank pixels in the comparison.
+        golden_array: Reference image array.
+        test_array: Test image array to compare.
+        percentiles: Sequence of percentiles to compute for absolute differences.
+        allclose_rtol: Relative tolerance for the allclose metric.
+        allclose_atol: Absolute tolerance for the allclose metric.
+        ignore_blank_pixels: If True, ignore blank pixels in the comparison.
 
     Returns:
         A dictionary containing the computed metrics: ``allclose``, ``rtol``, ``atol``,
@@ -62,6 +65,43 @@ def compute_difference_metrics(
         >>> metrics = compute_difference_metrics(a, b)
         >>> bool(metrics["allclose"])  # True if arrays are close with defaults
         True
+    """
+    return _compute_difference_metrics_impl(
+        golden_array=golden_array,
+        test_array=test_array,
+        percentiles=percentiles,
+        allclose_rtol=allclose_rtol,
+        allclose_atol=allclose_atol,
+        ignore_blank_pixels=ignore_blank_pixels,
+    )
+
+
+def _compute_difference_metrics_impl(
+    golden_array: np.ndarray,
+    test_array: np.ndarray,
+    *,
+    percentiles: list[float] | tuple[float, ...],
+    allclose_rtol: float,
+    allclose_atol: float,
+    ignore_blank_pixels: bool,
+) -> dict[str, object]:
+    """Internal implementation of compute_difference_metrics.
+
+    Args:
+        golden_array: Reference image array.
+        test_array: Test image array to compare.
+        percentiles: Sequence of percentiles to compute for absolute differences.
+        allclose_rtol: Relative tolerance for the allclose metric.
+        allclose_atol: Absolute tolerance for the allclose metric.
+        ignore_blank_pixels: If True, ignore blank pixels in the comparison.
+
+    Returns:
+        A dictionary containing the computed metrics: ``allclose``, ``rtol``, ``atol``,
+        ``mean_abs``, ``max_abs``, ``rmse``, and ``percentiles`` (a mapping from percentile
+        to value).
+
+    Raises:
+        ValueError: If image shapes do not match.
     """
     if golden_array.shape != test_array.shape:
         raise ValueError(f"Image shapes do not match: golden {golden_array.shape} vs test {test_array.shape}")
@@ -105,16 +145,13 @@ def compute_difference_metrics(
     }
 
 
-def print_difference_statistics(metrics: dict[str, object]) -> None:
+def print_difference_statistics(metrics: dict[str, object]):
     """Pretty-print image difference metrics.
 
     Prints a stable summary of the metrics computed by ``compute_difference_metrics``.
 
     Args:
-        param metrics: Dictionary returned by ``compute_difference_metrics``.
-
-    Returns:
-        None.
+        metrics: Dictionary returned by ``compute_difference_metrics``.
 
     Example:
 
@@ -160,22 +197,25 @@ def compare_arrays_within_tolerances(
     """Compare two image arrays against tolerance-based criteria.
 
     Args:
-        param golden_array: Reference image array.
-        param test_array: Test image array to compare.
-        param allclose_rtol: Relative tolerance for np.allclose (default: 1e-05). Pass None to
+        golden_array: Reference image array.
+        test_array: Test image array to compare.
+        allclose_rtol: Relative tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_atol=None too).
-        param allclose_atol: Absolute tolerance for np.allclose (default: 1e-08). Pass None to
+        allclose_atol: Absolute tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_rtol=None too).
-        param mean_tolerance: Maximum acceptable mean absolute difference (optional).
-        param max_tolerance: Maximum acceptable max absolute difference (optional).
-        param absolute_tolerance: Maximum absolute difference for any pixel (optional).
-        param percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
-        param rmse_tolerance: Maximum acceptable root mean square error (optional).
-        param print_all_stats: If True, compute and print all metrics regardless of criteria.
+        mean_tolerance: Maximum acceptable mean absolute difference (optional).
+        max_tolerance: Maximum acceptable max absolute difference (optional).
+        absolute_tolerance: Maximum absolute difference for any pixel (optional).
+        percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
+        rmse_tolerance: Maximum acceptable root mean square error (optional).
+        print_all_stats: If True, compute and print all metrics regardless of criteria.
 
     Returns:
         A dictionary with keys: ``passed`` (bool), ``criteria`` (mapping of criterion
         to bool), ``metrics`` (the computed metrics), and ``thresholds`` (configured values).
+
+    Raises:
+        ValueError: If image shapes do not match.
 
     Example:
 
@@ -275,22 +315,25 @@ def compare_images_within_tolerances(
     """Compare two image files against tolerance-based criteria.
 
     Args:
-        param golden_file_path: Path to the reference image file.
-        param test_file_path: Path to the test image file to compare.
-        param allclose_rtol: Relative tolerance for np.allclose (default: 1e-05). Pass None to
+        golden_file_path: Path to the reference image file.
+        test_file_path: Path to the test image file to compare.
+        allclose_rtol: Relative tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_atol=None too).
-        param allclose_atol: Absolute tolerance for np.allclose (default: 1e-08). Pass None to
+        allclose_atol: Absolute tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_rtol=None too).
-        param mean_tolerance: Maximum acceptable mean absolute difference (optional).
-        param max_tolerance: Maximum acceptable max absolute difference (optional).
-        param absolute_tolerance: Maximum absolute difference for any pixel (optional).
-        param percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
-        param rmse_tolerance: Maximum acceptable root mean square error (optional).
-        param print_all_stats: If True, compute and print all metrics regardless of criteria.
+        mean_tolerance: Maximum acceptable mean absolute difference (optional).
+        max_tolerance: Maximum acceptable max absolute difference (optional).
+        absolute_tolerance: Maximum absolute difference for any pixel (optional).
+        percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
+        rmse_tolerance: Maximum acceptable root mean square error (optional).
+        print_all_stats: If True, compute and print all metrics regardless of criteria.
 
     Returns:
         A dictionary with keys: ``passed`` (bool), ``criteria`` (mapping of criterion
         to bool), ``metrics`` (the computed metrics), and ``thresholds`` (configured values).
+
+    Raises:
+        FileNotFoundError: If either image file does not exist.
 
     Example:
 
@@ -371,21 +414,21 @@ def compare_images_in_directories(
     are listed in ``test_only_files``.
 
     Args:
-        param golden_dir: Path to the directory containing reference images.
-        param test_dir: Path to the directory containing test images.
-        param path_pattern: RegEx (Regular Expression) pattern to match filenames.
+        golden_dir: Path to the directory containing reference images.
+        test_dir: Path to the directory containing test images.
+        path_pattern: RegEx (Regular Expression) pattern to match filenames.
             If None, all files are considered.
-        param allclose_rtol: Relative tolerance for np.allclose (default: 1e-05). Pass None to
+        allclose_rtol: Relative tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_atol=None too).
-        param allclose_atol: Absolute tolerance for np.allclose (default: 1e-08). Pass None to
+        allclose_atol: Absolute tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_rtol=None too).
-        param mean_tolerance: Maximum acceptable mean absolute difference (optional).
-        param max_tolerance: Maximum acceptable max absolute difference (optional).
-        param absolute_tolerance: Maximum absolute difference for any pixel (optional).
-        param percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
-        param rmse_tolerance: Maximum acceptable root mean square error (optional).
-        param print_all_stats: If True, print detailed statistics for each comparison.
-        param print_per_file_results: If True, print a summary for each file comparison.
+        mean_tolerance: Maximum acceptable mean absolute difference (optional).
+        max_tolerance: Maximum acceptable max absolute difference (optional).
+        absolute_tolerance: Maximum absolute difference for any pixel (optional).
+        percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
+        rmse_tolerance: Maximum acceptable root mean square error (optional).
+        print_all_stats: If True, print detailed statistics for each comparison.
+        print_per_file_results: If True, print a summary for each file comparison.
 
     Returns:
         A dictionary with keys: ``all_passed`` (bool indicating if all files passed and file lists

@@ -103,6 +103,18 @@
               },
               {
                 "dock_id": 7,
+                "dock_tab_bar_enabled": true,
+                "dock_tab_bar_visible": true,
+                "height": 655.3333740234375,
+                "position_x": 1868.0,
+                "position_y": 22.666667938232422,
+                "selected_in_dock": false,
+                "title": "Robot Inspector",
+                "visible": true,
+                "width": 692.0
+              },
+              {
+                "dock_id": 7,
                 "height": 655.3333740234375,
                 "position_x": 1868.0,
                 "position_y": 22.666667938232422,

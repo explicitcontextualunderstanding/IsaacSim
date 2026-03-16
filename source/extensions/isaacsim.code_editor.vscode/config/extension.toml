@@ -1,11 +1,11 @@
 [package]
-version = "1.1.0"
+version = "1.1.2"
 category = "Utility"
 title = "VS Code integration"
 description = "VS Code version of Omniverse's script editor"
 keywords = ["isaac", "python", "vscode", "editor"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -26,3 +26,6 @@ exts."isaacsim.code_editor.vscode".port = 8226
 # Whether to publish incoming carb logging messages.
 # Warning: enabling this feature may cause the application to freeze in certain circumstances.
 exts."isaacsim.code_editor.vscode".carb_logs = false
+
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

@@ -13,12 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Entry point extension for Isaac Sim Replicator examples, providing reference implementations of synthetic data generation capabilities for robotics simulation and machine learning workflows."""
+
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
+    """Entry point for the isaacsim.replicator.examples extension.
+
+    This extension provides example implementations and demonstrations of Replicator functionality
+    within Isaac Sim. It serves as a reference for users learning how to use Replicator's
+    synthetic data generation capabilities for robotics simulation and machine learning workflows.
+    """
+
     def on_startup(self, ext_id):
+        """Called when the extension is starting up.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         pass
 
     def on_shutdown(self):
+        """Called when the extension is shutting down."""
         pass

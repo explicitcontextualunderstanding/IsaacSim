@@ -12,12 +12,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""A UI widget module that provides a resizable horizontal split-pane layout with draggable divider functionality."""
+
+
 from typing import Callable
 
 import omni.ui as ui
 
 
 class Splitter:
+    """A UI widget that creates a resizable horizontal split-pane layout.
+
+    This class provides a two-panel layout with a draggable splitter in the middle that allows users to adjust
+    the width of the left panel. The right panel automatically takes up the remaining space. Each panel's
+    content is defined by callback functions that are executed when the UI is built.
+
+    The splitter is positioned at 300 pixels from the left by default and can be dragged horizontally, with
+    a minimum width constraint of 230 pixels for the left panel.
+
+    Args:
+        build_left_fn: Callback function to build the content of the left panel.
+        build_right_fn: Callback function to build the content of the right panel.
+    """
+
     def __init__(self, build_left_fn: Callable[[], None], build_right_fn: Callable[[], None]):
         self._frame = ui.Frame()
         self._frame.set_build_fn(self.on_build)
@@ -25,11 +43,13 @@ class Splitter:
         self.__build_right_fn = build_right_fn
 
     def destroy(self):
+        """Cleans up the splitter by clearing build functions and frame references."""
         self.__build_right_fn = None
         self.__build_left_fn = None
         self._frame = None
 
     def on_build(self):
+        """Builds the splitter UI with left and right panels separated by a draggable divider."""
         with ui.HStack():
             with ui.ZStack(width=0):
                 # Left pannel

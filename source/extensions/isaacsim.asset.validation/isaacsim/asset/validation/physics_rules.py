@@ -234,7 +234,7 @@ def get_initial_collider_pairs(stage: Usd.Stage) -> typing.Set[typing.Tuple[str,
 
     initial_attach = False
     if get_physics_simulation_interface().get_attached_stage() != stage_id:
-        get_physics_simulation_interface().attach_stage(stage_id)
+        get_physics_simulation_interface().initialize(stage_id)
         initial_attach = True
 
     contact_report_sub = get_physics_simulation_interface().subscribe_physics_contact_report_events(on_contact_event)
@@ -246,7 +246,7 @@ def get_initial_collider_pairs(stage: Usd.Stage) -> typing.Set[typing.Tuple[str,
         contact_report_sub = None
 
     if initial_attach:
-        get_physics_simulation_interface().detach_stage()
+        get_physics_simulation_interface().close()
 
     settings.set(SETTING_UPDATE_TO_USD, write_usd)
     settings.set("/physics/fabricEnabled", write_fabric)

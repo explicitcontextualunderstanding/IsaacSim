@@ -1,4 +1,64 @@
 # Changelog
+## [15.14.1] - 2026-03-09
+### Fixed
+- Fixed occasional segfault when running with many lidars doing full-scan processing at the same time by copying GenericModelOutput buffers into local copies rather than manipulating AOV
+
+## [15.14.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md, and SETTINGS.md and updated docstrings
+
+## [15.13.0] - 2026-03-02
+### Changed
+- Shifted RTX sensor scan accumulation and post-processing back to host by default to reduce GPU resource contention and improve frametime & frametime consistency. Post-processing-on-device still available as option by setting app.sensors.nv.[modality].outputBufferOnGPU=true.
+
+## [15.12.3] - 2026-02-13
+### Changed
+- Re-enable object ID test in CI to track fix
+
+## [15.12.2] - 2026-02-04
+### Added
+- Test for scan tearing when --/app/player/useFixedTimeStepping=True
+
+## [15.12.1] - 2026-02-03
+### Removed
+- Tools for manipulating deprecated JSONs
+
+### Fixed
+- IsaacCreateRTXLidarScanBuffer.transform output no longer resets frame-to-frame
+
+## [15.12.0] - 2026-01-30
+### Added
+- Use Hydra time (omni.timeline) in RTX Sensor models
+
+### Changed
+- Refactor Annotator tests to include soak tests and comparisons against upstream Annotator outputs
+- TestSupportedLidarConfigs tests only prims without saving a new USD for each test
+
+### Removed
+- Test only specific lidar configs in Annotator tests, rather than all configs
+- Unused Lidar USDA test
+
+### Fixed
+- Only reset outputs in IsaacCreateRTXLidarScanBuffer if enablePerFrameOutput == True, preventing output "flickering"
+- Prevent USD path warnings when using IsaacSensorCreateRtxSensor commands
+
+## [15.11.9] - 2026-01-28
+### Changed
+- IsaacSensorCreateRtxSensor commands accept usd_path argument to enable adding arbitrary RTX Sensor USDs to the stage
+- IsaacSensorCreateRtxRadar command validates if user has enabled Motion BVH before creating prim
+
+## [15.11.8] - 2026-01-23
+### Changed
+- Cleanup and make docstrings consistent and add missing docstrings, example strings and type hints
+
+## [15.11.7] - 2026-01-09
+### Changed
+- Cleanup unused imports
+
+## [15.11.6] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
 ## [15.11.5] - 2025-12-18
 ### Fixed
 - IsaacSensorCreateRTXSensor commands resolve prim paths as expected when using Replicator APIs as a fallback

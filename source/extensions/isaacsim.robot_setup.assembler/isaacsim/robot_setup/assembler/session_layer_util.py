@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utilities for managing USD session sublayers during robot assembly operations."""
+
+
 import asyncio
 import os
 
@@ -22,25 +26,25 @@ from pxr import Sdf, Usd, UsdUtils
 ASSEMBLY_SUBLAYER_NAME = "Assembly"
 
 
-def get_sublayer_filename(base_name):
+def get_sublayer_filename(base_name: str) -> str:
     """Generate a USD file name from a base name.
 
     Args:
-        base_name (str): The base name for the sublayer.
+        base_name: The base name for the sublayer.
 
     Returns:
-        str: The complete filename with .usd extension.
+        The complete filename with .usd extension.
     """
     return f"{base_name}.usd"
 
 
-def remove_session_sublayer(stage, layer_filename, save=False):
+def remove_session_sublayer(stage: Usd.Stage, layer_filename: str, save: bool = False):
     """Remove a sublayer from the session layer.
 
     Args:
-        stage (Usd.Stage): The USD stage to modify.
-        layer_filename (str): The filename of the layer to remove.
-        save (bool, optional): Whether to save the layer before removing. Defaults to False.
+        stage: The USD stage to modify.
+        layer_filename: The filename of the layer to remove.
+        save: Whether to save the layer before removing.
     """
     session_layer = stage.GetSessionLayer()
     if session_layer:
@@ -55,16 +59,16 @@ def remove_session_sublayer(stage, layer_filename, save=False):
                 asyncio.ensure_future(omni.client.delete_async(layer_filename))
 
 
-def get_or_create_layer_stage(filename):
+def get_or_create_layer_stage(filename: str) -> Usd.Stage:
     """Get an existing USD stage or create a new one if it doesn't exist.
 
     Creates a new stage with correct up-axis settings by using the active stage as a template.
 
     Args:
-        filename (str): The filename for the USD stage.
+        filename: The filename for the USD stage.
 
     Returns:
-        Usd.Stage: The new or existing USD stage.
+        The new or existing USD stage.
     """
     try:
         if not os.path.exists(filename):
@@ -86,15 +90,15 @@ def get_or_create_layer_stage(filename):
     return existing_stage
 
 
-def start_assembly_session_sublayer(stage, sublayer_filename):
+def start_assembly_session_sublayer(stage: Usd.Stage, sublayer_filename: str) -> Sdf.Layer:
     """Start a new assembly session sublayer and add it to the stage.
 
     Args:
-        stage (Usd.Stage): The USD stage to modify.
-        sublayer_filename (str): The filename for the new sublayer.
+        stage: The USD stage to modify.
+        sublayer_filename: The filename for the new sublayer.
 
     Returns:
-        Sdf.Layer: The root layer of the new sublayer.
+        The root layer of the new sublayer.
     """
     session_layer = stage.GetSessionLayer()
 
@@ -104,25 +108,25 @@ def start_assembly_session_sublayer(stage, sublayer_filename):
     return stage.GetRootLayer()
 
 
-def stop_assembly_session_sublayer(stage, sublayer_filename, save=False):
+def stop_assembly_session_sublayer(stage: Usd.Stage, sublayer_filename: str, save: bool = False):
     """Stop and remove an assembly session sublayer.
 
     Args:
-        stage (Usd.Stage): The USD stage to modify.
-        sublayer_filename (str): The filename of the sublayer to stop.
-        save (bool, optional): Whether to save the layer before stopping. Defaults to False.
+        stage: The USD stage to modify.
+        sublayer_filename: The filename of the sublayer to stop.
+        save: Whether to save the layer before stopping.
     """
     remove_session_sublayer(stage, sublayer_filename, save)
 
 
-def merge_assembly_session_sublayer(stage):
+def merge_assembly_session_sublayer(stage: Usd.Stage):
     """Merge the assembly session sublayer into the main stage and cleanup.
 
     Stitches the contents of the assembly layer into the main stage's root layer,
     removes the session sublayer, and deletes the temporary file.
 
     Args:
-        stage (Usd.Stage): The USD stage to merge into.
+        stage: The USD stage to merge into.
     """
     default_prim_path = stage.GetDefaultPrim().GetPath()
 

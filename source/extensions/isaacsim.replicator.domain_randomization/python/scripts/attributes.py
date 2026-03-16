@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Defines attribute constants for domain randomization in Isaac Sim Replicator."""
+
+
 SIMULATION_CONTEXT_ATTRIBUTES = ["gravity"]
 
 RIGID_PRIM_ATTRIBUTES = [

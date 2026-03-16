@@ -14,6 +14,10 @@
 # limitations under the License.
 
 # Titlte of the widget in the property panel
+
+"""Module defining global UI widget constants for the replicator behavior interface."""
+
+
 WIDGET_TITLE = "Exposed Variables"
 
 # Unique name identifier for the widget

@@ -87,27 +87,22 @@ def get_pose(positions, orientations, device):
 
 @torch.jit.script
 def get_world_from_local_position(pos_offset_local: torch.Tensor, pose_global: torch.Tensor):
-    """Convert a point from the local frame to the global frame
+    """Convert a point from the local frame to the global frame.
+
     Args:
         pos_offset_local: Point in local frame. Shape: [N, 3]
-        pose_global: The spatial pose of this point. Shape: [N, 7]
+        pose_global: The spatial pose of this point. Shape: [N, 7], where
+            the first 3 elements are position (x, y, z) and the last 4 elements
+            are quaternion orientation in scalar-first format (w, x, y, z).
+
     Returns:
         Position in the global frame. Shape: [N, 3]
     """
-    quat_pos_local = torch.cat(
-        [
-            pos_offset_local,
-            torch.zeros(pos_offset_local.shape[0], 1, dtype=torch.float32, device=pos_offset_local.device),
-        ],
-        dim=-1,
-    )
     quat_global = pose_global[:, 3:7]
-    quat_global_conj = quat_conjugate(quat_global)
-    pos_offset_global = quat_mul(quat_global, quat_mul(quat_pos_local, quat_global_conj))[:, 0:3]
+    pos_offset_global = quat_apply(quat_global, pos_offset_local)
+    result_pos_global = pos_offset_global + pose_global[:, 0:3]
 
-    result_pos_gloal = pos_offset_global + pose_global[:, 0:3]
-
-    return result_pos_gloal
+    return result_pos_global
 
 
 # NB: do not make this function jit, since it is passed around as an argument.

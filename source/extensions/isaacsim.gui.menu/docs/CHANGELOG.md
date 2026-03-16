@@ -1,4 +1,60 @@
+
+
+## [2.10.2] - 2026-03-10
+### Fixed
+- OMPE-84348: rewrote `_test_environment_menu_option` to not use golden images
+
+## [2.10.1] - 2026-03-05
+### Fixed
+- OMPE-84348: fixed flaky test
+
 # Changelog
+## [2.10.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md and update docstrings
+
+## [2.9.0] - 2026-02-27
+### Removed
+- Removed Warp Sample Scenes menu item from Help menu (omni.warp dependency removed)
+
+## [2.8.0] - 2026-02-24
+### Added
+- Robot Self-Collision Detector to Tools > Asset Editors menu
+
+## [2.7.1] - 2026-02-23
+### Changed
+- Add ticked=True to Asset Check menu item
+
+## [2.7.0] - 2026-02-07
+### Changed
+- Remove Asset Browser from menu and context menu
+- Use menu.open_content_browser_to_path to open the Content Browser to a specific path as a replacement
+- Add Utility menu item to check Isaac Sim assets root path
+
+## [2.6.0] - 2026-01-26
+### Changed
+- Fix broken Isaac Sim documentation links
+- Update deprecated onclick_fn to on_click_action
+- Added missing docstrings and cleanup code
+
+## [2.5.3] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [2.5.2] - 2026-01-22
+### Changed
+- Move menu dictionary to initialize when tests are run rather than at module load time
+
+## [2.5.1] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [2.5.0] - 2025-12-22
+### Changed
+- Refactor test_menu to use isaacsim.test.utils.MenuUITestCase and isaacim.gui.components.create_submenu
+
+### Removed
+- Move sensor menu UI tests to their own extensions
 
 ## [2.4.8] - 2025-12-11
 ### Changed

@@ -21,7 +21,12 @@ import sys
 import carb
 import omni.ext
 
-from .ros2_common import SUPPORTED_ROS_DISTROS, get_ubuntu_version, print_environment_setup_instructions
+from .ros2_common import (
+    SUPPORTED_ROS_DISTROS,
+    get_ubuntu_version,
+    print_environment_setup_instructions,
+    restore_ros2_python_paths,
+)
 
 
 class ROS2CoreExtension(omni.ext.IExt):
@@ -67,11 +72,15 @@ class ROS2CoreExtension(omni.ext.IExt):
             omni.kit.app.get_app().print_and_log(f"Using backup internal ROS2 {backup_ros_distro} distro")
             ros_distro = backup_ros_distro
             os.environ["ROS_DISTRO"] = ros_distro
+            # Signal to C++ plugin that internal lib fallback is allowed (no user-sourced ROS)
+            carb.settings.get_settings().set_bool("/exts/isaacsim.ros2.bridge/internal_lib_fallback", True)
 
         if ros_distro not in SUPPORTED_ROS_DISTROS.values():
-            carb.log_error(f"ROS_DISTRO of {ros_distro} is currently not supported")
-            ext_manager.set_extension_enabled("isaacsim.ros2.core", False)
-            return
+            omni.kit.app.get_app().print_and_log(
+                f"[Experimental] ROS_DISTRO '{ros_distro}' is not an officially supported distribution. "
+                "Support for non-default ROS 2 distributions is experimental. "
+                "Attempting to load system ROS 2 libraries."
+            )
 
         if sys.platform == "win32":
             if os.environ.get("PATH"):
@@ -104,16 +113,26 @@ class ROS2CoreExtension(omni.ext.IExt):
             if f"{self._extension_path}" not in sys.path:
                 sys.path.append(f"{self._extension_path}")
 
-            if ros_distro == "humble":
-                from humble.rclpy import Extension as rclpy_ext
+            import importlib
 
+            try:
+                rclpy_module = importlib.import_module(f"{ros_distro}.rclpy")
+                rclpy_ext = rclpy_module.Extension
                 self._rclpy_instance = rclpy_ext()
-            elif ros_distro == "jazzy":
-                from jazzy.rclpy import Extension as rclpy_ext
-
-                self._rclpy_instance = rclpy_ext()
-            else:
+            except ImportError:
+                carb.log_info(f"No bundled rclpy for '{ros_distro}', attempting to load system rclpy")
                 self._rclpy_instance = None
+
+                restore_ros2_python_paths()
+
+                try:
+                    import rclpy
+
+                    rclpy.init()
+                    rclpy.shutdown()
+                    omni.kit.app.get_app().print_and_log(f"System rclpy loaded for ROS distro '{ros_distro}'")
+                except Exception as e:
+                    carb.log_warn(f"Could not import system rclpy for '{ros_distro}': {e}")
 
             if self._rclpy_instance is not None:
                 self._rclpy_instance.on_startup("isaacsim.ros2.core")
@@ -138,15 +157,21 @@ class ROS2CoreExtension(omni.ext.IExt):
         # Run an external process that checks if ROS2 can be loaded
         # If ROS2 cannot be loaded a memory leak occurs, running in a separate process prevent this
         path = os.path.abspath(self._extension_path + "/bin")
-        ros_lib_path = os.path.join(os.path.abspath(f"{self._extension_path}/{distro}/lib"), "")
 
-        command = [f'./isaacsim.ros2.core.check "{ros_lib_path}"']
+        # When user sourced ROS, use system libs (empty path). Otherwise use internal libs.
+        using_internal_libs = carb.settings.get_settings().get_as_bool(
+            "/exts/isaacsim.ros2.bridge/internal_lib_fallback"
+        )
+        if using_internal_libs:
+            ros_lib_path = os.path.join(os.path.abspath(f"{self._extension_path}/{distro}/lib"), "")
+        else:
+            ros_lib_path = ""
+        command = ["./isaacsim.ros2.core.check", ros_lib_path]
         if sys.platform == "win32":
-
-            command = [f"isaacsim.ros2.core.check.exe", f"{ros_lib_path}"]
+            command = ["isaacsim.ros2.core.check.exe", ros_lib_path]
 
         try:
-            output = subprocess.check_output(command, shell=True, cwd=f"{path}")
+            output = subprocess.check_output(command, cwd=path)
             return True
         except subprocess.CalledProcessError as grepexc:
             print(grepexc.output.decode("utf-8"))

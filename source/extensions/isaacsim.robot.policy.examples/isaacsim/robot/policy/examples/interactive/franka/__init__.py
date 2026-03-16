@@ -15,5 +15,10 @@
 
 # NOTE: Import here your extension examples to be propagated to ISAAC SIM Extensions startup
 
+"""Interactive Franka robot policy example demonstrating autonomous drawer opening tasks in Isaac Sim."""
+
+
 from .franka_example import FrankaExample
 from .franka_example_extension import FrankaExampleExtension
+
+__all__ = ["FrankaExample", "FrankaExampleExtension"]

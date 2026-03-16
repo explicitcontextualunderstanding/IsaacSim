@@ -15,10 +15,9 @@
 
 
 import numpy as np
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.core.nodes import BaseResetNode
 from isaacsim.core.nodes.ogn.OgnIsaacArticulationControllerDatabase import OgnIsaacArticulationControllerDatabase
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.types import ArticulationAction
 
 
 class OgnIsaacArticulationControllerInternalState(BaseResetNode):
@@ -27,8 +26,8 @@ class OgnIsaacArticulationControllerInternalState(BaseResetNode):
     """
 
     def __init__(self):
-        self.robot_prim = None
-        self.controller_handle = None
+        self.prim_path = None
+        self.articulation = None
         self.joint_names = None
         self.joint_indices = None
         self.joint_picked = False
@@ -36,16 +35,12 @@ class OgnIsaacArticulationControllerInternalState(BaseResetNode):
         super().__init__(initialize=False)
 
     def initialize_controller(self):
-        self.controller_handle = SingleArticulation(self.robot_prim, reset_xform_properties=False)
-        self.controller_handle.initialize()
-        self.num_dof = self.controller_handle.num_dof
+        self.articulation = Articulation(self.prim_path)
         self.initialized = True
 
     def joint_indicator(self):
         if self.joint_names:
-            self.joint_indices = []
-            for name in self.joint_names:
-                self.joint_indices.append(self.controller_handle.get_dof_index(name))
+            self.joint_indices = self.articulation.get_dof_indices(self.joint_names).numpy().flatten()
         elif np.size(self.joint_indices) > 0:
             self.joint_indices = self.joint_indices
         else:
@@ -55,24 +50,28 @@ class OgnIsaacArticulationControllerInternalState(BaseResetNode):
 
     def apply_action(self, joint_positions, joint_velocities, joint_efforts):
         if self.initialized:
-            joint_actions = ArticulationAction()
-            joint_actions.joint_indices = self.joint_indices
             if np.size(joint_positions) > 0:
-                joint_actions.joint_positions = joint_positions
+                if np.isnan(joint_positions).any():
+                    target = self.articulation.get_dof_position_targets(dof_indices=self.joint_indices).numpy()[0]
+                    joint_positions = np.where(np.isnan(joint_positions), target, joint_positions)
+                self.articulation.set_dof_position_targets(joint_positions, dof_indices=self.joint_indices)
             if np.size(joint_velocities) > 0:
-                joint_actions.joint_velocities = joint_velocities
+                if np.isnan(joint_velocities).any():
+                    target = self.articulation.get_dof_velocity_targets(dof_indices=self.joint_indices).numpy()[0]
+                    joint_velocities = np.where(np.isnan(joint_velocities), target, joint_velocities)
+                self.articulation.set_dof_velocity_targets(joint_velocities, dof_indices=self.joint_indices)
             if np.size(joint_efforts) > 0:
-                joint_actions.joint_efforts = joint_efforts
-            self.controller_handle.apply_action(control_actions=joint_actions)
+                if np.isnan(joint_efforts).any():
+                    target = self.articulation.get_dof_efforts(dof_indices=self.joint_indices).numpy()[0]
+                    joint_efforts = np.where(np.isnan(joint_efforts), target, joint_efforts)
+                self.articulation.set_dof_efforts(joint_efforts, dof_indices=self.joint_indices)
 
     def custom_reset(self):
-        self.controller_handle = None
+        self.articulation = None
         if self.initialized:
             self.node.get_attribute("inputs:positionCommand").set(np.empty(shape=(0, 0), dtype=np.double))
             self.node.get_attribute("inputs:velocityCommand").set(np.empty(shape=(0, 0), dtype=np.double))
             self.node.get_attribute("inputs:effortCommand").set(np.empty(shape=(0, 0), dtype=np.double))
-
-        pass
 
 
 class OgnIsaacArticulationController:
@@ -95,13 +94,13 @@ class OgnIsaacArticulationController:
         try:
             if not state.initialized:
                 if len(db.inputs.robotPath) != 0:
-                    state.robot_prim = db.inputs.robotPath
+                    state.prim_path = db.inputs.robotPath
                 else:
                     if len(db.inputs.targetPrim) == 0:
                         db.log_error("No robot prim found for the articulation controller")
                         return False
                     else:
-                        state.robot_prim = db.inputs.targetPrim[0].GetString()
+                        state.prim_path = db.inputs.targetPrim[0].GetString()
 
                 # initialize the controller handle for the robot
                 state.initialize_controller()
@@ -120,11 +119,7 @@ class OgnIsaacArticulationController:
             if not state.joint_picked:
                 state.joint_indicator()
 
-            joint_positions = db.inputs.positionCommand
-            joint_velocities = db.inputs.velocityCommand
-            joint_efforts = db.inputs.effortCommand
-
-            state.apply_action(joint_positions, joint_velocities, joint_efforts)
+            state.apply_action(db.inputs.positionCommand, db.inputs.velocityCommand, db.inputs.effortCommand)
 
         except Exception as error:
             db.log_warn(str(error))

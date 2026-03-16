@@ -12,31 +12,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Kit command helpers for importing URDF from ROS 2 nodes."""
+
+import os
+import typing
 from functools import partial
 
 import carb
 import omni.client
 import omni.kit.commands
-from isaacsim.asset.importer.urdf import _urdf
-from isaacsim.ros2.urdf.RobotDescription import RobotDefinitionReader
+from isaacsim.asset.importer.urdf import URDFImporter, URDFImporterConfig
+from isaacsim.ros2.urdf.robot_definition_reader import RobotDefinitionReader
 from omni.client import Result
 from pxr import Usd, UsdUtils
 
 
 class URDFImportFromROS2Node(omni.kit.commands.Command):
+    """Command that imports a URDF from a ROS 2 node.
+
+    Args:
+        ros2_node_name: ROS 2 node to query for robot_description.
+        import_config: Import configuration overrides.
+        dest_path: Destination path for output assets.
+        get_articulation_root: Whether to return articulation root.
+    """
+
     def __init__(
         self,
         ros2_node_name: str = "robot_state_publisher",
-        import_config=_urdf.ImportConfig(),
+        import_config: URDFImporterConfig = URDFImporterConfig(),
         dest_path: str = "",
         get_articulation_root: bool = False,
     ):
+        self.urdf_importer = URDFImporter()
         self.ros2_node_name = ros2_node_name
         self.dest_path = dest_path
         self.config = import_config
         self.robot_definition = RobotDefinitionReader()
         self.robot_definition.description_received_fn = partial(self.on_description_received)
-        self.robot_model = None
+        self.urdf_path = None
         self.finished = False
         self.__subscription = carb.eventdispatcher.get_eventdispatcher().observe_event(
             event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
@@ -44,61 +58,53 @@ class URDFImportFromROS2Node(omni.kit.commands.Command):
             observer_name="isaacsim.ros2.urdf.commands.URDFImportFromROS2Node._on_app_update",
         )
 
-    def on_app_update(self, event):
+    def on_app_update(self, event: typing.Any) -> None:
+        """Handle app update ticks to trigger import completion.
+
+        Args:
+            event: App update event payload.
+        """
         if self.finished:
             self.__subscription = None
-            if self.robot_model:
-                self.import_robot(self.robot_model)
+            if self.urdf_path:
+                self.import_robot(self.urdf_path)
             return
 
-    def on_description_received(self, urdf_description):
+    def on_description_received(self, urdf_description: str) -> None:
+        """Persist the received URDF description to disk.
 
-        result, robot_model = omni.kit.commands.execute(
-            "URDFParseText", urdf_string=urdf_description, import_config=self.config
-        )
-        if result:
-            self.finished = True
-            self.robot_model = robot_model
+        Args:
+            urdf_description: URDF document string from the node.
+        """
+        ext_manager = omni.kit.app.get_app().get_extension_manager()
+        ext_id = ext_manager.get_enabled_extension_id("isaacsim.ros2.urdf")
+        self._extension_path = ext_manager.get_extension_path(ext_id)
+        data_folder = os.path.join(self._extension_path, "data", "urdf", "temp")
+        os.makedirs(data_folder, exist_ok=True)
+        urdf_path = os.path.join(data_folder, "urdf_description.urdf")
+        with open(urdf_path, "w", encoding="utf-8") as f:
+            f.write(urdf_description)
 
-    def import_robot(self, robot_model):
-        if self.dest_path == "":
-            all_cache_stage = UsdUtils.StageCache.Get().GetAllStages()
-            if len(all_cache_stage) == 1:
-                result = omni.kit.commands.execute(
-                    "URDFImportRobot",
-                    urdf_robot=robot_model,
-                    import_config=self.config,
-                    dest_path=self.dest_path,
-                )
-                return all_cache_stage[0].GetRootLayer().identifier
-        else:
-            result = omni.kit.commands.execute(
-                "URDFImportRobot",
-                urdf_robot=robot_model,
-                import_config=self.config,
-                dest_path=self.dest_path,
-            )
-            stage = Usd.Stage.Open(self.dest_path)
-            prim_name = str(stage.GetDefaultPrim().GetName())
+        self.finished = True
+        self.urdf_path = urdf_path
 
-            # print(prim_name)
-            # stage.Save()
-            def add_reference_to_stage():
-                current_stage = omni.usd.get_context().get_stage()
-                if current_stage:
-                    prim_path = omni.usd.get_stage_next_free_path(
-                        current_stage, str(current_stage.GetDefaultPrim().GetPath()) + "/" + prim_name, False
-                    )
-                    robot_prim = current_stage.OverridePrim(prim_path)
-                    if "anon:" in current_stage.GetRootLayer().identifier:
-                        robot_prim.GetReferences().AddReference(self.dest_path)
-                    else:
-                        robot_prim.GetReferences().AddReference(
-                            omni.client.make_relative_url(current_stage.GetRootLayer().identifier, self.dest_path)
-                        )
+    def import_robot(self, urdf_path: str) -> None:
+        """Import the robot from a URDF file.
 
-            add_reference_to_stage()
+        Args:
+            urdf_path: Path to the URDF file to import.
+        """
+        self.config.urdf_path = urdf_path
+        if self.dest_path:
+            self.config.usd_path = self.dest_path
+        self.urdf_importer.config = self.config
+        self.urdf_importer.import_urdf()
 
     def do(self) -> Result:
+        """Execute the command to fetch and import the URDF.
 
+        Returns:
+            Command result status.
+        """
         self.robot_definition.start_get_robot_description(self.ros2_node_name)
+        return Result.OK

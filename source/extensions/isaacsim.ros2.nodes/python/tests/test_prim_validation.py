@@ -27,14 +27,12 @@ from .common import ROS2TestCase, add_cube, add_franka
 class TestPrimValidation(ROS2TestCase):
 
     async def setUp(self):
-        # before each test
         await super().setUp()
         await omni.usd.get_context().new_stage_async()
         self._stage = omni.usd.get_context().get_stage()
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
-        # after each test
         await super().tearDown()
 
     async def test_joint_state_valid_prim(self):

@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Provides pose sampling implementations for 2D navigation in occupancy maps."""
+
+
 import math
 import random
 
@@ -37,14 +40,14 @@ class PoseSampler:
         implementations.
 
         Args:
-            occupancy_map (OccupancyMap): An occupancy map that the
+            occupancy_map: An occupancy map that the
                 pose sampler may use.
 
         Raises:
             NotImplementedError: The method is not implemented.
 
         Returns:
-            Pose2d: The sampled pose in (x, y) pixel and (theta)
+            The sampled pose in (x, y) pixel and (theta)
                 world coordinates.
         """
         raise NotImplementedError
@@ -53,11 +56,11 @@ class PoseSampler:
         """Sample a 2D pose in world coordinates.
 
         Args:
-            occupancy_map (OccupancyMap): An occupancy map that the
+            occupancy_map: An occupancy map that the
                 pose sampler may use.
 
         Returns:
-            Pose2d: The sampled 2D pose.
+            The sampled 2D pose.
         """
         pose_px = self.sample_px(occupancy_map)
         world_pt = occupancy_map.pixel_to_world(Point2d(pose_px.x, pose_px.y))
@@ -72,6 +75,17 @@ class UniformPoseSampler(PoseSampler):
     """
 
     def sample_px(self, occupancy_map: OccupancyMap) -> Pose2d:
+        """Sample a 2D pose uniformly from freespace, with (x, y) in pixel coordinates.
+
+        Selects any freespace pixel in the occupancy map with equal probability and assigns
+        a random orientation.
+
+        Args:
+            occupancy_map: An occupancy map containing the freespace to sample from.
+
+        Returns:
+            The sampled pose in (x, y) pixel and (theta) world coordinates.
+        """
         freespace = occupancy_map.freespace_mask()
         coords = np.argwhere(freespace)
         random_index = np.random.randint(0, len(coords))
@@ -90,6 +104,8 @@ class GridPoseSampler(PoseSampler):
     2. Sampling a grid region uniformly
     3. Sampling a final pose uniformly from the freespace inside the sampled region.
 
+    Args:
+        grid_size_meters: Size of each grid cell in meters.
     """
 
     grid_size_meters: float
@@ -98,6 +114,17 @@ class GridPoseSampler(PoseSampler):
         self.grid_size_meters = grid_size_meters
 
     def sample_px(self, occupancy_map: OccupancyMap) -> Pose2d:
+        """Sample a 2D pose using grid partitioning, with (x, y) in pixel coordinates.
+
+        Splits the occupancy map into grid regions, samples a grid region uniformly,
+        then samples a final pose uniformly from the freespace inside the sampled region.
+
+        Args:
+            occupancy_map: An occupancy map that the pose sampler uses for grid partitioning.
+
+        Returns:
+            The sampled pose in (x, y) pixel and (theta) world coordinates.
+        """
         num_grid_x = math.ceil(occupancy_map.width_meters() / self.grid_size_meters)
         num_grid_y = math.ceil(occupancy_map.height_meters() / self.grid_size_meters)
 

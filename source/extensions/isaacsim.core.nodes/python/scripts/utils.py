@@ -16,13 +16,13 @@
 
 import omni
 import omni.replicator.core as rep
-from isaacsim.core.utils.prims import set_targets
 
 
 def set_target_prims(primPath: str, targetPrimPaths: list, inputName: str = "inputs:targetPrim"):
     stage = omni.usd.get_context().get_stage()
     try:
-        set_targets(stage.GetPrimAtPath(primPath), inputName, targetPrimPaths)
+        input_rel = stage.GetPrimAtPath(primPath).CreateRelationship(inputName)
+        input_rel.SetTargets(targetPrimPaths)
     except Exception as e:
         print(e, primPath)
 

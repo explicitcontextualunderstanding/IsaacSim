@@ -24,11 +24,34 @@
 #include <ucxx/api.h>
 
 #include <cstring>
+#include <string>
 #include <thread>
 #include <vector>
 
 using omni::graph::core::GraphInstanceID;
 using omni::graph::core::NodeObj;
+
+namespace isaacsim::ucx::nodes
+{
+
+/**
+ * @struct ImageMetadata
+ * @brief Metadata structure for image messages (non-pixel data).
+ * @details
+ * Contains image metadata extracted from node inputs. Pixel data is handled
+ * separately to allow flexibility for CPU or GPU sources.
+ */
+struct ImageMetadata
+{
+    double timestamp; //!< Timestamp value in seconds
+    uint32_t width; //!< Image width in pixels
+    uint32_t height; //!< Image height in pixels
+    std::string encoding; //!< Image encoding (e.g., "rgb8", "rgba8")
+    uint32_t step; //!< Row length in bytes
+    size_t dataSize; //!< Size of pixel data in bytes
+};
+
+} // namespace isaacsim::ucx::nodes
 
 /**
  * @class UCXPublishImageNodeBase
@@ -79,7 +102,8 @@ protected:
      * @brief Common compute logic for image publishing nodes.
      * @details
      * Handles listener initialization, connection checking, input validation,
-     * and message publishing. Delegates to publishMessage() for actual message generation.
+     * and message publishing. Extracts metadata using extractMetadata() and
+     * delegates message generation to derived class via generateMessage().
      *
      * @param[in] db Database accessor for node inputs/outputs
      * @param[in] port Port number for UCX listener
@@ -110,34 +134,81 @@ protected:
             return false;
         }
 
-        return publishMessage(db, tag);
+        isaacsim::ucx::nodes::ImageMetadata metadata = extractMetadata(db);
+        return publishMessage(db, generateMessage(metadata, db), tag);
     }
 
     /**
-     * @brief Generate message from node inputs.
+     * @brief Extract image metadata from node inputs.
      * @details
-     * Pure virtual function that derived classes must implement to create
-     * and serialize their image message data. This should handle both CPU and GPU sources.
+     * Extracts non-pixel metadata from the database inputs. Pixel data is handled
+     * separately by generateMessage() to allow flexibility for CPU or GPU sources.
      *
      * @param[in] db Database accessor for node inputs
+     * @return ImageMetadata Extracted image metadata
+     */
+    virtual isaacsim::ucx::nodes::ImageMetadata extractMetadata(DatabaseT& db)
+    {
+        isaacsim::ucx::nodes::ImageMetadata metadata;
+        metadata.timestamp = db.inputs.timeStamp();
+        metadata.width = db.inputs.width();
+        metadata.height = db.inputs.height();
+        metadata.encoding = db.tokenToString(db.inputs.encoding());
+
+        // Determine data size from inputs
+        const size_t bufferSize = db.inputs.bufferSize();
+        if (bufferSize > 0)
+        {
+            metadata.dataSize = bufferSize;
+        }
+        else if (db.inputs.data.size() > 0)
+        {
+            metadata.dataSize = db.inputs.data.size();
+        }
+        else
+        {
+            metadata.dataSize = 0;
+        }
+
+        // Calculate step (bytes per row)
+        if (metadata.height > 0 && metadata.dataSize > 0)
+        {
+            metadata.step = static_cast<uint32_t>(metadata.dataSize / metadata.height);
+        }
+        else
+        {
+            metadata.step = 0;
+        }
+
+        return metadata;
+    }
+
+    /**
+     * @brief Generate message from image metadata and pixel data.
+     * @details
+     * Pure virtual function that derived classes must implement to serialize
+     * image data. Has access to both metadata and db for flexible pixel handling
+     * (CPU copy, GPU buffer, GPU texture, or GPU-direct send).
+     *
+     * @param[in] metadata Image metadata
+     * @param[in] db Database accessor for pixel data access
      * @return std::vector<uint8_t> Serialized message data
      */
-    virtual std::vector<uint8_t> generateMessage(DatabaseT& db) = 0;
+    virtual std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::ImageMetadata& metadata, DatabaseT& db) = 0;
 
     /**
      * @brief Publishes an image message over UCX.
      * @details
-     * Generates the message by calling the derived class's virtual generateMessage(),
-     * then sends it using UCX tagged send with timeout to ensure completion.
-     * Images are large (>1MB typically) so we use synchronous send to ensure
-     * the data transfer completes before the next frame, preventing race conditions
-     * between send and receive operations.
+     * Sends the pre-generated message using UCX tagged send with async tracking.
+     * Images are large (>1MB typically) so we use async send with completion tracking
+     * to prevent race conditions between send and receive operations.
      *
-     * @param[in] db Database accessor for logging and inputs
+     * @param[in] db Database accessor for logging
+     * @param[in] messageData Serialized message to send
      * @param[in] tag UCX tag for message identification
      * @return bool True if publish succeeded, false otherwise
      */
-    bool publishMessage(DatabaseT& db, uint64_t tag)
+    bool publishMessage(DatabaseT& db, std::vector<uint8_t> messageData, uint64_t tag)
     {
         // Check if previous async send is still in progress
         if (m_sendRequest && !m_sendRequest->isCompleted())
@@ -147,12 +218,9 @@ protected:
             return true;
         }
 
-        // Generate new message
-        std::vector<uint8_t> messageData = generateMessage(db);
-
         if (messageData.empty())
         {
-            db.logError("Failed to generate message - generateMessage returned empty");
+            db.logError("Failed to generate message - empty message data");
             return false;
         }
 
@@ -238,3 +306,17 @@ protected:
     std::vector<uint8_t> m_messageBuffer; //!< Persistent buffer to keep message alive during async send
     std::shared_ptr<ucxx::Request> m_sendRequest; //!< Request handle to track async send completion
 };
+
+// NOTE: To use this base class:
+// 1. Derive your OGN node class from UCXPublishImageNodeBase<YourDatabase>
+// 2. Implement static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+//    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
+//    - Call state.reset()
+// 3. Implement static bool compute(YourDatabase& db) that:
+//    - Extracts inputs from db (port, tag)
+//    - Gets the per-instance state: auto& state = db.template perInstanceState<YourClass>()
+//    - Calls state.computeImpl(db, port, tag)
+// 4. Implement virtual std::vector<uint8_t> generateMessage(const ImageMetadata& metadata, DatabaseT& db) override
+//    - Serialize metadata and handle pixel data (CPU copy, GPU copy, or GPU-direct)
+// 5. Optionally override extractMetadata() if different metadata extraction is needed
+// 6. See OgnUCXPublishImage.cpp for examples

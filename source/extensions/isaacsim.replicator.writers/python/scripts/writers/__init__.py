@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Collection of Isaac Sim Replicator writers for various data formats and visualization tasks."""
+
+
 from .data_visualization_writer import *
 from .dope_writer import *
 from .pose_writer import *
@@ -23,6 +26,12 @@ from .ycb_video_writer import *
 
 # Register writers and add them to the default writers for Replicator telemetry tracking
 def register_writers():
+    """Register all Isaac Sim Replicator writers with the WriterRegistry.
+
+    Registers DataVisualizationWriter, DOPEWriter, PoseWriter, PytorchWriter, and YCBVideoWriter
+    with the omni.replicator.core WriterRegistry and adds them to the default writers list for
+    Replicator telemetry tracking.
+    """
     from omni.replicator.core import WriterRegistry
 
     # DataVisualizationWriter

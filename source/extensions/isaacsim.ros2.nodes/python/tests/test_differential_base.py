@@ -38,9 +38,7 @@ from .common import (
 )
 
 
-# Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestRos2DifferentialBase(ROS2TestCase):
-    # Before running each test
     async def setUp(self):
         await super().setUp()
         SimulationContext.clear_instance()
@@ -58,11 +56,7 @@ class TestRos2DifferentialBase(ROS2TestCase):
 
         self.node = self.create_node("isaac_sim_test_diff_drive")
 
-    # After running each test
     async def tearDown(self):
-        for _ in range(10):
-            self.spin()
-            time.sleep(0.1)
         self.node = None
 
         # Reset class members
@@ -146,12 +140,14 @@ class TestRos2DifferentialBase(ROS2TestCase):
         await omni.kit.app.get_app().next_update_async()
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(2, 60, self.spin)
 
-        # wait 1 second for all data to be recieved by subscribers
-        for _ in range(10):
-            self.spin()
-            time.sleep(0.1)
+        # wait for physics to settle and for all data to be received by subscribers
+        await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None,
+            max_frames=120,  # Combined: 1s physics settle + 1s data wait at 60fps
+            per_frame_callback=self.spin,
+        )
 
         # check 0: is carter initial tf position and odometry position
         # [tx, ty, tz, rx, ry, rz, rw]
@@ -168,7 +164,9 @@ class TestRos2DifferentialBase(ROS2TestCase):
         # stop
         move_cmd = self.move_cmd_msg(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         cmd_vel_pub.publish(move_cmd)
-        await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None, max_frames=60, per_frame_callback=self.spin
+        )
 
         # check 1: location using default param
         print(self._trans.transform, self._odom_data)
@@ -189,11 +187,13 @@ class TestRos2DifferentialBase(ROS2TestCase):
 
         self._timeline.play()
 
+        # wait for physics to settle and for all data to be received by subscribers
         await simulate_async(1, 60, self.spin)
-
-        for _ in range(10):
-            self.spin()
-            time.sleep(0.1)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None,
+            max_frames=120,  # Combined: 1s physics settle + 1s data wait at 60fps
+            per_frame_callback=self.spin,
+        )
 
         # check 3: is carter initial tf position and odometry position
         # [tx, ty, tz, rx, ry, rz, rw]
@@ -213,9 +213,10 @@ class TestRos2DifferentialBase(ROS2TestCase):
         await simulate_async(1, 60, self.spin)
 
         # check 4: location after change radius
-        for _ in range(10):
-            self.spin()
-            time.sleep(0.1)
+        # wait for all data to be received by subscribers
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None, max_frames=60, per_frame_callback=self.spin
+        )
 
         # [tx, ty, tz, rx, ry, rz, rw]
         expected_trans = [1.51, -2.49, 0, 0, 0, 0.3846, 0.9230]
@@ -264,7 +265,9 @@ class TestRos2DifferentialBase(ROS2TestCase):
         cmd_vel_pub.publish(move_cmd)
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._odom_data is not None, max_frames=60, per_frame_callback=self.spin
+        )
 
         # check 1: location using default param
         odom_data = deepcopy(self._odom_data)
@@ -363,12 +366,14 @@ class TestRos2DifferentialBase(ROS2TestCase):
         await omni.kit.app.get_app().next_update_async()
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(2, 60, self.spin)
 
-        # wait 1 second for all data to be recieved by subscribers
-        for _ in range(10):
-            self.spin()
-            time.sleep(0.1)
+        # wait for physics to settle and for all data to be received by subscribers
+        await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None,
+            max_frames=120,  # Combined: 1s physics settle + 1s data wait at 60fps
+            per_frame_callback=self.spin,
+        )
 
         # check 0: is carter initial tf position and odometry position
         # [tx, ty, tz, rx, ry, rz, rw]
@@ -390,7 +395,9 @@ class TestRos2DifferentialBase(ROS2TestCase):
 
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None, max_frames=60, per_frame_callback=self.spin
+        )
 
         # check 1: location using default param
         carb.log_info(str(self._trans.transform))
@@ -415,9 +422,12 @@ class TestRos2DifferentialBase(ROS2TestCase):
         )
 
         self._timeline.play()
-        await omni.kit.app.get_app().next_update_async()
-
         await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None,
+            max_frames=120,  # Combined: 1s physics settle + 1s data wait at 60fps
+            per_frame_callback=self.spin,
+        )
 
         # check 3: is carter initial tf position and odometry position
         # [tx, ty, tz, rx, ry, rz, rw]
@@ -438,7 +448,9 @@ class TestRos2DifferentialBase(ROS2TestCase):
         cmd_vel_pub.publish(move_cmd)
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await simulate_async(1, 60, self.spin)
+        await self.simulate_until_condition(
+            lambda: self._trans is not None and self._odom_data is not None, max_frames=60, per_frame_callback=self.spin
+        )
 
         # check 4: location after change radius
         carb.log_info(str(self._trans.transform))

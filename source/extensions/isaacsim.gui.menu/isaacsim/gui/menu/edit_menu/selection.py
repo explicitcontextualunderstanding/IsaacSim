@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module provides the Selection class to encapsulate selection details, including a description and a timestamp."""
+"""Selection data model for recent and saved selections."""
 
 __all__ = ["Selection"]
 
@@ -20,20 +20,25 @@ import time
 
 
 class Selection:
-    """A class that encapsulates a selection with a description.
-
-    This class holds the details of a selection, including a timestamp of when the selection was created or modified. It provides the ability to update the timestamp to the current time.
+    """Encapsulate selection data with a timestamp.
 
     Args:
-        description (str): A brief description of the selection.
-        selection: The actual content of the selection."""
+        description: Human-readable label for the selection.
+        selection: Selection data or paths to store.
+    """
 
-    def __init__(self, description, selection):
-        """Initialize a new Selection instance with the given description and selection data."""
+    def __init__(self, description: str, selection: list[str]):
         self.time = time.monotonic()
         self.description = description
         self.selection = selection
 
     def touch(self):
-        """Updates the timestamp of the selection to the current time."""
+        """Update the timestamp for the selection.
+
+        Example:
+            .. code-block:: python
+
+                selection = Selection("My Set", ["/World/Cube"])
+                selection.touch()
+        """
         self.time = time.monotonic()

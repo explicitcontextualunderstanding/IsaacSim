@@ -1,17 +1,17 @@
 [package]
-version = "0.0.8"
+version = "0.2.0"
 category = "other"
 title = "Isaac Sim Robot Wizard [Beta]"
 description = "Wizard to guide through robot import and configuration"
 keywords = ["wizard","import"," "]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
-"isaacsim.core.utils" = {}
+"isaacsim.core.experimental.objects" = {}
 "isaacsim.gui.components" = {}
 "isaacsim.robot.schema" = {}
 
@@ -19,12 +19,15 @@ writeTarget.kit = true
 name = "isaacsim.robot_setup.wizard"
 
 [settings]
-# time out for resolving the robot wizard settings
+# Timeout for resolving the robot wizard settings.
 exts."isaacsim.robot_setup.wizard".timeout = 5
 
-# launch on startup
+# Launch on startup.
 persistent.exts."isaacsim.robot_setup.wizard".launch_on_startup = false
 
 [[test]]
 name = "startup"
 enabled = true
+
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

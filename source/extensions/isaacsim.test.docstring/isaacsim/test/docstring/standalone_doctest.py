@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module for standalone doctest support in Isaac Sim test environments."""
+
+
 import doctest
 import sys
 import unittest
@@ -79,9 +82,13 @@ class StandaloneDocTestCase(unittest.TestCase):
         >>> tester = isaacsim.test.docstring.StandaloneDocTestCase()
         >>> tester.__class__.__name__
         'StandaloneDocTestCase'
+
+    Args:
+        *args: Additional positional arguments passed to the parent unittest.TestCase class.
+        **kwargs: Additional keyword arguments passed to the parent unittest.TestCase class.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._doctest_checker = _doctest.DocTest()
 
@@ -90,13 +97,16 @@ class StandaloneDocTestCase(unittest.TestCase):
         expr: object,
         msg: str = "",
         flags: int = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST,
-    ) -> None:
-        """Check that the examples in docstrings pass for a class/module member
+    ):
+        """Check that the examples in docstrings pass for a class/module member.
 
         Args:
-            expr: module function or class definition, property or method to check docstrings examples for
-            msg (str): custom message to display when failing
-            flags (int): doctest's option flags
+            expr: Module function or class definition, property or method to check docstrings examples for.
+            msg: Custom message to display when failing.
+            flags: Doctest's option flags.
+
+        Raises:
+            AssertionError: If examples in docstrings fail.
 
         Example:
 
@@ -119,16 +129,19 @@ class StandaloneDocTestCase(unittest.TestCase):
         order: list[tuple[object, int]] = [],
         exclude: list[object] = [],
         stop_on_failure: bool = False,
-    ) -> None:
-        """Check that the examples in docstrings pass for all class/module's members (names)
+    ):
+        """Check that the examples in docstrings pass for all class/module's members (names).
 
         Args:
-            expr: module or class definition to check members' docstrings examples for
-            msg (str): custom message to display when failing
-            flags (int): doctest's option flags
-            order (list[tuple[object, int]]): list of pair (name, index) to modify the examples execution order
-            exclude (list[object]): list of class/module names to exclude for testing
-            stop_on_failure (bool): stop testing docstrings example at fist encountered failure
+            expr: Module or class definition to check members' docstrings examples for.
+            msg: Custom message to display when failing.
+            flags: Doctest's option flags.
+            order: List of pair (name, index) to modify the examples execution order.
+            exclude: List of class/module names to exclude for testing.
+            stop_on_failure: Stop testing docstrings example at first encountered failure.
+
+        Raises:
+            AssertionError: If some docstring examples fail.
 
         Example:
 

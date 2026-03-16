@@ -13,4 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .extension import CreateSetupExtension
+from .extension import CreateSetupExtension as CreateSetupExtension
+from .layout import LAYOUTS_PATH, load_layout
+
+__all__ = ["load_layout", "LAYOUTS_PATH"]

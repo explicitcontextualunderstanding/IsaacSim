@@ -24,7 +24,7 @@ from isaacsim.replicator.behavior.utils.behavior_utils import (
     remove_exposed_variables,
 )
 from isaacsim.replicator.behavior.utils.scene_utils import get_world_location
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 

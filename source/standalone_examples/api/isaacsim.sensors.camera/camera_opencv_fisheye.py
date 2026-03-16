@@ -17,11 +17,16 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True})
 
+import os
+
 import cv2
-import isaacsim.core.utils.numpy.rotations as rot_utils
 import numpy as np
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
+import omni.timeline
+from isaacsim.core.experimental.materials import OmniPbrMaterial
+from isaacsim.core.experimental.objects import Cube, DomeLight, GroundPlane
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim
+from isaacsim.core.experimental.utils.stage import get_current_stage
+from isaacsim.core.experimental.utils.transform import euler_angles_to_quaternion
 from isaacsim.sensors.camera import Camera
 from scipy.spatial.transform import Rotation
 
@@ -43,10 +48,11 @@ f_stop = 1.8
 # Set focus distance (meters) - chosen as distance from camera to cube
 focus_distance = 3.0
 
-# Create a world, add a 1x1x1 meter cube, a ground plane, and a camera
-# Note: stage units are set to meters.
-world = World(stage_units_in_meters=1.0)
-world.scene.add_default_ground_plane()
+# Create ground plane and dome light
+dome_light = DomeLight("/World/DomeLight")
+dome_light.set_intensities(500)
+GroundPlane("/World/defaultGroundPlane", sizes=100.0)
+
 # Define the position, scale and color of each cube, then add them to the stage
 cube_positions = [
     np.array([0, 0, 0.5]),
@@ -63,16 +69,18 @@ cube_colors = [
 ]
 
 for i, (position, scale, color) in enumerate(zip(cube_positions, cube_scale, cube_colors)):
-    cube = world.scene.add(
-        DynamicCuboid(
-            prim_path=f"/new_cube_{i}",
-            name=f"cube_{i}",
-            position=position,
-            scale=scale * np.ones((1, 3)),
-            size=1.0,
-            color=color,
-        )
+    cube_path = f"/new_cube_{i}"
+    cube = Cube(
+        cube_path,
+        sizes=1.0,
+        positions=position,
+        scales=np.array([scale, scale, scale]),
     )
+    GeomPrim(cube_path, apply_collision_apis=True)
+    RigidPrim(cube_path)
+    cube_material = OmniPbrMaterial(f"/World/Materials/cube_{i}")
+    cube_material.set_input_values("diffuse_color_constant", (color / 255.0).tolist())
+    cube.apply_visual_materials(cube_material)
 
 # Define camera position and orientation, then add the camera to the stage
 camera_position = np.array([0.0, 0.0, 3.5])
@@ -82,11 +90,13 @@ camera = Camera(
     position=camera_position,
     frequency=30,
     resolution=(width, height),
-    orientation=rot_utils.euler_angles_to_quats(camera_rotation_as_euler, degrees=True),
+    orientation=euler_angles_to_quaternion(camera_rotation_as_euler, degrees=True, extrinsic=False).numpy(),
 )
 
-# Initialize the camera, creating the render product and setting its resolution
-world.reset()
+# Start the timeline and initialize the camera
+timeline = omni.timeline.get_timeline_interface()
+timeline.play()
+timeline.commit()
 camera.initialize()
 
 # Calculate the focal length and aperture size from the camera matrix
@@ -111,7 +121,7 @@ camera.set_opencv_fisheye_properties(cx=cx, cy=cy, fx=fx, fy=fy, fisheye=distort
 
 # Render 10 frames, then load the rendered image into a CV2-compatible format
 for i in range(10):
-    world.step(render=True)
+    simulation_app.update()
 img = cv2.cvtColor(camera.get_rgb().astype(np.uint8), cv2.COLOR_RGB2BGR)
 
 # Plot cube corners on the rendered image. Code adapted from snippet provided by forum user @ericpedley.
@@ -173,10 +183,13 @@ for i, pt in enumerate(image_points):
     cv2.circle(img, tuple(pt[0].astype(int)), 5, (0, 255, 255), -1)
     cv2.circle(img, tuple(pt[0].astype(int)), 3, color, -1)
 
-print("Saving the rendered image to: camera_opencv_fisheye.png")
-cv2.imwrite("camera_opencv_fisheye.png", img)
+img_path = os.path.join(os.getcwd(), "camera_opencv_fisheye.png")
+print(f"Saving the rendered image to: {img_path}")
+cv2.imwrite(img_path, img)
 
-print("Saving the asset to camera_opencv_fisheye.usd")
-world.scene.stage.Export("camera_opencv_fisheye.usd")
+usd_path = os.path.join(os.getcwd(), "camera_opencv_fisheye.usd")
+print(f"Saving the asset to: {usd_path}")
+stage = get_current_stage()
+stage.Export(usd_path)
 
 simulation_app.close()

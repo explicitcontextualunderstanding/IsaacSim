@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import carb
 import omni
-from isaacsim.core.utils.render_product import set_camera_prim_path
+from isaacsim.core.rendering_manager import ViewportManager
 
 
 class OgnIsaacSetCameraOnRenderProduct:
@@ -28,6 +27,8 @@ class OgnIsaacSetCameraOnRenderProduct:
         if len(db.inputs.cameraPrim) == 0:
             db.log_error(f"Camera prim must be specified")
             return False
-        set_camera_prim_path(db.inputs.renderProductPath, db.inputs.cameraPrim[0].GetString())
+        ViewportManager.set_camera(
+            db.inputs.cameraPrim[0].GetString(), render_product_or_viewport=db.inputs.renderProductPath
+        )
         db.outputs.execOut = omni.graph.core.ExecutionAttributeState.ENABLED
         return True

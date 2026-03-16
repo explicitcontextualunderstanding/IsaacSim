@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides YCBVideoWriter for writing annotator groundtruth data in the YCB Video Dataset format."""
+
+
 import io
 import os
 from typing import Dict, List
@@ -37,38 +40,26 @@ class YCBVideoWriter(Writer):
     .. deprecated::
         This class has been deprecated and will be removed in the next major release.
 
-    Attributes:
-        output_dir:
-            Output directory string that indicates the directory to save the results.
-        num_frames:
-            Total number of frames to be generated.
-        semantic_types:
-            List of semantic types to consider when filtering annotator data. Default: ["class"]
-        rgb:
-            Boolean value that indicates whether the rgb annotator will be activated
-            and the data will be written or not. Default: False.
-        bounding_box_2d_tight:
-            Boolean value that indicates whether the bounding_box_2d_tight annotator will be activated
-            and the data will be written or not. Default: False.
-        semantic_segmentation:
-            Boolean value that indicates whether the semantic_segmentation annotator will be activated
-            and the data will be written or not. Default: False.
-        distance_to_image_plane:
-            Boolean value that indicates whether the distance_to_image_plane annotator will be activated
-            and the data will be written or not. Default: False.
-        image_output_format:
-            String that indicates the format of saved RGB images. Default: "png"
-        pose:
-            Boolean value that indicates whether the pose annotator will be activated
-            and the data will be written or not. Default: False.
-        class_name_to_index_map:
-            Mapping between semantic label and index used in the YCB Video Dataset. This indices are used in the
-            'cls_indexes' field of the generated meta.mat file, in addition to being used to color the semantic
-            segmentation (where pixels are colored according to the grayscale class index).
-        factor_depth:
-            Depth scaling factor used in the YCB Video Dataset. Default: 10000.
-        intrinsic_matrix:
-            Camera intrinsic matrix. shape is (3, 3).
+    Args:
+        output_dir: Output directory string that indicates the directory to save the results.
+        num_frames: Total number of frames to be generated.
+        semantic_types: List of semantic types to consider when filtering annotator data.
+        rgb: Boolean value that indicates whether the rgb annotator will be activated and the data will be written or
+            not.
+        bounding_box_2d_tight: Boolean value that indicates whether the bounding_box_2d_tight annotator will be
+            activated and the data will be written or not.
+        semantic_segmentation: Boolean value that indicates whether the semantic_segmentation annotator will be
+            activated and the data will be written or not.
+        distance_to_image_plane: Boolean value that indicates whether the distance_to_image_plane annotator will be
+            activated and the data will be written or not.
+        image_output_format: String that indicates the format of saved RGB images.
+        pose: Boolean value that indicates whether the pose annotator will be activated and the data will be written
+            or not.
+        class_name_to_index_map: Mapping between semantic label and index used in the YCB Video Dataset. These
+            indices are used in the 'cls_indexes' field of the generated meta.mat file, in addition to being used to
+            color the semantic segmentation (where pixels are colored according to the grayscale class index).
+        factor_depth: Depth scaling factor used in the YCB Video Dataset.
+        intrinsic_matrix: Camera intrinsic matrix. shape is (3, 3).
     """
 
     def __init__(
@@ -522,6 +513,7 @@ class YCBVideoWriter(Writer):
 
     def _create_train_text_file(self):
         """Creates a text file to specify the set of YCB Video Dataset samples to be used during training of a model.
+
         Lines include the video basename corresponding to the video that the sample is from, and the image ID of the
         sample. Training samples are written as if a single video is being used (see the note in
         create_output_folders()). Additionally, it is assumed data is generated only for model training (rather than
@@ -539,10 +531,10 @@ class YCBVideoWriter(Writer):
         """Check and flag frame as valid if training data is present in the frame.
 
         Args:
-            data (dict): The frame data to check.
+            data: The frame data to check.
 
         Returns:
-            bool: True if frame is valid, False otherwise.
+            True if frame is valid, False otherwise.
         """
         try:
             self._last_frame_is_valid = data["pose"]["data"].size > 0
@@ -554,6 +546,6 @@ class YCBVideoWriter(Writer):
         """Checks if the last frame was valid (training data was present).
 
         Returns:
-            bool: True if the last frame was valid, False otherwise.
+            True if the last frame was valid, False otherwise.
         """
         return self._last_frame_is_valid

@@ -1,5 +1,5 @@
 [package]
-version = "1.0.12"
+version = "1.0.13"
 category = "Robotics"
 title = "Omni Isaac Cortex"
 description = "Isaac Cortex is a framework within NVIDIA's Isaac Sim that integrates various robotics tools into a unified system, facilitating the development of collaborative robotic applications. It emphasizes reactivity and adaptability, enabling robots to operate safely alongside humans without the need for physical barriers."
@@ -21,8 +21,26 @@ writeTarget.kit = true
 name = "isaacsim.cortex.framework"
 
 [[test]]
+name = "startup"
+
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
+dependencies = [
+    "omni.isaac.ml_archive",
+]
 stdoutFailPatterns.exclude = [
     "*WARNING: cannot load logging configuration file*", # exclude warning as failure
+    '*The NumPy module was reloaded*',
 ]
 args = [
     "--enable",
@@ -32,7 +50,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -48,6 +66,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",

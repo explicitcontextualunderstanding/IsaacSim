@@ -204,4 +204,63 @@ TEST_SUITE("isaacsim.ros2.core.service_tests")
 
         CHECK(ctx->shutdown("test-multiple-services"));
     }
+
+    TEST_CASE("Ros2Service: first takeRequest poll receives pending request")
+    {
+        ROS2_TEST_SETUP();
+
+        auto ctx = testBase.getFactory()->createContextHandle();
+        REQUIRE(ctx != nullptr);
+        int argc = 0;
+        char** argv = nullptr;
+        ctx->init(argc, argv);
+        REQUIRE(ctx->isValid());
+
+        auto serviceNode = testBase.getFactory()->createNodeHandle("service_node_first_poll", "test", ctx.get());
+        auto clientNode = testBase.getFactory()->createNodeHandle("client_node_first_poll", "test", ctx.get());
+        REQUIRE(serviceNode != nullptr);
+        REQUIRE(clientNode != nullptr);
+
+        auto requestMsg = testBase.getFactory()->createDynamicMessage(
+            "std_srvs", "srv", "Empty", isaacsim::ros2::core::BackendMessageType::eRequest);
+        auto responseMsg = testBase.getFactory()->createDynamicMessage(
+            "std_srvs", "srv", "Empty", isaacsim::ros2::core::BackendMessageType::eResponse);
+        REQUIRE(requestMsg != nullptr);
+        REQUIRE(responseMsg != nullptr);
+
+        isaacsim::ros2::core::Ros2QoSProfile qos = Ros2TestBase::createDefaultQoS();
+        auto service = testBase.getFactory()->createService(
+            serviceNode.get(), "/first_poll_service", requestMsg->getTypeSupportHandle(), qos);
+        auto client = testBase.getFactory()->createClient(
+            clientNode.get(), "/first_poll_service", requestMsg->getTypeSupportHandle(), qos);
+        REQUIRE(service != nullptr);
+        REQUIRE(client != nullptr);
+        REQUIRE(service->isValid());
+        REQUIRE(client->isValid());
+
+        // Allow ROS graph discovery to complete before sending the request.
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        REQUIRE(client->sendRequest(requestMsg->getPtr()));
+
+        // Give the request enough time to reach the service queue, then verify the
+        // first poll can receive it.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        CHECK(service->takeRequest(requestMsg->getPtr()));
+
+        REQUIRE(service->sendResponse(responseMsg->getPtr()));
+
+        bool gotResponse = false;
+        for (int i = 0; i < 50 && !gotResponse; ++i)
+        {
+            gotResponse = client->takeResponse(responseMsg->getPtr());
+            if (!gotResponse)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+        CHECK(gotResponse);
+
+        CHECK(ctx->shutdown("test-service-first-poll"));
+    }
 }

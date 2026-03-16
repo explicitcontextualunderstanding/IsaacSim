@@ -1,4 +1,11 @@
 # Changelog
+## [1.2.1] - 2026-03-02
+### Changed
+- Add Overview.md, public python_api.md and update docstrings
+
+## [1.2.0] - 2025-12-15
+### Changed
+- Migrate extension implementation to core experimental API
 
 ## [1.1.0] - 2025-11-24
 ### Added

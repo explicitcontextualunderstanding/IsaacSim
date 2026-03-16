@@ -1,4 +1,17 @@
 # Changelog
+
+## [5.0.1] - 2026-03-03
+### Fixed
+- Fix issues with incorrect API usage in ArticulationSubset
+
+## [5.0.0] - 2026-01-20
+### Removed
+- Remove deprecated PhysX residual reporting APIs (`enable_residual_reporting`, `get_solver_velocity_residual`, `get_solver_position_residual`) from `PhysicsContext`.
+
+## [4.11.5] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
 ## [4.11.4] - 2025-12-05
 ### Changed
 - Migrate to Events 2.0.

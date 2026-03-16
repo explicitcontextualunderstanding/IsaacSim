@@ -1,4 +1,61 @@
 # Changelog
+## [1.3.1] - 2026-03-05
+### Changed
+- Fix api and docs syntax issues
+
+
+## [1.3.0] - 2026-03-03
+### Added
+- `getDofNames()` and `getDofTypes()` on `IArticulationDataView` for articulation DOF metadata (names and types in articulation order)
+- `setArticulationDofMetadata()` on `IPrimDataReader` for Newton backend to supply DOF names and types from Python
+
+## [1.2.1] - 2026-03-02
+### Changed
+- Enable a set of Newton unit tests that are implemented and pass
+
+## [1.2.0] - 2026-02-27
+### Changed
+- Add C++ interface to read xform, rigid body and articulation data
+
+## [1.1.4] - 2026-02-27
+### Fixed
+- Fixed Warp 1.12 compatibility for deformable prims (wp.mat33 row-vector constructor replaced with wp.matrix_from_rows)
+
+## [1.1.3] - 2026-02-12
+### Added
+- `XformPrim` now creates `FabricHierarchyLocalMatrix` and `FabricHierarchyWorldMatrix` if they don't exist.
+
+## [1.1.2] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [1.1.1] - 2026-02-05
+### Changed
+- Disable newton physics engine tests
+
+## [1.1.0] - 2026-02-05
+### Added
+- Add Newton physics engine support for articulation and rigid body tests
+
+## [1.0.1] - 2026-02-04
+### Fixed
+- Only return values for DOFs that have applied the `PhysxDrivePerformanceEnvelopeAPI` when querying drive model properties
+
+## [1.0.0] - 2026-01-23
+### Removed
+- Remove deprecated PhysX residual reporting APIs (`enable_residual_reports`, `get_solver_residual_reports`) from `Articulation`
+
+## [0.10.1] - 2026-01-23
+### Changed
+- Fixed docstring test errors
+
+## [0.10.0] - 2026-01-16
+### Added
+- Add contact tracking functionality to RigidPrim: `set_enabled_contact_tracking()`, `get_enabled_contact_tracking()`, `get_net_contact_forces()`, `get_contact_force_matrix()`, `get_contact_force_data()`, `get_friction_data()`
+
+## [0.9.8] - 2026-01-14
+### Changed
+- Slight modification to show how a new physics engine can be added in the future
 
 ## [0.9.7] - 2025-12-11
 ### Removed

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension that provides a Unitree H1 humanoid robot policy example."""
+
+
 import os
 
 import omni.ext
@@ -22,7 +25,30 @@ from isaacsim.robot.policy.examples.interactive.humanoid import HumanoidExample
 
 
 class HumanoidExampleExtension(omni.ext.IExt):
+    """Extension that provides a Unitree H1 humanoid robot policy example.
+
+    This extension demonstrates a Unitree H1 humanoid robot running a flat terrain locomotion policy
+    trained in Isaac Lab. The example showcases policy deployment for humanoid robots in Isaac Sim.
+
+    The extension registers itself with the examples browser under the "Policy" category and provides
+    a user interface for interacting with the humanoid robot simulation. Users can control the robot
+    using keyboard inputs to move forward and rotate.
+
+    Keyboard controls:
+        - Up arrow / numpad 8: Move forward
+        - Left arrow / numpad 4: Spin counterclockwise
+        - Right arrow / numpad 6: Spin clockwise
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the Humanoid example extension.
+
+        Registers the Unitree H1 humanoid robot example with the examples browser and creates the UI template
+        with keyboard controls for forward movement and rotation.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self.example_name = "Humanoid"
         self.category = "Policy"
 
@@ -52,4 +78,5 @@ class HumanoidExampleExtension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Cleans up the extension by deregistering the Humanoid example from the examples browser."""
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)

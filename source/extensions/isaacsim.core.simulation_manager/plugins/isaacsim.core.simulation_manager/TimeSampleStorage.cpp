@@ -164,7 +164,7 @@ std::optional<double> TimeSampleStorage::getSimulationTimeAt(const omni::fabric:
     auto adjacent = findAdjacentSamples(time);
     if (!adjacent.has_value())
     {
-        CARB_LOG_WARN("No adjacent samples found for interpolation at time %s", time.toString().c_str());
+        CARB_LOG_INFO("No adjacent samples found for interpolation at time %s", time.toString().c_str());
         return std::nullopt;
     }
 
@@ -195,7 +195,7 @@ std::optional<double> TimeSampleStorage::getMonotonicSimulationTimeAt(const omni
     auto adjacent = findAdjacentSamples(time);
     if (!adjacent.has_value())
     {
-        CARB_LOG_WARN("No adjacent samples found for interpolation at time %s", time.toString().c_str());
+        CARB_LOG_INFO("No adjacent samples found for interpolation at time %s", time.toString().c_str());
         return std::nullopt;
     }
 
@@ -226,7 +226,7 @@ std::optional<double> TimeSampleStorage::getSystemTimeAt(const omni::fabric::Rat
     auto adjacent = findAdjacentSamples(time);
     if (!adjacent.has_value())
     {
-        CARB_LOG_WARN("No adjacent samples found for interpolation at time %s", time.toString().c_str());
+        CARB_LOG_INFO("No adjacent samples found for interpolation at time %s", time.toString().c_str());
         return std::nullopt;
     }
 

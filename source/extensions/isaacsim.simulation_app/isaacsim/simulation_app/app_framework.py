@@ -12,17 +12,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides AppFramework class for creating minimal Omniverse applications without application configuration."""
+
+
 import builtins
 import os
 import sys
 import typing
+from typing import Any
 
 import carb
 import omni.kit.app
 
 
 class AppFramework:
-    """Minimal omniverse application that launches without any application config"""
+    """Minimal omniverse application that launches without any application config
+
+    Args:
+        name: Name of the application.
+        argv: Command line arguments to pass to the application.
+    """
 
     def __init__(self, name: str = "kit", argv=[]):
 
@@ -45,10 +55,8 @@ class AppFramework:
             argv.append("--allow-root")
         self._app.startup(name, app_root, argv)
 
-    def update(self) -> None:
-        """
-        Convenience function to step the application forward one frame
-        """
+    def update(self):
+        """Convenience function to step the application forward one frame."""
         self._app.update()
 
     def close(self):
@@ -58,14 +66,18 @@ class AppFramework:
 
     @property
     def app(self) -> omni.kit.app.IApp:
-        """
-        omni.kit.app.IApp: omniverse kit application object
+        """Omniverse Kit application object.
+
+        Returns:
+            The omni.kit.app.IApp instance.
         """
         return self._app
 
     @property
     def framework(self) -> typing.Any:
-        """
-        omni.kit.app.IApp: omniverse kit application object
+        """Carb framework object.
+
+        Returns:
+            The Carb framework instance.
         """
         return self._framework

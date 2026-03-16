@@ -1,11 +1,11 @@
 [package]
-version = "0.1.14"
+version = "0.3.0"
 category = "Simulation"
 title = "MobilityGen"
 description = "A toolset for generating mobility data for robots."
 keywords = ["isaac", "mobility"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -18,6 +18,7 @@ writeTarget.platform = true
 "isaacsim.core.prims" = {}
 "isaacsim.core.utils" = {}
 "omni.kit.pip_archive" = {}
+"omni.kit.usdz_export" = {}
 "omni.kit.viewport.utility" = {}
 "omni.replicator.core" = {}
 
@@ -26,6 +27,15 @@ name = "isaacsim.replicator.mobility_gen"
 
 [[python.module]]
 name = "isaacsim.replicator.mobility_gen.tests"
+
+[[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
 
 [[test]]
 dependencies = [
@@ -39,7 +49,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -55,6 +65,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -76,11 +87,5 @@ args = [
     "--/rtx/reservedDescriptors=900000",
 ]
 
-[[test]]
-name = "startup"
-dependencies = [
-    "omni.isaac.ml_archive",
-]
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

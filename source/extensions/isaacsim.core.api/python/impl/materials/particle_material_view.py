@@ -208,11 +208,6 @@ class ParticleMaterialView:
         carb.log_info("Particle material View Device: {}".format(self._device))
         return
 
-    def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
-        return
-
     def set_frictions(
         self,
         values: Optional[Union[np.ndarray, torch.Tensor]],

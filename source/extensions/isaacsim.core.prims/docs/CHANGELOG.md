@@ -1,4 +1,26 @@
 # Changelog
+## [0.8.8] - 2026-03-05
+### Changed
+- Fix api and docs syntax issues
+
+
+## [0.8.7] - 2026-01-20
+### Removed
+- Remove deprecated PhysX residual reporting APIs (`enable_residual_reports`, `get_position_residuals`, `get_velocity_residuals`) from `Articulation` and `SingleArticulation`.
+
+## [0.8.6] - 2026-01-19
+### Fixed
+- Fixed missing argument `context` in `_reset_fabric_selection` method.
+
+## [0.8.5] - 2026-01-08
+### Fixed
+- Fixed incorrect method call `set_wind` to `set_winds` in `ParticleSystem` constructor.
+- Fixed incorrect attribute name `solverPositionIteration` to `solverPositionIterationCount` in `ParticleSystem.get_solver_position_iteration_counts`.
+
+## [0.8.4] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
 ## [0.8.3] - 2025-12-05
 ### Changed
 - Migrate to Events 2.0.

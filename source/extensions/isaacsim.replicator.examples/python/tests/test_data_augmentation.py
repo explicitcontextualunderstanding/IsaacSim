@@ -117,15 +117,22 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
             normalized = (depth - min_val) / (max_val - min_val)
             return (normalized * 255.0).astype(np.uint8)
 
-        # Run the capture pipeline using step() to trigger a randomization and data capture
-        async def run_example_async(num_frames: int, resolution: tuple[int, int], use_warp: bool) -> float:
+        async def run_example_async(
+            num_frames: int, resolution: tuple[int, int], use_warp: bool, env_url: str | None = None
+        ) -> float:
+            """Run the capture pipeline using step_async() to trigger a randomization and data capture."""
             print(f"Running example with num_frames: {num_frames}, resolution: {resolution}, use_warp: {use_warp}")
 
-            # Open a new stage
-            assets_root_path = await get_assets_root_path_async()
-            stage_path = assets_root_path + ENV_URL
-            print(f"Opening stage: {stage_path}")
-            open_stage(stage_path)
+            if env_url is not None and env_url != "":
+                assets_root_path = await get_assets_root_path_async()
+                stage_path = assets_root_path + env_url
+                print(f"Opening stage: {stage_path}")
+                open_stage(stage_path)
+            else:
+                await omni.usd.get_context().new_stage_async()
+                rep.functional.create.dome_light(intensity=1000, rotation=(270, 0, 0))
+                ground_plane = rep.functional.create.plane(scale=(10, 10, 1), position=(0, 0, 0))
+                rep.functional.physics.apply_collider(ground_plane)
 
             # Use a fixed global seed for reproducibility
             rep.set_global_seed(SEED)
@@ -165,7 +172,7 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
                     rep.randomizer.rotation()
 
             # Output directory
-            out_dir = os.path.join(os.getcwd(), "_out_augm_annot")
+            out_dir = os.path.join(os.getcwd(), f"_out_augm_annot_{'warp' if use_warp else 'numpy'}")
             print(f"Writing data to: {out_dir}")
             os.makedirs(out_dir, exist_ok=True)
 
@@ -212,54 +219,34 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         # task = asyncio.ensure_future(run_example_async(NUM_FRAMES, RESOLUTION, USE_WARP))
         # task.add_done_callback(on_task_done)
 
-        # Numpy augmentations test
-        golden_dir = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_augm_annot_numpy"
-        )
-        out_dir = os.path.join(os.getcwd(), "_out_augm_annot")
-        num_frames = 2
-        use_warp = False
-        await run_example_async(num_frames=num_frames, resolution=RESOLUTION, use_warp=use_warp)
+        test_num_frames = 2
+        for test_use_warp in [False, True]:
+            mode_label = "warp" if test_use_warp else "numpy"
+            golden_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "data", "golden", f"_out_augm_annot_{mode_label}"
+            )
+            out_dir = os.path.join(os.getcwd(), f"_out_augm_annot_{mode_label}")
+            await run_example_async(
+                num_frames=test_num_frames, resolution=RESOLUTION, use_warp=test_use_warp, env_url=""
+            )
 
-        # Make sure the output directory contains the expected number of files
-        folder_contents_success = validate_folder_contents(path=out_dir, expected_counts={"png": num_frames * 3})
-        self.assertTrue(folder_contents_success, "Output directory contents validation failed with numpy augmentations")
+            folder_contents_success = validate_folder_contents(
+                path=out_dir, expected_counts={"png": test_num_frames * 3}
+            )
+            self.assertTrue(
+                folder_contents_success, f"Folder contents validation failed ({mode_label}). Output dir: {out_dir}"
+            )
 
-        # Compare the images in the output directory with the golden images
-        result = compare_images_in_directories(
-            golden_dir=golden_dir,
-            test_dir=out_dir,
-            path_pattern=r"\.png$",
-            allclose_rtol=None,  # Disable allclose for this test to rely only on mean tolerance
-            allclose_atol=None,
-            mean_tolerance=self.MEAN_DIFF_TOLERANCE,
-            print_all_stats=False,
-        )
-        self.assertTrue(result["all_passed"], "Image comparison failed with numpy augmentations")
-
-        # Clear the output directory for the next test
-        shutil.rmtree(out_dir)
-
-        # Warp augmentations test
-        golden_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_augm_annot_warp")
-        out_dir = os.path.join(os.getcwd(), "_out_augm_annot")
-        num_frames = 2
-        use_warp = True
-        await run_example_async(num_frames=num_frames, resolution=RESOLUTION, use_warp=use_warp)
-        folder_contents_success = validate_folder_contents(path=out_dir, expected_counts={"png": num_frames * 3})
-        self.assertTrue(folder_contents_success, "Output directory contents validation failed with warp augmentations")
-
-        # Compare the images in the output directory with the golden images
-        result = compare_images_in_directories(
-            golden_dir=golden_dir,
-            test_dir=out_dir,
-            path_pattern=r"\.png$",
-            allclose_rtol=None,  # Disable allclose for this test to rely only on mean tolerance
-            allclose_atol=None,
-            mean_tolerance=self.MEAN_DIFF_TOLERANCE,
-            print_all_stats=False,
-        )
-        self.assertTrue(result["all_passed"], "Image comparison failed with warp augmentations")
+            result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=out_dir,
+                path_pattern=r"\.png$",
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=self.MEAN_DIFF_TOLERANCE,
+                print_all_stats=False,
+            )
+            self.assertTrue(result["all_passed"], f"Image comparison failed ({mode_label}). Output dir: {out_dir}")
 
     async def test_data_augmentation_writer(self):
         import asyncio
@@ -347,15 +334,22 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
             "gn_depth_wp", rep.annotators.Augmentation.from_function(gaussian_noise_depth_wp, sigma=0.1, seed=None)
         )
 
-        # Run the capture pipeline using step() to trigger a randomization and data capture
-        async def run_example_async(num_frames: int, resolution: tuple[int, int], use_warp: bool) -> float:
+        async def run_example_async(
+            num_frames: int, resolution: tuple[int, int], use_warp: bool, env_url: str | None = None
+        ) -> float:
+            """Run the capture pipeline using step_async() to trigger a randomization and data capture."""
             print(f"Running example with num_frames: {num_frames}, resolution: {resolution}, use_warp: {use_warp}")
 
-            # Open a new stage
-            assets_root_path = await get_assets_root_path_async()
-            stage_path = assets_root_path + ENV_URL
-            print(f"Opening stage: {stage_path}")
-            open_stage(stage_path)
+            if env_url is not None and env_url != "":
+                assets_root_path = await get_assets_root_path_async()
+                stage_path = assets_root_path + env_url
+                print(f"Opening stage: {stage_path}")
+                open_stage(stage_path)
+            else:
+                await omni.usd.get_context().new_stage_async()
+                rep.functional.create.dome_light(intensity=1000, rotation=(270, 0, 0))
+                ground_plane = rep.functional.create.plane(scale=(10, 10, 1), position=(0, 0, 0))
+                rep.functional.physics.apply_collider(ground_plane)
 
             # Use a fixed global seed for reproducibility
             rep.set_global_seed(SEED)
@@ -377,7 +371,7 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
             gn_depth_augm = rep.annotators.get_augmentation("gn_depth_wp" if use_warp else "gn_depth_np")
 
             # Create a writer and apply the augmentations to its corresponding annotators
-            out_dir = os.path.join(os.getcwd(), "_out_augm_writer")
+            out_dir = os.path.join(os.getcwd(), f"_out_augm_writer_{'warp' if use_warp else 'numpy'}")
             backend = rep.backends.get("DiskBackend")
             backend.initialize(output_dir=out_dir)
             print(f"Writing data to: {out_dir}")
@@ -429,45 +423,31 @@ class TestDataAugmentation(omni.kit.test.AsyncTestCase):
         # task = asyncio.ensure_future(run_example_async(NUM_FRAMES, RESOLUTION, USE_WARP))
         # task.add_done_callback(on_task_done)
 
-        # Numpy augmentations test
-        golden_dir = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_augm_writer_numpy"
-        )
-        out_dir = os.path.join(os.getcwd(), "_out_augm_writer")
-        num_frames = 2
-        use_warp = False
-        await run_example_async(num_frames=num_frames, resolution=RESOLUTION, use_warp=use_warp)
+        test_num_frames = 2
+        for test_use_warp in [False, True]:
+            mode_label = "warp" if test_use_warp else "numpy"
+            golden_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "data", "golden", f"_out_augm_writer_{mode_label}"
+            )
+            out_dir = os.path.join(os.getcwd(), f"_out_augm_writer_{mode_label}")
+            await run_example_async(
+                num_frames=test_num_frames, resolution=RESOLUTION, use_warp=test_use_warp, env_url=""
+            )
 
-        # Make sure the output directory contains the expected number of files
-        folder_contents_success = validate_folder_contents(
-            path=out_dir, expected_counts={"png": num_frames * 2, "npy": num_frames}
-        )
-        self.assertTrue(folder_contents_success, "Output directory contents validation failed with numpy augmentations")
+            folder_contents_success = validate_folder_contents(
+                path=out_dir, expected_counts={"png": test_num_frames * 2, "npy": test_num_frames}
+            )
+            self.assertTrue(
+                folder_contents_success, f"Folder contents validation failed ({mode_label}). Output dir: {out_dir}"
+            )
 
-        # Clear the output directory for the next test
-        shutil.rmtree(out_dir)
-
-        # Warp augmentations test
-        golden_dir = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "data", "golden", "_out_augm_writer_warp"
-        )
-        out_dir = os.path.join(os.getcwd(), "_out_augm_writer")
-        num_frames = 2
-        use_warp = True
-        await run_example_async(num_frames=num_frames, resolution=RESOLUTION, use_warp=use_warp)
-        folder_contents_success = validate_folder_contents(
-            path=out_dir, expected_counts={"png": num_frames * 2, "npy": num_frames}
-        )
-        self.assertTrue(folder_contents_success, "Output directory contents validation failed with warp augmentations")
-
-        # Compare the images in the output directory with the golden images
-        result = compare_images_in_directories(
-            golden_dir=golden_dir,
-            test_dir=out_dir,
-            path_pattern=r"\.png$",
-            allclose_rtol=None,  # Disable allclose for this test to rely only on mean tolerance
-            allclose_atol=None,
-            mean_tolerance=self.MEAN_DIFF_TOLERANCE,
-            print_all_stats=False,
-        )
-        self.assertTrue(result["all_passed"], "Image comparison failed with warp augmentations")
+            result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=out_dir,
+                path_pattern=r"\.png$",
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=self.MEAN_DIFF_TOLERANCE,
+                print_all_stats=False,
+            )
+            self.assertTrue(result["all_passed"], f"Image comparison failed ({mode_label}). Output dir: {out_dir}")

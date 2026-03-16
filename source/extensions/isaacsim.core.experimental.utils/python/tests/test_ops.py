@@ -54,7 +54,7 @@ class TestOps(omni.kit.test.AsyncTestCase):
         a: wp.array | list[wp.array],
         shape: list[int] | None = None,
         dtype: type | None = None,
-        device: str | wp.context.Device | None = None,
+        device: str | wp.Device | None = None,
     ):
         for i, x in enumerate(a if isinstance(a, (list, tuple)) else [a]):
             assert isinstance(x, wp.array), f"[{i}]: {repr(x)} ({type(x)}) is not a Warp array"
@@ -87,6 +87,29 @@ class TestOps(omni.kit.test.AsyncTestCase):
             assert (x == y).all(), f"[{i}]: Unexpected value:\nExpected\n{x}\nGot\n{y}{msg}"
 
     # --------------------------------------------------------------------
+
+    async def test_parse_device(self):
+        for device in [None, "cpu", "cuda", "cuda:0", "cuda:10", "edge-case", wp.get_device()]:
+            # get target device
+            target_device = None
+            if device in [None, "edge-case"]:
+                target_device = wp.get_device()
+            elif isinstance(device, str) and device.startswith("cuda"):
+                try:
+                    index = int(f"{device}:0".split(":")[1])
+                    target_device = wp.get_device(f"cuda:{index}")
+                except Exception as e:
+                    target_device = wp.get_device()
+            if not target_device:
+                target_device = wp.get_device(device)
+            # check device
+            self.assertEqual(ops_utils.parse_device(device), target_device)
+            # check device with raise_on_invalid=True
+            if device in ["cuda:10", "edge-case"]:
+                with self.assertRaises(ValueError):
+                    ops_utils.parse_device(device, raise_on_invalid=True)
+            else:
+                ops_utils.parse_device(device, raise_on_invalid=True)
 
     async def test_place(self):
         for device in self.parametrize_device:

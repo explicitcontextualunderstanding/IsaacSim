@@ -34,7 +34,7 @@ from isaacsim.core.utils import extensions, stage
 from isaacsim.core.utils.render_product import set_camera_prim_path
 from isaacsim.storage.native import get_assets_root_path
 from omni.kit.viewport.utility import get_active_viewport
-from pxr import Gf, UsdGeom
+from pxr import Gf, Sdf, UsdGeom
 
 # enable ROS bridge extension
 extensions.enable_extension("isaacsim.ros2.bridge")
@@ -63,6 +63,9 @@ camera_prim.GetVerticalApertureAttr().Set(16)
 camera_prim.GetProjectionAttr().Set("perspective")
 camera_prim.GetFocalLengthAttr().Set(24)
 camera_prim.GetFocusDistanceAttr().Set(400)
+camera_prim.GetPrim().CreateAttribute("exposure:time", Sdf.ValueTypeNames.Float).Set(0.02)
+camera_prim.GetPrim().CreateAttribute("exposure:responsivity", Sdf.ValueTypeNames.Float).Set(1.10267)
+camera_prim.GetPrim().CreateAttribute("exposure:fStop", Sdf.ValueTypeNames.Float).Set(5.0)
 
 simulation_app.update()
 

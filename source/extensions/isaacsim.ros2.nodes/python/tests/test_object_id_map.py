@@ -30,7 +30,6 @@ from .common import ROS2TestCase, create_sarcophagus, get_qos_profile
 
 class TestROS2ObjectIdMap(ROS2TestCase):
 
-    # Before running each test
     async def setUp(self):
         await super().setUp()
 
@@ -92,12 +91,19 @@ class TestROS2ObjectIdMap(ROS2TestCase):
         await super().tearDown()
 
     def spin(self):
-        rclpy.spin_once(self._ros_node, timeout_sec=0.1)
+        rclpy.spin_once(self._ros_node, timeout_sec=0.01)
 
     async def test_object_id_map(self):
         # Run the timeline to populate data
         self._timeline.play()
-        await simulate_async(0.1, callback=self.spin)
+        condition_met = await self.simulate_until_condition(
+            lambda: self._ros_msg_data is not None,
+            max_frames=120,
+            per_frame_callback=self.spin,
+        )
+        self.assertTrue(condition_met, "Timed out waiting for object-id-map ROS message")
+
+        # Once ROS message is present, fetch annotator output for comparison.
         self._annotator_data = self._annotator.get_data()
         self._timeline.stop()
 

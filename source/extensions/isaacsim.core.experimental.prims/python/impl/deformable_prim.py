@@ -1374,7 +1374,7 @@ def _wf_compute_deformation_matrix(
         det = wp.determinant(m)
         volume = det / 6.0
         if volume < 1e-9:
-            m = wp.mat33(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
+            m = wp.matrix_from_rows(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
         else:
             m = wp.inverse(m)
     return m

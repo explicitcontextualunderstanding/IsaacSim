@@ -150,9 +150,15 @@ void ContactManager::onPhysicsStep(const float& currentTime, const float& timeEl
     uint32_t numContactHeaders = 0;
     {
         CARB_PROFILE_ZONE(0, "[IsaacSim] Contact Sensor manager - Get Data");
+        auto* physxSim = carb::getCachedInterface<omni::physx::IPhysxSimulation>();
+        if (!physxSim)
+        {
+            CARB_LOG_WARN("IPhysxSimulation interface not available, skipping contact report");
+            return;
+        }
         uint32_t numContactData = 0;
         uint32_t numFrictionAnchorData = 0;
-        numContactHeaders = carb::getCachedInterface<omni::physx::IPhysxSimulation>()->getFullContactReport(
+        numContactHeaders = physxSim->getFullContactReport(
             &contactEventHeadersBuffer, &contactDataBuffer, numContactData, &frictionAnchorData, numFrictionAnchorData);
     }
     {

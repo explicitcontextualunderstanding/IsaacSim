@@ -6,4 +6,10 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+
+"""Provides an extension for robot motion generation tutorials with a kinematics example using the Franka robot."""
+
+
 from .extension import *
+
+__all__ = ["UIBuilder", "Extension"]

@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides color-coded table widget for visualizing and selecting robot joints in the gains tuner interface."""
+
+
 import colorsys
 from enum import Enum
 from functools import partial
@@ -23,12 +27,18 @@ from .cell_widget import CellColor
 from .style import get_style
 
 
-def generate_distinct_colors(n):
-    """
-    Generate n visually distinct colors and represent them in 32-bit hexadecimal format.
+def generate_distinct_colors(n: int) -> list[list[int]]:
+    """Generate n visually distinct colors and represent them in 32-bit hexadecimal format.
 
-    :param n: The number of colors to generate
-    :return: A list of n colors, each represented as a 32-bit hexadecimal integer
+    Each color group contains three variations with different saturation levels (1.0, 0.4, 0.2) to provide
+    visual variety for joint coloring in the robot setup gain tuner interface.
+
+    Args:
+        n: The number of color groups to generate.
+
+    Returns:
+        A list of n color groups, where each group contains three color variations represented as 32-bit
+        hexadecimal integers with full alpha opacity.
     """
     group_colors = []
     for i in range(n):
@@ -46,41 +56,94 @@ def generate_distinct_colors(n):
 
 
 class ColorJointItem(TableItem):
+    """Represents a joint item with color visualization for the gain tuner table.
 
-    def __init__(self, name, joint_index, color):
+    This class extends TableItem to provide a specialized item for displaying joint information
+    along with associated color data in the gain tuner interface. Each item represents a single
+    joint with its name, index, and color scheme for visual identification.
+
+    Args:
+        name: The name of the joint.
+        joint_index: The index of the joint in the articulation.
+        color: List of colors associated with the joint for visual representation.
+    """
+
+    def __init__(self, name: str, joint_index: int, color: list):
         super().__init__(joint_index)
         self.colors = color
         self.name = name
         self.color_cell = None
 
-    def get_item_value(self, col_id=0):
+    def get_item_value(self, col_id: int = 0):
+        """Retrieves the value for the specified column.
+
+        Args:
+            col_id: Column identifier (0 for colors, 1 for joint name).
+
+        Returns:
+            The colors list if col_id is 0, or the joint name if col_id is 1.
+        """
         if col_id == 0:
             return self.colors
         elif col_id == 1:
             return self.name
 
-    def set_item_value(self, col_id, value):
+    def set_item_value(self, col_id: int, value):
+        """Sets the value for the specified column.
+
+        Args:
+            col_id: Column identifier (0 for colors, 1 for joint name).
+            value: The new value to set.
+        """
         if col_id == 0:
             self.colors = value
         elif col_id == 1:
             self.name = value
 
-    def get_value_model(self, col_id=0):
+    def get_value_model(self, col_id: int = 0):
+        """Gets the value model for the specified column.
+
+        Args:
+            col_id: Column identifier.
+
+        Returns:
+            Always returns None as no value model is used.
+        """
         return None
 
 
 class ColorJointItemDelegate(TableItemDelegate):
+    """A delegate for rendering color and joint name items in the robot joint selection table.
+
+    This delegate handles the visual representation and interaction for table items that display
+    robot joint information with associated color coding. It manages two columns: a color indicator
+    column showing visual color swatches and a joint name column displaying the joint names.
+    The delegate provides sorting functionality and handles selection state changes to update
+    the visual appearance of color cells.
+
+    Args:
+        model: The table model containing the joint data to be displayed.
+    """
+
     header_tooltip = ["Color", "Joint"]
+    """Tooltip text for each column header in the color joint table."""
     header = ["", "Joint"]
+    """Header labels for each column in the color joint table."""
 
     def __init__(self, model):
         super().__init__(model)
         self.column_headers = {}
 
     def init_model(self):
+        """Initialize the model for the delegate."""
         pass
 
-    def build_header(self, column_id=0):
+    def build_header(self, column_id: int = 0):
+        """Build the header widget for a specific column.
+
+        Args:
+            column_id: The column identifier to build the header for.
+        """
         alignment = ui.Alignment.LEFT
         if column_id == 0:
             with ui.HStack():
@@ -102,9 +165,21 @@ class ColorJointItemDelegate(TableItemDelegate):
                 self.build_sort_button(column_id)
 
     def update_defaults(self):
+        """Update default settings for the delegate."""
         pass
 
-    def build_widget(self, model, item=None, index=0, level=0, expanded=False):
+    def build_widget(
+        self, model, item: ColorJointItem | None = None, index: int = 0, level: int = 0, expanded: bool = False
+    ):
+        """Build the widget for a table item at the specified column.
+
+        Args:
+            model: The table model containing the data.
+            item: The color joint item to build the widget for.
+            index: The column index to build the widget for.
+            level: The nesting level of the item.
+            expanded: Whether the item is expanded.
+        """
         if item:
             if index == 0:
                 with ui.ZStack(height=ITEM_HEIGHT):
@@ -131,6 +206,11 @@ class ColorJointItemDelegate(TableItemDelegate):
                         ui.Spacer()
 
     def select_changed(self, selection):
+        """Handle changes in item selection by updating the visual state of color cells.
+
+        Args:
+            selection: The list of selected items.
+        """
         for item in self.get_children():
             if item.color_cell:
                 item.color_cell.selected = False
@@ -140,6 +220,18 @@ class ColorJointItemDelegate(TableItemDelegate):
 
 
 class ColorJointModel(TableModel):
+    """A table model for managing joint color assignments in the gains tuner interface.
+
+    This model creates a collection of ColorJointItem instances, with each item representing a joint
+    from the articulation and its associated distinct color. The colors are automatically generated
+    to provide visual distinction between different joints in the gains tuning interface.
+
+    Args:
+        gains_tuner: The gains tuner instance that provides access to the articulation and its joints.
+        value_changed_fn: Callback function invoked when a value in the model changes.
+        **kwargs: Additional keyword arguments passed to the parent TableModel class.
+    """
+
     def __init__(self, gains_tuner, value_changed_fn, **kwargs):
         super().__init__(value_changed_fn)
         self.gains_tuner = gains_tuner
@@ -153,12 +245,36 @@ class ColorJointModel(TableModel):
             for joint_index in range(self.gains_tuner.get_articulation().num_dofs)
         ]
 
-    def get_item_value_model_count(self, item):
-        """The number of columns"""
+    def get_item_value_model_count(self, item) -> int:
+        """The number of columns.
+
+        Args:
+            item: The table item to query.
+
+        Returns:
+            The number of columns for the table.
+        """
         return 2
 
 
 class ColorJointWidget(TableWidget):
+    """A UI widget for displaying and selecting robot joints with color-coded visualization.
+
+    Provides a table-based interface showing robot joints with associated color indicators. Each joint is
+    displayed with a unique color and its name, allowing users to visually distinguish and select joints
+    for gain tuning operations. The widget automatically generates distinct colors for each joint and
+    supports selection callbacks for integration with other components.
+
+    The widget displays joints in a two-column format: a color cell showing the joint's assigned color
+    and a text cell showing the joint name. Users can select joints to perform operations or highlight
+    specific joints in the tuning interface.
+
+    Args:
+        gains_tuner: The gains tuner instance containing the robot articulation and joint information.
+        value_changed_fn: Callback function called when widget values change.
+        selected_changed_fn: Callback function called when joint selection changes.
+    """
+
     def __init__(self, gains_tuner, value_changed_fn=None, selected_changed_fn=None):
         self.gains_tuner = gains_tuner
         model = ColorJointModel(gains_tuner, self._on_value_changed)
@@ -168,6 +284,10 @@ class ColorJointWidget(TableWidget):
         super().__init__(value_changed_fn, model, delegate)
 
     def _build_ui(self):
+        """Builds the UI components for the color joint widget.
+
+        Creates a scrolling frame containing the tree view for displaying joint colors and names.
+        """
         with ui.ScrollingFrame(
             horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_OFF,
             vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_AS_NEEDED,
@@ -179,6 +299,11 @@ class ColorJointWidget(TableWidget):
                 self.build_tree_view()
 
     def build_tree_view(self):
+        """Builds the tree view component for displaying joints with their colors.
+
+        Creates a TreeView widget with fixed column widths for color and joint name display,
+        sets up selection handling, and initializes the selection to the first joint.
+        """
         self.list = ui.TreeView(
             self.model,
             delegate=self.delegate,
@@ -197,6 +322,14 @@ class ColorJointWidget(TableWidget):
         self.list.selection = [default_item]
 
     def __selection_changed(self, selection):
+        """Handles selection changes in the joint tree view.
+
+        Updates the visual selection state of color cells and notifies the parent widget
+        of the selection change through the callback function.
+
+        Args:
+            selection: The list of selected joint items in the tree view.
+        """
         if not selection:
             return
         self.delegate.select_changed(selection)

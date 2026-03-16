@@ -34,6 +34,27 @@
 using omni::graph::core::GraphInstanceID;
 using omni::graph::core::NodeObj;
 
+namespace isaacsim::ucx::nodes
+{
+
+/**
+ * @struct JointStateData
+ * @brief Data structure for joint state message payload.
+ * @details
+ * Contains robot joint state data including positions, velocities, and efforts
+ * for all joints in the articulation.
+ */
+struct JointStateData
+{
+    double timestamp; //!< Timestamp value in seconds
+    uint32_t numJoints; //!< Number of joints in the articulation
+    std::vector<double> positions; //!< Joint positions (scaled to meters)
+    std::vector<double> velocities; //!< Joint velocities (scaled)
+    std::vector<double> efforts; //!< Joint efforts/forces
+};
+
+} // namespace isaacsim::ucx::nodes
+
 /**
  * @class UCXPublishJointStateNodeBase
  * @brief Templated base class for UCX joint state publishing nodes.
@@ -91,7 +112,8 @@ protected:
      * @brief Common compute logic for joint state publishing nodes.
      * @details
      * Handles listener initialization, connection checking, and message publishing.
-     * Initializes the articulation view if needed.
+     * Initializes the articulation view if needed. Extracts data using extractData()
+     * and serializes using generateMessage().
      *
      * @param[in] db Database accessor for node inputs/outputs
      * @param[in] context Graph context for accessing stage
@@ -120,7 +142,8 @@ protected:
             }
         }
 
-        return publishMessage(db, tag, timeoutMs);
+        isaacsim::ucx::nodes::JointStateData data = extractData(db);
+        return this->publishMessage(db, generateMessage(data), tag, timeoutMs);
     }
 
     /**
@@ -228,15 +251,26 @@ protected:
     }
 
     /**
-     * @brief Generate message from node inputs.
+     * @brief Extract joint state data from articulation.
      * @details
-     * Pure virtual function that derived classes must implement to create
-     * and serialize their message data from joint states.
+     * Pure virtual function that derived classes must implement to read
+     * joint data from the articulation and return it as JointStateData.
      *
      * @param[in] db Database accessor for node inputs
+     * @return JointStateData Extracted joint state data
+     */
+    virtual isaacsim::ucx::nodes::JointStateData extractData(DatabaseT& db) = 0;
+
+    /**
+     * @brief Generate message from joint state data.
+     * @details
+     * Pure virtual function that derived classes must implement to serialize
+     * joint state data into the appropriate message format.
+     *
+     * @param[in] data Joint state data to serialize
      * @return std::vector<uint8_t> Serialized message data
      */
-    virtual std::vector<uint8_t> generateMessage(DatabaseT& db) = 0;
+    virtual std::vector<uint8_t> generateMessage(const isaacsim::ucx::nodes::JointStateData& data) = 0;
 
     /**
      * @brief Helper to create tensor descriptor.
@@ -250,31 +284,6 @@ protected:
         tensorDesc.dtype = type;
         tensorDesc.numDims = 1;
         tensorDesc.dims[0] = count;
-    }
-
-    /**
-     * @brief Publishes a message over UCX.
-     * @details
-     * Generates the message by calling the derived class's virtual generateMessage(),
-     * then sends it using UCX tagged send with timeout handling. If the request doesn't
-     * complete within the timeout, it is cancelled.
-     *
-     * @param[in] db Database accessor for logging and inputs
-     * @param[in] tag UCX tag for message identification
-     * @param[in] timeoutMs Timeout in milliseconds (0 = infinite)
-     * @return bool True if publish succeeded, false otherwise
-     */
-    bool publishMessage(DatabaseT& db, uint64_t tag, uint32_t timeoutMs)
-    {
-        std::vector<uint8_t> messageData = generateMessage(db);
-
-        if (messageData.empty())
-        {
-            db.logError("Failed to generate message");
-            return false;
-        }
-
-        return this->sendMessage(db, messageData, tag, timeoutMs);
     }
 
     pxr::UsdStageWeakPtr m_stage = nullptr;
@@ -294,11 +303,13 @@ protected:
 // 3. Implement static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
 //    - Get state: auto& state = YourDatabase::template sPerInstanceState<YourClass>(nodeObj, instanceId)
 //    - Call state.reset()
-// 4. Implement virtual std::vector<uint8_t> generateMessage(DatabaseT& db) override
-//    This protected function should read joint data and return the serialized message bytes
-// 5. Implement static bool compute(YourDatabase& db) that:
+// 4. Implement virtual JointStateData extractData(DatabaseT& db) override
+//    - Read joint data from articulation and return as JointStateData
+// 5. Implement virtual std::vector<uint8_t> generateMessage(const JointStateData& data) override
+//    - Serialize the joint state data into message format
+// 6. Implement static bool compute(YourDatabase& db) that:
 //    - Extracts inputs from db
 //    - Gets the graph context
 //    - Gets the per-instance state: auto& state = db.template perInstanceState<YourClass>()
-//    - Calls state.computeImpl(db, context, port, tag)
-// 6. See OgnUCXPublishJointState.cpp for examples
+//    - Calls state.computeImpl(db, context, port, tag, timeoutMs)
+// 7. See OgnUCXPublishJointState.cpp for examples

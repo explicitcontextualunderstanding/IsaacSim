@@ -20,8 +20,8 @@ import carb
 import omni.ext
 import omni.kit
 from isaacsim.ros2.core.impl.ros2_common import (
-    SUPPORTED_ROS_DISTROS,
     print_environment_setup_instructions,
+    restore_ros2_python_paths,
     setup_ros2_environment,
 )
 
@@ -29,17 +29,9 @@ from isaacsim.ros2.core.impl.ros2_common import (
 class Extension(omni.ext.IExt):
     def on_startup(self, ext_id):
         ros_distro = os.environ.get("ROS_DISTRO")
-        if ros_distro in SUPPORTED_ROS_DISTROS.values() and os.path.join(f"{ros_distro}", "rclpy") in os.path.join(
-            os.path.dirname(__file__)
-        ):
+        if ros_distro is not None and os.path.join(f"{ros_distro}", "rclpy") in os.path.join(os.path.dirname(__file__)):
             omni.kit.app.get_app().print_and_log("Attempting to load system rclpy")
-            ament_prefix = os.environ.get("AMENT_PREFIX_PATH")
-            if ament_prefix is not None and os.environ.get("OLD_PYTHONPATH") is not None:
-                for python_path in os.environ.get("OLD_PYTHONPATH").split(":"):
-                    for ament_path in ament_prefix.split(":"):
-                        if python_path.startswith(os.path.abspath(ament_path) + os.sep):
-                            sys.path.append(os.path.join(python_path))
-                            break
+            restore_ros2_python_paths()
             try:
                 import rclpy
 

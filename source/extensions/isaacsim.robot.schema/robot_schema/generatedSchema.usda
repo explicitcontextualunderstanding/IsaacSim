@@ -6,45 +6,92 @@
 class "IsaacRobotAPI"
 {
     string[] isaac:changelog = [] (
-        doc = """\r
-        Changelog of the robot.\r
-        """
+        customData = {
+            string userDocBrief = "Changelog of the robot."
+        }
     )
     string isaac:description = ""
     token isaac:license = "Other" (
         allowedTokens = ["MIT", "Apache-2.0", "GPL-3.0", "LGPL-3.0", "BSD-3-Clause", "BSD-2-Clause", "ISC", "MPL-2.0", "EPL-2.0", "CC0-1.0", "Unlicense", "Other"]
-        doc = """\r
-        License for using the robot.\r
-        """
+        customData = {
+            string userDocBrief = "License for using the robot."
+        }
     )
     string isaac:namespace = ""
     rel isaac:physics:robotJoints (
-        doc = """\r
-        Sorted list of joints to be reported in the robot structure. This list can contain either direct references to Robot Joints, or to a Robot composition - which inserts all sub-components into the list.\r
-        """
+        customData = {
+            string userDocBrief = "Sorted list of joints to be reported in the robot structure."
+        }
     )
     rel isaac:physics:robotLinks (
-        doc = """\r
-        Sorted list of bodies, Reference points or Robot assemblies ( all bodies from the robot are inserted) to be listed in the robot kinematics tree. \r
-        The order defines how the robot will be reported both in communication protocols as in the body poses \r
-        tensor.\r
-        """
+        customData = {
+            string userDocBrief = "Sorted list of bodies, Reference points or Robot assemblies ( all bodies from the robot are inserted) to be listed in the robot kinematics tree."
+        }
+    )
+    rel isaac:robot:namedPoses (
+        customData = {
+            string userDocBrief = "List of named poses for the robot."
+        }
     )
     token isaac:robotType = "Default" (
         allowedTokens = ["Default", "End Effector", "Manipulator", "Humanoid", "Wheeled", "Holonomic", "Quadruped", "Mobile Manipulators", "Aerial"]
-        doc = """\r
-        Type of robot.\r
-        """
+        customData = {
+            string userDocBrief = "Type of robot."
+        }
     )
     string isaac:source = "" (
-        doc = """\r
-        Source of the robot.\r
-        """
+        customData = {
+            string userDocBrief = "Source of the robot."
+        }
     )
     string isaac:version = "" (
-        doc = """\r
-        Version of the robot.\r
-        """
+        customData = {
+            string userDocBrief = "Version of the robot."
+        }
+    )
+}
+
+class IsaacNamedPose "IsaacNamedPose" (
+    customData = {
+        string userDocBrief = "Named pose for a robot."
+    }
+)
+{
+    rel isaac:robot:pose:endLink
+    bool[] isaac:robot:pose:jointFixed
+    rel isaac:robot:pose:joints
+    float[] isaac:robot:pose:jointValues
+    rel isaac:robot:pose:startLink
+    bool isaac:robot:pose:valid
+    rel proxyPrim (
+        customData = {
+            string userDocBrief = '''The proxyPrim relationship allows us to link a
+        prim whose purpose is "render" to its (single target)
+        purpose="proxy" prim.'''
+        }
+    )
+    uniform token purpose = "default" (
+        allowedTokens = ["default", "render", "proxy", "guide"]
+        customData = {
+            string userDocBrief = """Purpose is a classification of geometry into categories that 
+        can each be independently included or excluded from traversals of prims 
+        on a stage, such as rendering or bounding-box computation traversals."""
+        }
+    )
+    token visibility = "inherited" (
+        allowedTokens = ["inherited", "invisible"]
+        customData = {
+            string userDocBrief = '''Visibility is meant to be the simplest form of "pruning" 
+        visibility that is supported by most DCC apps.'''
+        }
+    )
+    uniform token[] xformOpOrder (
+        customData = {
+            string userDocBrief = """Encodes the sequence of transformation operations in the
+        order in which they should be pushed onto a transform stack while
+        visiting a UsdStage's prims in a graph traversal that will effect
+        the desired positioning for this prim and its descendant prims."""
+        }
     )
 }
 
@@ -66,76 +113,75 @@ class "IsaacJointAPI"
     bool[] isaac:actuator = []
     string isaac:NameOverride = ""
     token[] isaac:physics:DofOffsetOpOrder = [] (
-        doc = """\r
-        Ordered list describing the sequence of DoF offsets to expose for the joint.\r
-        """
+        customData = {
+            string userDocBrief = "Ordered list describing the sequence of DoF offsets to expose for the joint."
+        }
     )
 }
 
 class "IsaacSurfaceGripper"
 {
     rel isaac:attachmentPoints (
-        doc = """\r
-        List of D6 Joints to be used as components of the Surface Gripper.\r
-        These joints represent the contact points where the gripper can attach to objects.\r
-        """
+        customData = {
+            string userDocBrief = """List of D6 Joints to be used as components of the Surface Gripper.\r
+        These joints represent the contact points where the gripper can attach to objects."""
+        }
     )
     float isaac:coaxialForceLimit = -1 (
+        customData = {
+            string userDocBrief = """Maximum allowable coaxial force per attachment point, measured in Newtons.\r
+        A value of -1 indicates no limit."""
+        }
         displayName = "Coaxial Force Limit"
-        doc = """\r
-        Maximum allowable coaxial force per attachment point, measured in Newtons.\r
-        A value of -1 indicates no limit.\r
-        """
     )
     rel isaac:grippedObjects (
+        customData = {
+            string userDocBrief = "List of objects currently being gripped."
+        }
         displayName = "Gripped Objects"
-        doc = """\r
-        List of objects currently being gripped. This relationship is updated at runtime\r
-        to reflect the current state of the gripper's interactions.\r
-        """
     )
     float isaac:maxGripDistance = 0.01 (
+        customData = {
+            string userDocBrief = "Maximum distance the gripper can check to grab an object, measured in meters."
+        }
         displayName = "Max Grip Distance"
-        doc = """\r
-        Maximum distance the gripper can check to grab an object, measured in meters.\r
-        """
     )
     float isaac:retryInterval = 0 (
+        customData = {
+            string userDocBrief = "Time interval while the gripper is trying to close before it times out, measured in seconds."
+        }
         displayName = "Retry Interval"
-        doc = """\r
-        Time interval while the gripper is trying to close before it times out, measured in seconds.\r
-        """
     )
     float isaac:shearForceLimit = -1 (
+        customData = {
+            string userDocBrief = """Maximum allowable shear force per attachment point, measured in Newtons.\r
+        A value of -1 indicates no limit."""
+        }
         displayName = "Shear Force Limit"
-        doc = """\r
-        Maximum allowable shear force per attachment point, measured in Newtons.\r
-        A value of -1 indicates no limit.\r
-        """
     )
     uniform token isaac:status = "Open" (
         allowedTokens = ["Open", "Closed", "Closing"]
+        customData = {
+            string userDocBrief = "Current status of the surface gripper."
+        }
         displayName = "Status"
-        doc = """\r
-        Current status of the surface gripper.\r
-        """
     )
 }
 
 class "IsaacAttachmentPointAPI"
 {
     float isaac:clearanceOffset = 0 (
+        customData = {
+            string userDocBrief = "Offset to be added to the grip distance to avoid self-collision, measured in meters."
+        }
         displayName = "Clearance Offset"
-        doc = """\r
-        Offset to be added to the grip distance to avoid self-collision, measured in meters.\r
-        """
     )
     uniform token isaac:forwardAxis = "X" (
         allowedTokens = ["X", "Y", "Z"]
+        customData = {
+            string userDocBrief = "Axis along which the gripper opens and closes."
+        }
         displayName = "Forward Axis"
-        doc = """\r
-        Axis along which the gripper opens and closes.\r
-        """
     )
 }
 

@@ -14,6 +14,10 @@
 # limitations under the License.
 
 # RL based robot template classes
+
+"""Provides example robot policies including terrain navigation and manipulation tasks for Anymal, Franka, H1, and Spot robots."""
+
+
 from isaacsim.robot.policy.examples.robots.anymal import AnymalFlatTerrainPolicy
 from isaacsim.robot.policy.examples.robots.franka import FrankaOpenDrawerPolicy
 from isaacsim.robot.policy.examples.robots.h1 import H1FlatTerrainPolicy

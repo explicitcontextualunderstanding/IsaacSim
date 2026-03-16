@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utilities for creating tree view components with searchable items, filtering, and placeholder support in Isaac Sim robot setup wizard."""
+
+
 import asyncio
 from enum import Enum
 from functools import partial
@@ -20,12 +24,12 @@ import omni.ui as ui
 
 
 class TreeViewIDColumn:
-    """
-    This is the ID (first) column of the TreeView. It's not part of the treeview delegate, because it's cheaper to do
-    item remove in this way. And we dont need to update it when the treeview list is smaller than DEFAULT_ITEM_NUM.
+    """This is the ID (first) column of the TreeView. It's not part of the treeview delegate, because it's cheaper to do
+    item remove in this way. And we don't need to update it when the treeview list is smaller than DEFAULT_ITEM_NUM.
     """
 
     DEFAULT_ITEM_NUM = 15
+    """Default number of items to display in the ID column."""
 
     def __init__(self):
         self.frame = ui.Frame()
@@ -33,6 +37,11 @@ class TreeViewIDColumn:
         self.frame.set_build_fn(self._build_frame)
 
     def _build_frame(self):
+        """Builds the UI frame containing the ID column with numbered items.
+
+        Creates a vertical stack with a background rectangle and numbered labels for each item,
+        up to the current item count.
+        """
         self.column = ui.VStack(width=25)
         with self.column:
             ui.Rectangle(name="treeview_background", height=25)
@@ -42,6 +51,11 @@ class TreeViewIDColumn:
                     ui.Label(str(i + 1), alignment=ui.Alignment.CENTER, height=0)
 
     def add_item(self):
+        """Adds a new numbered item to the ID column.
+
+        Creates a new UI element with a rectangle background and a centered label showing
+        the next sequential number.
+        """
         self.num += 1
         with self.column:
             with ui.ZStack(height=30):
@@ -49,6 +63,11 @@ class TreeViewIDColumn:
                 ui.Label(str(self.num), alignment=ui.Alignment.CENTER, height=0)
 
     def remove_item(self):
+        """Removes the last item from the ID column if above the default count.
+
+        Reduces the item count and rebuilds the frame only when the number of items
+        exceeds the default minimum number.
+        """
         if self.num > TreeViewIDColumn.DEFAULT_ITEM_NUM:
             self.num -= 1
             self.frame.rebuild()
@@ -68,6 +87,20 @@ class SearchableItemSortPolicy(Enum):
 
 
 class SearchableItem(ui.AbstractItem):
+    """Base class for items that can be searched and filtered in tree views.
+
+    This class extends Omni UI's AbstractItem to provide filtering capabilities based on text search
+    and custom conditions. Items can be filtered by matching text content and by custom filter
+    conditions that subclasses can implement.
+
+    The class maintains filtering state through boolean flags that determine whether the item
+    matches current filter criteria. It also provides a text representation that can be used
+    for searching and sorting operations.
+
+    Subclasses should override the refresh_text method to update the item's text representation
+    when underlying data changes.
+    """
+
     def __init__(self):
         super().__init__()
         # filtered is True when match the filter otherwise is False
@@ -76,15 +109,41 @@ class SearchableItem(ui.AbstractItem):
         self.text = ""
 
     def refresh_text(self):
+        """Updates the text representation of the searchable item."""
         pass
 
 
 class PlacerHolderItem(ui.AbstractItem):
+    """A placeholder item used in tree view models to maintain consistent visual spacing.
+
+    This class serves as a visual placeholder in tree views when the number of actual items is less than the
+    desired minimum display count. It extends ui.AbstractItem to integrate seamlessly with Omni UI tree view
+    components, ensuring that tree views maintain a consistent appearance with empty rows displayed as needed.
+
+    The placeholder items are automatically managed by TreeViewWithPlacerHolderModel to fill gaps between
+    actual content and the minimum row count, providing a cleaner user interface experience.
+    """
+
     def __init__(self):
         super().__init__()
 
 
 class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
+    """A tree view model that manages searchable items with placeholder support.
+
+    This model extends the Omni UI AbstractItemModel to provide a flat list structure with filtering,
+    sorting, and placeholder functionality. It maintains a minimum number of items by adding placeholder
+    items when the actual item count falls below the default threshold.
+
+    The model supports text-based filtering, conditional filtering, and sorting by item properties.
+    When items are filtered or sorted, only the searchable items are affected while placeholders
+    remain to maintain the visual structure.
+
+    Args:
+        items: Initial list of items to populate the model.
+        *args: Additional positional arguments passed to the parent class.
+    """
+
     def __init__(self, items, *args):
         super().__init__()
 
@@ -106,11 +165,25 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
         self._children = []
 
     def get_item_value_model_count(self, item):
-        """The number of columns"""
+        """The number of columns.
+
+        Args:
+            item: The item to get column count for.
+
+        Returns:
+            The number of columns.
+        """
         return 8
 
     def get_item_children(self, item):
-        """Returns all the children when the widget asks it."""
+        """Returns all the children when the widget asks it.
+
+        Args:
+            item: The parent item to get children for.
+
+        Returns:
+            List of child items with applied filters and sorting.
+        """
         if item is not None:
             # Since we are doing a flat list, we return the children of root only.
             # If it's not root we return.
@@ -134,6 +207,11 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
         return children
 
     def add_item(self, item):
+        """Adds an item to the model, replacing any existing item with the same name.
+
+        Args:
+            item: The item to add to the model.
+        """
         # Check if an item with the same name already exists
         for existing_item in self._children:
             if (
@@ -155,6 +233,12 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
         self._item_changed(None)
 
     def remove_item(self, item, enabled):
+        """Removes an item from the model if enabled.
+
+        Args:
+            item: The item to remove from the model.
+            enabled: Whether the removal operation is enabled.
+        """
         if not enabled:
             return
         if item in self._children:
@@ -165,9 +249,19 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
             self._item_changed(None)
 
     def edit_item(self, item):
+        """Initiates editing of an item.
+
+        Args:
+            item: The item to edit.
+        """
         pass
 
     def filter_by_text(self, filter_texts):
+        """Filters items by text, showing only items that contain all filter texts.
+
+        Args:
+            filter_texts: List of text strings to filter by.
+        """
         if not self._children:
             return
 
@@ -187,6 +281,11 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
         self._item_changed(None)
 
     def filter_by_conditions(self, conditions):
+        """Filters items by multiple conditions.
+
+        Args:
+            conditions: List of conditions to apply for filtering.
+        """
         self._filter_conditions = conditions
         # TODO: implement the logic in subclass
         for condition in conditions:
@@ -194,9 +293,20 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
         self._item_changed(None)
 
     def filter_by_condition(self, condition):
+        """Filters items by a single condition. Should be implemented in subclass.
+
+        Args:
+            condition: The condition to apply for filtering.
+        """
         print("should implement the logic in subclass")
 
     def sort_by_name(self, policy, column_id):
+        """Sorts items by name according to the specified policy.
+
+        Args:
+            policy: The sort policy to apply.
+            column_id: The column ID to sort by.
+        """
         if policy == SearchableItemSortPolicy.Z_TO_A:
             self._items_sort_reversed = True
         else:
@@ -207,9 +317,14 @@ class TreeViewWithPlacerHolderModel(ui.AbstractItemModel):
 
 
 class TreeViewWithPlacerHolderDelegate(ui.AbstractItemDelegate):
-    """
-    Delegate is the representation layer. TreeView calls the methods
+    """Delegate is the representation layer. TreeView calls the methods
     of the delegate to create custom widgets for each item.
+
+    Args:
+        headers: Column headers for the tree view.
+        combo_lists: Lists of options for combo box columns.
+        combo_ids: Column IDs that should use combo boxes.
+        model: The tree view model instance.
     """
 
     def __init__(self, headers, combo_lists, combo_ids, model):
@@ -223,13 +338,32 @@ class TreeViewWithPlacerHolderDelegate(ui.AbstractItemDelegate):
         self.__items_sort_policy = [SearchableItemSortPolicy.DEFAULT] * self.__model.get_item_value_model_count(None)
 
     def destroy(self):
+        """Cleans up resources and references held by the delegate."""
         self.__name_sort_options_menu = None
 
     def build_branch(self, model, item, column_id, level, expanded):
-        """Create a branch widget that opens or closes subtree"""
+        """Create a branch widget that opens or closes subtree.
+
+        Args:
+            model: The tree view model.
+            item: The item to create a branch widget for.
+            column_id: The column identifier.
+            level: The nesting level of the item.
+            expanded: Whether the branch is expanded.
+        """
         pass
 
     def __build_rename_field(self, item, item_model, label, value, parent_stack):
+        """Creates a rename field widget that allows editing item names on double-click.
+
+        Args:
+            item: The item to be renamed.
+            item_model: The model for the item value.
+            label: The label widget to display the current value.
+            value: The current value to display.
+            parent_stack: The parent stack container for mouse event handling.
+        """
+
         def on_end_edit(label, field):
             new_str = field.model.get_value_as_string()
             item_model.set_value(new_str)
@@ -262,7 +396,15 @@ class TreeViewWithPlacerHolderDelegate(ui.AbstractItemDelegate):
         parent_stack.set_mouse_double_clicked_fn(lambda x, y, b, _: on_mouse_double_clicked(b, label, field))
 
     def build_widget(self, model, item, column_id, level, expanded):
-        """Create a widget per column per item"""
+        """Create a widget per column per item.
+
+        Args:
+            model: The tree view model.
+            item: The item to create a widget for.
+            column_id: The column identifier.
+            level: The nesting level of the item.
+            expanded: Whether the item is expanded.
+        """
         with ui.ZStack(height=30):
             if isinstance(item, SearchableItem):
                 if column_id != 0 and column_id != model.get_item_value_model_count(item) - 1:
@@ -310,6 +452,12 @@ class TreeViewWithPlacerHolderDelegate(ui.AbstractItemDelegate):
                                     self.__build_rename_field(item, item_model, label, value, stack)
 
     def sort_button_pressed_fn(self, b, column_id):
+        """Handles sort button press events to display sorting options menu.
+
+        Args:
+            b: The mouse button that was pressed.
+            column_id: The column identifier for the sort button.
+        """
         if b != 0:
             return
 
@@ -339,7 +487,15 @@ class TreeViewWithPlacerHolderDelegate(ui.AbstractItemDelegate):
             )
         self.__name_sort_options_menu.show()
 
-    def build_header(self, column_id: int = 0) -> None:
+    def build_header(self, column_id: int = 0):
+        """Creates header widgets for tree view columns.
+
+        Args:
+            column_id: The column identifier to build the header for.
+
+        Returns:
+            The created header widget.
+        """
         header_widget = ui.HStack(height=25)
         with header_widget:
             if column_id == len(self.headers) + 1:

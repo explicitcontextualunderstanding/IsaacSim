@@ -114,6 +114,11 @@ std::shared_ptr<Ros2ImageMessage> Ros2FactoryImpl::createImageMessage()
     return std::make_shared<Ros2ImageMessageImpl>();
 }
 
+std::shared_ptr<Ros2CompressedImageMessage> Ros2FactoryImpl::createCompressedImageMessage()
+{
+    return std::make_shared<Ros2CompressedImageMessageImpl>();
+}
+
 std::shared_ptr<Ros2NitrosBridgeImageMessage> Ros2FactoryImpl::createNitrosBridgeImageMessage()
 {
 #if defined(_WIN32)

@@ -1,4 +1,22 @@
 # Changelog
+
+## [1.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.3.2] - 2026-02-18
+### Changed
+- Add WAR to split Windows camera tests into groups to avoid GPU crashes due to descriptor count
+
+## [1.3.1] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [1.3.0] - 2026-02-03
+### Changed
+- Added pinholeOpenCV and fisheyePolynomial projection support to pose writer
+- Moved DOPE utils to DOPEWriter class
+
 ## [1.2.1] - 2025-12-01
 ### Changed
 - Deprecate DOPEWriter and YCBVideoWriter writers

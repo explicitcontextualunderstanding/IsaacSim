@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example implementations of policies for Franka robots."""
+
+
 import isaacsim.core.experimental.utils.transform as transform_utils
 import warp as wp
 from isaacsim.core.deprecation_manager import import_module
@@ -27,7 +30,16 @@ torch = import_module("torch")
 
 
 class FrankaOpenDrawerPolicy(PolicyController):
-    """The Franka Open Drawer Policy. In this policy, the robot will open the top drawer of the cabinet and hold it open"""
+    """The Franka Open Drawer Policy. In this policy, the robot will open the top drawer of the cabinet and hold it open.
+
+    Args:
+        prim_path: The prim path of the robot on the stage.
+        cabinet: The cabinet articulation.
+        root_path: The path to the articulation root of the robot.
+        usd_path: The robot usd filepath in the directory.
+        position: The position of the robot.
+        orientation: The orientation of the robot.
+    """
 
     def __init__(
         self,
@@ -37,7 +49,7 @@ class FrankaOpenDrawerPolicy(PolicyController):
         usd_path: str | None = None,
         position: list[float] | None = None,
         orientation: list[float] | None = None,
-    ) -> None:
+    ):
         """
         Initialize franka robot and import flat terrain policy.
 
@@ -75,8 +87,7 @@ class FrankaOpenDrawerPolicy(PolicyController):
         print(self.drawer_handle_top_prim.paths)
 
     def _compute_observation(self):
-        """
-        Compute the observation vector for the policy.
+        """Compute the observation vector for the policy.
 
         The observation includes robot joint states, drawer state, relative positioning
         between end-effector and drawer handle (with their respective offsets), and previous actions.
@@ -162,8 +173,7 @@ class FrankaOpenDrawerPolicy(PolicyController):
         return obs
 
     def forward(self, dt):
-        """
-        Computes and applies joint position targets for the Franka arm to execute the drawer opening task.
+        """Computes and applies joint position targets for the Franka arm to execute the drawer opening task.
         The control runs at a decimated rate and applies position control to the first 8 joints
         (excluding the mimic joint). Actions are scaled and added to the default pose.
 
@@ -182,9 +192,8 @@ class FrankaOpenDrawerPolicy(PolicyController):
 
         self._policy_counter += 1
 
-    def initialize(self, physics_sim_view=None) -> None:
-        """
-        Initializes the Franka arm articulation with position control mode and configures solver parameters.
+    def initialize(self, physics_sim_view=None):
+        """Initializes the Franka arm articulation with position control mode and configures solver parameters.
         Sets up drawer link indices and specific physics solver settings for stable manipulation.
 
         Args:

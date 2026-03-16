@@ -1,4 +1,21 @@
 # Changelog
+## [8.2.2] - 2026-03-05
+### Changed
+- Updated Overview.md with note about newer experimental motion generation API.
+- Updated path_planner_visualizer.py docstring to clarify it only does interpolation.
+
+## [8.2.1] - 2026-03-04
+### Changed
+- Fix api errors
+
+## [8.2.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [8.1.4] - 2026-01-20
+### Removed
+- Removed tests which made use of a deprecated asset.
+
 ## [8.1.3] - 2025-11-12
 ### Changed
 - Increased tolerances on flaky tests in `tests/test_trajectory_generator.py`.

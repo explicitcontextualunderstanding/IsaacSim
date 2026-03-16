@@ -1,0 +1,27 @@
+########################################################################################################################
+# URDF to USD Converter and Dependencies
+########################################################################################################################
+
+# Install URDF to USD converter and its required dependencies
+# Note: pycollada is required by urdf-usd-converter
+
+# SWIPAT Dependencies List:
+# -------------------------
+# Package              | Version                  | License     | Source
+# urdf-usd-converter   | 0.1.0                    | Apache-2.0  | PyPI
+# pycollada            | 0.9.3                    | BSD-3       | PyPI
+
+[[dependency]]
+python = "../_build/target-deps/python"
+packages = [
+    "urdf-usd-converter==0.1.0",  # URDF to USD converter
+    "pycollada==0.9.3",
+]
+target = "../_build/target-deps/isaac_urdf_usd_prebundle"
+platforms = ["*-x86_64", "*-aarch64"]
+download_only = false
+install_dependencies = false
+append_to_install_folder = true
+gather_licenses_path = "../_build/PACKAGE-LICENSES/PIP-prebundled-LICENSES.txt"
+extra_args = ["--extra-index-url", "https://pypi.org/simple"]
+

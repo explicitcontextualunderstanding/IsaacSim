@@ -26,15 +26,15 @@ class FollowTarget(tasks.FollowTarget):
     """UR10 robot follow target task.
 
     Args:
-        name: Task name. Defaults to "ur10_follow_target".
-        target_prim_path: USD path for target. Defaults to None.
-        target_name: Target name. Defaults to None.
-        target_position: Initial target position. Defaults to None.
-        target_orientation: Initial target orientation. Defaults to None.
-        offset: Task offset. Defaults to None.
-        ur10_prim_path: USD path for UR10 robot. Defaults to None.
-        ur10_robot_name: Robot name. Defaults to None.
-        attach_gripper: Whether to attach gripper. Defaults to False.
+        name: Task name.
+        target_prim_path: USD path for target.
+        target_name: Target name.
+        target_position: Initial target position.
+        target_orientation: Initial target orientation.
+        offset: Task offset.
+        ur10_prim_path: USD path for UR10 robot.
+        ur10_robot_name: Robot name.
+        attach_gripper: Whether to attach gripper.
     """
 
     def __init__(
@@ -48,7 +48,7 @@ class FollowTarget(tasks.FollowTarget):
         ur10_prim_path: Optional[str] = None,
         ur10_robot_name: Optional[str] = None,
         attach_gripper: bool = False,
-    ) -> None:
+    ):
         if target_orientation is None:
             target_orientation = euler_angles_to_quat(np.array([0, np.pi / 2.0, 0]))
         tasks.FollowTarget.__init__(

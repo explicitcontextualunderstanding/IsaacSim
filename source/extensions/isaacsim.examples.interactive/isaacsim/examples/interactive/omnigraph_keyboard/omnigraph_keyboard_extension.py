@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides an extension demonstrating keyboard input control through Omnigraph programming in Isaac Sim."""
+
+
 import os
 
 import omni.ext
@@ -22,7 +25,25 @@ from isaacsim.examples.interactive.omnigraph_keyboard import OmnigraphKeyboard
 
 
 class OmnigraphKeyboardExtension(omni.ext.IExt):
+    """Extension demonstrating keyboard input control through Omnigraph programming in Isaac Sim.
+
+    This example shows how to modify a cube's size using keyboard inputs processed through
+    Omnigraph nodes. Users can grow or shrink a cube by pressing 'a' or 'd' keys respectively.
+    The extension integrates with the Visual Scripting Window to display the underlying
+    Omnigraph implementation.
+
+    The extension registers itself with the examples browser under the "Input Devices" category
+    and provides an interactive UI for running the demonstration.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the Omnigraph Keyboard extension.
+
+        Sets up the UI template and registers the example with the examples browser. The example demonstrates how to control cube size using keyboard input through Omnigraph programming.
+
+        Args:
+            ext_id: The extension identifier.
+        """
 
         self.example_name = "Omnigraph Keyboard"
         self.category = "Input Devices"
@@ -53,4 +74,8 @@ class OmnigraphKeyboardExtension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Cleans up the Omnigraph Keyboard extension.
+
+        Deregisters the example from the examples browser.
+        """
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)

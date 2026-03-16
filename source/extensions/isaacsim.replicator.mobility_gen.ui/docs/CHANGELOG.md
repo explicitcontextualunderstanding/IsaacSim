@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [0.2.0] - 2026-02-06
+### Added
+- Support loading usdz asset
+
 ## [0.1.10] - 2025-10-27
 ### Changed
 - Make omni.isaac.ml_archive an explicit test dependency

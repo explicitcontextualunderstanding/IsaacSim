@@ -43,7 +43,7 @@ physics_timer_callback = physics_sim_interface.subscribe_physics_on_step_events(
 )
 
 # In Isaac Sim we run the following to "warm up" physics without simulating forward in time
-physics_sim_interface.attach_stage(stage_id)
+physics_sim_interface.initialize(stage_id)
 physics_sim_interface.simulate(1.0 / 60.0, 0.0)
 print("Fetch results")
 physics_sim_interface.fetch_results()

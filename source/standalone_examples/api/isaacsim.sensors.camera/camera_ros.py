@@ -22,12 +22,15 @@ from isaacsim import SimulationApp
 simulation_app = SimulationApp({"headless": True})
 
 import math
+import os
 
-import isaacsim.core.utils.numpy.rotations as rot_utils
 import numpy as np
+import omni.timeline
 import yaml
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.experimental.objects import Cube, DomeLight, GroundPlane
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim
+from isaacsim.core.experimental.utils.stage import get_current_stage
+from isaacsim.core.experimental.utils.transform import euler_angles_to_quaternion
 from isaacsim.sensors.camera import Camera
 from PIL import Image, ImageDraw
 
@@ -74,29 +77,31 @@ data = yaml.safe_load(yaml_data)
 print("Header Frame ID:", data["header"]["frame_id"])
 width, height, K, D = data["width"], data["height"], data["K"], data["D"]
 
-# Create a world, add a 1x1x1 meter cube, a ground plane, and a camera
-world = World(stage_units_in_meters=1.0)
-world.scene.add_default_ground_plane()
-world.reset()
+# Create ground plane and dome light
+dome_light = DomeLight("/World/DomeLight")
+dome_light.set_intensities(500)
+GroundPlane("/World/defaultGroundPlane", sizes=100.0)
 
-cube_1 = world.scene.add(
-    DynamicCuboid(
-        prim_path="/new_cube_1",
-        name="cube_1",
-        position=np.array([0, 0, 0.5]),
-        scale=np.array([1.0, 1.0, 1.0]),
-        size=1.0,
-        color=np.array([255, 0, 0]),
-    )
+cube_1 = Cube(
+    "/new_cube_1",
+    sizes=1.0,
+    positions=np.array([0, 0, 0.5]),
+    scales=np.array([1.0, 1.0, 1.0]),
 )
+GeomPrim("/new_cube_1", apply_collision_apis=True)
+RigidPrim("/new_cube_1")
 
 camera = Camera(
     prim_path="/World/camera",
     position=np.array([0.0, 0.0, 3.0]),  # 2 meter away from the side of the cube
     frequency=30,
     resolution=(width, height),
-    orientation=rot_utils.euler_angles_to_quats(np.array([0, 90, 0]), degrees=True),
+    orientation=euler_angles_to_quaternion(np.array([0, 90, 0]), degrees=True, extrinsic=False).numpy(),
 )
+# Start the timeline and initialize the camera
+timeline = omni.timeline.get_timeline_interface()
+timeline.play()
+timeline.commit()
 camera.initialize()
 
 # Calculate the focal length and aperture size from the camera matrix
@@ -123,7 +128,7 @@ camera.set_rational_polynomial_properties(width, height, cx, cy, diagonal_fov, D
 
 # Get the rendered frame and save it to a file
 for i in range(100):
-    world.step(render=True)
+    simulation_app.update()
 camera.get_current_frame()
 img = Image.fromarray(camera.get_rgba()[:, :, :3])
 
@@ -151,10 +156,13 @@ def draw_points_opencv(points3d):
 # Draw the 3D points to the image plane
 draw_points_opencv(points3d=np.array([[0.5, 0.5, 4.0], [-0.5, 0.5, 4.0], [0.5, -0.5, 4.0], [-0.5, -0.5, 4.0]]))
 
-print("Saving the rendered image to: camera_ros.png")
-img.save("camera_ros.png")
+image_path = os.path.join(os.getcwd(), "camera_ros.png")
+print(f"Saving the rendered image to: {image_path}")
+img.save(image_path)
 
-print("Saving the asset to camera_ros.usd")
-world.scene.stage.Export("camera_ros.usd")
+usd_path = os.path.join(os.getcwd(), "camera_ros.usd")
+print(f"Saving the asset to: {usd_path}")
+stage = get_current_stage()
+stage.Export(usd_path)
 
 simulation_app.close()

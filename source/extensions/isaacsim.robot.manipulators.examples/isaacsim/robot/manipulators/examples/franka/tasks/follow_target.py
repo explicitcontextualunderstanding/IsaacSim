@@ -25,14 +25,14 @@ class FollowTarget(tasks.FollowTarget):
     """Franka robot follow target task.
 
     Args:
-        name: Task name. Defaults to "franka_follow_target".
-        target_prim_path: USD path for target. Defaults to None.
-        target_name: Target name. Defaults to None.
-        target_position: Initial target position. Defaults to None.
-        target_orientation: Initial target orientation. Defaults to None.
-        offset: Task offset. Defaults to None.
-        franka_prim_path: USD path for Franka robot. Defaults to None.
-        franka_robot_name: Robot name. Defaults to None.
+        name: Task name.
+        target_prim_path: USD path for target.
+        target_name: Target name.
+        target_position: Initial target position.
+        target_orientation: Initial target orientation.
+        offset: Task offset.
+        franka_prim_path: USD path for Franka robot.
+        franka_robot_name: Robot name.
     """
 
     def __init__(
@@ -45,7 +45,7 @@ class FollowTarget(tasks.FollowTarget):
         offset: Optional[np.ndarray] = None,
         franka_prim_path: Optional[str] = None,
         franka_robot_name: Optional[str] = None,
-    ) -> None:
+    ):
         tasks.FollowTarget.__init__(
             self,
             name=name,

@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Defines UI styling constants and functions for the robot setup assembler extension."""
+
+
 import pathlib
 
 import carb.settings
@@ -47,7 +51,16 @@ TREEVIEW_HEADER_BG_COLOR = 0xFF2D2D2D
 WINDOW_BG_COLOR = 0xFF454545
 
 
-def get_style():
+def get_style() -> dict[str, dict[str, str | int]]:
+    """Returns the UI style dictionary for the robot setup assembler extension.
+
+    Provides styling configurations for various UI components including buttons, labels, images,
+    lines, and other visual elements used in the robot setup assembler interface.
+
+    Returns:
+        A dictionary mapping UI element selectors to their style properties such as colors,
+        font sizes, and image URLs.
+    """
     style = {
         "Button:disabled": {"background_color": BUTTON_DISABLED_BG_COLOR},
         "Button:hovered": {"background_color": BUTTON_DISABLED_BG_COLOR},

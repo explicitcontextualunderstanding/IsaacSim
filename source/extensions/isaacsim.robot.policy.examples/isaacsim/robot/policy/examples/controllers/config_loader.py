@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utilities for loading and parsing robot policy environment configuration files."""
+
+
 import fnmatch
 import io
 import sys
@@ -66,13 +70,10 @@ def get_robot_joint_properties(
         joint_names: Ordered list of joint names to extract properties for
 
     Returns:
-        A tuple containing ordered lists of joint properties:
-        - effort_limits: Maximum torque/force limits for each joint
-        - velocity_limits: Maximum velocity limits for each joint
-        - stiffness: Position control stiffness gains
-        - damping: Velocity control damping gains
-        - default_pos: Initial/default joint positions
-        - default_vel: Initial/default joint velocities
+        A tuple containing ordered lists of joint properties (effort_limits, velocity_limits, stiffness, damping,
+        default_pos, default_vel) where effort_limits are maximum torque/force limits, velocity_limits are maximum
+        velocity limits, stiffness are position control stiffness gains, damping are velocity control damping gains,
+        default_pos are initial/default joint positions, and default_vel are initial/default joint velocities.
     """
     actuator_data = data.get("scene").get("robot").get("actuators")
     stiffness = {}
@@ -243,10 +244,9 @@ def get_physics_properties(data: dict[str, Any]) -> tuple[int, float, int]:
         data: Environment configuration dictionary
 
     Returns:
-        A tuple containing:
-        - decimation: Policy update decimation factor
-        - dt: Physics simulation timestep in seconds
-        - render_interval: Number of physics steps between renders
+        A tuple containing (decimation, dt, render_interval) where decimation is the policy update decimation factor,
+        dt is the physics simulation timestep in seconds, and render_interval is the number of physics steps between
+        renders.
     """
     return data.get("decimation"), data.get("sim").get("dt"), data.get("sim").get("render_interval")
 

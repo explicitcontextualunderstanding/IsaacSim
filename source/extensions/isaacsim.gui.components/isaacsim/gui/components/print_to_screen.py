@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides utilities for displaying text on the viewport screen using OmniGraph visualization nodes."""
+
+
 import numpy as np
 import omni
 import omni.graph.core as og
@@ -23,11 +26,15 @@ class ScreenPrinter:
     """Print text to the viewport using the omni.graph.visualization.nodes.DrawScreenSpaceText node.
 
     Args:
-        screen_pos_x (float): X position of the text on the screen, given as a percent of screen width with 0 refering to the left hand side. (Default: 78)
-        screen_pos_y (float): Y position of the text on the screen, given as a percent of screen width with 0 refering to the top. (Default 95)
-        text_size (float): Size of text (Default 14.0)
-        max_width (float): Maximum width of text before wrapping around and continuing on a new line.  A value of 0 means there is no wraparound (Default 0)
-        color (np.array): Color of text, given in a (4x1) np.array of the form [r,g,b,luminocity].  All four values have a minimum of 0.0 and a maximum of 2.0. (Default [1,1,1,1])
+        screen_pos_x: X position of the text on the screen, given as a percent of screen width with 0 referring
+            to the left hand side.
+        screen_pos_y: Y position of the text on the screen, given as a percent of screen width with 0 referring
+            to the top.
+        text_size: Size of text.
+        max_width: Maximum width of text before wrapping around and continuing on a new line. A value of 0 means
+            there is no wraparound.
+        color: Color of text, given in a (4x1) np.array of the form [r,g,b,luminosity]. All four values have
+            a minimum of 0.0 and a maximum of 2.0.
     """
 
     def __init__(
@@ -37,7 +44,7 @@ class ScreenPrinter:
         text_size: float = 14.0,
         max_width: int = 0,
         color: np.array = np.ones(4),
-    ) -> None:
+    ):
         self._keys = og.Controller.Keys
         self._controller = og.Controller()
 
@@ -65,53 +72,57 @@ class ScreenPrinter:
 
         self._print_node = self.nodes[1]
 
-    def set_text(self, text: str) -> None:
-        """Set the text on the screen
+    def set_text(self, text: str):
+        """Set the text on the screen.
 
         Args:
-            text (str): Text to appear on the screen.
+            text: Text to appear on the screen.
         """
         self._controller.edit(self.graph, {self._keys.SET_VALUES: (("inputs:text", self._print_node), text)})
 
-    def set_text_position(self, screen_pos_x: float, screen_pos_y: float) -> None:
-        """Set the x,y position of the text on the screen
+    def set_text_position(self, screen_pos_x: float, screen_pos_y: float):
+        """Set the x,y position of the text on the screen.
 
         Args:
-            screen_pos_x (float): X position of the text on the screen, given as a percent of screen width with 0 refering to the left hand side.
-            screen_pos_y (float): Y position of the text on the screen, given as a percent of screen width with 0 refering to the top.
+            screen_pos_x: X position of the text on the screen, given as a percent of screen width with 0 refering to the
+                left hand side.
+            screen_pos_y: Y position of the text on the screen, given as a percent of screen width with 0 refering to the
+                top.
         """
         self._controller.edit(
             self.graph, {self._keys.SET_VALUES: (("inputs:position", self._print_node), [screen_pos_x, screen_pos_y])}
         )
 
-    def set_text_size(self, size: float) -> None:
+    def set_text_size(self, size: float):
         """Set the size of the text.
 
         Args:
-            size (float): Pixel height of a line of text
+            size: Pixel height of a line of text.
         """
         self._controller.edit(self.graph, {self._keys.SET_VALUES: (("inputs:size", self._print_node), size)})
 
-    def set_text_max_width(self, max_width: int) -> None:
-        """Set the maximum text width (in pixels) before wrap-around
+    def set_text_max_width(self, max_width: int):
+        """Set the maximum text width (in pixels) before wrap-around.
 
         Args:
-            max_width (int): Maximum width of text before wrapping around and continuing on a new line.  A value of 0 means there is no wrap-around
+            max_width: Maximum width of text before wrapping around and continuing on a new line. A value of 0 means
+                there is no wrap-around.
         """
         self._controller.edit(self.graph, {self._keys.SET_VALUES: (("inputs:boxWidth", self._print_node), max_width)})
 
-    def set_text_color(self, color4f: np.array) -> None:
-        """Set the color of the text
+    def set_text_color(self, color4f: np.array):
+        """Set the color of the text.
 
         Args:
-            color4f (np.array): Color of text, given in a (4x1) np.array of the form [r,g,b,luminocity].  All four values have a minimum of 0.0 and a maximum of 2.0.
+            color4f: Color of text, given in a (4x1) np.array of the form [r,g,b,luminocity]. All four values have a
+                minimum of 0.0 and a maximum of 2.0.
         """
         self._controller.edit(self.graph, {self._keys.SET_VALUES: (("inputs:textColor", self.nodes[1]), color4f)})
 
-    def clear_text(self) -> None:
+    def clear_text(self):
         """Clear the text from the screen."""
         self.set_text("")
 
-    def exit(self) -> None:
-        """Delete OmniGraph used by this ScreenPrinter.  After calling exit(), all subsequent function calls will fail."""
+    def exit(self):
+        """Delete OmniGraph used by this ScreenPrinter. After calling exit(), all subsequent function calls will fail."""
         DeletePrimsCommand([self._graph_path]).do()

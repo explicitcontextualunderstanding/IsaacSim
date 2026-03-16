@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides functionality for executing Python statements and expressions from strings with customizable namespaces."""
+
+
 import __future__
 
 import contextlib
@@ -29,18 +33,22 @@ class Executor:
     """Execute Python statements or expressions from strings
 
     Args:
-        globals (str): global namespace
-        locals (str): local namespace
+        globals: Global namespace.
+        locals: Local namespace.
     """
 
-    def __init__(self, globals: dict = {}, locals: dict = {}) -> None:
+    def __init__(self, globals: dict = {}, locals: dict = {}):
         self._globals = globals
         self._locals = locals
         self._compiler_flags = self._get_compiler_flags()
         self._coroutine_flag = self._get_coroutine_flag()
 
     def _get_compiler_flags(self) -> int:
-        """Get current Python version compiler flags"""
+        """Get current Python version compiler flags.
+
+        Returns:
+            The compiler flags for the current Python version.
+        """
         flags = 0
         for value in globals().values():
             try:
@@ -51,20 +59,24 @@ class Executor:
         return flags | PyCF_ALLOW_TOP_LEVEL_AWAIT
 
     def _get_coroutine_flag(self) -> int:
-        """Get current Python version coroutine flag"""
+        """Get current Python version coroutine flag.
+
+        Returns:
+            The coroutine flag for the current Python version, or -1 if not found.
+        """
         for k, v in dis.COMPILER_FLAG_NAMES.items():
             if v == "COROUTINE":
                 return k
         return -1
 
     async def execute(self, source: str) -> tuple[str, Exception, str]:
-        """Execute source in the Python scope
+        """Execute source in the Python scope.
 
         Args:
-            source (str): statement or expression
+            source: Statement or expression.
 
         Returns:
-            tuple[str, Exception, str]: standard output, exception thrown (or None if not thrown), exception trace
+            A tuple of (standard output, exception thrown (or None if not thrown), exception trace).
         """
         output = io.StringIO()
         try:

@@ -13,21 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test module for forklift robot articulation and movement functionality."""
+
+
 import carb
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 import omni.kit.test
+import omni.timeline
 import usdrt.Sdf
-from isaacsim.core.api import World
-from isaacsim.core.prims import SingleRigidPrim
-from isaacsim.core.utils.prims import delete_prim, get_prim_at_path
-from isaacsim.core.utils.stage import add_reference_to_stage, create_new_stage_async
+from isaacsim.core.experimental.prims import RigidPrim
+from isaacsim.core.experimental.utils.prim import get_prim_at_path
 from isaacsim.storage.native import get_assets_root_path_async
 
 
 class TestForkliftArticulations(omni.kit.test.AsyncTestCase):
+    """Tests for forklift robot articulation and movement."""
+
     # Before running each test
     async def setUp(self):
-        await create_new_stage_async()
+        """Set up test environment with forklift robot and action graph."""
+        await stage_utils.create_new_stage_async()
         self._timeline = omni.timeline.get_timeline_interface()
 
         self._assets_root_path = await get_assets_root_path_async()
@@ -36,21 +43,22 @@ class TestForkliftArticulations(omni.kit.test.AsyncTestCase):
             return
 
         self.usd_path = self._assets_root_path + "/Isaac/Robots/IsaacSim/ForkliftC/forklift_c.usd"
-        add_reference_to_stage(usd_path=self.usd_path, prim_path="/World/Forklift")
+        stage_utils.add_reference_to_stage(self.usd_path, "/World/Forklift")
         self.stage = omni.usd.get_context().get_stage()
 
         usd_path = self._assets_root_path + "/Isaac/Environments/Grid/default_environment.usd"
-        add_reference_to_stage(usd_path=usd_path, prim_path="/World/defaultGroundPlane")
+        stage_utils.add_reference_to_stage(usd_path, "/World/defaultGroundPlane")
 
         await omni.kit.app.get_app().next_update_async()
 
-        self.my_world = World(stage_units_in_meters=1.0)
-        await self.my_world.initialize_simulation_context_async()
+        # Set stage units
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        await app_utils.update_app_async()
 
         self.graph_path = "/ActionGraph"
 
         if get_prim_at_path(self.graph_path):
-            delete_prim(self.graph_path)
+            stage_utils.delete_prim(self.graph_path)
 
         keys = og.Controller.Keys
         og.Controller.edit(
@@ -109,27 +117,31 @@ class TestForkliftArticulations(omni.kit.test.AsyncTestCase):
 
     # After running each test
     async def tearDown(self):
-        self.my_world.stop()
+        """Clean up test environment and stop timeline."""
+        self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             await omni.kit.app.get_app().next_update_async()
         pass
 
     async def test_forklift_forward(self):
-        body_prim = SingleRigidPrim("/World/Forklift/body")
+        """Test forklift moves forward when positive wheel velocity is applied."""
+        body_prim = RigidPrim("/World/Forklift/body")
 
         og.Controller.attribute(self.graph_path + "/ArticulationController.inputs:velocityCommand").set([5.0, 5.0])
 
         # start the timeline
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        pos = body_prim.get_current_dynamic_state().position
+        positions, _ = body_prim.get_world_poses()
+        pos = positions.numpy()[0]
 
         # wait for 200 frames
         for _ in range(200):
             await omni.kit.app.get_app().next_update_async()
 
-        new_pos = body_prim.get_current_dynamic_state().position
+        new_positions, _ = body_prim.get_world_poses()
+        new_pos = new_positions.numpy()[0]
 
         # check if the forklift moved
         self.assertNotAlmostEqual(pos[0], new_pos[0], delta=1)
@@ -138,20 +150,23 @@ class TestForkliftArticulations(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(pos[2], new_pos[2], delta=1)
 
     async def test_forklift_reverse(self):
-        body_prim = SingleRigidPrim("/World/Forklift/body")
+        """Test forklift moves backward when negative wheel velocity is applied."""
+        body_prim = RigidPrim("/World/Forklift/body")
 
         og.Controller.attribute(self.graph_path + "/ArticulationController.inputs:velocityCommand").set([-5.0, -5.0])
 
         # start the timeline
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        pos = body_prim.get_current_dynamic_state().position
+        positions, _ = body_prim.get_world_poses()
+        pos = positions.numpy()[0]
 
         # wait for 200 frames
         for _ in range(200):
             await omni.kit.app.get_app().next_update_async()
 
-        new_pos = body_prim.get_current_dynamic_state().position
+        new_positions, _ = body_prim.get_world_poses()
+        new_pos = new_positions.numpy()[0]
 
         # check if the forklift moved
         self.assertNotAlmostEqual(pos[0], new_pos[0], delta=1)
@@ -160,21 +175,24 @@ class TestForkliftArticulations(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(pos[2], new_pos[2], delta=1)
 
     async def test_forklift_reverse_turn(self):
-        body_prim = SingleRigidPrim("/World/Forklift/body")
+        """Test forklift turns while reversing with steering angle applied."""
+        body_prim = RigidPrim("/World/Forklift/body")
 
         og.Controller.attribute(self.graph_path + "/ArticulationController.inputs:velocityCommand").set([-5.0, -5.0])
         og.Controller.attribute(self.graph_path + "/SteeringAngle.inputs:value").set(20.0)
 
         # start the timeline
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        pos = body_prim.get_current_dynamic_state().position
+        positions, _ = body_prim.get_world_poses()
+        pos = positions.numpy()[0]
 
         # wait for 200 frames
         for _ in range(200):
             await omni.kit.app.get_app().next_update_async()
 
-        new_pos = body_prim.get_current_dynamic_state().position
+        new_positions, _ = body_prim.get_world_poses()
+        new_pos = new_positions.numpy()[0]
 
         # check if the forklift moved
         self.assertNotAlmostEqual(pos[0], new_pos[0], delta=1)
@@ -182,20 +200,23 @@ class TestForkliftArticulations(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(pos[2], new_pos[2], delta=1)
 
     async def test_forklift_lift(self):
-        lift_prim = SingleRigidPrim("/World/Forklift/lift")
+        """Test forklift lift mechanism raises when position target is set."""
+        lift_prim = RigidPrim("/World/Forklift/lift")
 
         og.Controller.attribute(self.graph_path + "/LiftPosition.inputs:value").set(1.0)
 
         # start the timeline
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        pos = lift_prim.get_current_dynamic_state().position
+        positions, _ = lift_prim.get_world_poses()
+        pos = positions.numpy()[0]
 
         # wait for 60 frames
         for _ in range(60):
             await omni.kit.app.get_app().next_update_async()
 
-        new_pos = lift_prim.get_current_dynamic_state().position
+        new_positions, _ = lift_prim.get_world_poses()
+        new_pos = new_positions.numpy()[0]
 
         # check if the forklift moved
         self.assertAlmostEqual(pos[0], new_pos[0], delta=1)

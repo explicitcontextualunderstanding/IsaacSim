@@ -89,37 +89,35 @@ bool Ros2ServiceImpl::takeRequest(void* requestMsg)
         }
         m_waitSetInitialized = true;
     }
-    else
+
+    rcl_ret_t rc = rcl_wait_set_clear(&m_waitSet);
+    if (rc != RCL_RET_OK)
     {
-        rcl_ret_t rc = rcl_wait_set_clear(&m_waitSet);
+        RCL_ERROR_MSG(takeRequest, rcl_wait_set_clear);
+        return false;
+    }
+    rc = rcl_wait_set_add_service(&m_waitSet, m_service.get(), nullptr);
+    if (rc != RCL_RET_OK)
+    {
+        RCL_ERROR_MSG(takeRequest, rcl_wait_set_add_service);
+        return false;
+    }
+    rc = rcl_wait(&m_waitSet, 0);
+    // CARB_LOG_WARN_ONCE("Subscriber created, check topic name and message type if not active");
+    if (rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT)
+    {
+        RCL_WARN_MSG(takeRequest, rcl_wait);
+        return false;
+    }
+    if (m_waitSet.services[0])
+    {
+        rc = rcl_take_request(m_service.get(), &m_requestId, requestMsg);
         if (rc != RCL_RET_OK)
         {
-            RCL_ERROR_MSG(takeRequest, rcl_wait_set_clear);
+            RCL_ERROR_MSG(takeRequest, rcl_take_request);
             return false;
         }
-        rc = rcl_wait_set_add_service(&m_waitSet, m_service.get(), nullptr);
-        if (rc != RCL_RET_OK)
-        {
-            RCL_ERROR_MSG(takeRequest, rcl_wait_set_add_service);
-            return false;
-        }
-        rc = rcl_wait(&m_waitSet, 0);
-        // CARB_LOG_WARN_ONCE("Subscriber created, check topic name and message type if not active");
-        if (rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT)
-        {
-            RCL_WARN_MSG(takeRequest, rcl_wait);
-            return false;
-        }
-        if (m_waitSet.services[0])
-        {
-            rc = rcl_take_request(m_service.get(), &m_requestId, requestMsg);
-            if (rc != RCL_RET_OK)
-            {
-                RCL_ERROR_MSG(takeRequest, rcl_take_request);
-                return false;
-            }
-            return true;
-        }
+        return true;
     }
     return false;
 }

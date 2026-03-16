@@ -17,12 +17,104 @@
 This is the implementation of the OGN node defined in OgnDope.ogn
 """
 
+import json
+
 import numpy as np
 import omni.graph.core as og
 from isaacsim.core.utils.rotations import euler_angles_to_quat
 from isaacsim.core.utils.transformations import pose_from_tf_matrix, tf_matrix_from_pose
-from isaacsim.replicator.writers.scripts.utils import get_image_space_points, get_semantics
+from isaacsim.replicator.writers.scripts.utils import get_image_space_points
 from omni.syntheticdata.scripts.helpers import get_bbox_3d_corners
+
+
+def _get_semantics(
+    num_semantics,
+    num_semantic_tokens,
+    instance_semantic_map,
+    min_semantic_idx,
+    max_semantic_hierarchy_depth,
+    semantic_token_map,
+    required_semantic_types,
+):
+    """Process semantic data and return labels mapping.
+
+    Args:
+        num_semantics: Number of semantic entities.
+        num_semantic_tokens: Number of tokens per semantic entity.
+        instance_semantic_map: Mapping from instance to semantic index.
+        min_semantic_idx: Minimum semantic index offset.
+        max_semantic_hierarchy_depth: Maximum depth of semantic hierarchy.
+        semantic_token_map: List of semantic token strings.
+        required_semantic_types: List of semantic types to extract.
+
+    Returns:
+        Tuple of (serialized_index_to_labels, semantic_ids, valid_count, prim_paths).
+    """
+    instance_to_semantic = instance_semantic_map - min_semantic_idx
+
+    id_to_parents = {}
+    for i in range(0, len(instance_to_semantic), max_semantic_hierarchy_depth):
+        curr_semantic_id = instance_to_semantic[i]
+        id_to_parents[curr_semantic_id] = []
+        for j in range(1, max_semantic_hierarchy_depth):
+            parent_semantic_id = instance_to_semantic[i + j]
+            if parent_semantic_id != 65535:
+                id_to_parents[curr_semantic_id].append(parent_semantic_id)
+
+    index_to_labels = {}
+    valid_semantic_entity_count = 0
+    prim_paths = []
+
+    for i in range(num_semantics):
+        is_valid = True
+        if is_valid:
+            index_to_labels[valid_semantic_entity_count] = {}
+
+            self_labels = semantic_token_map[i * num_semantic_tokens : (i + 1) * num_semantic_tokens]
+            parent_labels = []
+
+            if i in id_to_parents.keys():
+                for parent_semantic_id in id_to_parents[i]:
+                    parent_labels.extend(
+                        semantic_token_map[
+                            parent_semantic_id * num_semantic_tokens : (parent_semantic_id + 1) * num_semantic_tokens
+                        ]
+                    )
+
+            all_labels = self_labels + parent_labels
+
+            prim_paths.append(all_labels[0])
+            for label_string in all_labels:
+                for label in label_string.split(" "):
+                    if ":" not in label:
+                        continue
+                    semantic_type, semantic_data = label.split(":")
+                    if semantic_type in required_semantic_types:
+                        index_to_labels[valid_semantic_entity_count].setdefault(semantic_type, set()).add(semantic_data)
+            valid_semantic_entity_count += 1
+
+    semantic_ids = []
+    labels_to_id = {}
+    id_to_labels = {}
+    id_count = 0
+
+    for index, labels in index_to_labels.items():
+        labels_str = str(labels)
+        if labels_str not in labels_to_id:
+            labels_to_id[labels_str] = id_count
+            id_to_labels[id_count] = {}
+
+            for label in labels:
+                id_to_labels[id_count] = {k: ",".join(sorted(v)) for k, v in labels.items()}
+
+            semantic_ids.append(id_count)
+            id_count += 1
+        else:
+            semantic_ids.append(labels_to_id[labels_str])
+
+    serialized_index_to_labels = json.dumps(id_to_labels)
+
+    return serialized_index_to_labels, semantic_ids, valid_semantic_entity_count, prim_paths
 
 
 class OgnDope:
@@ -76,7 +168,7 @@ class OgnDope:
 
         required_semantic_types = db.inputs.semanticTypes
 
-        serialized_index_to_labels, _, _, _ = get_semantics(
+        serialized_index_to_labels, _, _, _ = _get_semantics(
             num_semantics,
             num_semantic_tokens,
             instance_semantic_map,

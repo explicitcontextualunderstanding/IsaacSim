@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Visual Studio Code integration extension for Isaac Sim enabling real-time code execution and logging communication."""
+
+
 import asyncio
 import json
 import socket
@@ -27,7 +30,14 @@ from . import executor, ui_builder
 
 
 def _get_event_loop() -> asyncio.AbstractEventLoop:
-    """Backward compatible function for getting the event loop"""
+    """Backward compatible function for getting the event loop.
+
+    Provides a fallback mechanism to retrieve the current event loop when `asyncio.get_event_loop()` raises
+    a RuntimeError, using the event loop policy instead.
+
+    Returns:
+        The current event loop instance.
+    """
     try:
         return asyncio.get_event_loop()
     except RuntimeError:
@@ -35,7 +45,38 @@ def _get_event_loop() -> asyncio.AbstractEventLoop:
 
 
 class Extension(omni.ext.IExt):
+    """Extension for Visual Studio Code integration with Isaac Sim.
+
+    Provides real-time code execution capabilities and optional Carbonite logging integration for VS Code development
+    workflows. The extension creates socket-based communication channels that allow VS Code to execute Python code
+    directly within the Isaac Sim environment and optionally receive logging output.
+
+    Key features include:
+
+    - Socket server for receiving and executing Python code from VS Code
+    - Optional UDP-based Carbonite log broadcasting to VS Code
+    - UI window for connection status and configuration
+    - Asynchronous code execution with proper error handling and result transmission
+
+    The extension listens on a configurable host and port for incoming connections from VS Code extensions or
+    plugins. When code is received, it executes within Isaac Sim's Python environment and returns results,
+    including any output, errors, and tracebacks.
+
+    Configuration is managed through Carbonite settings:
+
+    - ``/exts/isaacsim.code_editor.vscode/host``: Host address for socket connections
+    - ``/exts/isaacsim.code_editor.vscode/port``: Port number for socket connections
+    - ``/exts/isaacsim.code_editor.vscode/carb_logs``: Enable Carbonite log broadcasting
+    """
+
     def on_startup(self, ext_id):
+        """Called when the extension is being activated.
+
+        Initializes the VS Code extension, sets up socket connections for code execution, and optionally configures carb logging broadcast.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self._globals = {**globals()}
 
         # get extension settings
@@ -72,6 +113,10 @@ class Extension(omni.ext.IExt):
         _get_event_loop().create_task(self._create_socket())
 
     def on_shutdown(self):
+        """Called when the extension is being deactivated.
+
+        Cleans up resources including the UI builder, socket server, UDP logging connections, and carb logging handlers.
+        """
         self._ui_builder.shutdown()
         # close socket
         if self._server is not None:
@@ -96,6 +141,15 @@ class Extension(omni.ext.IExt):
             self._udp_server_running = False
 
     def _carb_logging(self, source, level, filename, lineNumber, message):
+        """Handles carb log messages and broadcasts them to connected UDP clients.
+
+        Args:
+            source: The source of the log message.
+            level: The logging level.
+            filename: The source filename.
+            lineNumber: The line number in the source file.
+            message: The log message content.
+        """
         if level in self._logging_levels and self._udp_server and self._udp_clients:
             data = f"[{self._logging_levels[level]}][{source}] {message}".encode()
             for client in self._udp_clients:
@@ -104,7 +158,7 @@ class Extension(omni.ext.IExt):
                 except Exception as e:
                     carb.log_error(f"{e} len:{len(data)}")
 
-    def _create_udp_socket(self) -> None:
+    def _create_udp_socket(self):
         """Create an UDP socket for broadcasting carb logging"""
         self._udp_clients = []
         self._udp_server_running = True
@@ -136,7 +190,7 @@ class Extension(omni.ext.IExt):
             self._udp_clients = []
             self._udp_server_running = False
 
-    async def _create_socket(self) -> None:
+    async def _create_socket(self):
         """Create a socket server to listen for incoming connections"""
 
         class ServerProtocol(asyncio.Protocol):
@@ -167,8 +221,13 @@ class Extension(omni.ext.IExt):
             carb.log_error(str(e))
             self._server = None
 
-    async def _process_code(self, source: str, transport: asyncio.Transport) -> None:
-        """Execute the source code in the Kit Python scope and send the result back to the client"""
+    async def _process_code(self, source: str, transport: asyncio.Transport):
+        """Execute the source code in the Kit Python scope and send the result back to the client
+
+        Args:
+            source: The Python source code to execute.
+            transport: The asyncio transport for sending the response.
+        """
         _executor = executor.Executor(self._globals, self._globals)
         output, exception, trace = await _executor.execute(source)
         if output.endswith("\n"):

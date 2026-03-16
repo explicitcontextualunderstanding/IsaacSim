@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utilities for capturing image and annotator data from virtual cameras in Isaac Sim simulations."""
+
+
 import os
 from typing import Any
 

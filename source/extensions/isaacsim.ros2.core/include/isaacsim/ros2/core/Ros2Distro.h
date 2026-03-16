@@ -117,18 +117,17 @@ inline std::optional<Ros2Distro> stringToRos2Distro(const std::string& lowerDist
 } // namespace
 
 /**
- * @brief Checks if a ROS 2 distribution is supported
+ * @brief Checks if a ROS 2 distribution name is valid
  * @details
- * Determines whether a given ROS 2 distribution name is among
- * the supported distributions in the Isaac Sim ROS 2 core.
+ * Accepts any non-empty distribution name. This allows user-sourced
+ * ROS 2 workspaces of any distro to be used with the bridge.
  *
  * @param[in] distro The name of the ROS 2 distribution to check
- * @return bool True if the distribution is supported, false otherwise
+ * @return bool True if the distribution name is non-empty, false otherwise
  */
 inline bool isRos2DistroSupported(const std::string& distro)
 {
-    const std::string lowerDistro = toLower(distro);
-    return stringToRos2Distro(lowerDistro).has_value();
+    return !distro.empty();
 }
 
 } // namespace isaacsim::ros2::core

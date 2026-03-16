@@ -23,7 +23,7 @@ from pxr import Sdf, UsdUtils
 from ..nucleus import get_assets_root_path, get_assets_root_path_async
 
 
-def path_join(base, name):
+def path_join(base: str, name: str) -> str:
     """Join two path components intelligently handling Omniverse URLs.
 
     Args:
@@ -241,7 +241,7 @@ def get_stage_references(stage_path, resolve_relatives=True):
 
     Args:
         stage_path: Path to the USD stage.
-        resolve_relatives: If True, resolve all relative paths to absolute. Default is True.
+        resolve_relatives: If True, resolve all relative paths to absolute.
 
     Returns:
         List of path strings to referenced assets.
@@ -308,7 +308,7 @@ def is_absolute_path(path):
     return os.path.isabs(path)
 
 
-def is_valid_usd_file(item, excludes):
+def is_valid_usd_file(item: str, excludes: list) -> bool:
     """Check if a path is a USD file and doesn't contain excluded substrings.
 
     Valid USD file extensions are: .usd, .usda, .usdc, .usdz.
@@ -343,7 +343,7 @@ def is_valid_usd_file(item, excludes):
     return False
 
 
-def is_mdl_file(item):
+def is_mdl_file(item: str) -> bool:
     """Check if a path is an MDL file.
 
     Args:
@@ -402,7 +402,7 @@ async def find_absolute_paths_in_usds(base_path):
     return abs_items
 
 
-def is_path_external(path, base_path):
+def is_path_external(path: str, base_path: str) -> bool:
     """Check if a path is external to a base path.
 
     A path is considered external if it does not contain the base_path as a substring.
@@ -532,7 +532,7 @@ def find_missing_references(base_path):
             print(item, unresolved_paths)
 
 
-async def path_exists(path):
+async def path_exists(path: str) -> bool:
     """Check if a path exists.
 
     Uses the Omniverse client to check if the path exists on local
@@ -564,7 +564,7 @@ async def path_exists(path):
     return result == Result.OK
 
 
-def layer_has_missing_references(layer_identifier):
+def layer_has_missing_references(layer_identifier: str) -> bool:
     """Check if a layer has any missing references.
 
     Recursively checks the layer and all its external references to find
@@ -606,7 +606,7 @@ def layer_has_missing_references(layer_identifier):
     return False
 
 
-def prim_spec_has_missing_references(prim_spec):
+def prim_spec_has_missing_references(prim_spec) -> bool:
     """Check if a prim specification has any missing references.
 
     Checks all references in the prim specification's reference list and
@@ -646,7 +646,7 @@ def prim_spec_has_missing_references(prim_spec):
     return False
 
 
-def prim_has_missing_references(prim):
+def prim_has_missing_references(prim) -> bool:
     """Check if a prim has any missing references.
 
     Checks all prim specs in the prim's stack for missing references.
@@ -677,7 +677,7 @@ def prim_has_missing_references(prim):
     return False
 
 
-def path_relative(path, start):
+def path_relative(path: str, start: str) -> str:
     """URL friendly version of os.path.relpath.
 
     Handles both local filesystem paths and Omniverse URLs.
@@ -724,7 +724,7 @@ def path_relative(path, start):
         return os.path.relpath(os.path.normpath(path), os.path.normpath(start))
 
 
-def path_dirname(path):
+def path_dirname(path: str) -> str:
     """URL friendly version of os.path.dirname.
 
     Handles both local filesystem paths and Omniverse URLs.

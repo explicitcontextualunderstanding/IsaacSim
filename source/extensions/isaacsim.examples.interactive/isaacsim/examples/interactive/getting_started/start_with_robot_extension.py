@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive tutorial extension for getting started with robots in Isaac Sim, demonstrating manipulator and mobile robot operations."""
+
+
 import os
 
 import carb.eventdispatcher
@@ -28,7 +31,27 @@ from isaacsim.gui.components.ui_utils import btn_builder
 
 
 class GettingStartedRobotExtension(omni.ext.IExt):
+    """Extension that provides an interactive tutorial for getting started with robots in Isaac Sim.
+
+    This extension implements the "Part II: Robot" tutorial from the Getting Started documentation series.
+    It creates a UI that guides users through adding manipulators and mobile robots to a scene, controlling
+    them, and monitoring their states. The tutorial covers working with Franka Panda manipulators and
+    Nova Carter mobile robots, demonstrating basic robot operations like positioning, movement, and state
+    querying.
+
+    The extension registers itself with the examples browser under the "Tutorials" category and provides
+    a comprehensive interactive learning experience for robot fundamentals in Isaac Sim.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initialize the Getting Started Robot extension.
+
+        Sets up the UI components, creates the sample instance, and registers the example
+        with the examples browser.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self.example_name = "Part II: Robot"
         self.category = "Tutorials"
 
@@ -51,20 +74,38 @@ class GettingStartedRobotExtension(omni.ext.IExt):
         )
 
     def on_shutdown(self):
+        """Clean up and shutdown the Getting Started Robot extension.
+
+        Performs UI cleanup and deregisters the example from the examples browser.
+        """
         self.ui_handle.on_shutdown()
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
 
 
 class GettingStartedRobotUI(BaseSampleUITemplate):
+    """UI interface for the Getting Started with a Robot tutorial.
+
+    Provides an interactive UI that guides users through adding and controlling robots in Isaac Sim.
+    Users can add a Franka Panda manipulator and a Nova Carter mobile robot to the scene,
+    control their movements, and print joint states. The interface includes buttons for adding
+    robots, moving them, and monitoring their states with timeline event handling.
+
+    The UI automatically manages button states based on timeline events, disabling movement
+    controls when the timeline is stopped and enabling them during playback. It also handles
+    robot initialization and provides feedback through button text updates.
+
+    Args:
+        *args: Variable length argument list passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._timeline = omni.timeline.get_timeline_interface()
         self._event_timer_callback = None
 
     def build_ui(self):
-        """
-        overwriting the build_ui function to add timeline callbacks that only registeres when the tutorial is clicked on and UI is built
-        """
+        """Overwriting the build_ui function to add timeline callbacks that only registers when the tutorial is clicked on and UI is built."""
         self.arm_handle = None
         self.car_handle = None
         self._timeline = omni.timeline.get_timeline_interface()
@@ -81,6 +122,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
         super().build_ui()
 
     def build_extra_frames(self):
+        """Builds the extra frames section containing the Getting Started with a Robot collapsible frame."""
         extra_stacks = self.get_extra_frames_handle()
         self.task_ui_elements = {}
         with extra_stacks:
@@ -97,6 +139,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
                 self.build_getting_started_ui()
 
     def build_getting_started_ui(self):
+        """Builds the UI elements for the Getting Started with a Robot tutorial including buttons for adding and controlling arm and vehicle robots."""
         with ui.VStack(spacing=5):
 
             dict = {
@@ -150,6 +193,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
             self.task_ui_elements["Print Joint State"].enabled = False
 
     def _add_arm(self):
+        """Adds a Franka Panda manipulator to the scene at the specified position and creates an articulation handle for it."""
 
         import carb
         from isaacsim.core.experimental.prims import Articulation, XformPrim
@@ -184,6 +228,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
             self.task_ui_elements["Add Arm"].enabled = False
 
     def _add_vehicle(self):
+        """Adds a Nova Carter mobile robot to the scene and creates an articulation handle for it."""
         import carb
         from isaacsim.core.experimental.prims import Articulation, XformPrim
         from isaacsim.core.experimental.utils import stage as stage_utils
@@ -213,6 +258,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
             self.task_ui_elements["Add Vehicle"].enabled = False
 
     def _move_arm(self):
+        """Toggles the arm between a moved position and reset position by setting DOF positions."""
         if self.task_ui_elements["Move Arm"].text.upper() == "MOVE ARM":
             # move the arm
             self.arm_handle.set_dof_positions([[-1.5, 0.0, 0.0, -1.5, 0.0, 1.5, 0.5, 0.04, 0.04]])
@@ -229,6 +275,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
             pass
 
     def _move_vehicle(self):
+        """Toggles the vehicle between moving and stopped states by setting DOF velocities."""
 
         if self.task_ui_elements["Move Vehicle"].text.upper() == "MOVE VEHICLE":
             # move the vehicle
@@ -246,6 +293,7 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
             pass
 
     def _print_state(self):
+        """Toggles the robot joint state printing functionality and updates the button text accordingly."""
         self.sample.print_state = not self.sample.print_state  # toggle print state
         if self.sample.print_state:
             self.task_ui_elements["Print Joint State"].text = "STOP PRINTING"
@@ -253,7 +301,11 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
             self.task_ui_elements["Print Joint State"].text = "PRINT JOINT STATE"
 
     def _timeline_stop_callback_fn(self, event):
-        """Timeline stop event callback - reset buttons when pressed STOP."""
+        """Timeline stop event callback - reset buttons when pressed STOP.
+
+        Args:
+            event: The timeline stop event.
+        """
         if self.car_handle is not None:
             self.task_ui_elements["Move Vehicle"].enabled = False
             self.task_ui_elements["Move Vehicle"].text = "PRESS PLAY"
@@ -265,7 +317,11 @@ class GettingStartedRobotUI(BaseSampleUITemplate):
         self.task_ui_elements["Print Joint State"].text = "PRESS PLAY"
 
     def _timeline_play_callback_fn(self, event):
-        """Timeline play event callback - enable buttons when pressed PLAY."""
+        """Timeline play event callback - enable buttons when pressed PLAY.
+
+        Args:
+            event: The timeline play event.
+        """
         if self.car_handle is not None:
             self.task_ui_elements["Move Vehicle"].enabled = True
             self.task_ui_elements["Move Vehicle"].text = "MOVE VEHICLE"

@@ -47,18 +47,18 @@
 [[dependency]]
 python = "../_build/target-deps/python"
 packages = [
-    "llvmlite==0.42.0",             # SWIPAT filed under: https://nvbugs/3433740 # Used by: (dependency of numba)
-    "nest_asyncio==1.5.6",          # SWIPAT filed under: https://nvbugs/3433748 # Used by: isaacsim.ros2.sim_control, isaacsim.simulation_app
-    "matplotlib==3.10.3",           # SWIPAT filed under: https://nvbugs/3430500 # Used by: isaacsim.sensors.rtx
-    "contourpy==1.3.1",             # SWIPAT filed under: https://nvbugs/5303073 # Used by: (dependency of matplotlib)
-    "fonttools==4.55.3",            # SWIPAT filed under: https://nvbugs/5303095 # Used by: (dependency of matplotlib)
-    "pyparsing==3.0.9",             # SWIPAT filed under: https://nvbugs/3433756 # Used by: (dependency of matplotlib)
-    "cycler==0.11.0",               # SWIPAT filed under: https://nvbugs/3433763 # Used by: (dependency of matplotlib)
-    "kiwisolver==1.4.5",            # SWIPAT filed under: https://nvbugs/3433770 # Used by: (dependency of matplotlib)
-    "packaging==23.0",              # SWIPAT filed under: https://nvbugs/3433815 # Used by: isaacsim.asset.exporter.urdf, isaacsim.ros2.bridge, isaacsim.ros2.core
-    "osqp==0.6.7.post3",            # SWIPAT filed under: https://nvbugs/3577752 # Used by: isaacsim.robot.wheeled_robots
+    "llvmlite==0.46.0",             # SWIPAT filed under: https://nvbugs/3433740 # Used by: (dependency of numba)
+    "nest_asyncio==1.6.0",          # SWIPAT filed under: https://nvbugs/3433748 # Used by: isaacsim.ros2.sim_control, isaacsim.simulation_app
+    "matplotlib==3.10.8",           # SWIPAT filed under: https://nvbugs/3430500 # Used by: isaacsim.sensors.rtx
+    "contourpy==1.3.3",             # SWIPAT filed under: https://nvbugs/5303073 # Used by: (dependency of matplotlib)
+    "fonttools==4.61.1",            # SWIPAT filed under: https://nvbugs/5303095 # Used by: (dependency of matplotlib)
+    "pyparsing==3.3.2",             # SWIPAT filed under: https://nvbugs/3433756 # Used by: (dependency of matplotlib)
+    "cycler==0.12.1",               # SWIPAT filed under: https://nvbugs/3433763 # Used by: (dependency of matplotlib)
+    "kiwisolver==1.4.9",            # SWIPAT filed under: https://nvbugs/3433770 # Used by: (dependency of matplotlib)
+    "packaging==26.0",              # SWIPAT filed under: https://nvbugs/3433815 # Used by: isaacsim.asset.exporter.urdf, isaacsim.ros2.core, isaacsim.ucx.core
+    "osqp==1.0.5",                  # SWIPAT filed under: https://nvbugs/3577752 # Used by: isaacsim.robot.wheeled_robots
     "qdldl==0.1.7.post5",           # SWIPAT filed under: https://nvbugs/3577749 # Used by: (dependency of osqp)
-    "pyperclip==1.8.0",             # SWIPAT filed under: https://nvbugs/5326856 # Used by: isaacsim.app.about, isaacsim.asset.importer.urdf, isaacsim.gui.components, isaacsim.robot_setup.gain_tuner
+    "pyperclip==1.11.0",            # SWIPAT filed under: https://nvbugs/5326856 # Used by: isaacsim.app.about, isaacsim.asset.importer.urdf.ui, isaacsim.gui.components, isaacsim.robot_setup.gain_tuner
     "python-dateutil==2.9.0.post0", # SWIPAT filed under: https://nvbugs/5303032 # Used by: (dependency of aiobotocore, botocore, matplotlib)
     "six==1.17.0",                  # SWIPAT filed under: https://nvbugs/5303087 # Used by: (dependency of azure-core, azure-identity, isodate, python-dateutil)
 ]
