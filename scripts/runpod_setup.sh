@@ -22,12 +22,20 @@ apt-get install -y \
     build-essential \
     python3 \
     python3-pip \
+    python3-requests \
     docker.io || true
 
 # Install Git LFS (needed for Isaac Sim repo)
 echo "Installing Git LFS..."
 apt-get install -y git-lfs
 git lfs install
+
+# Install GCC 11 (Strict requirement for Isaac Sim 6.0-dev)
+echo "Setting up GCC 11..."
+apt-get install -y gcc-11 g++-11
+update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110
+update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 110
+echo "✅ GCC 11 configured as default"
 
 # Verify NVIDIA driver
 echo "Checking NVIDIA driver..."
@@ -45,16 +53,14 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
-echo "1. Clone the Isaac Sim repo:"
+echo "1. Clone the Isaac Sim repo (if not already present):"
 echo "   git clone https://github.com/${GH_ORG:-explicitcontextualunderstanding}/IsaacSim.git"
 echo "   cd IsaacSim"
 echo ""
-echo "2. Set GitHub authentication:"
-echo "   export GH_USER=your-username"
-echo "   export GH_PAT=your-github-token"
-echo ""
-echo "3. Run the Kaniko build:"
-echo "   ./scripts/run_kaniko_build.sh --push"
-echo ""
-echo "Or use the automated script:"
+echo "2. Run the automated build orchestrator:"
+echo "   export RUNPOD_API_KEY='your-key'"
+echo "   export NETWORK_VOLUME_ID='vol-xxx'"
 echo "   python3 scripts/automated_build.py"
+echo ""
+echo "Or run the validation gate manually:"
+echo "   ./scripts/validate_container.sh"
