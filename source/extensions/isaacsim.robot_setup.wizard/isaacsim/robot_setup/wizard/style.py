@@ -12,7 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides UI styling and color definitions for the robot setup wizard interface components."""
+
+
 import pathlib
+from typing import Any
 
 import omni.kit.app
 import omni.ui as ui
@@ -48,7 +53,13 @@ TREEVIEW_HEADER_BG_COLOR = 0xFF2D2D2D
 WINDOW_BG_COLOR = 0xFF454545
 
 
-def get_style():
+def get_style() -> dict[str, dict[str, Any]]:
+    """Main UI style configuration for the robot setup wizard.
+
+    Returns:
+        A comprehensive dictionary of UI style settings for all wizard components including buttons, labels, frames,
+        trees, and other interface elements.
+    """
     style = {
         "Button": {"stack_direction": ui.Direction.LEFT_TO_RIGHT},
         "Button:disabled": {"background_color": BUTTON_DISABLED_BG_COLOR},
@@ -260,7 +271,12 @@ def get_style():
     return style
 
 
-def get_popup_window_style():
+def get_popup_window_style() -> dict[str, dict[str, Any]]:
+    """UI style configuration for popup window components.
+
+    Returns:
+        A dictionary of UI style settings for buttons, fields, labels, and other UI elements in popup windows.
+    """
     style = {
         "Button": {"background_color": BUTTON_BG_COLOR},
         "Button:disabled": {"background_color": BUTTON_DISABLED_BG_COLOR},
@@ -329,7 +345,12 @@ def get_popup_window_style():
     return style
 
 
-def get_progress_none_style():
+def get_progress_none_style() -> dict[str, dict[str, Any]]:
+    """UI style configuration for default progress step display.
+
+    Returns:
+        A dictionary of UI style settings for displaying a progress step in its default state with standard gray colors.
+    """
     style = {
         "Label::step_name": {
             "color": LABEL_COLOR,
@@ -342,7 +363,12 @@ def get_progress_none_style():
     return style
 
 
-def get_progress_complete_style():
+def get_progress_complete_style() -> dict[str, dict[str, Any]]:
+    """UI style configuration for completed progress step display.
+
+    Returns:
+        A dictionary of UI style settings for displaying a completed progress step with green colors.
+    """
     style = {
         "Circle::step_index": {"background_color": STEP_GREEN_COLOR},
         "Label::step_name": {
@@ -356,7 +382,12 @@ def get_progress_complete_style():
     return style
 
 
-def get_progress_edit_style():
+def get_progress_edit_style() -> dict[str, dict[str, Any]]:
+    """UI style configuration for editable progress step display.
+
+    Returns:
+        A dictionary of UI style settings for displaying an editable progress step with blue colors.
+    """
     style = {
         "Circle::step_index": {"background_color": STEP_BLUE_COLOR},
         "Label::step_name": {
@@ -370,7 +401,12 @@ def get_progress_edit_style():
     return style
 
 
-def get_progress_active_style():
+def get_progress_active_style() -> dict[str, dict[str, Any]]:
+    """UI style configuration for active progress step display.
+
+    Returns:
+        A dictionary of UI style settings for displaying an active progress step with blue colors and border highlighting.
+    """
     style = {
         "Circle::step_index": {
             "background_color": STEP_BLUE_COLOR,
@@ -388,7 +424,12 @@ def get_progress_active_style():
     return style
 
 
-def get_asset_picker_style():
+def get_asset_picker_style() -> dict[str, dict[str, Any]]:
+    """UI style configuration for asset picker components.
+
+    Returns:
+        A dictionary of UI style settings for buttons and labels in the asset picker interface.
+    """
     style = {
         "Button": {"background_color": BUTTON_BG_COLOR},
         "Button.Label:disabled": {"color": LABEL_DISABLED_COLOR},

@@ -14,15 +14,13 @@
 # limitations under the License.
 
 import asyncio
-import random
 from enum import Enum
 
 import carb
 import carb.events
-import carb.settings
+import numpy as np
 import omni.kit.app
 import omni.kit.window.property
-import omni.physx
 import omni.usd
 from isaacsim.replicator.behavior.global_variables import EXPOSED_ATTR_NS, EXTENSION_NAME, SCOPE_NAME
 from isaacsim.replicator.behavior.utils.behavior_utils import (
@@ -49,7 +47,7 @@ from isaacsim.replicator.behavior.utils.scene_utils import (
     set_transform_attributes,
 )
 from isaacsim.storage.native import get_assets_root_path_async
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, PhysicsSchemaTools, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade, UsdUtils
 
 
@@ -146,10 +144,17 @@ class VolumeStackRandomizer(BehaviorScript):
                 "NOTE: If multiple simulation behaviors are running concurently, this should be managed externally."
             ),
         },
+        {
+            "attr_name": "seed",
+            "attr_type": Sdf.ValueTypeNames.Int,
+            "default_value": -1,
+            "doc": "Random seed for reproducible randomization. Use -1 for non-deterministic behavior.",
+        },
     ]
 
     def on_init(self):
         """Called when the script is assigned to a prim."""
+        self._rng = None
         self._state = BehaviorState.INIT
         self._event_name_out = self.EVENT_NAME_OUT
         self._drop_height = 2.0
@@ -183,7 +188,6 @@ class VolumeStackRandomizer(BehaviorScript):
     def on_destroy(self):
         """Called when the script is unassigned from a prim."""
         # Unsubscribe from the event stream
-        self._event_sub.reset()
         self._event_sub = None
 
         asyncio.ensure_future(self._reset_async())
@@ -235,6 +239,11 @@ class VolumeStackRandomizer(BehaviorScript):
         self._render_simulation = self._get_exposed_variable("renderSimulation")
         self._remove_rigid_body_dynamics = self._get_exposed_variable("removeRigidBodyDynamics")
         self._preserve_simulation_state = self._get_exposed_variable("preserveSimulationState")
+        seed = self._get_exposed_variable("seed")
+
+        # Initialize the random number generator (use seed if valid, otherwise non-deterministic)
+        if self._rng is None:
+            self._rng = np.random.default_rng(seed if seed >= 0 else None)
 
         # Set the simulation delta time
         self._physx_dt = 1 / self.stage.GetTimeCodesPerSecond()
@@ -292,6 +301,7 @@ class VolumeStackRandomizer(BehaviorScript):
                 remove_empty_scopes(scope_root_prim, self.stage)
         self._valid_prims.clear()
         self._reset_requested = False
+        self._rng = None
 
         # Update the current behavior state and publish the new value
         self._set_state_and_publish(BehaviorState.RESET)
@@ -362,8 +372,8 @@ class VolumeStackRandomizer(BehaviorScript):
         for prim in self._valid_prims:
             # Get the random list of assets to spawn
             assets = []
-            rand_num = random.randint(num_assets_range[0], num_assets_range[1])
-            rand_assets_urls = random.choices(assets_urls, k=rand_num)
+            rand_num = self._rng.integers(num_assets_range[0], num_assets_range[1] + 1)
+            rand_assets_urls = self._rng.choice(assets_urls, size=rand_num).tolist()
 
             # Add the assets to a common root outside of the prim hierarchy to avoid inheriting any parent scaling
             assets_root_path = omni.usd.get_stage_next_free_path(
@@ -473,16 +483,17 @@ class VolumeStackRandomizer(BehaviorScript):
 
             # Generate a random location for the asset within the adjusted drop area, ensuring no overlap with the walls
             random_location = drop_area_center + Gf.Vec3d(
-                random.uniform(-drop_area_size, drop_area_size),
-                random.uniform(-drop_area_size, drop_area_size),
+                self._rng.uniform(-drop_area_size, drop_area_size),
+                self._rng.uniform(-drop_area_size, drop_area_size),
                 0,  # No vertical offset in randomization
             )
 
             # Generate a random orientation with 90-degree steps around the x, y, and z axes
+            rotation_choices = [180, 90, 0, -90, -180]
             random_rotation = (
-                Gf.Rotation(Gf.Vec3d.XAxis(), random.choice([180, 90, 0, -90, -180]))
-                * Gf.Rotation(Gf.Vec3d.YAxis(), random.choice([180, 90, 0, -90, -180]))
-                * Gf.Rotation(Gf.Vec3d.ZAxis(), random.choice([180, 90, 0, -90, -180]))
+                Gf.Rotation(Gf.Vec3d.XAxis(), float(self._rng.choice(rotation_choices)))
+                * Gf.Rotation(Gf.Vec3d.YAxis(), float(self._rng.choice(rotation_choices)))
+                * Gf.Rotation(Gf.Vec3d.ZAxis(), float(self._rng.choice(rotation_choices)))
             )
 
             # Calculate the spawn location and rotation relative to the prim's world transform
@@ -647,3 +658,11 @@ class VolumeStackRandomizer(BehaviorScript):
     def _get_exposed_variable(self, attr_name):
         full_attr_name = f"{EXPOSED_ATTR_NS}:{self.BEHAVIOR_NS}:{attr_name}"
         return get_exposed_variable(self.prim, full_attr_name)
+
+    def set_rng(self, rng: np.random.Generator | None = None):
+        """Set the random number generator, overriding the USD seed attribute.
+
+        Args:
+            rng: Numpy random generator. If None, creates a new default generator.
+        """
+        self._rng = rng if rng is not None else np.random.default_rng()

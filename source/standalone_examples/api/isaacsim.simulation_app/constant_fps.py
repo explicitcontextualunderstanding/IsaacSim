@@ -59,4 +59,6 @@ while simulation_app.is_running():
     instantaneous_fps = 1.0 / max(frame_period_s, app_update_time_s)
     carb.log_warn(f"FPS is {instantaneous_fps}")
 
+update_sub = None
+
 simulation_app.close()

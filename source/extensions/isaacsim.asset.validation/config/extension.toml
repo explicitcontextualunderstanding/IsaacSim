@@ -1,5 +1,5 @@
 [package]
-version = "1.1.0"
+version = "1.2.1"
 category = "SyntheticData"
 title = "Isaac Sim Asset Validation Rules"
 description = "The extension provides various custom rules to validate content for Isaac Sim."
@@ -14,7 +14,9 @@ writeTarget.platform = true # Build separate extensions for Windows and Linux so
 "isaacsim.robot.schema" = {}
 "omni.asset_validator.core" = {}
 "omni.hydra.usdrt_delegate" = {}
-"omni.physx"={}
+"omni.physics" = {}
+"omni.physics.physx" = {}
+"omni.physx" = {}
 "omni.usd" = {}
 "omni.usd.schema.physx" = {}
 

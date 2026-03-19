@@ -48,7 +48,7 @@ class TestSDGCosmosWriter(omni.kit.test.AsyncTestCase):
             "cube": [255, 0, 0, 255],
             "sphere": [0, 255, 0, 255],
         }
-        NUM_FRAMES = 30
+        NUM_FRAMES = 30  # 60
 
         async def run_cosmos_example_async(num_frames, segmentation_mapping=None):
             # Create a new stage
@@ -85,8 +85,10 @@ class TestSDGCosmosWriter(omni.kit.test.AsyncTestCase):
             rp = rep.create.render_product(camera, (1280, 720))
             out_dir = os.path.join(os.getcwd(), "_out_cosmos_simple")
             print(f"Output directory: {out_dir}")
+            backend = rep.backends.get("DiskBackend")
+            backend.initialize(output_dir=out_dir)
             cosmos_writer = rep.WriterRegistry.get("CosmosWriter")
-            cosmos_writer.initialize(output_dir=out_dir, segmentation_mapping=segmentation_mapping)
+            cosmos_writer.initialize(backend=backend, segmentation_mapping=segmentation_mapping)
             cosmos_writer.attach(rp)
 
             # Start the simulation
@@ -170,7 +172,9 @@ class TestSDGCosmosWriter(omni.kit.test.AsyncTestCase):
 
                 if current_time <= prev_time:
                     print(f"Warning: Timeline did not advance at update {step_count} (time: {current_time:.4f}s).")
-            print(f"Finished advancing timeline to {timeline.get_end_time():.4f}s in {step_count} steps")
+            print(
+                f"Finished advancing timeline to {current_time:.4f}s (target {target_time:.4f}s) in {step_count} steps"
+            )
 
         async def run_sdg_pipeline_async(
             camera_path,

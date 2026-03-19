@@ -13,15 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains trigger functions for controlling when domain randomization occurs in Isaac Sim."""
+
+
 from omni.replicator.core.utils import ReplicatorItem, ReplicatorWrapper, create_node
 
 
 @ReplicatorWrapper
-def on_interval(interval):
-    """
+def on_interval(interval) -> ReplicatorItem:
+    """Create a trigger node for domain randomization that activates at specified intervals.
+
+    This function sets up a filtering node that triggers randomization at regular intervals
+    based on frame counts, enabling periodic domain randomization during simulation.
+
     Args:
-        interval (int): The frequency interval for randomization. The interval is incremented
-                        by isaacsim.replicator.domain_randomization.physics_view.step_randomization() call.
+        interval: The frequency interval for randomization. The interval is incremented
+            by isaacsim.replicator.domain_randomization.physics_view.step_randomization() call.
+
+    Returns:
+        The created interval filtering node configured for interval-based triggering.
     """
     node = create_node("isaacsim.replicator.domain_randomization.OgnIntervalFiltering")
     trigger_node = ReplicatorItem._get_context()
@@ -34,7 +44,16 @@ def on_interval(interval):
 
 
 @ReplicatorWrapper
-def on_env_reset():
+def on_env_reset() -> ReplicatorItem:
+    """Create a trigger node for domain randomization that activates on environment reset.
+
+    This function sets up a filtering node that ignores interval-based triggering and instead
+    responds to environment reset signals, enabling randomization to occur when environments
+    are reset rather than at regular intervals.
+
+    Returns:
+        The created interval filtering node configured for environment reset triggering.
+    """
     node = create_node("isaacsim.replicator.domain_randomization.OgnIntervalFiltering")
     trigger_node = ReplicatorItem._get_context()
 

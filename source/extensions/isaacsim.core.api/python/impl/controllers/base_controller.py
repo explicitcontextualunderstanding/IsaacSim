@@ -18,10 +18,10 @@ from isaacsim.core.utils.types import ArticulationAction
 
 
 class BaseController(ABC):
-    """[summary]
+    """Abstract base class for robot controllers.
 
     Args:
-        name (str): [description]
+        name: Name identifier for the controller.
     """
 
     def __init__(self, name: str) -> None:
@@ -33,13 +33,13 @@ class BaseController(ABC):
            ArticulationController.
 
         Args:
-            observations (dict): [description]
+            observations (dict): Dictionary containing controller-specific observations.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
-            ArticulationAction: [description]
+            ArticulationAction: Action containing joint positions, velocities, or efforts to apply.
         """
         raise NotImplementedError
 

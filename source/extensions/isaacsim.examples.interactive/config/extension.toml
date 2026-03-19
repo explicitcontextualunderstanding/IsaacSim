@@ -1,36 +1,37 @@
 [package]
-version = "4.7.4"
+version = "4.15.1"
 category = "Simulation"
 title = "Isaac Sim Samples"
-description = "Sample extensions for Isaac Sim"
+description = "Provides interactive sample extensions demonstrating Isaac Sim features including robot manipulation, path planning, gamepad control, bin filling, and Cortex behavior framework usage."
 keywords = ["isaac", "samples", "manipulation"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
 "isaacsim.core.api" = {}
+"isaacsim.core.experimental.utils" = {}
 "isaacsim.core.prims" = {}
 "isaacsim.cortex.behaviors" = {}
 "isaacsim.cortex.framework" = {}
+"isaacsim.examples.base" = {}
 "isaacsim.examples.browser" = {}
 "isaacsim.examples.extension" = {}
 "isaacsim.gui.components" = {}
+"isaacsim.robot.experimental.wheeled_robots" = {}
 "isaacsim.robot.manipulators" = {}
 "isaacsim.robot.manipulators.examples" = {}
-"isaacsim.robot.policy.examples" = {}
 "isaacsim.robot.wheeled_robots" = {}
 "isaacsim.robot_motion.motion_generation" = {}
 "isaacsim.storage.native" = {}
 "omni.graph.action" = {}
 "omni.graph.core" = {}
 "omni.graph.nodes" = {}
-"omni.isaac.dynamic_control" = {}
 "omni.kit.uiapp" = {}
-"omni.physx" = {}
-"isaacsim.core.experimental.utils" = {}
+"omni.physics" = {}
+"omni.physics.physx" = {}
 
 [[python.module]]
 name = "isaacsim.examples.interactive.tests"
@@ -45,16 +46,13 @@ name = "isaacsim.examples.interactive.omnigraph_keyboard"
 name = "isaacsim.examples.interactive.follow_target"
 
 [[python.module]]
-name = "isaacsim.examples.interactive.ur_follow_target"
-
-[[python.module]]
 name = "isaacsim.examples.interactive.path_planning"
 
 [[python.module]]
-name = "isaacsim.examples.interactive.simple_stack"
+name = "isaacsim.examples.interactive.bin_filling"
 
 [[python.module]]
-name = "isaacsim.examples.interactive.bin_filling"
+name = "isaacsim.examples.interactive.franka_cortex"
 
 [[python.module]]
 name = "isaacsim.examples.interactive.robo_factory"
@@ -72,34 +70,35 @@ name = "isaacsim.examples.interactive.replay_follow_target"
 name = "isaacsim.examples.interactive.surface_gripper"
 
 [[python.module]]
-name = "isaacsim.examples.interactive.quadruped"
+name = "isaacsim.examples.interactive.ur10_palletizing"
 
 [[python.module]]
 name = "isaacsim.examples.interactive.user_examples"
 
 [[python.module]]
-name = "isaacsim.examples.interactive.ur10_palletizing"
-
-[[python.module]]
-name = "isaacsim.examples.interactive.franka_cortex"
-
-[[python.module]]
-name = "isaacsim.examples.interactive.humanoid"
-
-[[python.module]]
 name = "isaacsim.examples.interactive.getting_started"
 
-[[python.module]]
-name = "isaacsim.examples.interactive.franka"
-
-[[python.module]]
-name = "isaacsim.examples.interactive.pick_place"
+[[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+stdoutFailPatterns.exclude = [    
+    '*The NumPy module was reloaded*',
+]
 
 [[test]]
 timeout = 900
-
+dependencies = [
+    "isaacsim.test.utils",
+    "omni.isaac.ml_archive"
+]
 stdoutFailPatterns.exclude = [
     '*[Error] [carb] [Plugin: omni.sensors.nv.lidar.ext.plugin] Dependency: [omni::sensors::lidar::IGenericModelOutputIOFactory v0.1] failed to be resolved.*', # feature not included in Windows
+    '*The NumPy module was reloaded*',
 ]
 
 args = [
@@ -110,7 +109,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -126,6 +125,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -150,8 +150,5 @@ args = [
     "--/app/window/scaleToMonitor=false",
 ]
 
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

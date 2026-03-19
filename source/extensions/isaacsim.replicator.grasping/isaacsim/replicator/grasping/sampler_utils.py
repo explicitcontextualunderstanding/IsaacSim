@@ -13,15 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utility functions for sampling grasp poses and converting between different coordinate and mesh representations."""
+
+
 import numpy as np
-import scipy.stats as stats
 import trimesh
 import trimesh.transformations as tra
 from pxr import Gf, UsdGeom
 
 
 def transforms_to_poses_wxyz(transforms: list[np.ndarray]) -> list[list[float]]:
-    """Convert a list of transformation matrices to 7D poses [x, y, z, qw, qx, qy, qz]."""
+    """Convert a list of transformation matrices to 7D poses [x, y, z, qw, qx, qy, qz].
+
+    Args:
+        transforms: List of 4x4 transformation matrices.
+
+    Returns:
+        List of 7-element pose vectors with position and quaternion.
+    """
     poses = []
     for t in transforms:
         # Extract position from the transformation matrix
@@ -65,8 +74,8 @@ def usd_mesh_to_trimesh(usd_mesh: UsdGeom.Mesh, apply_scale: bool = True, verbos
 
     Args:
         usd_mesh: The USD mesh (`UsdGeom.Mesh`) to convert.
-        apply_scale: Whether to apply world scaling to vertices. Defaults to True.
-        verbose: Whether to print verbose information during conversion. Defaults to False.
+        apply_scale: Whether to apply world scaling to vertices.
+        verbose: Whether to print verbose information during conversion.
 
     Returns:
         A `trimesh.Trimesh` object representing the input USD mesh.
@@ -152,20 +161,25 @@ def sample_antipodal(object_mesh: trimesh.Trimesh, **kwargs) -> list[np.ndarray]
 
     Args:
         object_mesh: A trimesh.Trimesh object to sample grasp poses from.
-        **kwargs: Dictionary of parameters:
-            num_candidates: Target number of grasp candidates to attempt to sample.
-            num_orientations: Number of different orientations to sample per valid grasp axis.
-            gripper_maximum_aperture: Maximum width between gripper fingers in meters.
-            gripper_standoff_fingertips: Distance from fingertip contact points to the gripper's origin along the negative approach direction.
-            gripper_approach_direction: Unit vector [x, y, z] indicating the approach direction in the gripper's local frame.
-            grasp_align_axis: Unit vector [x, y, z] indicating the gripper's local axis to align with the physical grasp line.
-            orientation_sample_axis: Unit vector [x, y, z] indicating the gripper's local axis around which to sample orientations.
-            lateral_sigma: Standard deviation for random perturbation of grasp center point along grasp axis.
-            random_seed: Seed for random number generation for reproducibility.
-            verbose: If True, print detailed messages during processing.
+
+    Keyword Args:
+        num_candidates: Target number of grasp candidates to attempt to sample.
+        num_orientations: Number of different orientations to sample per valid grasp axis.
+        gripper_maximum_aperture: Maximum width between gripper fingers in meters.
+        gripper_standoff_fingertips: Distance from fingertip contact points to the gripper's origin along the negative
+            approach direction.
+        gripper_approach_direction: Unit vector [x, y, z] indicating the approach direction in the gripper's local
+            frame.
+        grasp_align_axis: Unit vector [x, y, z] indicating the gripper's local axis to align with the physical grasp
+            line.
+        orientation_sample_axis: Unit vector [x, y, z] indicating the gripper's local axis around which to sample
+            orientations.
+        lateral_sigma: Standard deviation for random perturbation of grasp center point along grasp axis.
+        random_seed: Seed for random number generation for reproducibility.
+        verbose: If True, print detailed messages during processing.
 
     Returns:
-        list: List of 4x4 homogeneous transformation matrices representing valid grasp poses
+        List of 4x4 homogeneous transformation matrices representing valid grasp poses.
     """
     # Extract parameters with defaults
     num_candidates = kwargs.get("num_candidates", 100)
@@ -277,6 +291,8 @@ def sample_antipodal(object_mesh: trimesh.Trimesh, **kwargs) -> list[np.ndarray]
 
                 # Apply lateral perturbation if requested
                 if lateral_sigma > 0:
+                    import scipy.stats as stats
+
                     # Center is perturbed along the grasp axis using a truncated normal distribution
                     # Boundaries ensure the perturbed center stays between the two contact points
                     center_ratio_lower = 0.0  # Ratio along axis for surface_points[point_idx]

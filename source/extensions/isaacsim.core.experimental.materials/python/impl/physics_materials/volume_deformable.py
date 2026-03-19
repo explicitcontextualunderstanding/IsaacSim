@@ -15,14 +15,12 @@
 
 from __future__ import annotations
 
-import carb
 import isaacsim.core.experimental.utils.ops as ops_utils
 import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import warp as wp
 from isaacsim.core.experimental.prims.impl.prim import _MSG_PRIM_NOT_VALID
-from omni.physx.bindings import _physx as physx_bindings
 from omni.physx.scripts import deformableUtils
 from pxr import Usd
 
@@ -31,12 +29,6 @@ from .physics_material import PhysicsMaterial
 
 class VolumeDeformableMaterial(PhysicsMaterial):
     """High level wrapper for creating/encapsulating Volume Deformable material prims.
-
-    .. warning::
-
-        The deformable materials require the Deformable feature (beta) to be enabled.
-        Deformable feature (beta) can be enabled in *apps/.kit* experience files by setting
-        ``physics.enableDeformableBeta = true`` under the ``[settings.persistent]`` section.
 
     .. note::
 
@@ -60,7 +52,6 @@ class VolumeDeformableMaterial(PhysicsMaterial):
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
 
     Raises:
-        RuntimeError: If the Deformable feature (beta) is disabled.
         ValueError: If material type is invalid.
         ValueError: If resulting paths are mixed or invalid.
         AssertionError: If the created/wrapped prims are not valid USD Materials.
@@ -87,15 +78,6 @@ class VolumeDeformableMaterial(PhysicsMaterial):
         poissons_ratios: float | list | np.ndarray | wp.array | None = None,
         densities: float | list | np.ndarray | wp.array | None = None,
     ) -> None:
-        # check for deformable feature (beta)
-        setting_name = physx_bindings.SETTING_ENABLE_DEFORMABLE_BETA
-        enabled = carb.settings.get_settings().get(setting_name)
-        if not enabled:
-            setting_name = (setting_name[1:] if setting_name.startswith("/") else setting_name).replace("/", ".")
-            raise RuntimeError(
-                "Deformable materials require Deformable feature (beta) to be enabled. "
-                f"Enable it in .kit experience settings ('{setting_name} = true') to use them."
-            )
         # get or create prims
         self._materials = []
         stage = stage_utils.get_current_stage(backend="usd")

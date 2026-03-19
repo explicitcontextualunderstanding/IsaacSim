@@ -13,19 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 from typing import Tuple
 
 from isaacsim.core.utils.prims import set_prim_hide_in_stage_window, set_prim_no_delete
 from isaacsim.core.utils.stage import get_current_stage
 from pxr import Gf, Sdf, Usd, UsdRender
-
-
-def create_hydra_texture(resolution: Tuple[int], camera_prim_path: str):
-    warnings.warn(
-        "This function is deprecated, use omni.replicator.core.create.render_product instead", DeprecationWarning
-    )
-    return None, None
 
 
 def add_aov(render_product_path: str, aov_name: str):
@@ -85,21 +77,29 @@ def get_camera_prim_path(render_product_path: str):
 
 
 def set_camera_prim_path(render_product_path: str, camera_prim_path: str):
-    """Sets the camera prim path for a render product
+    """Sets the camera prim path for a render product.
+
+    Also applies the OmniRtxCameraExposureAPI_1 schema to the camera prim and sets the exposure:time attribute to 0.02.
 
     Args:
         render_product_path (str):  path to the render product prim
         camera_prim_path (str):  path to the camera prim
 
     Raises:
-        RuntimeError: If the render product path is invalid
+        RuntimeError: If the render product path is invalid.
+        RuntimeError: If the camera prim path is invalid.
     """
     stage = get_current_stage()
     with Usd.EditContext(stage, stage.GetSessionLayer()):
         render_prod_prim = UsdRender.Product(stage.GetPrimAtPath(render_product_path))
         if not render_prod_prim:
             raise RuntimeError(f'Invalid renderProduct "{render_product_path}"')
+        camera_prim = stage.GetPrimAtPath(camera_prim_path)
+        if not camera_prim.IsValid():
+            raise RuntimeError(f'Invalid camera prim "{camera_prim_path}"')
         render_prod_prim.GetCameraRel().SetTargets([camera_prim_path])
+    camera_prim.AddAppliedSchema("OmniRtxCameraExposureAPI_1")
+    camera_prim.CreateAttribute("exposure:time", Sdf.ValueTypeNames.Float).Set(0.02)
 
 
 def get_resolution(render_product_path: str):

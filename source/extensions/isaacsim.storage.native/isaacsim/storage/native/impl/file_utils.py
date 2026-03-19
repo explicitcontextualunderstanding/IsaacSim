@@ -20,10 +20,10 @@ from typing import List
 import carb
 from pxr import Sdf, UsdUtils
 
-from ..nucleus import get_assets_root_path_async
+from ..nucleus import get_assets_root_path, get_assets_root_path_async
 
 
-def path_join(base, name):
+def path_join(base: str, name: str) -> str:
     """Join two path components intelligently handling Omniverse URLs.
 
     Args:
@@ -97,10 +97,21 @@ def find_files_recursive(abs_path, filter_fn=lambda a: True):
 
     Args:
         abs_path: List of absolute paths to search.
-        filter_fn: Filter function that takes a path and returns boolean indicating if path should be included.
+        filter_fn: Filter function that takes a path and returns boolean indicating
+            if path should be included. Defaults to accepting all files.
 
     Returns:
         List of file paths that match the filter criteria.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import find_files_recursive
+        >>>
+        >>> # Find all USD files
+        >>> usd_filter = lambda p: p.endswith('.usd')
+        >>> files = find_files_recursive(["/path/to/assets"], usd_filter)
     """
     import omni.client
     from omni.client import Result
@@ -234,6 +245,16 @@ def get_stage_references(stage_path, resolve_relatives=True):
 
     Returns:
         List of path strings to referenced assets.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import get_stage_references
+        >>>
+        >>> refs = get_stage_references("/path/to/scene.usd")
+        >>> refs
+        ['/path/to/material.usd', '/path/to/mesh.usd']
     """
     (all_layers, all_assets, unresolved_paths) = UsdUtils.ComputeAllDependencies(stage_path)
     paths = []
@@ -254,11 +275,27 @@ def get_stage_references(stage_path, resolve_relatives=True):
 def is_absolute_path(path):
     """Check if a path is absolute, including Omniverse URLs.
 
+    Handles standard filesystem absolute paths as well as omniverse://,
+    file://, http://, and https:// URLs.
+
     Args:
         path: Path string to check.
 
     Returns:
-        Boolean indicating if path is absolute.
+        True if path is absolute.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import is_absolute_path
+        >>>
+        >>> is_absolute_path("/home/user/file.usd")
+        True
+        >>> is_absolute_path("omniverse://localhost/path/file.usd")
+        True
+        >>> is_absolute_path("relative/path/file.usd")
+        False
     """
     if path.lower().startswith("omniverse://"):
         return True
@@ -271,15 +308,30 @@ def is_absolute_path(path):
     return os.path.isabs(path)
 
 
-def is_valid_usd_file(item, excludes):
+def is_valid_usd_file(item: str, excludes: list) -> bool:
     """Check if a path is a USD file and doesn't contain excluded substrings.
+
+    Valid USD file extensions are: .usd, .usda, .usdc, .usdz.
 
     Args:
         item: Path to check.
         excludes: List of substrings that should not be present in the path.
 
     Returns:
-        Boolean indicating if the path is a valid USD file.
+        True if the path is a valid USD file.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import is_valid_usd_file
+        >>>
+        >>> is_valid_usd_file("/path/to/scene.usd", [".thumbs"])
+        True
+        >>> is_valid_usd_file("/path/.thumbs/scene.usd", [".thumbs"])
+        False
+        >>> is_valid_usd_file("/path/to/image.png", [])
+        False
     """
     # remove any substrings we dont want
     for e in excludes:
@@ -291,14 +343,25 @@ def is_valid_usd_file(item, excludes):
     return False
 
 
-def is_mdl_file(item):
+def is_mdl_file(item: str) -> bool:
     """Check if a path is an MDL file.
 
     Args:
         item: Path to check.
 
     Returns:
-        Boolean indicating if the path is an MDL file.
+        True if the path is an MDL file.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import is_mdl_file
+        >>>
+        >>> is_mdl_file("/path/to/material.mdl")
+        True
+        >>> is_mdl_file("/path/to/scene.usd")
+        False
     """
     _, ext = os.path.splitext(item)
     return ext in [".mdl"]
@@ -307,11 +370,27 @@ def is_mdl_file(item):
 async def find_absolute_paths_in_usds(base_path):
     """Check for absolute paths in USD files.
 
+    Recursively searches for USD files and identifies any absolute path references
+    within each file.
+
     Args:
         base_path: Base path to search for USD files.
 
     Returns:
         Dictionary mapping file paths to lists of absolute references they contain.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import asyncio
+        >>> from isaacsim.storage.native import find_absolute_paths_in_usds
+        >>>
+        >>> abs_paths = asyncio.get_event_loop().run_until_complete(
+        ...     find_absolute_paths_in_usds("/path/to/assets")
+        ... )
+        >>> abs_paths
+        {'/path/to/scene.usd': ['/absolute/ref.usd']}
     """
     abs_items = {}
     files = await find_files_recursive(base_path, lambda item: is_valid_usd_file(item, []))
@@ -323,18 +402,31 @@ async def find_absolute_paths_in_usds(base_path):
     return abs_items
 
 
-def is_path_external(path, base_path):
+def is_path_external(path: str, base_path: str) -> bool:
     """Check if a path is external to a base path.
+
+    A path is considered external if it does not contain the base_path as a substring.
 
     Args:
         path: Path to check.
         base_path: Base path to compare against.
 
     Returns:
-        Boolean indicating if path is external to base_path.
+        True if path is external to base_path.
 
     Raises:
-        Exception: If there's an error comparing the paths.
+        Exception: If there is an error comparing the paths.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import is_path_external
+        >>>
+        >>> is_path_external("/external/path/file.usd", "/project/assets")
+        True
+        >>> is_path_external("/project/assets/file.usd", "/project/assets")
+        False
     """
     try:
         return base_path not in path
@@ -346,11 +438,27 @@ def is_path_external(path, base_path):
 async def find_external_references(base_path):
     """Check for external references in USD files.
 
+    Recursively searches for USD files and identifies references that point
+    outside the base path.
+
     Args:
         base_path: Base path to search for USD files.
 
     Returns:
         Dictionary mapping file paths to lists of external references they contain.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import asyncio
+        >>> from isaacsim.storage.native import find_external_references
+        >>>
+        >>> ext_refs = asyncio.get_event_loop().run_until_complete(
+        ...     find_external_references("/project/assets")
+        ... )
+        >>> ext_refs
+        {'/project/assets/scene.usd': ['/shared/material.usd']}
     """
     abs_items = {}
     for item in await find_files_recursive(base_path, lambda item: is_valid_usd_file(item, [])):
@@ -364,11 +472,27 @@ async def find_external_references(base_path):
 async def count_asset_references(base_path):
     """Get reference counts for all assets in a base path.
 
+    Recursively searches for all files and counts how many times each file
+    is referenced by other USD files.
+
     Args:
         base_path: Base path to search for assets.
 
     Returns:
         Dictionary mapping asset paths to their reference counts, sorted by count.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import asyncio
+        >>> from isaacsim.storage.native import count_asset_references
+        >>>
+        >>> ref_counts = asyncio.get_event_loop().run_until_complete(
+        ...     count_asset_references("/project/assets")
+        ... )
+        >>> ref_counts
+        {'/project/assets/unused.usd': 0, '/project/assets/shared.usd': 5}
     """
     items = {item: 0 for item in await find_files_recursive(base_path)}
     for item in items.keys():
@@ -386,8 +510,20 @@ async def count_asset_references(base_path):
 def find_missing_references(base_path):
     """Check for missing references in USD files.
 
+    Recursively searches for USD files and prints any files that have
+    unresolved references.
+
     Args:
         base_path: Base path to search for USD files.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import find_missing_references
+        >>>
+        >>> find_missing_references("/project/assets")
+        /project/assets/scene.usd ['missing_file.usd']
     """
     items = {item: 0 for item in find_files_recursive(base_path, lambda item: is_valid_usd_file(item, []))}
     for item in items.keys():
@@ -396,14 +532,30 @@ def find_missing_references(base_path):
             print(item, unresolved_paths)
 
 
-async def path_exists(path):
+async def path_exists(path: str) -> bool:
     """Check if a path exists.
+
+    Uses the Omniverse client to check if the path exists on local
+    filesystem or remote Nucleus server.
 
     Args:
         path: Path to check.
 
     Returns:
-        Boolean indicating if the path exists.
+        True if the path exists.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import asyncio
+        >>> from isaacsim.storage.native import path_exists
+        >>>
+        >>> exists = asyncio.get_event_loop().run_until_complete(
+        ...     path_exists("omniverse://localhost/NVIDIA/Assets/Isaac")
+        ... )
+        >>> exists
+        True
     """
     import omni.client
     from omni.client import Result
@@ -412,14 +564,27 @@ async def path_exists(path):
     return result == Result.OK
 
 
-def layer_has_missing_references(layer_identifier):
+def layer_has_missing_references(layer_identifier: str) -> bool:
     """Check if a layer has any missing references.
+
+    Recursively checks the layer and all its external references to find
+    any layers that cannot be opened.
 
     Args:
         layer_identifier: Identifier for the layer to check.
 
     Returns:
-        Boolean indicating if the layer has missing references.
+        True if the layer has missing references.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import layer_has_missing_references
+        >>>
+        >>> has_missing = layer_has_missing_references("/path/to/scene.usd")
+        >>> has_missing
+        False
     """
     queue = [layer_identifier]
     accessed_layers = []
@@ -441,14 +606,30 @@ def layer_has_missing_references(layer_identifier):
     return False
 
 
-def prim_spec_has_missing_references(prim_spec):
+def prim_spec_has_missing_references(prim_spec) -> bool:
     """Check if a prim specification has any missing references.
+
+    Checks all references in the prim specification's reference list and
+    verifies that they can be resolved.
 
     Args:
         prim_spec: Prim specification to check.
 
     Returns:
-        Boolean indicating if the prim specification has missing references.
+        True if the prim specification has missing references.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from pxr import Sdf
+        >>> from isaacsim.storage.native import prim_spec_has_missing_references
+        >>>
+        >>> layer = Sdf.Layer.FindOrOpen("/path/to/scene.usd")
+        >>> prim_spec = layer.GetPrimAtPath("/World/Mesh")
+        >>> has_missing = prim_spec_has_missing_references(prim_spec)
+        >>> has_missing
+        False
     """
     from omni.kit.widget.stage.stage_model import AssetType
 
@@ -465,14 +646,29 @@ def prim_spec_has_missing_references(prim_spec):
     return False
 
 
-def prim_has_missing_references(prim):
+def prim_has_missing_references(prim) -> bool:
     """Check if a prim has any missing references.
+
+    Checks all prim specs in the prim's stack for missing references.
 
     Args:
         prim: Prim to check.
 
     Returns:
-        Boolean indicating if the prim has missing references.
+        True if the prim has missing references.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from pxr import Usd
+        >>> from isaacsim.storage.native import prim_has_missing_references
+        >>>
+        >>> stage = Usd.Stage.Open("/path/to/scene.usd")
+        >>> prim = stage.GetPrimAtPath("/World/Mesh")
+        >>> has_missing = prim_has_missing_references(prim)
+        >>> has_missing
+        False
     """
     for prim_spec in prim.GetPrimStack():
         if prim_spec_has_missing_references(prim_spec):
@@ -481,8 +677,10 @@ def prim_has_missing_references(prim):
     return False
 
 
-def path_relative(path, start):
+def path_relative(path: str, start: str) -> str:
     """URL friendly version of os.path.relpath.
+
+    Handles both local filesystem paths and Omniverse URLs.
 
     Args:
         path: Path to make relative.
@@ -492,7 +690,18 @@ def path_relative(path, start):
         Relative path string.
 
     Raises:
-        ValueError: If URL scheme or domain doesn't match.
+        ValueError: If URL scheme or domain does not match.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import path_relative
+        >>>
+        >>> path_relative("/project/assets/textures/wood.png", "/project/assets")
+        'textures/wood.png'
+        >>> path_relative("omniverse://localhost/A/B/file.usd", "omniverse://localhost/A")
+        'B/file.usd'
     """
     from urllib.parse import urlparse
 
@@ -515,14 +724,27 @@ def path_relative(path, start):
         return os.path.relpath(os.path.normpath(path), os.path.normpath(start))
 
 
-def path_dirname(path):
+def path_dirname(path: str) -> str:
     """URL friendly version of os.path.dirname.
+
+    Handles both local filesystem paths and Omniverse URLs.
 
     Args:
         path: Path to get the directory name from.
 
     Returns:
         Directory path string.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.storage.native import path_dirname
+        >>>
+        >>> path_dirname("/project/assets/scene.usd")
+        '/project/assets/'
+        >>> path_dirname("omniverse://localhost/A/B/file.usd")
+        'omniverse://localhost/A/B/'
     """
     from urllib.parse import urlparse, urlunparse
 
@@ -540,7 +762,7 @@ def path_dirname(path):
 async def resolve_asset_path_async(original_path: str) -> str | None:
     """Resolve asset path by checking original location and fallback to assets root.
 
-    This function attempts to resolve a given asset path by first checking if it exists
+    This async function attempts to resolve a given asset path by first checking if it exists
     in its original location. If not found, it constructs an alternate path using the
     Isaac Sim assets root path and checks if that exists instead.
 
@@ -582,6 +804,62 @@ async def resolve_asset_path_async(original_path: str) -> str | None:
             )
 
             if await path_exists(alternate_path):
+                return alternate_path
+    except Exception as e:
+        carb.log_warn(f"Could not get assets root path: {e}")
+
+    return None
+
+
+def resolve_asset_path(original_path: str) -> str | None:
+    """Resolve asset path by checking original location and fallback to assets root.
+
+    This function attempts to resolve a given asset path by first checking if it exists
+    in its original location. If not found, it constructs an alternate path using the
+    Isaac Sim assets root path and checks if that exists instead.
+
+    Args:
+        original_path: The original asset path to resolve.
+
+    Returns:
+        The resolved path if found, None otherwise.
+        Returns the path that exists (either original or assets root based), or None if neither exists.
+
+    Raises:
+        Exception: May raise exceptions from synchronous stat calls or get_assets_root_path.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> path = resolve_asset_path("/Isaac/Environments/Grid/default_environment.usd")
+        >>> print(path)
+        /path/to/assets/Isaac/Environments/Grid/default_environment.usd
+        >>>
+        >>> invalid_path = resolve_asset_path("/nonexistent/file.usd")
+        >>> print(invalid_path)
+        None
+    """
+    import omni.client
+    from omni.client import Result
+
+    # Check if the original path exists
+    result, _ = omni.client.stat(original_path)
+    if result == Result.OK:
+        return original_path
+
+    try:
+        # Construct alternate path with asset root
+        assets_root_path = get_assets_root_path()
+        if assets_root_path:
+            alternate_path = (
+                assets_root_path + original_path
+                if original_path.startswith("/")
+                else assets_root_path + "/" + original_path
+            )
+
+            result_alt, _ = omni.client.stat(alternate_path)
+            if result_alt == Result.OK:
                 return alternate_path
     except Exception as e:
         carb.log_warn(f"Could not get assets root path: {e}")

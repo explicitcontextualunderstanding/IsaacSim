@@ -1,4 +1,12 @@
 # Changelog
+## [2.1.19] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [2.1.18] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
 ## [2.1.17] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 2.1.16)
@@ -61,7 +69,7 @@
 
 ## [2.1.2] - 2025-01-02
 ### Changed
-- performing any UI logic only once window is built
+- Performing any UI logic only once window is built
 
 ## [2.1.1] - 2024-12-11
 ### Changed

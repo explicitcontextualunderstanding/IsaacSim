@@ -1,6 +1,6 @@
 {
     "IsaacCreateRTXLidarScanBuffer": {
-        "version": 2,
+        "version": 3,
         "icon": "icons/isaac-sim.svg",
         "description": [
             "This node creates a full scan buffer for RTX Lidar sensor."
@@ -20,11 +20,6 @@
                 "type": "uint64",
                 "description": "Pointer to Lidar render result.",
                 "uiName": "Data Pointer"
-            },
-            "metadataPtr": {
-                "type": "uint64",
-                "description": "Pointer to Lidar metadata.",
-                "uiName": "Metadata Pointer"
             },
             "cudaDeviceIndex": {
                 "type": "int",
@@ -60,31 +55,7 @@
             },
             "renderProductPath": {
                 "type": "token",
-                "description": "DEPRECATED - Config is gotten from this"
-            },
-            "outputIntensity": {
-                "type": "bool",
-                "description": "Create an output array for the Intensity.",
-                "default": false,
-                "uiName": "Output The Intensity"
-            },
-            "outputDistance": {
-                "type": "bool",
-                "description": "Create an output array for the Distance.",
-                "default": false,
-                "uiName": "Output The Distance"
-            },
-            "outputObjectId": {
-                "type": "bool",
-                "description": "Create an output array for the ObjectId.",
-                "default": false,
-                "uiName": "Output The ObjectId"
-            },
-            "outputVelocity": {
-                "type": "bool",
-                "description": "Create an output array for the Velocity.",
-                "default": false,
-                "uiName": "Output The Velocity"
+                "description": "Used to retrieve Lidar configuration."
             },
             "outputAzimuth": {
                 "type": "bool",
@@ -98,11 +69,17 @@
                 "default": false,
                 "uiName": "Output The Elevation"
             },
-            "outputNormal": {
+            "outputDistance": {
                 "type": "bool",
-                "description": "Create an output array for the Normals.",
+                "description": "Create an output array for the Distance.",
                 "default": false,
-                "uiName": "Output The Normals"
+                "uiName": "Output The Distance"
+            },
+            "outputIntensity": {
+                "type": "bool",
+                "description": "Create an output array for the Intensity (Lidar) or Radar Cross Section (Radar).",
+                "default": false,
+                "uiName": "Output The Intensity"
             },
             "outputTimestamp": {
                 "type": "bool",
@@ -116,17 +93,59 @@
                 "default": false,
                 "uiName": "Output The EmitterId"
             },
-            "outputBeamId": {
+            "outputChannelId": {
                 "type": "bool",
-                "description": "DEPRECATED - Create an output array for the BeamId.",
+                "description": "Create an output array for the ChannelId.",
                 "default": false,
-                "uiName": "Output The BeamId"
+                "uiName": "Output The ChannelId"
             },
             "outputMaterialId": {
                 "type": "bool",
                 "description": "Create an output array for the MaterialId.",
                 "default": false,
                 "uiName": "Output The MaterialId"
+            },
+            "outputTickId": {
+                "type": "bool",
+                "description": "Create an output array for the TickId.",
+                "default": false,
+                "uiName": "Output The TickId"
+            },
+            "outputHitNormal": {
+                "type": "bool",
+                "description": "Create an output array for the Normals.",
+                "default": false,
+                "uiName": "Output The Normals"
+            },
+            "outputVelocity": {
+                "type": "bool",
+                "description": "Create an output array for the Velocity.",
+                "default": false,
+                "uiName": "Output The Velocity"
+            },
+            "outputObjectId": {
+                "type": "bool",
+                "description": "Create an output array for the ObjectId.",
+                "default": false,
+                "uiName": "Output The ObjectId"
+            },
+            "outputEchoId": {
+                "type": "bool",
+                "description": "Create an output array for the EchoId.",
+                "default": false,
+                "uiName": "Output The EchoId"
+            },
+            "outputTickState": {
+                "type": "bool",
+                "description": "Create an output array for the TickState.",
+                "default": false,
+                "uiName": "Output The TickState"
+            },
+            "outputRadialVelocityMS": {
+                "type": "bool",
+                "description": "Create an output array for the Radial Velocity.",
+                "default": false,
+                "uiName": "Output The Radial Velocity"
             },
             "enablePerFrameOutput": {
                 "type": "bool",
@@ -158,20 +177,6 @@
                 "type": "matrixd[4]",
                 "description": "The transform matrix from Lidar to world coordinates at the end of the full scan."
             },
-            "intensityPtr":{"uiName": "intensity","type": "uint64",
-                "description": "intensity [0,1]"},
-                "intensityDataType":{
-                    "type": "float",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"intensityBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
-                }
-            },
-            "distancePtr":{"uiName": "distance","type": "uint64",
-                "description": "range in m"},
-                "distanceDataType":{
-                    "type": "float",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"distanceBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
-                }
-            },
             "azimuthPtr":{"uiName": "azimuth","type": "uint64",
                 "description": "azimuth in rad [-pi,pi]"},
                 "azimuthDataType":{
@@ -186,81 +191,265 @@
                     "default": 4,"description": "type","metadata": {"hidden": "true"}},"elevationBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
                 }
             },
-            "velocityPtr":{"uiName": "velocity","type": "uint64",
-                "description": "elevation in rad [-pi/2, pi/2]"},
-                "velocityDataType":{
-                    "type": "float[3]",
-                    "default": [4,0,0],"description": "type","metadata": {"hidden": "true"}},"velocityBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
+            "distancePtr":{"uiName": "distance","type": "uint64",
+                "description": "range in m"},
+                "distanceDataType":{
+                    "type": "float",
+                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"distanceBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
                 }
             },
-            "objectIdPtr":{"uiName": "objectId","type": "uint64",
-                "description": "ObjectId for getting usd prim information"},
-                "objectIdDataType":{
-                    "type": "uint",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"objectIdBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
+            "intensityPtr": {
+                "uiName": "intensity",
+                "type": "uint64",
+                "description": "intensity [0,1]",
+                "default": 0
+            },
+            "intensityDataType": {
+                "type": "float",
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
                 }
             },
-            "normalPtr":{"uiName": "normal","type": "uint64",
-                "description": "Normal at the hit location"},
-                "normalDataType":{
-                    "type": "float[3]",
-                    "default": [4,0,0],"description": "type","metadata": {"hidden": "true"}},"normalBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
+            "intensityBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
                 }
             },
-            "timestampPtr":{"uiName": "timestamp","type": "uint64",
-                "description": "timestamp in ns"},
-                "timestampDataType":{
-                    "type": "uint64",
-                    "default": 8,"description": "type","metadata": {"hidden": "true"}},"timestampBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
+            "timestampPtr": {
+                "uiName": "timestamp",
+                "type": "uint64",
+                "description": "timestamp in ns",
+                "default": 0
+            },
+            "timestampDataType": {
+                "type": "uint64",
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
                 }
             },
-            "emitterIdPtr":{"uiName": "emitterId","type": "uint64",
-                "description": "emitterId"},
-                "emitterIdDataType":{
-                    "type": "uint",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"emitterIdBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
+            "timestampBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
                 }
             },
-            "beamIdPtr":{"uiName": "beamId","type": "uint64",
-                "description": "DEPRECATED - beamId"},
-                "beamIdDataType":{
-                    "type": "uint",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"beamIdBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
-                }
+            "emitterIdPtr": {
+                "uiName": "emitterId",
+                "type": "uint64",
+                "description": "emitterId",
+                "default": 0
             },
-            "materialIdPtr":{"uiName": "materialId","type": "uint64",
-                "description": "materialId at hit location"},
-                "materialIdDataType":{
-                    "type": "uint",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"materialIdBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
-                }
-            },
-            "indexPtr":{"uiName": "index","type": "uint64",
-                "description": "DEPRECATED -Index into the full array if keepOnlyPositiveDistance ((startTick+tick)*numChannels*numEchos + channel*numEchos + echo)"},
-                "indexDataType":{
-                    "type": "uint",
-                    "default": 4,"description": "type","metadata": {"hidden": "true"}},"indexBufferSize":{"type": "uint64","description": "size","metadata": {"hidden": "true"
-                }
-            },
-            "numReturnsPerScan": {
+            "emitterIdDataType": {
                 "type": "uint",
-                "description": "DEPRECATED - Number of returns in the full scan"
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
             },
-            "ticksPerScan": {
+            "emitterIdBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "channelIdPtr": {
+                "uiName": "channelId",
+                "type": "uint64",
+                "description": "channelId",
+                "default": 0
+            },
+            "channelIdDataType": {
                 "type": "uint",
-                "description": "DEPRECATED - Number of ticks in a full scan"
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
             },
-            "numChannels": {
+            "channelIdBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "materialIdPtr": {
+                "uiName": "materialId",
+                "type": "uint64",
+                "description": "materialId at hit location",
+                "default": 0
+            },
+            "materialIdDataType": {
                 "type": "uint",
-                "description": "DEPRECATED - Number of channels of the lidar"
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
             },
-            "numEchos": {
+            "materialIdBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "tickIdPtr": {
+                "uiName": "tickId",
+                "type": "uint64",
+                "description": "tickId",
+                "default": 0
+            },
+            "tickIdDataType": {
                 "type": "uint",
-                "description": "DEPRECATED - Number of echos of the lidar"
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
             },
-            "renderProductPath": {
-                "type": "token",
-                "description": "Config is gotten from this"
+            "tickIdBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "hitNormalPtr": {
+                "uiName": "normal",
+                "type": "uint64",
+                "description": "Normal at the hit location",
+                "default": 0
+            },
+            "hitNormalDataType":{
+                "type": "float[3]",
+                "description": "type",
+                "default": [0,0,0],
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "hitNormalBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "velocityPtr": {
+                "uiName": "velocity",
+                "type": "uint64",
+                "description": "Velocity vector at the hit point (m/s)",
+                "default": 0
+            },
+            "velocityDataType": {
+                "type": "float[3]",
+                "description": "type",
+                "default": [0,0,0],
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "velocityBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "objectIdPtr": {
+                "uiName": "objectId",
+                "type": "uint64",
+                "description": "ObjectId for getting usd prim information",
+                "default": 0
+            },
+            "objectIdDataType": {
+                "type": "uint[]",
+                "description": "type",
+                "default": [0,0,0,0],
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "objectIdBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "echoIdPtr": {
+                "uiName": "echoId",
+                "type": "uint64",
+                "description": "echoId",
+                "default": 0
+            },
+            "echoIdDataType": {
+                "type": "uchar",
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "echoIdBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "tickStatePtr": {
+                "uiName": "tickState",
+                "type": "uint64",
+                "description": "tickState",
+                "default": 0
+            },
+            "tickStateDataType": {
+                "type": "uchar",
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "tickStateBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "radialVelocityMSPtr": {
+                "uiName": "radialVelocityMS",
+                "type": "uint64",
+                "description": "radialVelocityMS",
+                "default": 0
+            },
+            "radialVelocityMSDataType": {
+                "type": "float",
+                "description": "type",
+                "default": 0,
+                "metadata": {
+                    "hidden": "true"
+                }
+            },
+            "radialVelocityMSBufferSize": {
+                "type": "uint64",
+                "description": "size",
+                "metadata": {
+                    "hidden": "true"
+                }
             },
             "height":{
                 "type": "uint",

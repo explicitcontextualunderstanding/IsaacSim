@@ -1,4 +1,29 @@
 # Changelog
+
+## [2.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [2.1.4] - 2026-02-23
+### Changed
+- Add ticked=True to Extension Generator menu item
+
+## [2.1.3] - 2025-12-15
+### Changed
+- Fix event name usage.
+
+## [2.1.2] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.1.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [2.1.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [2.0.12] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0
@@ -9,7 +34,7 @@
 
 ## [2.0.10] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.0.9] - 2025-04-09
 ### Changed

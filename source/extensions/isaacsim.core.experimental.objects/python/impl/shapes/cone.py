@@ -47,6 +47,8 @@ class Cone(Shape):
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         axes: Axes (cone's axis along which the spine is aligned) (shape ``(N,)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
+        colors: Display colors (shape ``(N, 3)``).
+            If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         positions: Positions in the world frame (shape ``(N, 3)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         translations: Translations in the local frame (shape ``(N, 3)``).
@@ -70,9 +72,9 @@ class Cone(Shape):
         >>> from isaacsim.core.experimental.objects import Cone
         >>>
         >>> # given an empty USD stage with the /World Xform prim,
-        >>> # create cones at paths: /World/prim_0, /World/prim_1, and /World/prim_2
+        >>> # create green cones at paths: /World/prim_0, /World/prim_1, and /World/prim_2
         >>> paths = ["/World/prim_0", "/World/prim_1", "/World/prim_2"]
-        >>> prims = Cone(paths)  # doctest: +NO_CHECK
+        >>> prims = Cone(paths, colors=[0.0, 1.0, 0.0])  # doctest: +NO_CHECK
     """
 
     def __init__(
@@ -83,12 +85,14 @@ class Cone(Shape):
         radii: float | list | np.ndarray | wp.array | None = None,
         heights: float | list | np.ndarray | wp.array | None = None,
         axes: Literal["X", "Y", "Z"] | list[Literal["X", "Y", "Z"]] | None = None,
+        # Shape
+        colors: list | np.ndarray | wp.array | None = None,
         # XformPrim
         positions: list | np.ndarray | wp.array | None = None,
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         scales: list | np.ndarray | wp.array | None = None,
-        reset_xform_op_properties: bool = False,
+        reset_xform_op_properties: bool = True,
     ) -> None:
         self._geoms = []
         stage = stage_utils.get_current_stage(backend="usd")
@@ -109,6 +113,7 @@ class Cone(Shape):
         super().__init__(
             paths,
             resolve_paths=False,
+            colors=colors,
             positions=positions,
             translations=translations,
             orientations=orientations,

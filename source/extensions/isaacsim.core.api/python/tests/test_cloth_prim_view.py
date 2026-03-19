@@ -17,9 +17,9 @@ import asyncio
 
 import numpy as np
 import omni.kit.test
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.materials.particle_material import ParticleMaterial
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import ClothPrim, SingleClothPrim, SingleParticleSystem
 from isaacsim.core.utils.stage import create_new_stage_async, update_stage_async
 
@@ -31,6 +31,8 @@ from omni.physx.scripts import deformableUtils, physicsUtils
 from pxr import Gf, Usd, UsdGeom
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 
 class TestClothPrim(CoreTestCase):

@@ -4,7 +4,7 @@
 
 This document guides you through setting up this repository for C++ development on Windows using Microsoft Visual Studio and the Windows SDK.
 
-**For New Users:** If you are new to Windows C++ development, this guide provides a step-by-step installation of Visual Studio 2022 Community and the Windows SDK, ensuring you have all the components required for standard development tasks.
+**For New Users:** If you are new to Windows C++ development, this guide provides a step-by-step installation of Visual Studio 2026 Community and the Windows SDK, ensuring you have all the components required for standard development tasks.
 
 **For Advanced Configurations:** If you already have Visual Studio and the Windows SDK installed but wish to specify exact versions, this guide will help you configure your environment using the `[repo_build.msbuild]` configuration within `repo.toml` at the project root.
 
@@ -28,13 +28,54 @@ To enable the Windows C++ build process:
 
 **Note:** If you already have Visual Studio and the Windows SDK installed, this might be the only change needed. The tooling will auto-detect installed components.
 
+## Windows Long Paths Support
+
+Isaac Sim builds may generate file paths exceeding the traditional Windows 260-character limit. To avoid build errors related to missing files or path length restrictions, Windows Long Paths support must be enabled.
+
+### Automatic Check
+
+The build script (`build.bat`) automatically checks the `LongPathsEnabled` registry setting and displays warnings if long paths support is not properly configured.
+
+### Checking Long Paths Status
+
+To manually verify if long paths are enabled on your system, run the following command in PowerShell:
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled"
+```
+
+The value should be `1` for enabled, or `0` for disabled.
+
+### Enabling Long Paths Support
+
+If long paths are not enabled, follow these steps:
+
+1. **Open PowerShell as Administrator**
+   - Right-click on PowerShell and select "Run as Administrator"
+
+2. **Create or Set the Registry Value**
+
+   If the registry value doesn't exist, create it:
+   ```powershell
+   New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+   ```
+
+   If it already exists but is set to `0`, update it:
+   ```powershell
+   Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1
+   ```
+
+3. **Restart Your System**
+   - A system restart is required for the changes to take effect.
+
+**Note:** Long paths support requires Windows 10 version 1607 or later, or Windows 11.
+
 ## Compiler Version Checking
 
 The Windows build process will check a handful of versions before starting.  It expects to find the following versions (defined in `repo.toml`):
- * VS 2022
- * MSVC v143
- * MSBuild 17.*
- * WinSDK 10.0.22621.0
+ * VS 2026
+ * MSVC v145
+ * MSBuild 18.*
 
 If you do not have these versions you can still start a build, run `build.bat --skip-compiler-version-check`
 
@@ -42,31 +83,31 @@ If you do not have these versions you can still start a build, run `build.bat --
 
 ### Basic Installation
 
-#### Installing Visual Studio 2022 Community
+#### Installing Visual Studio 2026 Community (Recommended)
 
-1. **Download Visual Studio Installer**
+Install using Winget by running the following command in PowerShell:
 
-   ![VS Download](./vs_download.png)
-   - Visit the [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/).
-   - Click "Free download" under "Community".
+  ```powershell
+   winget install --id=Microsoft.VisualStudio.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+   ```
 
-2. **Run the Installer**
-   - Open the downloaded installer.
-   - Select "Community" edition and click "Install".
+   Ensure that the following versions are installed:
 
-3. **Select Workloads**
+     - MSVC v145
+     - WinSDK 10.0.26100.*
 
-   ![VS Workloads](./vs_workloads.png)
-   - Check "Desktop development with C++".
-   - This includes tools like the MSVC compiler and C++ libraries.
+#### Installing Visual Studio 2022 Community (Also Supported)
 
-4. **Additional Components**
-   ![VS Additional](./vs_additional.png)
-   - If you need specific components, go to "Individual components".
-   - Select additional tools as needed.
+Install using Winget by running the following command in PowerShell:
 
-5. **Complete the Installation**
-   - Proceed with the installation to download and set up all files.
+  ```powershell
+   winget install --id=Microsoft.VisualStudio.2022.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+   ```
+
+   Ensure that the following versions are installed:
+
+     - MSVC v145
+     - WinSDK 10.0.26100.*
 
 #### Installing Windows SDK (as needed)
 
@@ -83,7 +124,7 @@ Usually, the Windows SDK is included with the "Desktop development with C++" wor
 3. **Verify Windows SDK**
 
    ![VS WinSDK Verify](./vs_winsdk_verify.png)
-   - Ensure "Windows SDK" is selected under "Optional" sections or "Individual components".
+   - Ensure "Windows 11 SDK" is selected under "Optional" sections or "Individual components".
 
 4. **Apply Changes**
    - Click "Modify" to install or update the SDK.
@@ -96,7 +137,7 @@ If Visual Studio and the Windows SDK are installed in default locations, the bui
 
 - Default Windows SDK: `C:\Program Files (x86)\Windows Kits`
 - Default Visual Studio 2019: `C:\Program Files (x86)\Microsoft Visual Studio`
-- Default Visual Studio 2022: `C:\Program Files\Microsoft Visual Studio`
+- Default Visual Studio 2026: `C:\Program Files\Microsoft Visual Studio`
 
 #### Non-Default Installation Paths
 
@@ -120,10 +161,11 @@ For multiple Visual Studio or Windows SDK installations, the latest version is u
 
 ```toml
 [repo_build.msbuild]
-vs_version = "vs2022"
+vs_version = "18"
 vs_edition = "Community"
-vs_path = "D:\\AnotherPath\\Visual Studio\\2022\\Enterprise\\"
+vs_path = "D:\\AnotherPath\\Visual Studio\\2026\\Enterprise\\"
 ```
+
 
 ##### Windows SDK
 

@@ -12,24 +12,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module provides a SelectionSetWindow class for creating a new selection set with a user-defined name through a UI window."""
+"""Selection set naming UI for the Edit menu."""
 
 __all__ = ["SelectionSetWindow"]
+
+from collections.abc import Callable
 
 import omni.ui as ui
 
 
 class SelectionSetWindow:
-    """A window to input and create a new selection set name.
-
-    This class provides a UI window that allows users to enter a name for a new selection set and create it using a callback function. The window includes a label, a text field, and 'Create' and 'Cancel' buttons.
+    """Collect a selection set name and invoke a callback.
 
     Args:
-        callback (Callable[[str], None]): Function to call with the new selection set name."""
+        callback: Function to call with the new selection set name.
+    """
 
-    def __init__(self, callback):
-        """Initializes the SelectionSetWindow with a callback to be triggered upon creation."""
-        self._callback = callback
+    def __init__(self, callback: Callable[[str], None]):
+        self._callback: Callable[[str], None] | None = callback
         window = ui.Window(
             "Selection Set Name",
             width=300,
@@ -39,11 +39,18 @@ class SelectionSetWindow:
 
         with window.frame:
 
-            def on_create(widget):
-                self._callback(widget.model.as_string)
+            def on_create(widget: ui.StringField) -> None:
+                """Handle creation of a new selection set.
+
+                Args:
+                    widget: String field containing the set name.
+                """
+                if self._callback is not None:
+                    self._callback(widget.model.as_string)
                 window.visible = False
 
-            def on_cancel():
+            def on_cancel() -> None:
+                """Dismiss the selection set window."""
                 window.visible = False
 
             with ui.VStack(
@@ -59,7 +66,14 @@ class SelectionSetWindow:
                     create_button = ui.Button("Create", enabled=False, clicked_fn=lambda w=widget: on_create(w))
                     ui.Button("Cancel", clicked_fn=on_cancel)
 
-                def window_pressed_key(key_index, key_flags, key_down):
+                def window_pressed_key(key_index: int, key_flags: int, key_down: bool) -> None:
+                    """Handle key presses for the dialog.
+
+                    Args:
+                        key_index: Keyboard key code.
+                        key_flags: Modifier flags.
+                        key_down: Whether the key was pressed.
+                    """
                     import carb.input
 
                     create_button.enabled = len(widget.model.as_string) > 0
@@ -76,16 +90,30 @@ class SelectionSetWindow:
                 widget.focus_keyboard()
                 window.set_key_pressed_fn(window_pressed_key)
 
-        self._window = window
-        self._widget = widget
+        self._window: ui.Window = window
+        self._widget: ui.StringField = widget
 
     def shutdown(self):
-        """Shuts down the SelectionSetWindow and cleans up resources."""
+        """Release UI resources for the selection set dialog.
+
+        Example:
+            .. code-block:: python
+
+                window = SelectionSetWindow(lambda name: None)
+                window.shutdown()
+        """
         self._callback = None
         del self._window
 
     def show(self):
-        """Shows the SelectionSetWindow and resets the input field."""
+        """Show the dialog and reset the input field.
+
+        Example:
+            .. code-block:: python
+
+                window = SelectionSetWindow(lambda name: None)
+                window.show()
+        """
         self._window.visible = True
         self._widget.model.set_value("")
         self._widget.focus_keyboard()

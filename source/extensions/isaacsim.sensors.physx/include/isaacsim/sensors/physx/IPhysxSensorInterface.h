@@ -278,10 +278,10 @@ struct LightBeamSensorInterface
 {
     CARB_PLUGIN_INTERFACE("isaacsim::sensors::physx::LightBeamSensorInterface", 0, 1);
 
-    //! Check is Prim a LightBeamSensorSchema
-    /*! Return True for is, False for is not an LightBeamSensorSchema
-     * \param usdPath sensor prim path
-     * \return true for is, false for is not an LightBeamSensorSchema
+    /**
+     * @brief Checks if a given path refers to a light beam sensor.
+     * @param[in] usdPath Path to the sensor in the scene.
+     * @return True if path refers to a light beam sensor, false otherwise.
      */
     bool(CARB_ABI* isLightBeamSensor)(const char* usdPath);
     /**

@@ -1,4 +1,29 @@
 # Changelog
+## [2.5.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [2.4.3] - 2026-02-18
+### Fixed
+- Replaced deprecated `onclick_fn` with `onclick_action` in menu items to eliminate deprecation warnings
+- Registered proper actions for PhysX Lidar and LightBeam sensor creation menu items
+
+## [2.4.2] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [2.4.1] - 2026-01-22
+### Changed
+- Move menu dictionary to initialize when tests are run rather than at module load time
+
+## [2.4.0] - 2025-12-22
+### Added
+- Add unit tests.
+
+## [2.3.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.3.0] - 2025-08-12
 ### Added
 - Tashan TS-F-A sensor under "LightBeam" menu
@@ -45,7 +70,7 @@
 
 ## [2.2.2] - 2025-02-14
 ### Added
-- sensors to context menu
+- Sensors to context menu
 
 ## [2.2.1] - 2025-01-21
 ### Changed
@@ -57,15 +82,15 @@
 
 ## [2.1.2] - 2024-12-04
 ### Changed
-- glyph for the Create Menu
+- Glyph for the Create Menu
 
 ## [2.1.1] - 2024-11-25
 ### Fixed
-- a bug in shutdown code
+- A bug in shutdown code
 
 ## [2.1.0] - 2024-11-01
 ### Changed
-- menu name and location
+- Menu name and location
 
 ## [2.0.1] - 2024-10-24
 ### Changed
@@ -77,7 +102,7 @@
 
 ## [1.0.1] - 2024-07-17
 ### Fixed
-- missing omni.kit.context_menu dependency
+- Missing omni.kit.context_menu dependency
 
 ## [1.0.0] - 2024-03-12
 ### Added

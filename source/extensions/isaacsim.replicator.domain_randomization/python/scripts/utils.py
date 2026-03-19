@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides utility functions for domain randomization in Isaac Sim replicator, including distribution parameter management, semantic data processing, 3D to 2D projection, truncation calculations, and NumPy JSON serialization."""
+
+
 import json
 from typing import Dict, List
 
@@ -20,13 +23,17 @@ import numpy as np
 from omni.replicator.core.utils import ReplicatorItem
 
 
-def set_distribution_params(distribution: ReplicatorItem, parameters: Dict) -> None:
-    """
+def set_distribution_params(distribution: ReplicatorItem, parameters: Dict):
+    """Updates parameter values of a replicator distribution object.
+
     Args:
-        distribution (ReplicatorItem): The replicator distribution object to be modified.
-        parameters (Dict): A dictionary where the keys are the names of the replicator
-                           distribution parameters and the values are the parameter values
-                           to be set.
+        distribution: The replicator distribution object to be modified.
+        parameters: A dictionary where the keys are the names of the replicator
+            distribution parameters and the values are the parameter values
+            to be set.
+
+    Raises:
+        ValueError: If the distribution does not have the specified parameter.
     """
     node = distribution.node
 
@@ -38,13 +45,17 @@ def set_distribution_params(distribution: ReplicatorItem, parameters: Dict) -> N
 
 
 def get_distribution_params(distribution: ReplicatorItem, parameters: List[str]) -> List:
-    """
-    Args:
-        distribution (ReplicatorItem): A replicator distribution object.
-        parameters (List[str]): A list of the names of the replicator distribution parameters.
-    Returns:
-        List[str]: A list of the distribution parameters of the given replicator distribution object.
+    """Retrieves parameter values from a replicator distribution object.
 
+    Args:
+        distribution: A replicator distribution object.
+        parameters: A list of the names of the replicator distribution parameters.
+
+    Returns:
+        A list of the distribution parameters of the given replicator distribution object.
+
+    Raises:
+        ValueError: If the distribution does not have the specified parameter.
     """
     node = distribution.node
     params = list()
@@ -69,6 +80,25 @@ def get_semantics(
     semantic_token_map,
     required_semantic_types,
 ):
+    """Extracts and processes semantic information from instance semantic data.
+
+    Processes semantic tokens to build hierarchical relationships between semantic entities and their parents,
+    filtering by required semantic types to generate semantic labels and unique identifiers.
+
+    Args:
+        num_semantics: Number of semantic entities to process.
+        num_semantic_tokens: Number of tokens per semantic entity.
+        instance_semantic_map: Array mapping instances to semantic indices.
+        min_semantic_idx: Minimum semantic index value for offset calculation.
+        max_semantic_hierarchy_depth: Maximum depth of semantic hierarchy.
+        semantic_token_map: Array containing semantic token strings.
+        required_semantic_types: List of semantic types to filter and include.
+
+    Returns:
+        A tuple containing (serialized_labels, semantic_ids, valid_count, prim_paths) where
+        serialized_labels is JSON string of semantic mappings, semantic_ids is list of unique identifiers,
+        valid_count is number of valid semantic entities, and prim_paths is list of primitive paths.
+    """
 
     instance_to_semantic = instance_semantic_map - min_semantic_idx
 
@@ -144,13 +174,15 @@ def get_semantics(
     return serialized_index_to_labels, semantic_ids, valid_semantic_entity_count, prim_paths
 
 
-def get_image_space_points(points, view_proj_matrix):
-    """
+def get_image_space_points(points, view_proj_matrix) -> np.ndarray:
+    """Projects 3D world space points into 2D image space coordinates.
+
     Args:
-        points: numpy array of N points (N, 3) in the world space. Points will be projected into the image space.
-        view_proj_matrix: Desired view projection matrix, transforming points from world frame to image space of desired camera
+        points: Numpy array of N points (N, 3) in the world space. Points will be projected into the image space.
+        view_proj_matrix: Desired view projection matrix, transforming points from world frame to image space of desired camera.
+
     Returns:
-        numpy array of shape (N, 3) of points projected into the image space.
+        Numpy array of shape (N, 3) of points projected into the image space.
     """
 
     homo = np.pad(points, ((0, 0), (0, 1)), constant_values=1.0)
@@ -162,13 +194,13 @@ def get_image_space_points(points, view_proj_matrix):
     return image_space_points
 
 
-def calculate_truncation_ratio_simple(corners, img_width, img_height):
-    """
-    Calculate the truncation ratio of a cuboid using a simplified bounding box method.
+def calculate_truncation_ratio_simple(corners, img_width: int, img_height: int) -> float:
+    """Calculate the truncation ratio of a cuboid using a simplified bounding box method.
+
     Args:
         corners: (9, 2) numpy array containing the projected corners of the cuboid.
-        img_width: width of image
-        img_height: height of image
+        img_width: Width of image.
+        img_height: Height of image.
 
     Returns:
         The truncation ratio of the cuboid.
@@ -198,7 +230,22 @@ def calculate_truncation_ratio_simple(corners, img_width, img_height):
 
 
 class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles NumPy arrays.
+
+    This encoder extends the standard JSON encoder to properly serialize NumPy arrays by converting them to Python lists,
+    making them JSON-serializable. When encountering a NumPy array during JSON serialization, it automatically converts
+    the array to a list format that can be included in the JSON output.
+    """
+
     def default(self, obj):
+        """Converts NumPy arrays to Python lists for JSON serialization.
+
+        Args:
+            obj: Object to serialize. If it's a NumPy array, converts to list.
+
+        Returns:
+            Python list if obj is a NumPy array, otherwise the result of the parent class default method.
+        """
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)

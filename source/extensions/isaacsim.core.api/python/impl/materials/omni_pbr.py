@@ -24,16 +24,16 @@ from pxr import Gf, Sdf, UsdShade
 
 
 class OmniPBR(VisualMaterial):
-    """[summary]
+    """OmniPBR physically-based rendering material.
 
     Args:
-        prim_path (str): [description]
-        name (str, optional): [description]. Defaults to "omni_pbr".
-        shader (Optional[UsdShade.Shader], optional): [description]. Defaults to None.
-        texture_path (Optional[str], optional): [description]. Defaults to None.
-        texture_scale (Optional[np.ndarray], optional): [description]. Defaults to None.
-        texture_translate (Optional[np.ndarray, optional): [description]. Defaults to None.
-        color (Optional[np.ndarray], optional): [description]. Defaults to None.
+        prim_path: USD prim path for the material.
+        name: Name identifier. Defaults to "omni_pbr".
+        shader: Existing shader to use. Defaults to None.
+        texture_path: Path to diffuse texture. Defaults to None.
+        texture_scale: Texture UV scale (x, y). Defaults to None.
+        texture_translate: Texture UV translation (x, y). Defaults to None.
+        color: Diffuse color RGB. Defaults to None.
     """
 
     def __init__(
@@ -98,10 +98,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def set_color(self, color: np.ndarray) -> None:
-        """[summary]
+        """Set the diffuse color.
 
         Args:
-            color (np.ndarray): [description]
+            color: RGB color array.
         """
         if self.shaders_list[0].GetInput("diffuse_color_constant").Get() is None:
             self.shaders_list[0].CreateInput("diffuse_color_constant", Sdf.ValueTypeNames.Color3f).Set(
@@ -112,10 +112,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def get_color(self) -> np.ndarray:
-        """[summary]
+        """Get the diffuse color.
 
         Returns:
-            np.ndarray: [description]
+            RGB color array.
         """
         if self.shaders_list[0].GetInput("diffuse_color_constant").Get() is None:
             carb.log_warn("A color attribute is not set yet")
@@ -124,10 +124,10 @@ class OmniPBR(VisualMaterial):
             return np.array(self.shaders_list[0].GetInput("diffuse_color_constant").Get())
 
     def set_texture(self, path: str) -> None:
-        """[summary]
+        """Set the diffuse texture path.
 
         Args:
-            path (str): [description]
+            path: Path to the texture file.
         """
         if self.shaders_list[0].GetInput("diffuse_texture").Get() is None:
             self.shaders_list[0].CreateInput("diffuse_texture", Sdf.ValueTypeNames.Asset).Set(path)
@@ -136,10 +136,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def get_texture(self) -> str:
-        """[summary]
+        """Get the diffuse texture path.
 
         Returns:
-            str: [description]
+            Path to the texture file.
         """
         if self.shaders_list[0].GetInput("diffuse_texture").Get() is None:
             carb.log_warn("A diffuse_texture attribute is not set yet")
@@ -148,11 +148,11 @@ class OmniPBR(VisualMaterial):
             return self.shaders_list[0].GetInput("diffuse_texture").Get()
 
     def set_texture_scale(self, x: float, y: float) -> None:
-        """[summary]
+        """Set the texture UV scale.
 
         Args:
-            x (float): [description]
-            y (float): [description]
+            x: Scale in U direction.
+            y: Scale in V direction.
         """
         if self.shaders_list[0].GetInput("texture_scale").Get() is None:
             self.shaders_list[0].CreateInput("texture_scale", Sdf.ValueTypeNames.Float2).Set(Gf.Vec2f([x, y]))
@@ -161,11 +161,11 @@ class OmniPBR(VisualMaterial):
         return
 
     def set_texture_translate(self, x: float, y: float) -> None:
-        """[summary]
+        """Set the texture UV translation.
 
         Args:
-            x (float): [description]
-            y (float): [description]
+            x: Translation in U direction.
+            y: Translation in V direction.
         """
         if self.shaders_list[0].GetInput("texture_translate").Get() is None:
             self.shaders_list[0].CreateInput("texture_translate", Sdf.ValueTypeNames.Float2).Set(Gf.Vec2f([x, y]))
@@ -174,10 +174,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def get_texture_scale(self) -> np.ndarray:
-        """[summary]
+        """Get the texture UV scale.
 
         Returns:
-            np.ndarray: [description]
+            Array with (x, y) scale values.
         """
         if self.shaders_list[0].GetInput("texture_scale").Get() is None:
             carb.log_warn("A texture_scale attribute is not set yet")
@@ -186,10 +186,10 @@ class OmniPBR(VisualMaterial):
             return np.array(self.shaders_list[0].GetInput("texture_scale").Get())
 
     def get_texture_translate(self) -> np.ndarray:
-        """[summary]
+        """Get the texture UV translation.
 
         Returns:
-            np.ndarray: [description]
+            Array with (x, y) translation values.
         """
         if self.shaders_list[0].GetInput("texture_translate").Get() is None:
             carb.log_warn("A texture_translate attribute is not set yet")
@@ -198,10 +198,10 @@ class OmniPBR(VisualMaterial):
             return np.array(self.shaders_list[0].GetInput("texture_translate").Get())
 
     def set_project_uvw(self, flag: bool) -> None:
-        """[summary]
+        """Enable or disable UVW projection.
 
         Args:
-            flag (bool): [description]
+            flag: True to enable projection, False to disable.
         """
         if self.shaders_list[0].GetInput("project_uvw").Get() is None:
             self.shaders_list[0].CreateInput("project_uvw", Sdf.ValueTypeNames.Bool).Set(flag)
@@ -210,10 +210,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def get_project_uvw(self) -> bool:
-        """[summary]
+        """Get the UVW projection state.
 
         Returns:
-            bool: [description]
+            True if projection is enabled, False otherwise.
         """
         if self.shaders_list[0].GetInput("project_uvw").Get() is None:
             carb.log_warn("A project_uvw attribute is not set yet")
@@ -222,10 +222,10 @@ class OmniPBR(VisualMaterial):
             return self.shaders_list[0].GetInput("project_uvw").Get()
 
     def set_reflection_roughness(self, amount: float) -> None:
-        """[summary]
+        """Set the reflection roughness.
 
         Args:
-            amount (float): [description]
+            amount: Roughness value (0-1).
         """
         if self.shaders_list[0].GetInput("reflection_roughness_constant").Get() is None:
             self.shaders_list[0].CreateInput("reflection_roughness_constant", Sdf.ValueTypeNames.Float).Set(amount)
@@ -234,10 +234,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def get_reflection_roughness(self) -> float:
-        """[summary]
+        """Get the reflection roughness.
 
         Returns:
-            float: [description]
+            Roughness value.
         """
         if self.shaders_list[0].GetInput("reflection_roughness_constant").Get() is None:
             carb.log_warn("A reflection_roughness_constant attribute is not set yet")
@@ -246,10 +246,10 @@ class OmniPBR(VisualMaterial):
             return self.shaders_list[0].GetInput("reflection_roughness_constant").Get()
 
     def set_metallic_constant(self, amount: float) -> None:
-        """[summary]
+        """Set the metallic constant.
 
         Args:
-            amount (float): [description]
+            amount: Metallic value (0-1).
         """
         if self.shaders_list[0].GetInput("metallic_constant").Get() is None:
             self.shaders_list[0].CreateInput("metallic_constant", Sdf.ValueTypeNames.Float).Set(amount)
@@ -258,10 +258,10 @@ class OmniPBR(VisualMaterial):
         return
 
     def get_metallic_constant(self) -> float:
-        """[summary]
+        """Get the metallic constant.
 
         Returns:
-            float: [description]
+            Metallic value.
         """
         if self.shaders_list[0].GetInput("metallic_constant").Get() is None:
             carb.log_warn("A metallic_constant attribute is not set yet")

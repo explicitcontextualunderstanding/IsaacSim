@@ -16,9 +16,11 @@
 import carb
 import numpy as np
 import omni.graph.core as og
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.replicator.domain_randomization import SIMULATION_CONTEXT_ATTRIBUTES
 from isaacsim.replicator.domain_randomization import physics_view as physics
+
+torch = import_module("torch")
 
 OPERATION_TYPES = ["direct", "additive", "scaling"]
 

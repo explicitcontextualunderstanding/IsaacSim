@@ -19,10 +19,10 @@ import unittest
 import carb
 import numpy as np
 import omni.kit.test
-import torch
 import warp as wp
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.deprecation_manager import import_module
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
 from isaacsim.core.prims import RigidPrim, XFormPrim
@@ -39,6 +39,8 @@ from isaacsim.core.utils.warp.rotations import euler_angles_to_quats as euler_an
 from omni.physx.scripts import physicsUtils
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 default_physics_material = {"static_friction": 1.0, "dynamic_friction": 1.0, "restitution": 0.0}
 

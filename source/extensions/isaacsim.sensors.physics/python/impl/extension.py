@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension module for Isaac Sim physics sensors, providing access to contact sensors and IMU sensors."""
+
+
 import gc
 
 import omni
@@ -23,11 +26,29 @@ EXTENSION_NAME = "Isaac Sensor"
 
 
 class Extension(omni.ext.IExt):
+    """Extension for Isaac Sim physics sensors.
+
+    Provides access to physics-based sensors including contact sensors and IMU sensors through
+    the Isaac Sim sensor interfaces. This extension manages the initialization and cleanup of
+    sensor interfaces required for physics simulation in Isaac Sim.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initialize the Isaac Sensor extension.
+
+        Acquires the contact sensor and IMU sensor interfaces for use by the extension.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self._cs = _sensor.acquire_contact_sensor_interface()
         self._is = _sensor.acquire_imu_sensor_interface()
 
     def on_shutdown(self):
+        """Clean up the Isaac Sensor extension.
+
+        Releases the contact sensor and IMU sensor interfaces and performs garbage collection.
+        """
         _sensor.release_contact_sensor_interface(self._cs)
         _sensor.release_imu_sensor_interface(self._is)
 

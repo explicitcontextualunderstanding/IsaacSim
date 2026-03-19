@@ -13,11 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for the NVIDIA JetBot robot simulation including loading, movement, acceleration, braking, spinning, and circular motion behaviors."""
+
+
 import math
 import time
 
 import carb
 import carb.tokens
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.graph.core as og
 
@@ -25,19 +30,22 @@ import omni.graph.core as og
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-from isaacsim.core.api import World
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.prims import delete_prim
-from isaacsim.core.utils.stage import open_stage_async
+import omni.timeline
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.storage.native import get_assets_root_path_async
 
-from .robot_helpers import init_robot_sim, setup_robot_og
+from .robot_helpers import init_robot_sim, open_stage_async, setup_robot_og
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestJetBot(omni.kit.test.AsyncTestCase):
+    """Tests for the NVIDIA JetBot robot simulation."""
+
     # Before running each test
     async def setUp(self):
+        """Set up test environment with JetBot robot."""
+        self._timeline = omni.timeline.get_timeline_interface()
+
         self._assets_root_path = await get_assets_root_path_async()
         if self._assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
@@ -51,8 +59,9 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
 
         await omni.kit.app.get_app().next_update_async()
 
-        self.my_world = World(stage_units_in_meters=1.0)
-        await self.my_world.initialize_simulation_context_async()
+        # Set stage units
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        await app_utils.update_app_async()
 
         # setup omnigraph
         self.graph_path = "/ActionGraph"
@@ -64,8 +73,8 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
 
     # After running each test
     async def tearDown(self):
-        self.my_world.stop()
-        self.my_world.clear_instance()
+        """Clean up test environment and stop timeline."""
+        self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
@@ -75,27 +84,28 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
 
     # Actual test, notice it is "async" function, so "await" can be used if needed
     async def test_loading(self):
+        """Test that the JetBot robot loads and can move forward."""
 
-        delete_prim("/ActionGraph")
+        stage_utils.delete_prim("/ActionGraph")
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         # get the jetbot
-        self.ar = SingleArticulation("/jetbot")
-        self.ar._articulation_view.initialize()
-        self.starting_pos, _ = self.ar.get_world_pose()
-        left_wheel_joint_idx = self.ar._articulation_view.get_dof_index("left_wheel_joint")
-        right_wheel_joint_idx = self.ar._articulation_view.get_dof_index("right_wheel_joint")
-        self.ar._articulation_view.set_joint_velocity_targets(
-            velocities=np.array([1.0, 1.0]), joint_indices=[left_wheel_joint_idx, right_wheel_joint_idx]
-        )
+        self.ar = Articulation("/jetbot")
+        # Wait for physics to be ready
+        await omni.kit.app.get_app().next_update_async()
+        starting_pos, _ = self.ar.get_world_poses()
+        self.starting_pos = starting_pos.numpy()[0]
+        dof_indices = self.ar.get_dof_indices(["left_wheel_joint", "right_wheel_joint"])
+        self.ar.set_dof_velocity_targets(velocities=np.array([[1.0, 1.0]]), dof_indices=dof_indices)
 
         # move the jetbot
         for i in range(60):
             await omni.kit.app.get_app().next_update_async()
 
-        self.current_pos, _ = self.ar.get_world_pose()
+        current_pos, _ = self.ar.get_world_poses()
+        self.current_pos = current_pos.numpy()[0]
 
         delta = np.linalg.norm(self.current_pos - self.starting_pos)
         print("Diff is ", delta)
@@ -106,12 +116,13 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
     # general, slowly building up speed testcase
     # note, jetbot cannot exceed 0.42 m/s
     async def test_accel(self):
+        """Test acceleration behavior with gradually increasing velocities."""
 
         odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
 
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         await init_robot_sim("/jetbot")
@@ -126,28 +137,29 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
             print(x, forward_velocity, og.DataView.get(odom_velocity)[0])
             if og.DataView.get(odom_ang_vel)[2] > 0.8:
                 print("spinning out of control, linear velocity: " + str(forward_velocity))
-                self.my_world.stop()
+                self._timeline.stop()
             else:
                 self.assertAlmostEqual(og.DataView.get(odom_velocity)[0], forward_velocity, delta=1e-1)
             await omni.kit.app.get_app().next_update_async()
 
-        self.my_world.stop()
+        self._timeline.stop()
 
         pass
 
     # braking from different init speeds
     async def test_brake(self):
+        """Test braking behavior from various initial velocities."""
 
         odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
 
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         await init_robot_sim("/jetbot")
         for x in range(1, 5):
-            self.my_world.play()
+            self._timeline.play()
             await omni.kit.app.get_app().next_update_async()
             forward_velocity = x * 0.10
             angular_velocity = x * 0.10
@@ -169,16 +181,17 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
             self.assertAlmostEqual(og.DataView.get(odom_velocity)[0], 0.0, delta=5e-1)
             self.assertAlmostEqual(og.DataView.get(odom_ang_vel)[2], 0.0, delta=5e-1)
 
-            self.my_world.stop()
+            self._timeline.stop()
             await omni.kit.app.get_app().next_update_async()
         pass
 
     async def test_spin(self):
+        """Test spinning behavior at different angular velocities."""
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
 
         for x in range(1, 6):
             # Start Simulation and wait
-            self.my_world.play()
+            self._timeline.play()
             await omni.kit.app.get_app().next_update_async()
 
             await init_robot_sim("/jetbot")
@@ -195,18 +208,19 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
             curr_ang_vel = float(og.DataView.get(odom_ang_vel)[2])
             self.assertAlmostEqual(curr_ang_vel, angular_velocity, delta=2e-1)
 
-        self.my_world.stop()
+        self._timeline.stop()
 
         pass
 
     # go in circle
     async def test_circle(self):
+        """Test circular motion and verify return to starting position."""
         odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
         odom_position = og.Controller.attribute("outputs:position", self.odom_node)
 
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         await init_robot_sim("/jetbot")
@@ -226,69 +240,3 @@ class TestJetBot(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
         pass
-
-    # corner case: quick accel from zero
-    # async def test_jetbot_accel_drop_reset(self):
-    #     odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
-    #     odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
-
-    #     # Start Simulation and wait
-    #     self.my_world.play()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     await init_robot_sim("/jetbot")
-    #     l_wheel = self.dc.get_rigid_body("/jetbot/left_wheel")
-
-    #     forward_velocity = 0.2
-    #     og.Controller.attribute(self.graph_path + "/DifferentialController.inputs:linearVelocity").set(forward_velocity)
-
-    #     # wait until const velocity reached
-    #     for i in range(50):
-    #         await omni.kit.app.get_app().next_update_async()
-
-    #     curr_t = 0
-    #     for i in range(1600):
-    #         if i - curr_t >= 200:
-    #             self.my_world.stop()
-    #             og.Controller.attribute(self.graph_path + "/DifferentialController.inputs:linearVelocity").set(0)
-    #             await omni.kit.app.get_app().next_update_async()
-    #             curr_t = i
-    #             self.my_world.play()
-    #             await omni.kit.app.get_app().next_update_async()
-
-    #             await init_robot_sim("/jetbot")
-    #             # l_wheel = self.dc.get_rigid_body("/jetbot/left_wheel")
-
-    #             # wait until const velocity reached
-    #             for j in range(100):
-    #                 await omni.kit.app.get_app().next_update_async()
-
-    #             forward_velocity += 0.2
-    #             og.Controller.attribute(self.graph_path + "/DifferentialController.inputs:linearVelocity").set(
-    #                 forward_velocity
-    #             )
-
-    #             print("forward velocity: " + str(forward_velocity))
-
-    #             # wait until const velocity reached
-    #             for j in range(100):
-    #                 await omni.kit.app.get_app().next_update_async()
-
-    #         if og.DataView.get(odom_ang_vel)[2] > 0.8:
-    #             print("spinning out of control!")
-    #             print("linear velocity: " + str(forward_velocity))
-    #             self.my_world.stop()
-
-    #         else:
-    #             curr_vel = float(og.DataView.get(odom_velocity)[0])
-    #             self.assertAlmostEqual(curr_vel, forward_velocity, delta=5e-1)
-    #             self.assertAlmostEqual(
-    #                 curr_vel, (self.dc.get_rigid_body_angular_velocity(l_wheel)[1]) * 0.0325, delta=0.25
-    #             )
-    #             print(self.dc.get_rigid_body_angular_velocity(l_wheel)[1] * 0.0325)
-    #             print("correct forward velocity: " + str(forward_velocity))
-    #         await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.stop()
-
-    #     pass

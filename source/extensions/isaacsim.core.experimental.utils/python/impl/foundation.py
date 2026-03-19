@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Functions for working with USD/USDRT foundations, e.g.: Scene Description Foundations (Sdf), Graphics Foundations (Gf).
+"""
+
 from __future__ import annotations
 
 from typing import Literal

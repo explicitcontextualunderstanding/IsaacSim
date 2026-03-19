@@ -28,10 +28,11 @@ required_extensions = [
     "omni.kit.loop",
     "omni.kit.usd.mdl",
     "omni.usd.metrics.assembler.ui",
+    "omni.hydra.usdrt_delegate",
 ]
 
 # Create extra_args list using a loop
-extra_args = []
+extra_args = [f"--/app/exts/folders=['apps','exts','extscache','extsUser','extsDeprecated']"]
 for extension in required_extensions:
     extra_args.extend(["--enable", extension])
 

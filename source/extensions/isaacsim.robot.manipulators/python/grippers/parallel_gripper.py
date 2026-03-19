@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides high level functions for controlling parallel grippers with two fingers through joint position control."""
+
+
 from typing import Callable, List
 
 import numpy as np
@@ -25,12 +29,14 @@ class ParallelGripper(Gripper):
     (a gripper that has two fingers).
 
     Args:
-        end_effector_prim_path (str): prim path of the Prim that corresponds to the gripper root/ end effector.
-        joint_prim_names (List[str]): the left finger joint prim name and the right finger joint prim name respectively.
-        joint_opened_positions (np.ndarray): joint positions of the left finger joint and the right finger joint respectively when opened.
-        joint_closed_positions (np.ndarray): joint positions of the left finger joint and the right finger joint respectively when closed.
-        action_deltas (np.ndarray, optional): deltas to apply for finger joint positions when openning or closing the gripper. Defaults to None.
-        use_mimic_joints (bool, optional): whether to use mimic joints. Defaults to False. If True, only the drive joint is used
+        end_effector_prim_path: Prim path of the Prim that corresponds to the gripper root/ end effector.
+        joint_prim_names: The left finger joint prim name and the right finger joint prim name respectively.
+        joint_opened_positions: Joint positions of the left finger joint and the right finger joint respectively when
+            opened.
+        joint_closed_positions: Joint positions of the left finger joint and the right finger joint respectively when
+            closed.
+        action_deltas: Deltas to apply for finger joint positions when opening or closing the gripper.
+        use_mimic_joints: Whether to use mimic joints. If True, only the drive joint is used.
     """
 
     def __init__(
@@ -41,7 +47,7 @@ class ParallelGripper(Gripper):
         joint_closed_positions: np.ndarray,
         action_deltas: np.ndarray = None,
         use_mimic_joints: bool = False,
-    ) -> None:
+    ):
         Gripper.__init__(self, end_effector_prim_path=end_effector_prim_path)
         self._joint_prim_names = joint_prim_names
         self._joint_dof_indicies = np.array([None, None])
@@ -56,53 +62,57 @@ class ParallelGripper(Gripper):
 
     @property
     def joint_opened_positions(self) -> np.ndarray:
-        """
+        """Joint positions of the left finger joint and the right finger joint respectively when opened.
+
         Returns:
-            np.ndarray: joint positions of the left finger joint and the right finger joint respectively when opened.
+            Joint positions of the left finger joint and the right finger joint respectively when opened.
         """
         return self._joint_opened_positions
 
     @property
     def joint_closed_positions(self) -> np.ndarray:
-        """
+        """Joint positions of the left finger joint and the right finger joint respectively when closed.
+
         Returns:
-            np.ndarray: joint positions of the left finger joint and the right finger joint respectively when closed.
+            Joint positions of the left finger joint and the right finger joint respectively when closed.
         """
         return self._joint_closed_positions
 
     @property
     def joint_dof_indicies(self) -> np.ndarray:
-        """
+        """Joint DOF indices in the articulation of the left finger joint and the right finger joint respectively.
+
         Returns:
-            np.ndarray: joint dof indices in the articulation of the left finger joint and the right finger joint respectively.
+            Joint DOF indices in the articulation of the left finger joint and the right finger joint respectively.
         """
         return self._joint_dof_indicies
 
     @property
     def joint_prim_names(self) -> List[str]:
-        """
+        """The left finger joint prim name and the right finger joint prim name respectively.
+
         Returns:
-            List[str]: the left finger joint prim name and the right finger joint prim name respectively.
+            The left finger joint prim name and the right finger joint prim name respectively.
         """
         return self._joint_prim_names
 
     @property
-    def active_joint_indices(self):
-        """Get the indices of active joints based on the use_mimic_joints setting.
+    def active_joint_indices(self) -> list[int]:
+        """Indices of active joints based on the use_mimic_joints setting.
 
         Returns:
-            List[int]: List of active joint indices.
+            List of active joint indices.
         """
         if self._use_mimic_joints:
             return [self._joint_dof_indicies[0]]
         return [self._joint_dof_indicies[0], self._joint_dof_indicies[1]]
 
     @property
-    def active_joint_count(self):
-        """Get the number of active joints based on the use_mimic_joints setting.
+    def active_joint_count(self) -> int:
+        """Number of active joints based on the use_mimic_joints setting.
 
         Returns:
-            int: Number of active joints (1 or 2).
+            Number of active joints (1 or 2).
         """
         return 1 if self._use_mimic_joints else 2
 
@@ -113,20 +123,20 @@ class ParallelGripper(Gripper):
         set_joint_positions_func: Callable,
         dof_names: List,
         physics_sim_view: omni.physics.tensors.SimulationView = None,
-    ) -> None:
+    ):
         """Create a physics simulation view if not passed and creates a rigid prim view using physX tensor api.
-            This needs to be called after each hard reset (i.e stop + play on the timeline) before interacting with any
-            of the functions of this class.
+        This needs to be called after each hard reset (i.e stop + play on the timeline) before interacting with any
+        of the functions of this class.
 
         Args:
-            articulation_apply_action_func (Callable): apply_action function from the Articulation class.
-            get_joint_positions_func (Callable): get_joint_positions function from the Articulation class.
-            set_joint_positions_func (Callable): set_joint_positions function from the Articulation class.
-            dof_names (List): dof names from the Articulation class.
-            physics_sim_view (omni.physics.tensors.SimulationView, optional): current physics simulation view. Defaults to None
+            articulation_apply_action_func: apply_action function from the Articulation class.
+            get_joint_positions_func: get_joint_positions function from the Articulation class.
+            set_joint_positions_func: set_joint_positions function from the Articulation class.
+            dof_names: dof names from the Articulation class.
+            physics_sim_view: current physics simulation view.
 
         Raises:
-            Exception: _description_
+            Exception: If not all gripper dof names were resolved to dof handles and dof indices.
         """
         Gripper.initialize(self, physics_sim_view=physics_sim_view)
         self._get_joint_positions_func = get_joint_positions_func
@@ -154,47 +164,48 @@ class ParallelGripper(Gripper):
         self._set_joint_positions_func = set_joint_positions_func
         return
 
-    def open(self) -> None:
+    def open(self):
         """Applies actions to the articulation that opens the gripper (ex: to release an object held)."""
         self._articulation_apply_action_func(self.forward(action="open"))
         return
 
-    def close(self) -> None:
+    def close(self):
         """Applies actions to the articulation that closes the gripper (ex: to hold an object)."""
         self._articulation_apply_action_func(self.forward(action="close"))
         return
 
-    def set_action_deltas(self, value: np.ndarray) -> None:
-        """
+    def set_action_deltas(self, value: np.ndarray):
+        """Sets the deltas to apply for finger joint positions when opening or closing the gripper.
+
         Args:
-            value (np.ndarray): deltas to apply for finger joint positions when openning or closing the gripper.
-                               [left, right]. Defaults to None.
+            value: deltas to apply for finger joint positions when openning or closing the gripper.
+                [left, right].
         """
         self._action_deltas = value
         return
 
     def get_action_deltas(self) -> np.ndarray:
-        """
+        """Deltas that will be applied for finger joint positions when opening or closing the gripper.
+
         Returns:
-            np.ndarray: deltas that will be applied for finger joint positions when openning or closing the gripper.
-                        [left, right]. Defaults to None.
+            Deltas for left and right finger joints.
         """
         return self._action_deltas
 
-    def set_default_state(self, joint_positions: np.ndarray) -> None:
-        """Sets the default state of the gripper
+    def set_default_state(self, joint_positions: np.ndarray):
+        """Sets the default state of the gripper.
 
         Args:
-            joint_positions (np.ndarray): joint positions of the left finger joint and the right finger joint respectively.
+            joint_positions: Joint positions of the left finger joint and the right finger joint respectively.
         """
         self._default_state = joint_positions
         return
 
     def get_default_state(self) -> np.ndarray:
-        """Gets the default state of the gripper
+        """Gets the default state of the gripper.
 
         Returns:
-            np.ndarray: joint positions of the left finger joint and the right finger joint respectively.
+            Joint positions of the left finger joint and the right finger joint respectively.
         """
         return self._default_state
 
@@ -204,34 +215,36 @@ class ParallelGripper(Gripper):
         self._set_joint_positions_func(positions=self._default_state, joint_indices=self.active_joint_indices)
         return
 
-    def set_joint_positions(self, positions: np.ndarray) -> None:
-        """
+    def set_joint_positions(self, positions: np.ndarray):
+        """Sets the joint positions of the gripper fingers.
+
         Args:
-            positions (np.ndarray): joint positions of the left finger joint and the right finger joint respectively.
+            positions: Joint positions of the left finger joint and the right finger joint respectively.
         """
         self._set_joint_positions_func(positions=positions, joint_indices=self.active_joint_indices)
         return
 
     def get_joint_positions(self) -> np.ndarray:
-        """
+        """Joint positions of the left finger joint and the right finger joint respectively.
+
         Returns:
-            np.ndarray: joint positions of the left finger joint and the right finger joint respectively.
+            Joint positions of the left finger joint and the right finger joint respectively.
         """
         return self._get_joint_positions_func(joint_indices=self.active_joint_indices)
 
     def forward(self, action: str) -> ArticulationAction:
-        """calculates the ArticulationAction for all of the articulation joints that corresponds to "open"
-           or "close" actions.
+        """Calculates the ArticulationAction for all of the articulation joints that corresponds to "open"
+        or "close" actions.
 
         Args:
-            action (str): "open" or "close" as an abstract action.
+            action: "open" or "close" as an abstract action.
 
         Raises:
-            Exception: _description_
+            Exception: If action is not "open" or "close".
 
         Returns:
-            ArticulationAction: articulation action to be passed to the articulation itself
-                                (includes all joints of the articulation).
+            Articulation action to be passed to the articulation itself
+            (includes all joints of the articulation).
         """
         target_joint_positions = [None] * self._articulation_num_dofs
 
@@ -261,11 +274,11 @@ class ParallelGripper(Gripper):
 
         return ArticulationAction(joint_positions=target_joint_positions)
 
-    def apply_action(self, control_actions: ArticulationAction) -> None:
+    def apply_action(self, control_actions: ArticulationAction):
         """Applies actions to all the joints of an articulation that corresponds to the ArticulationAction of the finger joints only.
 
         Args:
-            control_actions (ArticulationAction): ArticulationAction for the left finger joint and the right finger joint respectively.
+            control_actions: ArticulationAction for the left finger joint and the right finger joint respectively.
         """
         joint_actions = ArticulationAction()
         if control_actions.joint_positions is not None:

@@ -50,15 +50,17 @@ simulation_app = SimulationApp(
 
 import carb
 import omni
+from isaacsim.core.experimental.utils.stage import is_stage_loading
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.core.utils.rotations import euler_angles_to_quat
-from isaacsim.core.utils.stage import is_stage_loading
 from isaacsim.sensors.camera import SingleViewDepthSensor
 
 enable_extension("isaacsim.benchmark.services")
-from isaacsim.benchmark.services import BaseIsaacBenchmark
+from isaacsim.benchmark.services import DEFAULT_RECORDERS, BaseIsaacBenchmark
 
 # Create the benchmark
+# Define recorders to use, use default set, other combinations, or custom data recorders
+recorders = DEFAULT_RECORDERS + ["gpu_frametime"] if gpu_frametime else DEFAULT_RECORDERS
 benchmark = BaseIsaacBenchmark(
     benchmark_name="benchmark_single_view_depth_sensor",
     workflow_metadata={
@@ -70,7 +72,7 @@ benchmark = BaseIsaacBenchmark(
         ]
     },
     backend_type=args.backend_type,
-    gpu_frametime=gpu_frametime,
+    recorders=recorders,
 )
 benchmark.set_phase("loading", start_recording_frametime=False, start_recording_runtime=True)
 

@@ -18,68 +18,84 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
 
-import omni.usd
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid, VisualCuboid
-from isaacsim.core.api.objects.ground_plane import GroundPlane
-from pxr import Sdf, UsdLux
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
+from isaacsim.core.experimental.materials import PreviewSurfaceMaterial
+from isaacsim.core.experimental.objects import Cube, DistantLight, GroundPlane
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim
+from isaacsim.core.rendering_manager import RenderingManager
+from isaacsim.core.simulation_manager import SimulationManager
+
+# Create a new stage
+stage_utils.create_new_stage()
 
 # Add Ground Plane
-GroundPlane(prim_path="/World/GroundPlane", z_position=0)
+GroundPlane("/World/GroundPlane", positions=[0, 0, 0])
 
 # Add Light Source
-stage = omni.usd.get_context().get_stage()
-distantLight = UsdLux.DistantLight.Define(stage, Sdf.Path("/DistantLight"))
-distantLight.CreateIntensityAttr(300)
+distant_light = DistantLight("/DistantLight")
+distant_light.set_intensities(300)
+
+# Create materials for cubes
+yellow_material = PreviewSurfaceMaterial("/Materials/yellow")
+yellow_material.set_input_values("diffuseColor", [1.0, 1.0, 0.0])  # - Yellow (RGB 255,255,0 -> normalized)
+
+green_material = PreviewSurfaceMaterial("/Materials/green")
+green_material.set_input_values("diffuseColor", [0.0, 1.0, 0.0])  # - Green (RGB 0,255,0 -> normalized)
+
+cyan_material = PreviewSurfaceMaterial("/Materials/cyan")
+cyan_material.set_input_values("diffuseColor", [0.0, 1.0, 1.0])  # - Cyan (RGB 0,255,255 -> normalized)
 
 # Add Visual Cubes
-visual_cube = VisualCuboid(
-    prim_path="/visual_cube",
-    name="visual_cube",
-    position=np.array([0, 0.5, 1.0]),
-    size=0.3,
-    color=np.array([255, 255, 0]),
+visual_cube = Cube(
+    paths="/visual_cube",
+    positions=[0, 0.5, 1.0],
+    sizes=0.3,
 )
+visual_cube.apply_visual_materials(yellow_material)
 
-visual_cube_static = VisualCuboid(
-    prim_path="/visual_cube_static",
-    name="visual_cube_static",
-    position=np.array([0.5, 0, 0.5]),
-    size=0.3,
-    color=np.array([0, 255, 0]),
+visual_cube_static = Cube(
+    paths="/visual_cube_static",
+    positions=[0.5, 0, 0.5],
+    sizes=0.3,
 )
+visual_cube_static.apply_visual_materials(green_material)
 
 # Add Physics Cubes
-dynamic_cube = DynamicCuboid(
-    prim_path="/dynamic_cube",
-    name="dynamic_cube",
-    position=np.array([0, -0.5, 1.5]),
-    size=0.3,
-    color=np.array([0, 255, 255]),
+dynamic_cube = Cube(
+    paths="/dynamic_cube",
+    positions=[0, -0.5, 1.5],
+    sizes=0.3,
 )
+dynamic_cube.apply_visual_materials(cyan_material)
 
-# start a world to step simulator
-my_world = World(stage_units_in_meters=1.0)
+# - Apply physics to `dynamic_cube`
+dynamic_rigid = RigidPrim(paths="/dynamic_cube")
+dynamic_geom = GeomPrim(paths="/dynamic_cube", apply_collision_apis=True)
 
-# start the simulator
+SimulationManager.set_physics_dt(1.0 / 60.0)
+
+# Start timeline
+app_utils.play()
+simulation_app.update()
+
+# Start the simulator.
 for i in range(3):
-    my_world.reset()
-    print("simulator running", i)
+    # - Reset simulation
+    app_utils.stop()
+    app_utils.play()
+    simulation_app.update()
+
+    print("Simulator running", i)
     if i == 1:
         print("Adding Physics Properties to the Visual Cube")
-        from isaacsim.core.prims import RigidPrim
-
-        RigidPrim("/visual_cube")
+        visual_rigid = RigidPrim("/visual_cube")  # - Apply physics to `visual_cube`
 
     if i == 2:
         print("Adding Collision Properties to the Visual Cube")
-        from isaacsim.core.prims import GeometryPrim
-
-        prim = GeometryPrim("/visual_cube")
-        prim.apply_collision_apis()
+        visual_geometry = GeomPrim("/visual_cube", apply_collision_apis=True)  # - Apply collision to `visual_cube`
 
     for j in range(100):
-        my_world.step(render=True)  # stepping through the simulation
-
-# shutdown the simulator automatically
-simulation_app.close()
+        SimulationManager.step()
+        RenderingManager.render()
+        simulation_app.update()  # - Stepping through the simulation

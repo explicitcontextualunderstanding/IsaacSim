@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Properties widget for Surface Gripper prims providing specialized controls and attribute display for gripper functionality in the USD property panel."""
+
+
 import asyncio
 from functools import partial
 from typing import List
@@ -52,6 +56,28 @@ from usd.schema.isaac import robot_schema
 
 
 class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
+    """Properties widget for Surface Gripper prims in the USD stage.
+
+    This widget provides a specialized property interface for ``SurfaceGripper`` prims, enabling users to view and
+    modify gripper attributes and relationships through the Omniverse Kit property panel. It displays gripper-specific
+    properties such as status, grip limits, force constraints, and attachment points in a customized layout.
+
+    The widget includes interactive controls for opening and closing the gripper, automatically refreshes when USD
+    changes occur, and filters properties to show only those relevant to Surface Gripper functionality. Properties
+    are displayed in a logical order with custom display names and tooltips for better user experience.
+
+    Key features include:
+    - Interactive open/close gripper buttons
+    - Custom property ordering and display names
+    - Real-time USD change monitoring and refresh
+    - Filtered view showing only Surface Gripper properties
+    - Support for both attributes (status, limits, offsets) and relationships (attachment points, gripped objects)
+
+    Args:
+        *args: Variable positional arguments passed to the parent UsdPropertiesWidget.
+        **kwargs: Additional keyword arguments passed to the parent UsdPropertiesWidget.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._old_payload = []
@@ -112,6 +138,12 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
         window.frame.rebuild()
 
     def _on_usd_changed(self, notice, stage):
+        """Handles USD change notifications.
+
+        Args:
+            notice: The USD notice containing change information.
+            stage: The USD stage that was modified.
+        """
         targets = notice.GetChangedInfoOnlyPaths()
         if self._old_payload != self.on_new_payload(
             self._payload
@@ -122,6 +154,14 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
             super()._on_usd_changed(notice, stage)
 
     def _get_prim(self, prim_path):
+        """Gets a Surface Gripper prim from the specified path.
+
+        Args:
+            prim_path: Path to the prim.
+
+        Returns:
+            The Surface Gripper prim if valid, otherwise None.
+        """
         if prim_path:
             stage = self._payload.get_stage()
             if stage:
@@ -131,8 +171,13 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
         return None
 
     def on_new_payload(self, payload):
-        """
-        See PropertyWidget.on_new_payload
+        """See PropertyWidget.on_new_payload
+
+        Args:
+            payload: The new payload containing prim selection data.
+
+        Returns:
+            List of valid Surface Gripper prims if found, otherwise False.
         """
 
         if not super().on_new_payload(payload):
@@ -147,9 +192,7 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
         return self._prims
 
     def build_items(self):
-        """
-        Build the property widget items for the Surface Gripper.
-        """
+        """Build the property widget items for the Surface Gripper."""
         # Reset the widget state
         self.reset()
 
@@ -229,7 +272,14 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
             asyncio.ensure_future(self._build_schema_group_frames(frame, stage, grouped_props, last_prim))
 
     def _customize_props_layout(self, props):
-        """Customize the properties layout with specific display names and tooltips."""
+        """Customize the properties layout with specific display names and tooltips.
+
+        Args:
+            props: The properties to customize.
+
+        Returns:
+            The customized properties with applied metadata.
+        """
         # Apply metadata to properties
         for prop in props:
             if prop.prop_name in self.property_metadata:
@@ -240,6 +290,7 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
         return props
 
     def close(self):
+        """Closes the gripper for all selected prims."""
         gripper_interface = surface_gripper.acquire_surface_gripper_interface()
         for prim in self._prims:
             # Define the prim path for your gripper
@@ -249,26 +300,57 @@ class SurfaceGripperPropertiesWidget(UsdPropertiesWidget):
             success = gripper_interface.close_gripper(gripper_path)
 
     def open(self):
+        """Opens the gripper for all selected prims."""
         gripper_interface = surface_gripper.acquire_surface_gripper_interface()
         for prim in self._prims:
             gripper_path = prim.GetPath().pathString
             success = gripper_interface.open_gripper(gripper_path)
 
     def _on_forward_axis_selection(self, item: str):
+        """Handles forward axis selection changes.
+
+        Args:
+            item: The selected axis item.
+        """
         pass
 
     def _on_coaxial_force_limit_changed(self, value: float):
+        """Handles coaxial force limit value changes.
+
+        Args:
+            value: The new coaxial force limit value.
+        """
         print("Coaxial Force Limit Changed was called!", value)
         pass
 
     def _on_grip_distance_changed(self, value: float):
+        """Handles changes to the grip distance value.
+
+        Args:
+            value: The new grip distance value.
+        """
         pass
 
     def _on_max_grip_distance_changed(self, value: float):
+        """Handles changes to the maximum grip distance value.
+
+        Args:
+            value: The new maximum grip distance value.
+        """
         pass
 
     def _on_retry_interval_changed(self, value: float):
+        """Handles changes to the retry interval value.
+
+        Args:
+            value: The new retry interval value.
+        """
         pass
 
     def _on_shear_force_limit_changed(self, value: float):
+        """Handles changes to the shear force limit value.
+
+        Args:
+            value: The new shear force limit value.
+        """
         pass

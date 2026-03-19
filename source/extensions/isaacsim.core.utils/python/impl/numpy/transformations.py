@@ -20,14 +20,14 @@ from scipy.spatial.transform import Rotation
 
 
 def tf_matrices_from_poses(translations: np.ndarray, orientations: np.ndarray, device=None) -> np.ndarray:
-    """[summary]
+    """Compute transformation matrices from translation and orientation arrays.
 
     Args:
-        translations (Union[np.ndarray, torch.Tensor]): translations with shape (N, 3).
-        orientations (Union[np.ndarray, torch.Tensor]): quaternion representation (scalar first) with shape (N, 4).
+        translations: Translations with shape (N, 3).
+        orientations: Quaternion orientations (scalar first) with shape (N, 4).
 
     Returns:
-        Union[np.ndarray, torch.Tensor]: transformation matrices with shape (N, 4, 4)
+        Transformation matrices with shape (N, 4, 4).
     """
 
     result = np.zeros([orientations.shape[0], 4, 4], dtype=np.float32)

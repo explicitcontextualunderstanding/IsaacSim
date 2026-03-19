@@ -21,14 +21,14 @@ from isaacsim.robot.manipulators.grippers.parallel_gripper import ParallelGrippe
 
 
 class StackingController(manipulators_controllers.StackingController):
-    """[summary]
+    """Stacking controller for the Franka robot.
 
     Args:
-        name (str): [description]
-        gripper (ParallelGripper): [description]
-        robot_prim_path (str): [description]
-        picking_order_cube_names (List[str]): [description]
-        robot_observation_name (str): [description]
+        name: Name identifier for the controller.
+        gripper: The parallel gripper to use.
+        robot_articulation: The robot articulation to control.
+        picking_order_cube_names: Ordered list of cube names to stack.
+        robot_observation_name: Name key for robot observations.
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class StackingController(manipulators_controllers.StackingController):
         robot_articulation: SingleArticulation,
         picking_order_cube_names: List[str],
         robot_observation_name: str,
-    ) -> None:
+    ):
         manipulators_controllers.StackingController.__init__(
             self,
             name=name,

@@ -1,4 +1,55 @@
 # Changelog
+
+## [3.2.1] - 2026-03-09
+### Changed
+- update urdf-usd-converter to v0.1.0
+
+## [3.2.0] - 2026-03-04
+### Changed
+- urdf converter version bump to v0.1.0rc2
+
+## [3.1.0] - 2026-02-26
+### Changed
+- Added mjc / newton to physx attribute conversion for multi-physics engine asset support
+
+## [3.0.0] - 2026-02-01
+### Changed
+- USD exchange based backend
+- Unified UI
+- Asset structure 3
+
+## [2.5.0] - 2026-01-10
+### Removed
+- Removed UI elements from the URDF importer, moved to isaacsim.asset.importer.urdf.ui extension
+
+## [2.4.37] - 2026-01-05
+### Fixed
+- Updated configuring of mimic joints to be processed after all joints are created to avoid issues with lexicographical order of siblings
+
+## [2.4.36] - 2025-12-07
+### Changed
+- Update description
+
+## [2.4.35] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.4.34] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [2.4.33] - 2025-11-26
+### Fixed
+- Fixed issue that caused crash of Isaac sim on failed mesh conversion
+
+## [2.4.32] - 2025-11-25
+### Changed
+- Restore deprecated behavior of merging bodies with inertia; issue warning
+
+## [2.4.31] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
 ## [2.4.30] - 2025-09-26
 ### Changed
 - Update license headers
@@ -145,7 +196,7 @@
 
 ## [2.3.10] - 2025-01-13
 ### Changed
-- refactor UI imports to use isaacsim.gui.components
+- Refactor UI imports to use isaacsim.gui.components
 
 ## [2.3.9] - 2025-01-09
 ### Changed
@@ -231,7 +282,7 @@
 
 ## [2.0.0] - 2024-09-26
 ### Added
-- automatic config of Joints Drive gains by Natural Frequency.
+- Automatic config of Joints Drive gains by Natural Frequency.
 
 ## [1.18.0] - 2024-09-25
 ### Changed
@@ -326,7 +377,7 @@
 
 ## [1.6.1] - 2023-12-14
 ### Fixed
-- output USD was accumulating disk size every time it was overwritten
+- Output USD was accumulating disk size every time it was overwritten
 - Instanceable importing was causing the importer to segfault when overwriting.
 
 ## [1.6.0] - 2023-12-11
@@ -422,8 +473,8 @@
 
 ## [0.5.8] - 2023-02-22
 ### Fixed
-- removed max joint effort scaling by 60 during import
-- removed custom collision api when the shape is a cylinder
+- Removed max joint effort scaling by 60 during import
+- Removed custom collision api when the shape is a cylinder
 
 ## [0.5.7] - 2023-02-17
 ### Added
@@ -517,9 +568,9 @@
 
 ## [0.1.10] - 2021-11-04
 ### Changed
-- create physics scene is false for import config
-- create physics scene will not create a scene if one exists
-- set default prim is false for import config
+- Create physics scene is false for import config
+- Create physics scene will not create a scene if one exists
+- Set default prim is false for import config
 
 ## [0.1.9] - 2021-10-25
 ### Added
@@ -531,7 +582,7 @@
 - rootJoint prim is renamed to root_joint for consistency with other joint names.
 
 ### Fixed
-- warnings when setting attributes as double when they should have been float
+- Warnings when setting attributes as double when they should have been float
 
 ## [0.1.8] - 2021-10-18
 ### Added

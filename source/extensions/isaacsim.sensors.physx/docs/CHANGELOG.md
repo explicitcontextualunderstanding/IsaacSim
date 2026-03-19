@@ -1,4 +1,32 @@
 # Changelog
+## [2.5.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [2.4.5] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [2.4.4] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.4.3] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [2.4.2] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [2.4.1] - 2025-10-18
+### Changed
+- Remove extra carb settings from tests
+
+## [2.4.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [2.3.2] - 2025-09-26
 ### Changed
 - Update license headers
@@ -67,7 +95,7 @@
 
 ## [2.2.15] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.2.14] - 2025-05-02
 ### Changed
@@ -128,7 +156,7 @@
 
 ## [2.2.0] - 2024-10-30
 ### Changed
-- moved examples from menu to browser
+- Moved examples from menu to browser
 
 ## [2.1.0] - 2024-10-30
 ### Changed

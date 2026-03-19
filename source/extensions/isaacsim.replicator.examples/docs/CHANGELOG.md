@@ -1,4 +1,86 @@
 # Changelog
+## [1.9.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.8.0] - 2026-02-26
+### Changed
+- Added test for SDG getting started example with replicator enableWriteToFabric and wait_for_render options
+
+## [1.7.2] - 2026-02-21
+### Changed
+- Fixed SDG physics based volume filling example test to use the omni.physx api
+
+## [1.7.1] - 2026-02-19
+### Changed
+- SimulationManager device is set back to its default state following the deformable SDG example test
+
+## [1.7.0] - 2026-02-08
+### Changed
+- Added SDG deformables example test
+
+## [1.6.9] - 2026-02-04
+### Changed
+- Synched snippets with docs, typos and print statements fixes
+
+## [1.6.8] - 2026-01-05
+### Changed
+- Augmentation examples use basic empty stage (dome light + ground plane) by default, with optional env_url for custom stages
+
+## [1.6.7] - 2025-12-17
+### Changed
+- Added missing import for SDG getting started to be in sync with docs
+
+## [1.6.6] - 2025-12-11
+### Changed
+- Improved simready assets SDG example output results
+
+## [1.6.5] - 2025-12-09
+### Changed
+- Fixed sequential sphere scan randomizer example to work in script editor in sync with docs
+
+## [1.6.4] - 2025-12-08
+### Changed
+- Added explicit `.reset()` to events 2.0 subscribers in sync with docs examples
+
+## [1.6.3] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [1.6.2] - 2025-12-03
+### Changed
+- Added an app update after switching to pathtracing in the palletizing example test
+- Fixed scatter plane parent path in scene based SDG example test
+- Fixed SDG box stacking randomizer example test by waiting for the data to be written to disk
+
+## [1.6.1] - 2025-11-27
+### Changed
+- Make consistent use of SimulationManager
+
+## [1.6.0] - 2025-11-26
+### Changed
+- Added scene based SDG example test
+- Added object based SDG example test
+- Added AMR navigation example test
+- Switched to RealtimePathTracing in the motion blur example
+
+## [1.5.0] - 2025-10-28
+### Changed
+- Updated replicator examples to use replicator functional api where applicable
+- Writers use explicit backends to write data to disk
+- Changed data augmentation tests to use a fixed seed in the kernel functions as well, updated golden images
+- UR10 palletizing example uses realtime pathtracing and backend for its writer
+- Switched to core.experimental rigid prims where applicable
+- Switched to SimulationManager instead of World
+
+## [1.4.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.4.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.3.6] - 2025-10-08
 ### Changed
 - Added physics to custom fps example snippet, changed to dome light
@@ -30,7 +112,7 @@
 
 ## [1.2.2] - 2025-09-15
 ### Changed
-- switched to isaacsim.test.utils for folder contents validation and goldenimage comparison in tests
+- Switched to isaacsim.test.utils for folder contents validation and goldenimage comparison in tests
 
 ## [1.2.1] - 2025-09-01
 ### Fixed
@@ -85,11 +167,11 @@
 
 ## [1.1.22] - 2025-05-30
 ### Changed
-- increase rt_subframes in examples for more consistent results between updates
+- Increase rt_subframes in examples for more consistent results between updates
 
 ## [1.1.21] - 2025-05-23
 ### Changed
-- rename test utils.py to common.py
+- Rename test utils.py to common.py
 
 ## [1.1.20] - 2025-05-22
 ### Changed
@@ -105,11 +187,11 @@
 
 ## [1.1.17] - 2025-05-16
 ### Added
-- added test for starting capturing while the timeline is running
-- test utils.py for functions used in multiple tests
+- Added test for starting capturing while the timeline is running
+- Test utils.py for functions used in multiple tests
 
 ### Changed
-- more verbose terminal outputs for tests
+- More verbose terminal outputs for tests
 
 ## [1.1.16] - 2025-05-12
 ### Changed
@@ -121,7 +203,7 @@
 
 ## [1.1.14] - 2025-05-10
 ### Changed
-- fixed timeline tests by making sure the timeline is stopped and the looping is set to its original value
+- Fixed timeline tests by making sure the timeline is stopped and the looping is set to its original value
 
 ## [1.1.13] - 2025-05-09
 ### Added
@@ -138,7 +220,7 @@
 
 ## [1.1.10] - 2025-04-17
 ### Changed
-- changed add_update_semantics to add_labels
+- Changed add_update_semantics to add_labels
 
 ## [1.1.9] - 2025-04-09
 ### Changed
@@ -179,12 +261,12 @@
 
 ## [1.1.0] - 2024-12-17
 ### Added
-- added UR10 palletizing demo test
+- Added UR10 palletizing demo test
 
 ## [1.0.1] - 2024-12-15
 ### Fixed
-- added fixed timestepping for consistent results for custom fps capture test
+- Added fixed timestepping for consistent results for custom fps capture test
 
 ## [1.0.0] - 2024-12-09
 ### Added
-- created extension with example parts from omni.replicator.isaac
+- Created extension with example parts from omni.replicator.isaac

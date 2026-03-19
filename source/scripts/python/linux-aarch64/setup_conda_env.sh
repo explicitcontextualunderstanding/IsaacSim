@@ -42,4 +42,4 @@ cd $SCRIPT_DIR
 cd $OLDPWD
 
 # remove Kit Python from PYTHONPATH to avoid conflicts with conda
-export PYTHONPATH=$(echo "$PYTHONPATH" | tr ':' '\n' | grep -v "$SCRIPT_DIR/kit/python/lib/python3.11" | tr '\n' ':' | sed 's/:$//')
+export PYTHONPATH=$(echo "$PYTHONPATH" | tr ':' '\n' | grep -v "$SCRIPT_DIR/kit/python/lib/python3.12" | tr '\n' ':' | sed 's/:$//')

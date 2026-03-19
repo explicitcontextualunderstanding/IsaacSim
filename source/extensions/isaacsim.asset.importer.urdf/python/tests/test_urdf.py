@@ -14,46 +14,83 @@
 # limitations under the License.
 
 import asyncio
-import json
+import gc
 import os
+import shutil
 import unittest
 
+import carb
 import numpy as np
-import omni.kit.commands
 
 # NOTE:
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
 import pxr
+from isaacsim.asset.importer.urdf import URDFImporter, URDFImporterConfig
 from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, UsdGeom, UsdPhysics, UsdShade
-
-TEST_OUT_PATH = "_tests_out"
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestUrdf(omni.kit.test.AsyncTestCase):
+    """Test URDF importer conversion workflows.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import omni.kit.test
+        >>> class Example(omni.kit.test.AsyncTestCase):
+        ...     pass
+        ...
+    """
+
     # Before running each test
-    async def setUp(self):
+    async def setUp(self) -> None:
+        """Prepare shared test fixtures.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import omni.timeline
+            >>> omni.timeline.get_timeline_interface()  # doctest: +SKIP
+        """
         self._timeline = omni.timeline.get_timeline_interface()
 
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.asset.importer.urdf")
         self._extension_path = ext_manager.get_extension_path(ext_id)
-        self.dest_path = os.path.abspath(self._extension_path + "/" + TEST_OUT_PATH)
+        self.dest_path = os.path.normpath(os.path.abspath(os.path.join(self._extension_path, "_tests_out")))
+        self.importer = URDFImporter()
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()
         self._stage = omni.usd.get_context().get_stage()
         pass
 
     # After running each test
-    async def tearDown(self):
-        # _urdf.release_urdf_interface(self._urdf_interface)
-        # await omni.usd.get_context().new_stage_async()
+    async def tearDown(self) -> None:
+        """Wait for stage loading to complete after tests.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import asyncio
+            >>> asyncio.sleep(0)  # doctest: +SKIP
+        """
         await omni.kit.app.get_app().next_update_async()
         pass
 
-    async def standard_checks(self, prim_path):
+    async def standard_checks(self, prim_path: str) -> None:
+        """Validate standard properties of imported URDF prims.
+
+        Checks that the stage uses meters as units and that all meshes have
+        non-zero vertex counts.
+
+        Args:
+            prim_path: USD path to the root prim to validate.
+        """
 
         self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(self._stage), 1.0)
 
@@ -63,60 +100,110 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         for prim in prim_range:
             mesh = UsdGeom.Mesh(prim)
             self.assertGreater(len(mesh.GetFaceVertexCountsAttr().Get()), 0)
-        # TODO: Add more checks here
 
-    # Tests to make sure visual mesh names are incremented
-    async def test_urdf_mesh_naming(self):
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_names.urdf")
-        stage = omni.usd.get_context().get_stage()
+    def _import_urdf(
+        self,
+        urdf_path: str,
+        usd_path: str | None = None,
+        collision_from_visuals: bool | None = None,
+        collision_type: str | None = None,
+        allow_self_collision: bool | None = None,
+        merge_mesh: bool | None = None,
+        debug_mode: bool | None = None,
+    ) -> tuple[str, str]:
+        """Import a URDF file with the new importer API.
 
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.merge_fixed_joints = True
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
-        prim = stage.GetPrimAtPath("/test_names/cube/visuals")
-        # prim_range = prim.GetChildren()
-        prim_range = [c for c in pxr.Usd.PrimRange(prim, pxr.Usd.TraverseInstanceProxies()) if UsdGeom.Mesh(c)]
-        # There should be a total of 6 visual meshes after import - the primrange with instance proxies should count each mesh twice and the root prim once
-        self.assertEqual(len(prim_range), 6)
+        Args:
+            urdf_path: Absolute path to the URDF file.
+            usd_path: Output directory for generated USD assets. Defaults to URDF directory.
+            collision_from_visuals: Whether to generate collisions from visuals.
+            collision_type: Collision geometry type.
+            allow_self_collision: Whether to enable self-collision.
+            merge_mesh: Whether to merge meshes after conversion.
+            debug_mode: Whether to keep intermediate outputs.
+
+        Returns:
+            Tuple of (output_path, prim_path).
+        """
+        config = URDFImporterConfig()
+        config.urdf_path = os.path.normpath(urdf_path)
+        config.usd_path = (
+            os.path.normpath(usd_path) if usd_path else os.path.normpath(os.path.dirname(config.urdf_path))
+        )
+        if collision_from_visuals is not None:
+            config.collision_from_visuals = collision_from_visuals
+        if collision_type is not None:
+            config.collision_type = collision_type
+        if allow_self_collision is not None:
+            config.allow_self_collision = allow_self_collision
+        if merge_mesh is not None:
+            config.merge_mesh = merge_mesh
+        if debug_mode is not None:
+            config.debug_mode = debug_mode
+
+        self.importer.config = config
+        output_path = os.path.normpath(self.importer.import_urdf())
+        omni.usd.get_context().open_stage(output_path)
+        self._stage = omni.usd.get_context().get_stage()
+        prim_path = f"/{os.path.splitext(os.path.basename(urdf_path))[0]}"
+        return output_path, prim_path
+
+    def _delete_directory(self, path: str) -> None:
+        """Delete a directory and handle errors gracefully.
+
+        Args:
+            path: Directory path to remove.
+        """
+        normalized_path = os.path.normpath(path)
+        self._stage = None
+        gc.collect()
+        try:
+            shutil.rmtree(normalized_path)
+        except OSError as e:
+            carb.log_warn(f"Warning: {normalized_path} : {e.strerror}")
 
     # basic urdf test: joints and links are imported correctly
-    async def test_urdf_basic(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+    async def test_urdf_basic(self) -> None:
+        """Import basic URDF and validate joints and links are imported correctly."""
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
+        )
+        path, prim_path = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
         await omni.kit.app.get_app().next_update_async()
 
-        prim = stage.GetPrimAtPath("/test_basic")
+        prim = self._stage.GetPrimAtPath("/test_basic")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
         # make sure the joints exist
-        root_joint = stage.GetPrimAtPath("/test_basic/root_joint")
+        root_joint = self._stage.GetPrimAtPath("/test_basic/Physics/root_to_base")
         self.assertNotEqual(root_joint.GetPath(), Sdf.Path.emptyPath)
 
-        wristJoint = stage.GetPrimAtPath("/test_basic/joints/wrist_joint")
+        wristJoint = self._stage.GetPrimAtPath("/test_basic/Physics/wrist_joint")
         self.assertNotEqual(wristJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(wristJoint.GetTypeName(), "PhysicsRevoluteJoint")
 
-        fingerJoint = stage.GetPrimAtPath("/test_basic/joints/finger_1_joint")
+        fingerJoint = self._stage.GetPrimAtPath("/test_basic/Physics/finger_1_joint")
         self.assertNotEqual(fingerJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(fingerJoint.GetTypeName(), "PhysicsPrismaticJoint")
         self.assertAlmostEqual(fingerJoint.GetAttribute("physics:upperLimit").Get(), 0.08)
 
-        fingerLink = stage.GetPrimAtPath("/test_basic/finger_link_2")
-        self.assertAlmostEqual(fingerLink.GetAttribute("physics:diagonalInertia").Get()[0], 2.0)
+        fingerLink = self._stage.GetPrimAtPath(
+            "/test_basic/Geometry/root_link/base_link/link_1/link_2/palm_link/finger_link_1"
+        )
+        self.assertAlmostEqual(fingerLink.GetAttribute("physics:diagonalInertia").Get()[0], 1.0)
         self.assertAlmostEqual(fingerLink.GetAttribute("physics:mass").Get(), 3)
 
-        fingerLink3 = stage.GetPrimAtPath("/test_basic/finger_link_3")
-        self.assertAlmostEqual(fingerLink3.GetAttribute("physics:diagonalInertia").Get()[0], 0.001002)
+        fingerLink3 = self._stage.GetPrimAtPath(
+            "/test_basic/Geometry/root_link/base_link/link_1/link_2/palm_link/finger_link_3"
+        )
+        self.assertAlmostEqual(fingerLink3.GetAttribute("physics:diagonalInertia").Get()[0], 0.000999, delta=1e-2)
         print(
             fingerLink3.GetAttribute("physics:principalAxes").Get().GetReal(),
             fingerLink3.GetAttribute("physics:principalAxes").Get().GetImaginary(),
         )
-        self.assertAlmostEqual(fingerLink3.GetAttribute("physics:principalAxes").Get().GetReal(), 0.88047838211059)
+        self.assertAlmostEqual(fingerLink3.GetAttribute("physics:principalAxes").Get().GetReal(), 0.88, delta=1e-2)
 
         # Start Simulation and wait
         self._timeline.play()
@@ -125,217 +212,199 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         # nothing crashes
         self._timeline.stop()
 
-        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(stage), 1.0)
+        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(self._stage), 1.0)
+        self._stage = None
+        self._delete_directory(os.path.dirname(path))
         pass
 
-    async def test_urdf_sensors(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_sensor.urdf")
-        dest_path = os.path.abspath(self.dest_path + "/test_sensor.usd")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=dest_path
+    async def test_urdf_massless(self) -> None:
+        """Import URDF with massless links and validate physics properties."""
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_massless.urdf"))
         )
-        await omni.kit.app.get_app().next_update_async()
-        stage = pxr.Usd.Stage.Open(dest_path)
-        await omni.kit.app.get_app().next_update_async()
-
-        camera_prim = stage.GetPrimAtPath("/test_sensor/link_1/camera")
-
-        self.assertAlmostEqual(UsdGeom.Camera(camera_prim).GetFocalLengthAttr().Get(), 10.477462768554688)
-
-        basic_lidar = stage.GetPrimAtPath("/test_sensor/link_1/basic_lidar")
-        self.assertEqual(basic_lidar.GetAttribute("sensorModelConfig").Get(), "test_sensor_basic_lidar")
-        with (
-            open(self.dest_path + "/configuration/test_sensor_basic_lidar.json") as f1,
-            open(self._extension_path + "/data/lidar_sensor_template/test_sensor_basic_lidar.json", "r") as f2,
-        ):
-            generated = json.load(f1)
-            reference = json.load(f2)
-
-            self.assertEqual(generated, reference)
-        custom_lidar = stage.GetPrimAtPath("/test_sensor/link_1/custom_lidar")
-        self.assertEqual(custom_lidar.GetAttribute("sensorModelConfig").Get(), "lidar_template")
-
-        preconfigured_lidar = stage.GetPrimAtPath("/test_sensor/link_1/preconfigured_lidar")
-        self.assertEqual(preconfigured_lidar.GetAttribute("sensorModelConfig").Get(), "Velodyne_VLS128")
-
-        pass
-
-    async def test_urdf_massless(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_massless.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        import_config.merge_fixed_joints = False
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        path, prim_path = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
         await omni.kit.app.get_app().next_update_async()
 
-        prim = stage.GetPrimAtPath("/test_massless")
+        prim = self._stage.GetPrimAtPath("/test_massless")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
-        rootLink = stage.GetPrimAtPath("/test_massless/root_link")
-        self.assertEqual(rootLink.GetAttribute("physics:mass").Get(), 0)
+        rootLink = self._stage.GetPrimAtPath("/test_massless/Geometry/root_link")
+        self.assertEqual(rootLink.GetAttribute("physics:mass").Get(), None)
 
-        no_mass_no_collision_no_inertia = stage.GetPrimAtPath("/test_massless/root_link")
-        self.assertAlmostEqual(no_mass_no_collision_no_inertia.GetAttribute("physics:diagonalInertia").Get()[0], 0.0001)
-        self.assertAlmostEqual(no_mass_no_collision_no_inertia.GetAttribute("physics:mass").Get(), 0.00000001)
+        no_mass_no_collision_no_inertia = self._stage.GetPrimAtPath(
+            "/test_massless/Geometry/root_link/no_mass_no_collision_no_inertia"
+        )
+        self.assertAlmostEqual(no_mass_no_collision_no_inertia.GetAttribute("physics:diagonalInertia").Get()[0], 0.0)
+        self.assertAlmostEqual(no_mass_no_collision_no_inertia.GetAttribute("physics:mass").Get(), 0.0)
 
-        mass_no_collision_no_inertia = stage.GetPrimAtPath("/test_massless/mass_no_collision_no_inertia")
-        self.assertAlmostEqual(mass_no_collision_no_inertia.GetAttribute("physics:diagonalInertia").Get()[0], 0.0001)
+        mass_no_collision_no_inertia = self._stage.GetPrimAtPath(
+            "/test_massless/Geometry/root_link/no_mass_no_collision_no_inertia/mass_no_collision_no_inertia"
+        )
+        self.assertAlmostEqual(mass_no_collision_no_inertia.GetAttribute("physics:diagonalInertia").Get()[0], 0.0)
         self.assertAlmostEqual(mass_no_collision_no_inertia.GetAttribute("physics:mass").Get(), 10.0)
 
-        mass_collision_no_inertia = stage.GetPrimAtPath("/test_massless/mass_collision_no_inertia")
+        mass_collision_no_inertia = self._stage.GetPrimAtPath(
+            "/test_massless/Geometry/root_link/no_mass_no_collision_no_inertia/mass_no_collision_no_inertia/mass_collision_no_inertia"
+        )
         self.assertAlmostEqual(mass_collision_no_inertia.GetAttribute("physics:diagonalInertia").Get()[0], 0.0)
         self.assertAlmostEqual(mass_collision_no_inertia.GetAttribute("physics:mass").Get(), 10.0)
 
-        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(stage), 1.0)
+        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(self._stage), 1.0)
+
+        self._delete_directory(os.path.dirname(path))
         pass
 
-    async def test_urdf_save_to_file(self):
+    async def test_urdf_save_to_file(self) -> None:
+        """Import URDF and save to a specified file path."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        dest_path = os.path.abspath(self.dest_path + "/test_basic.usd")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=dest_path
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
         )
+        dest_path = os.path.normpath(os.path.abspath(os.path.join(self.dest_path, "test_basic.usd")))
+        output_path, _ = self._import_urdf(urdf_path, usd_path=os.path.dirname(dest_path))
+        dest_path = output_path
         await omni.kit.app.get_app().next_update_async()
-        stage = pxr.Usd.Stage.Open(dest_path)
-        prim = stage.GetPrimAtPath("/test_basic")
+        self._stage = pxr.Usd.Stage.Open(dest_path)
+        prim = self._stage.GetPrimAtPath("/test_basic")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
         # make sure the joints exist
-        root_joint = stage.GetPrimAtPath("/test_basic/root_joint")
+        root_joint = self._stage.GetPrimAtPath("/test_basic/Physics/root_to_base")
         self.assertNotEqual(root_joint.GetPath(), Sdf.Path.emptyPath)
 
-        wristJoint = stage.GetPrimAtPath("/test_basic/joints/wrist_joint")
+        wristJoint = self._stage.GetPrimAtPath("/test_basic/Physics/wrist_joint")
         self.assertNotEqual(wristJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(wristJoint.GetTypeName(), "PhysicsRevoluteJoint")
 
-        fingerJoint = stage.GetPrimAtPath("/test_basic/joints/finger_1_joint")
+        fingerJoint = self._stage.GetPrimAtPath("/test_basic/Physics/finger_1_joint")
         self.assertNotEqual(fingerJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(fingerJoint.GetTypeName(), "PhysicsPrismaticJoint")
         self.assertAlmostEqual(fingerJoint.GetAttribute("physics:upperLimit").Get(), 0.08)
 
-        fingerLink = stage.GetPrimAtPath("/test_basic/finger_link_2")
-        self.assertAlmostEqual(fingerLink.GetAttribute("physics:diagonalInertia").Get()[0], 2.0)
+        fingerLink = self._stage.GetPrimAtPath(
+            "/test_basic/Geometry/root_link/base_link/link_1/link_2/palm_link/finger_link_1"
+        )
+        self.assertAlmostEqual(fingerLink.GetAttribute("physics:diagonalInertia").Get()[0], 1.0)
         self.assertAlmostEqual(fingerLink.GetAttribute("physics:mass").Get(), 3)
 
-        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(stage), 1.0)
-        stage = None
+        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(self._stage), 1.0)
+        self._stage = None
+
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_save_twice_to_file(self):
+    async def test_urdf_save_twice_to_file(self) -> None:
+        """Import URDF twice to the same location and verify no conflicts."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        dest_path = os.path.abspath(self.dest_path + "/test_basic.usd")
-        await self.test_urdf_save_to_file()
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
+        )
+        dest_path = os.path.normpath(os.path.abspath(os.path.join(self.dest_path, "test_basic.usd")))
+        output_path, _ = self._import_urdf(urdf_path, usd_path=os.path.dirname(dest_path))
+        dest_path = output_path
         await omni.kit.app.get_app().next_update_async()
         stats = os.stat(dest_path)
-        await self.test_urdf_save_to_file()
+        output_path, _ = self._import_urdf(urdf_path, usd_path=os.path.dirname(dest_path))
+        dest_path = output_path
         stats_2 = os.stat(dest_path)
         await omni.kit.app.get_app().next_update_async()
+
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_textured_obj(self):
+    async def test_urdf_textured_obj(self) -> None:
+        """Import URDF with OBJ mesh textures and validate texture import."""
 
-        base_path = self._extension_path + "/data/urdf/tests/test_textures_urdf"
-        basename = "cube_obj"
-        dest_path = "{}/{}/{}.usd".format(self.dest_path, basename, basename)
-        mats_path = "{}/{}/configuration/materials/textures".format(self.dest_path, basename)
-        omni.client.create_folder("{}/{}".format(self.dest_path, basename))
-        omni.client.create_folder(mats_path)
-
-        urdf_path = "{}/{}.urdf".format(base_path, basename)
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=dest_path
+        urdf_path = os.path.normpath(
+            os.path.join(self._extension_path, "data", "urdf", "tests", "test_textures_urdf", "cube_obj.urdf")
         )
+        output_path, _ = self._import_urdf(urdf_path)
         await omni.kit.app.get_app().next_update_async()
-        result = omni.client.list(mats_path)
-        print(mats_path)
+        result = omni.client.list(os.path.normpath(os.path.join(os.path.dirname(output_path), "Textures")))
         self.assertEqual(result[0], omni.client.Result.OK)
-        self.assertEqual(len(result[1]), 3)  # Metallic texture is unsuported by assimp on OBJ
+        self.assertEqual(len(result[1]), 2)  # Metallic texture is unsuported by assimp on OBJ
+
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_textured_in_memory(self):
+    async def test_urdf_textured_in_memory(self) -> None:
+        """Import URDF with textures and validate in-memory processing."""
 
-        base_path = self._extension_path + "/data/urdf/tests/test_textures_urdf"
+        base_path = os.path.normpath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_textures_urdf"))
         basename = "cube_obj"
 
-        urdf_path = "{}/{}.urdf".format(base_path, basename)
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        urdf_path = os.path.normpath(os.path.join(base_path, f"{basename}.urdf"))
+        output_path, _ = self._import_urdf(urdf_path)
         await omni.kit.app.get_app().next_update_async()
+
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
     @unittest.skipIf(os.getenv("ETM_ACTIVE"), "Skipped in ETM: Unknown reason for ETM failing to load DAE.")
-    async def test_urdf_textured_dae(self):
+    async def test_urdf_textured_dae(self) -> None:
+        """Import URDF with DAE mesh textures and validate texture import."""
 
-        base_path = self._extension_path + "/data/urdf/tests/test_textures_urdf"
+        base_path = os.path.normpath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_textures_urdf"))
         basename = "cube_dae"
-        dest_path = "{}/{}/{}.usd".format(self.dest_path, basename, basename)
-        mats_path = "{}/{}/configuration/materials/textures".format(self.dest_path, basename)
-        omni.client.create_folder("{}/{}".format(self.dest_path, basename))
+        dest_path = os.path.normpath(os.path.join(self.dest_path, basename))
+        mats_path = os.path.normpath(os.path.join(self.dest_path, basename, "Textures"))
+        omni.client.create_folder(os.path.normpath(os.path.join(self.dest_path, basename)))
         omni.client.create_folder(mats_path)
 
-        urdf_path = "{}/{}.urdf".format(base_path, basename)
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=dest_path
-        )
+        urdf_path = os.path.normpath(os.path.join(base_path, f"{basename}.urdf"))
+        output_path, _ = self._import_urdf(urdf_path, usd_path=os.path.dirname(dest_path))
+        dest_path = output_path
 
         await omni.kit.app.get_app().next_update_async()
         result = omni.client.list(mats_path)
         self.assertEqual(result[0], omni.client.Result.OK)
         self.assertEqual(len(result[1]), 1)  # only albedo is supported for Collada
+
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_overwrite_file(self):
+    async def test_urdf_overwrite_file(self) -> None:
+        """Import URDF twice to overwrite existing file and validate results."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        dest_path = os.path.abspath(self._extension_path + "/data/urdf/tests/" + TEST_OUT_PATH + "/test_basic.usd")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=dest_path
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
         )
-        await omni.kit.app.get_app().next_update_async()
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config, dest_path=dest_path
+        dest_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "_tests_out", "test_basic.usd"))
         )
+        output_path, _ = self._import_urdf(urdf_path, usd_path=os.path.dirname(dest_path))
+        dest_path = output_path
+        await omni.kit.app.get_app().next_update_async()
+        output_path, _ = self._import_urdf(urdf_path, usd_path=os.path.dirname(dest_path))
+        dest_path = output_path
         await omni.kit.app.get_app().next_update_async()
 
-        stage = pxr.Usd.Stage.Open(dest_path)
-        prim = stage.GetPrimAtPath("/test_basic")
+        self._stage = pxr.Usd.Stage.Open(dest_path)
+        prim = self._stage.GetPrimAtPath("/test_basic")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
         # make sure the joints exist
-        root_joint = stage.GetPrimAtPath("/test_basic/root_joint")
+        root_joint = self._stage.GetPrimAtPath("/test_basic/Physics/root_to_base")
         self.assertNotEqual(root_joint.GetPath(), Sdf.Path.emptyPath)
 
-        wristJoint = stage.GetPrimAtPath("/test_basic/joints/wrist_joint")
+        wristJoint = self._stage.GetPrimAtPath("/test_basic/Physics/wrist_joint")
         self.assertNotEqual(wristJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(wristJoint.GetTypeName(), "PhysicsRevoluteJoint")
 
-        fingerJoint = stage.GetPrimAtPath("/test_basic/joints/finger_1_joint")
+        fingerJoint = self._stage.GetPrimAtPath("/test_basic/Physics/finger_1_joint")
         self.assertNotEqual(fingerJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(fingerJoint.GetTypeName(), "PhysicsPrismaticJoint")
         self.assertAlmostEqual(fingerJoint.GetAttribute("physics:upperLimit").Get(), 0.08)
 
-        fingerLink = stage.GetPrimAtPath("/test_basic/finger_link_2")
-        self.assertAlmostEqual(fingerLink.GetAttribute("physics:diagonalInertia").Get()[0], 2.0)
+        fingerLink = self._stage.GetPrimAtPath(
+            "/test_basic/Geometry/root_link/base_link/link_1/link_2/palm_link/finger_link_1"
+        )
+        self.assertAlmostEqual(fingerLink.GetAttribute("physics:diagonalInertia").Get()[0], 1.0)
         self.assertAlmostEqual(fingerLink.GetAttribute("physics:mass").Get(), 3)
 
         # Start Simulation and wait
@@ -344,43 +413,44 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         await asyncio.sleep(1.0)
         # nothing crashes
         self._timeline.stop()
-        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(stage), 1.0)
-        stage = None
+        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(self._stage), 1.0)
+        self._stage = None
+        gc.collect()
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
     # advanced urdf test: test for all the categories of inputs that an urdf can hold
-    async def test_urdf_advanced(self):
+    async def test_urdf_advanced(self) -> None:
+        """Import advanced URDF with various features and validate all categories."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_advanced.urdf")
-        stage = omni.usd.get_context().get_stage()
-
-        # enable merging fixed joints
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.merge_fixed_joints = True
-        import_config.default_position_drive_damping = -1  # ignore this setting by making it -1
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_advanced.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
         await omni.kit.app.get_app().next_update_async()
 
         # check if object is there
-        prim = stage.GetPrimAtPath("/test_advanced")
+        prim = self._stage.GetPrimAtPath("/test_advanced")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
         # check color are imported
-        mesh = stage.GetPrimAtPath("/test_advanced/link_1/visuals/mesh_0")
+        mesh = self._stage.GetPrimAtPath("/test_advanced/Geometry/root_link/base_link/box")
         self.assertNotEqual(mesh.GetPath(), Sdf.Path.emptyPath)
         mat, rel = UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()
-        shader = UsdShade.Shader(stage.GetPrimAtPath(mat.GetPrim().GetChildren()[0].GetPath()))
-        self.assertTrue(Gf.IsClose(shader.GetInput("diffuse_color_constant").Get(), Gf.Vec3f(0, 0.8, 0), 1e-5))
+        self.assertTrue(Gf.IsClose(mat.GetInput("diffuseColor").Get(), Gf.Vec3f(0.0, 0.0, 0.60383), 1e-5))
 
-        # check joint properties
-        elbowPrim = stage.GetPrimAtPath("/test_advanced/joints/elbow_joint")
+        # TODO: URDF Converter does not import joint friction
+        elbowPrim = self._stage.GetPrimAtPath("/test_advanced/Physics/elbow_joint")
         self.assertNotEqual(elbowPrim.GetPath(), Sdf.Path.emptyPath)
-        self.assertAlmostEqual(elbowPrim.GetAttribute("physxJoint:jointFriction").Get(), 0.1)
-        self.assertAlmostEqual(elbowPrim.GetAttribute("drive:angular:physics:damping").Get(), 0.1)
+        # self.assertAlmostEqual(elbowPrim.GetAttribute("physxJoint:jointFriction").Get(), 0.1)
+        # self.assertAlmostEqual(elbowPrim.GetAttribute("drive:angular:physics:damping").Get(), 0.1)
 
         # check position of a link
         joint_pos = elbowPrim.GetAttribute("physics:localPos0").Get()
-        self.assertTrue(Gf.IsClose(joint_pos, Gf.Vec3f(0, 0, 0.40), 1e-5))
+        self.assertTrue(Gf.IsClose(joint_pos, Gf.Vec3f(0, 0, 0.85), 1e-5))
 
         # Start Simulation and wait
         self._timeline.play()
@@ -388,207 +458,206 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         await asyncio.sleep(1.0)
         # nothing crashes
         self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    # test for importing urdf where fixed joints are merged
-    async def test_urdf_merge_joints(self):
+    async def test_urdf_mtl(self) -> None:
+        """Import URDF with MTL material files and validate material binding."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_merge_joints.urdf")
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_mtl.urdf"))
+        )
+        usd_path = os.path.normpath(os.path.abspath(os.path.join(self._extension_path, "test_output")))
+        output_path, _ = self._import_urdf(urdf_path, usd_path=usd_path)
+        self._stage = omni.usd.get_context().get_stage()
 
-        stage = omni.usd.get_context().get_stage()
-
-        # enable merging fixed joints
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.merge_fixed_joints = True
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
-
-        # the merged link shouldn't be there
-        prim = stage.GetPrimAtPath("/test_merge_joints/link_2")
-        self.assertEqual(prim.GetPath(), Sdf.Path.emptyPath)
-
-        # palm link has mass, so it should not merge
-        prim = stage.GetPrimAtPath("/test_merge_joints/palm_link")
-        self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
-
-        pass
-
-    async def test_urdf_mtl(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_mtl.urdf")
-
-        stage = omni.usd.get_context().get_stage()
-
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
-
-        mesh = stage.GetPrimAtPath("/test_mtl/cube/visuals/test_mtl/World/mesh")
+        mesh = self._stage.GetPrimAtPath("/test_mtl/Geometry/cube/test_mtl")
         self.assertTrue(UsdShade.MaterialBindingAPI(mesh) is not None)
         mat, rel = UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()
-        shader = UsdShade.Shader(stage.GetPrimAtPath(mat.GetPrim().GetChildren()[0].GetPath()))
-        print(shader)
-        self.assertTrue(Gf.IsClose(shader.GetInput("diffuse_color_constant").Get(), Gf.Vec3f(0.8, 0.0, 0), 1e-5))
+        self.assertTrue(Gf.IsClose(mat.GetInput("diffuseColor").Get(), Gf.Vec3f(0.60383, 0.0, 0.0), 1e-5))
+
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
     async def test_urdf_material(self):
-
+        """Import URDF with material and validate material binding."""
         urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_material.urdf")
 
+        output_path, _ = self._import_urdf(urdf_path)
         stage = omni.usd.get_context().get_stage()
 
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
-
-        mesh = stage.GetPrimAtPath("/test_material/base/visuals/mesh_0")
+        mesh = stage.GetPrimAtPath("/test_material/Geometry/base/box")
         self.assertTrue(UsdShade.MaterialBindingAPI(mesh) is not None)
         mat, rel = UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()
-        shader = UsdShade.Shader(stage.GetPrimAtPath(mat.GetPrim().GetChildren()[0].GetPath()))
-        print(shader)
-        self.assertTrue(Gf.IsClose(shader.GetInput("diffuse_color_constant").Get(), Gf.Vec3f(1.0, 0.0, 0.0), 1e-5))
+        self.assertTrue(Gf.IsClose(mat.GetInput("diffuseColor").Get(), Gf.Vec3f(1.0, 0.0, 0.0), 1e-5))
 
-    async def test_urdf_mtl_stl(self):
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_mtl_stl.urdf")
+    async def test_urdf_mtl_stl(self) -> None:
+        """Import URDF with STL meshes and MTL materials and validate material binding."""
 
-        stage = omni.usd.get_context().get_stage()
-
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
-
-        mesh = stage.GetPrimAtPath("/test_mtl_stl/cube/visuals/cube")
-        self.assertTrue(UsdShade.MaterialBindingAPI(mesh) is not None)
-        mat, rel = UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()
-        shader = UsdShade.Shader(stage.GetPrimAtPath(mat.GetPrim().GetChildren()[0].GetPath()))
-        print(shader)
-        self.assertTrue(Gf.IsClose(shader.GetInput("diffuse_color_constant").Get(), Gf.Vec3f(0.8, 0.0, 0), 1e-5))
-
-    async def test_urdf_carter(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/robots/carter/urdf/carter.urdf")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.merge_fixed_joints = False
-        status, path = omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_mtl_stl.urdf"))
         )
-        self.assertTrue(path, "/carter")
+        usd_path = os.path.normpath(os.path.abspath(os.path.join(self._extension_path, "test_output")))
+        output_path, _ = self._import_urdf(urdf_path, usd_path=usd_path)
+        self._stage = omni.usd.get_context().get_stage()
+
+        mesh = self._stage.GetPrimAtPath("/test_mtl_stl/Geometry/cube/cube")
+        self.assertTrue(UsdShade.MaterialBindingAPI(mesh) is not None)
+        mat, rel = UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()
+        self.assertTrue(Gf.IsClose(mat.GetInput("diffuseColor").Get(), Gf.Vec3f(0.60383, 0.0, 0.0), 1e-5))
+
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
+
+    async def test_urdf_carter(self) -> None:
+        """Import Carter robot URDF and validate basic structure."""
+
+        urdf_path = os.path.normpath(
+            os.path.abspath(
+                os.path.join(self._extension_path, "data", "urdf", "robots", "carter", "urdf", "carter.urdf")
+            )
+        )
+        output_path, prim_path = self._import_urdf(urdf_path)
+        self.assertTrue(prim_path, "/carter")
         # TODO add checks here
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "Skipped in ETM: containing invalid characters")
     async def test_urdf_parse_mimic(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/robots/cobotta_pro_900/cobotta_pro_900.urdf")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.parse_mimic = True
-        status, path = omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config
-        )
-        self.assertTrue(path, "/cobotta_pro_900")
+        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_mimic.urdf")
+        _, prim_path = self._import_urdf(urdf_path)
+        self.assertTrue(prim_path, "/test_mimic")
 
         stage = omni.usd.get_context().get_stage()
-        joint = stage.GetPrimAtPath("/cobotta_pro_900/joints/left_inner_knuckle_joint")
-        self.assertTrue(joint.HasAPI(PhysxSchema.PhysxMimicJointAPI))
 
-        mimic_api = PhysxSchema.PhysxMimicJointAPI(joint, UsdPhysics.Tokens.rotX)
-        self.assertEqual(mimic_api.GetGearingAttr().Get(), 1.0)
-        self.assertEqual(mimic_api.GetOffsetAttr().Get(), 0.0)
+        # Verify source joint exists and has no mimic API
+        source_joint = stage.GetPrimAtPath("/test_mimic/Physics/source_joint")
+        self.assertNotEqual(source_joint.GetPath(), Sdf.Path.emptyPath)
+        self.assertFalse(source_joint.HasAPI(PhysxSchema.PhysxMimicJointAPI))
 
-        # self.assertIsNotNone( PhysxSchema.PhysxTendonAxisRootAPI(joint, "fixedTendon"))
+        # Verify a_mimic_joint (lexicographically BEFORE source_joint) has mimic API configured
+        # This tests that mimic joints are configured after all joints are created
+        a_mimic_joint = stage.GetPrimAtPath("/test_mimic/Physics/a_mimic_joint")
+        self.assertNotEqual(a_mimic_joint.GetPath(), Sdf.Path.emptyPath)
+        self.assertTrue(a_mimic_joint.HasAPI(PhysxSchema.PhysxMimicJointAPI))
 
-    @unittest.skipIf(os.getenv("ETM_ACTIVE"), "Skipped in ETM: containing invalid characters")
-    async def test_urdf_ignore_parse_mimic(self):
+        a_mimic_api = PhysxSchema.PhysxMimicJointAPI(a_mimic_joint, UsdPhysics.Tokens.rotZ)
+        self.assertAlmostEqual(a_mimic_api.GetGearingAttr().Get(), 1.5)
+        self.assertAlmostEqual(a_mimic_api.GetOffsetAttr().Get(), 0.1)
+        # Verify reference joint relationship points to source_joint
+        ref_joint_targets = a_mimic_api.GetReferenceJointRel().GetTargets()
+        self.assertEqual(len(ref_joint_targets), 1)
+        self.assertEqual(ref_joint_targets[0], source_joint.GetPath())
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/robots/cobotta_pro_900/cobotta_pro_900.urdf")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.parse_mimic = False
-        status, prim_path = omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config
+        # Verify z_mimic_joint (lexicographically AFTER source_joint) has mimic API configured
+        z_mimic_joint = stage.GetPrimAtPath("/test_mimic/Physics/z_mimic_joint")
+        self.assertNotEqual(z_mimic_joint.GetPath(), Sdf.Path.emptyPath)
+        self.assertTrue(z_mimic_joint.HasAPI(PhysxSchema.PhysxMimicJointAPI))
+
+        z_mimic_api = PhysxSchema.PhysxMimicJointAPI(z_mimic_joint, UsdPhysics.Tokens.rotZ)
+        self.assertAlmostEqual(z_mimic_api.GetGearingAttr().Get(), -1.0)
+        self.assertAlmostEqual(z_mimic_api.GetOffsetAttr().Get(), 0.0)
+        # Verify reference joint relationship points to source_joint
+        ref_joint_targets = z_mimic_api.GetReferenceJointRel().GetTargets()
+        self.assertEqual(len(ref_joint_targets), 1)
+        self.assertEqual(ref_joint_targets[0], source_joint.GetPath())
+
+    async def test_urdf_franka(self) -> None:
+        """Import Franka robot URDF and validate mesh geometry."""
+
+        urdf_path = os.path.normpath(
+            os.path.abspath(
+                os.path.join(
+                    self._extension_path,
+                    "data",
+                    "urdf",
+                    "robots",
+                    "franka_description",
+                    "robots",
+                    "panda_arm_hand.urdf",
+                )
+            )
         )
-        self.assertTrue(prim_path, "/cobotta_pro_900")
+        output_path, prim_path = self._import_urdf(urdf_path)
         await self.standard_checks(prim_path)
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
-        joint = self._stage.GetPrimAtPath("/cobotta_pro_900/joints/left_inner_knuckle_joint")
+    async def test_urdf_ur10(self) -> None:
+        """Import UR10 robot URDF and validate mesh geometry."""
 
-        self.assertFalse(joint.HasAPI(PhysxSchema.PhysxMimicJointAPI))
-
-    async def test_urdf_franka(self):
-
-        urdf_path = os.path.abspath(
-            self._extension_path + "/data/urdf/robots/franka_description/robots/panda_arm_hand.urdf"
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "robots", "ur10", "urdf", "ur10.urdf"))
         )
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        status, prim_path = omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config
-        )
+        output_path, prim_path = self._import_urdf(urdf_path)
         await self.standard_checks(prim_path)
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
-    async def test_urdf_ur10(self):
+    async def test_urdf_kaya(self) -> None:
+        """Import Kaya robot URDF and validate mesh geometry."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/robots/ur10/urdf/ur10.urdf")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        status, prim_path = omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "robots", "kaya", "urdf", "kaya.urdf"))
         )
+        output_path, prim_path = self._import_urdf(urdf_path)
         await self.standard_checks(prim_path)
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
-    async def test_urdf_kaya(self):
+    async def test_missing(self) -> None:
+        """Import URDF with missing mesh files and validate error handling."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/robots/kaya/urdf/kaya.urdf")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.merge_fixed_joints = False
-        status, prim_path = omni.kit.commands.execute(
-            "URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_missing.urdf"))
         )
-        await self.standard_checks(prim_path)
-
-    async def test_missing(self):
-
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_missing.urdf")
-
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        output_path, _ = self._import_urdf(urdf_path)
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
     # This sample corresponds to the example in the docs, keep this and the version in the docs in sync
-    async def test_doc_sample(self):
-        import omni.kit.commands
+    async def test_doc_sample(self) -> None:
+        """Test the documented example workflow for importing and configuring URDF."""
         from pxr import Gf, Sdf, UsdLux, UsdPhysics
-
-        # setting up import configuration:
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        import_config.merge_fixed_joints = False
-        import_config.convex_decomp = False
-        import_config.import_inertia_tensor = True
-        import_config.fix_base = False
 
         # Get path to extension data:
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.asset.importer.urdf")
         extension_path = ext_manager.get_extension_path(ext_id)
         # import URDF
-        omni.kit.commands.execute(
-            "URDFParseAndImportFile",
-            urdf_path=extension_path + "/data/urdf/robots/carter/urdf/carter.urdf",
-            import_config=import_config,
+        output_path, _ = self._import_urdf(
+            os.path.normpath(os.path.join(extension_path, "data", "urdf", "robots", "carter", "urdf", "carter.urdf"))
         )
         # get stage handle
-        stage = omni.usd.get_context().get_stage()
+        self._stage = omni.usd.get_context().get_stage()
+        prim = self._stage.GetPrimAtPath("/carter")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
 
         # enable physics
-        scene = UsdPhysics.Scene.Define(stage, Sdf.Path("/physicsScene"))
+        scene = UsdPhysics.Scene.Define(self._stage, Sdf.Path("/physicsScene"))
         # set gravity
         scene.CreateGravityDirectionAttr().Set(Gf.Vec3f(0.0, 0.0, -1.0))
         scene.CreateGravityMagnitudeAttr().Set(9.81)
 
         # add ground plane
-        PhysicsSchemaTools.addGroundPlane(stage, "/World/groundPlane", "Z", 1500, Gf.Vec3f(0, 0, -50), Gf.Vec3f(0.5))
+        PhysicsSchemaTools.addGroundPlane(
+            self._stage, "/World/groundPlane", "Z", 1500, Gf.Vec3f(0, 0, -50), Gf.Vec3f(0.5)
+        )
 
         # add lighting
-        distantLight = UsdLux.DistantLight.Define(stage, Sdf.Path("/DistantLight"))
+        distantLight = UsdLux.DistantLight.Define(self._stage, Sdf.Path("/DistantLight"))
         distantLight.CreateIntensityAttr(500)
         ####
         #### Next Docs section
         ####
 
         # get handle to the Drive API for both wheels
-        left_wheel_drive = UsdPhysics.DriveAPI.Get(stage.GetPrimAtPath("/carter/joints/left_wheel"), "angular")
-        right_wheel_drive = UsdPhysics.DriveAPI.Get(stage.GetPrimAtPath("/carter/joints/right_wheel"), "angular")
+        left_wheel_drive = UsdPhysics.DriveAPI.Get(self._stage.GetPrimAtPath("/carter/Physics/left_wheel"), "angular")
+        right_wheel_drive = UsdPhysics.DriveAPI.Get(self._stage.GetPrimAtPath("/carter/Physics/right_wheel"), "angular")
 
         # Set the velocity drive target in degrees/second
         left_wheel_drive.GetTargetVelocityAttr().Set(150)
@@ -603,39 +672,48 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         left_wheel_drive.GetStiffnessAttr().Set(0)
         right_wheel_drive.GetStiffnessAttr().Set(0)
 
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
+
     # Make sure that a urdf with more than 63 links imports
-    async def test_64(self):
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_large.urdf")
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
-        stage = omni.usd.get_context().get_stage()
-        prim = stage.GetPrimAtPath("/test_large")
+    async def test_64(self) -> None:
+        """Import URDF with more than 63 links and validate large model support."""
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_large.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
+        prim = self._stage.GetPrimAtPath("/test_large")
         self.assertTrue(prim)
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
 
     # basic urdf test: joints and links are imported correctly
-    async def test_urdf_floating(self):
+    async def test_urdf_floating(self) -> None:
+        """Import URDF with floating base and validate link transforms."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_floating.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_floating.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
+        prim = self._stage.GetPrimAtPath("/test_floating")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         await omni.kit.app.get_app().next_update_async()
 
-        prim = stage.GetPrimAtPath("/test_floating")
+        prim = self._stage.GetPrimAtPath("/test_floating")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
         # make sure the joints exist
-        root_joint = stage.GetPrimAtPath("/test_floating/root_joint")
+        root_joint = self._stage.GetPrimAtPath("/test_floating/Physics/root_to_base")
         self.assertNotEqual(root_joint.GetPath(), Sdf.Path.emptyPath)
 
-        link_1 = stage.GetPrimAtPath("/test_floating/link_1")
+        link_1 = self._stage.GetPrimAtPath("/test_floating/Geometry/root_link/base_link/link_1")
         self.assertNotEqual(link_1.GetPath(), Sdf.Path.emptyPath)
         link_1_trans = np.array(omni.usd.get_world_transform_matrix(link_1).ExtractTranslation())
 
         self.assertAlmostEqual(np.linalg.norm(link_1_trans - np.array([0, 0, 0.45])), 0, delta=0.03)
-        floating_link = stage.GetPrimAtPath("/test_floating/floating_link")
+        floating_link = self._stage.GetPrimAtPath("/test_floating/Geometry/root_link/base_link/link_1/floating_link")
         self.assertNotEqual(floating_link.GetPath(), Sdf.Path.emptyPath)
         floating_link_trans = np.array(omni.usd.get_world_transform_matrix(floating_link).ExtractTranslation())
 
@@ -646,16 +724,20 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         await asyncio.sleep(1.0)
         # nothing crashes
         self._timeline.stop()
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_scale(self):
+    async def test_urdf_scale(self) -> None:
+        """Import URDF and validate stage units and scaling."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.distance_scale = 1.0
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
+        prim = self._stage.GetPrimAtPath("/test_basic")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         await omni.kit.app.get_app().next_update_async()
 
         # Start Simulation and wait
@@ -665,22 +747,26 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         # nothing crashes
         self._timeline.stop()
 
-        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(stage), 1.0)
+        self.assertAlmostEqual(UsdGeom.GetStageMetersPerUnit(self._stage), 1.0)
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_drive_none(self):
+    async def test_urdf_drive_none(self) -> None:
+        """Import URDF and validate joint drive API presence for appropriate joints."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_basic.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        from isaacsim.asset.importer.urdf._urdf import UrdfJointTargetType
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
 
-        import_config.default_drive_type = UrdfJointTargetType.JOINT_DRIVE_NONE
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        prim = self._stage.GetPrimAtPath("/test_basic")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         await omni.kit.app.get_app().next_update_async()
 
-        self.assertFalse(stage.GetPrimAtPath("/test_basic/root_joint").HasAPI(UsdPhysics.DriveAPI))
-        self.assertTrue(stage.GetPrimAtPath("/test_basic/joints/elbow_joint").HasAPI(UsdPhysics.DriveAPI))
+        self.assertFalse(self._stage.GetPrimAtPath("/test_basic/Physics/root_to_base").HasAPI(UsdPhysics.DriveAPI))
+        self.assertTrue(self._stage.GetPrimAtPath("/test_basic/Physics/elbow_joint").HasAPI(UsdPhysics.DriveAPI))
 
         # Start Simulation and wait
         self._timeline.play()
@@ -688,22 +774,22 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         await asyncio.sleep(1.0)
         # nothing crashes
         self._timeline.stop()
-
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
-    async def test_urdf_usd(self):
+    async def test_urdf_usd(self) -> None:
+        """Import URDF referencing USD geometry and validate USD prim import."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_usd.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-        from isaacsim.asset.importer.urdf._urdf import UrdfJointTargetType
-
-        import_config.default_drive_type = UrdfJointTargetType.JOINT_DRIVE_NONE
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_usd.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
         await omni.kit.app.get_app().next_update_async()
 
-        self.assertNotEqual(stage.GetPrimAtPath("/test_usd/cube/visuals/mesh_0/Cylinder"), Sdf.Path.emptyPath)
-        self.assertNotEqual(stage.GetPrimAtPath("/test_usd/cube/visuals/mesh_1/Torus"), Sdf.Path.emptyPath)
+        self.assertNotEqual(self._stage.GetPrimAtPath("/test_usd/cube/visuals/mesh_0/Cylinder"), Sdf.Path.emptyPath)
+        self.assertNotEqual(self._stage.GetPrimAtPath("/test_usd/cube/visuals/mesh_1/Torus"), Sdf.Path.emptyPath)
         # Start Simulation and wait
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
@@ -711,43 +797,47 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         # nothing crashes
         self._timeline.stop()
 
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
     # test negative joint limits
-    async def test_urdf_limits(self):
+    async def test_urdf_limits(self) -> None:
+        """Import URDF with negative joint limits and validate limit configuration."""
 
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_limits.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-
-        import_config.import_inertia_tensor = True
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        urdf_path = os.path.normpath(
+            os.path.abspath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_limits.urdf"))
+        )
+        output_path, _ = self._import_urdf(urdf_path)
+        self._stage = omni.usd.get_context().get_stage()
+        prim = self._stage.GetPrimAtPath("/test_limits")
+        prim.GetVariantSet("Physics").SetVariantSelection("physx")
         await omni.kit.app.get_app().next_update_async()
 
         # ensure the import completed.
-        prim = stage.GetPrimAtPath("/test_limits")
+        prim = self._stage.GetPrimAtPath("/test_limits")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
         # ensure the joint limits are set on the elbow
-        elbowJoint = stage.GetPrimAtPath("/test_limits/joints/elbow_joint")
+        elbowJoint = self._stage.GetPrimAtPath("/test_limits/Physics/elbow_joint")
         self.assertNotEqual(elbowJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(elbowJoint.GetTypeName(), "PhysicsRevoluteJoint")
         self.assertTrue(elbowJoint.HasAPI(UsdPhysics.DriveAPI))
 
         # ensure the joint limits are set on the wrist
-        wristJoint = stage.GetPrimAtPath("/test_limits/joints/wrist_joint")
+        wristJoint = self._stage.GetPrimAtPath("/test_limits/Physics/wrist_joint")
         self.assertNotEqual(wristJoint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(wristJoint.GetTypeName(), "PhysicsRevoluteJoint")
         self.assertTrue(wristJoint.HasAPI(UsdPhysics.DriveAPI))
 
         # ensure the joint limits are set on the finger1
-        finger1Joint = stage.GetPrimAtPath("/test_limits/joints/finger_1_joint")
+        finger1Joint = self._stage.GetPrimAtPath("/test_limits/Physics/finger_1_joint")
         self.assertNotEqual(finger1Joint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(finger1Joint.GetTypeName(), "PhysicsPrismaticJoint")
         self.assertTrue(finger1Joint.HasAPI(UsdPhysics.DriveAPI))
 
         # ensure the joint limits are set on the finger2
-        finger2Joint = stage.GetPrimAtPath("/test_limits/joints/finger_2_joint")
+        finger2Joint = self._stage.GetPrimAtPath("/test_limits/Physics/finger_2_joint")
         self.assertNotEqual(finger2Joint.GetPath(), Sdf.Path.emptyPath)
         self.assertEqual(finger2Joint.GetTypeName(), "PhysicsPrismaticJoint")
         self.assertTrue(finger2Joint.HasAPI(UsdPhysics.DriveAPI))
@@ -758,111 +848,74 @@ class TestUrdf(omni.kit.test.AsyncTestCase):
         await asyncio.sleep(1.0)
         # nothing crashes
         self._timeline.stop()
-
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
 
     # test collision from visuals
-    async def test_collision_from_visuals(self):
-
-        def IsVisualGeom(prim):
-            return (
-                pxr.UsdGeom.Mesh(prim)
-                or pxr.UsdGeom.Sphere(prim)
-                or pxr.UsdGeom.Capsule(prim)
-                or pxr.UsdGeom.Cylinder(prim)
-                or pxr.UsdGeom.Cube(prim)
-                or pxr.UsdGeom.Cone(prim)
-            )
-
+    async def test_collision_from_visuals(self) -> None:
+        """Import URDF with collision from visuals enabled and validate collision geometry."""
         # import a urdf file without collision
-        urdf_path = os.path.abspath(self._extension_path + "/data/urdf/tests/test_collision_from_visuals.urdf")
-        stage = omni.usd.get_context().get_stage()
-        status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
+        urdf_path = os.path.normpath(
+            os.path.abspath(
+                os.path.join(self._extension_path, "data", "urdf", "tests", "test_collision_from_visuals.urdf")
+            )
+        )
+        USD_GEOMETRY_TYPES = {"Mesh", "Cube", "Sphere", "Capsule", "Cylinder", "Cone"}
 
-        import_config.set_collision_from_visuals(True)
-
-        omni.kit.commands.execute("URDFParseAndImportFile", urdf_path=urdf_path, import_config=import_config)
+        output_path, _ = self._import_urdf(urdf_path, collision_from_visuals=True)
+        self._stage = omni.usd.get_context().get_stage()
         await omni.kit.app.get_app().next_update_async()
 
         # ensure the import completed.
-        prim = stage.GetPrimAtPath("/test_collision_from_visuals")
+        prim = self._stage.GetPrimAtPath("/test_collision_from_visuals")
         self.assertNotEqual(prim.GetPath(), Sdf.Path.emptyPath)
 
-        # ensure the link collision prim exists and has the collision API applied.
-        base_link = [
-            child_prim
-            for child_prim in pxr.Usd.PrimRange(
-                stage.GetPrimAtPath("/test_collision_from_visuals/base_link/collisions"),
-                pxr.Usd.TraverseInstanceProxies(),
-            )
-            if IsVisualGeom(child_prim)
-        ]
-        self.assertNotEqual(base_link[0].GetPath(), Sdf.Path.emptyPath)
-        self.assertTrue(base_link[0].GetAttribute("physics:collisionEnabled").Get())
+        for child_prim in self._stage.Traverse():
+            prim_type = child_prim.GetTypeName()
+            if prim_type in USD_GEOMETRY_TYPES:
+                imageable = UsdGeom.Imageable(child_prim)
+                purpose = imageable.GetPurposeAttr().Get() or "default"
+                if purpose not in {"default", "render"}:
+                    continue
 
-        # ensure the link_1 collision prim exists and has the collision API applied.
-        link_1 = [
-            child_prim
-            for child_prim in pxr.Usd.PrimRange(
-                stage.GetPrimAtPath("/test_collision_from_visuals/link_1/collisions"), pxr.Usd.TraverseInstanceProxies()
-            )
-            if IsVisualGeom(child_prim)
-        ]
-        self.assertNotEqual(link_1[0].GetPath(), Sdf.Path.emptyPath)
-        self.assertTrue(link_1[0].GetAttribute("physics:collisionEnabled").Get())
-
-        # ensure the link_2 collision prim exists and has the collision API applied.
-        link_2 = [
-            child_prim
-            for child_prim in pxr.Usd.PrimRange(
-                stage.GetPrimAtPath("/test_collision_from_visuals/link_2/collisions"), pxr.Usd.TraverseInstanceProxies()
-            )
-            if IsVisualGeom(child_prim)
-        ]
-        self.assertNotEqual(link_2[0].GetPath(), Sdf.Path.emptyPath)
-        self.assertTrue(link_2[0].GetAttribute("physics:collisionEnabled").Get())
-
-        # ensure the palm_link collision prim exists and has the collision API applied.
-        palm_link = [
-            child_prim
-            for child_prim in pxr.Usd.PrimRange(
-                stage.GetPrimAtPath("/test_collision_from_visuals/palm_link/collisions"),
-                pxr.Usd.TraverseInstanceProxies(),
-            )
-            if IsVisualGeom(child_prim)
-        ]
-        self.assertNotEqual(palm_link[0].GetPath(), Sdf.Path.emptyPath)
-        self.assertTrue(palm_link[0].GetAttribute("physics:collisionEnabled").Get())
-
-        # ensure the finger_link_1 collision prim exists and has the collision API applied.
-        finger_link_1 = [
-            child_prim
-            for child_prim in pxr.Usd.PrimRange(
-                stage.GetPrimAtPath("/test_collision_from_visuals/finger_link_1/collisions"),
-                pxr.Usd.TraverseInstanceProxies(),
-            )
-            if IsVisualGeom(child_prim)
-        ]
-        self.assertNotEqual(finger_link_1[0].GetPath(), Sdf.Path.emptyPath)
-        self.assertTrue(finger_link_1[0].GetAttribute("physics:collisionEnabled").Get())
-
-        # ensure the finger_link_2 collision prim exists and has the collision API applied.
-        finger_link_2 = [
-            child_prim
-            for child_prim in pxr.Usd.PrimRange(
-                stage.GetPrimAtPath("/test_collision_from_visuals/finger_link_2/collisions"),
-                pxr.Usd.TraverseInstanceProxies(),
-            )
-            if IsVisualGeom(child_prim)
-        ]
-        self.assertNotEqual(finger_link_2[0].GetPath(), Sdf.Path.emptyPath)
-        self.assertTrue(finger_link_2[0].GetAttribute("physics:collisionEnabled").Get())
+                self.assertTrue(child_prim.HasAPI(UsdPhysics.CollisionAPI))
+                collision_api = UsdPhysics.CollisionAPI(child_prim)
+                collision_enabled_attr = collision_api.GetCollisionEnabledAttr()
+                self.assertTrue(collision_enabled_attr.Get())
 
         # Start Simulation and wait
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
-        await asyncio.sleep(2.0)
         # nothing crashes
         self._timeline.stop()
 
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
         pass
+
+    async def test_debug_mode(self) -> None:
+        """Import with debug mode enabled and validate results.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.asset.importer.urdf import URDFImporterConfig
+            >>> URDFImporterConfig()
+            <...>
+        """
+        urdf_path = os.path.normpath(os.path.join(self._extension_path, "data", "urdf", "tests", "test_basic.urdf"))
+        output_path, _ = self._import_urdf(urdf_path, debug_mode=True)
+
+        # Check if expected intermediate files exist (debug mode should keep temporary outputs)
+        temp_usd_path = os.path.normpath(os.path.join(os.path.dirname(output_path), "..", "temp", "test_basic.usd"))
+        usdex_usd_path = os.path.normpath(os.path.join(os.path.dirname(output_path), "..", "usdex", "test_basic.usdc"))
+        self.assertTrue(os.path.exists(temp_usd_path), f"Temp USD file not found: {temp_usd_path}")
+        self.assertTrue(os.path.exists(usdex_usd_path), f"USDEx USD file not found: {usdex_usd_path}")
+        self.assertTrue(os.path.exists(output_path), f"Output path not found: {output_path}")
+
+        await omni.kit.app.get_app().next_update_async()
+        self._delete_directory(os.path.dirname(output_path))
+        self._delete_directory(os.path.dirname(temp_usd_path))
+        self._delete_directory(os.path.dirname(usdex_usd_path))

@@ -31,9 +31,28 @@ from lula import LogLevel, set_default_logger_prefix, set_log_level
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the isaacsim.robot_motion.lula extension.
+
+    This extension integrates the Lula robot motion planning library into Isaac Sim, providing access to
+    advanced robot motion planning and control capabilities. Lula is a high-performance robot motion
+    planning library that supports various robot configurations and planning algorithms.
+
+    The extension configures the Lula logging system to integrate properly with Isaac Sim's logging
+    infrastructure, setting appropriate log levels and prefixes for better debugging and monitoring
+    of robot motion planning operations.
+    """
+
     def on_startup(self, ext_id):
+        """Called when the extension is starting up.
+
+        Sets up the Lula logging configuration with warning level and prefix.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         set_log_level(LogLevel.WARNING)
         set_default_logger_prefix("[Lula] ")
 
     def on_shutdown(self):
+        """Called when the extension is shutting down."""
         pass

@@ -19,15 +19,6 @@
 
 CARB_BINDINGS("isaacsim.ros2.tf_viewer")
 
-namespace isaacsim
-{
-namespace ros2
-{
-namespace tf_viewer
-{
-} // namespace tf_viewer
-} // namespace ros2
-} // namespace isaacsim
 
 namespace py = pybind11;
 

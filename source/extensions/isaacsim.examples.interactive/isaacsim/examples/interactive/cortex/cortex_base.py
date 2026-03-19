@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Base class for Cortex-based interactive examples with CortexWorld integration."""
+
+
 import gc
 from abc import abstractmethod
 
@@ -24,9 +28,19 @@ from isaacsim.examples.interactive import base_sample
 
 
 class CortexBase(base_sample.BaseSample):
+    """Base class for Cortex-based interactive examples.
+
+    This class extends BaseSample to provide Cortex framework integration for Isaac Sim interactive examples.
+    It initializes a CortexWorld instance instead of a standard World, enabling access to Cortex-specific
+    functionality such as behavior trees, decision making, and advanced task management.
+
+    The class handles the complete lifecycle of Cortex world setup, including stage creation, simulation
+    context initialization, scene setup, and task management. When tasks are present, it automatically
+    registers physics callbacks to enable task stepping during simulation.
+    """
+
     async def load_world_async(self):
-        """
-        Function called when clicking load buttton.
+        """Function called when clicking load button.
         The difference between this class and Base Sample is that we initialize a CortexWorld specialization.
         """
         if CortexWorld.instance() is None:

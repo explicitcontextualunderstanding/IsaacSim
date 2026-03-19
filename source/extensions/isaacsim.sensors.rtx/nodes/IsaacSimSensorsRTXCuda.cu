@@ -197,10 +197,28 @@ __global__ void selectRequiredValidPointsKernel(
 
 // Optimized fused kernel for optional outputs
 __global__ void selectOptionalValidPointsKernel(
-    const uint64_t* __restrict__ timestampSrc, const uint32_t* __restrict__ emitterIdSrc, const uint32_t* __restrict__ materialIdSrc, const uint8_t* __restrict__ objectIdSrc,
-    const float3* __restrict__ normalSrc, const float3* __restrict__ velocitySrc,
-    uint64_t* __restrict__ timestampDst, uint32_t* __restrict__ emitterIdDst, uint32_t* __restrict__ materialIdDst, uint8_t* __restrict__ objectIdDst,
-    float3* __restrict__ normalDst, float3* __restrict__ velocityDst,
+    const uint64_t* __restrict__ timestampSrc,
+    const uint32_t* __restrict__ emitterIdSrc,
+    const uint32_t* __restrict__ channelIdSrc,
+    const uint32_t* __restrict__ materialIdSrc,
+    const uint32_t* __restrict__ tickIdSrc,
+    const float3* __restrict__ normalSrc,
+    const float3* __restrict__ velocitySrc,
+    const uint8_t* __restrict__ objectIdSrc,
+    const uint8_t* __restrict__ echoIdSrc,
+    const uint8_t* __restrict__ tickStateSrc,
+    const float* __restrict__ radialVelocityMSSrc,
+    uint64_t* __restrict__ timestampDst,
+    uint32_t* __restrict__ emitterIdDst,
+    uint32_t* __restrict__ channelIdDst,
+    uint32_t* __restrict__ materialIdDst,
+    uint32_t* __restrict__ tickIdDst,
+    float3* __restrict__ normalDst,
+    float3* __restrict__ velocityDst,
+    uint8_t* __restrict__ objectIdDst,
+    uint8_t* __restrict__ echoIdDst,
+    uint8_t* __restrict__ tickStateDst,
+    float* __restrict__ radialVelocityMSDst,
     const size_t* __restrict__ validIndices, int* __restrict__ numValidPoints, uint32_t enableMask)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -213,14 +231,19 @@ __global__ void selectOptionalValidPointsKernel(
     // Optional outputs - less frequently accessed together
     if (enableMask & (1 << 4)) timestampDst[idx] = timestampSrc[srcIdx];      // bit 4: timestamp
     if (enableMask & (1 << 5)) emitterIdDst[idx] = emitterIdSrc[srcIdx];      // bit 5: emitter ID
-    if (enableMask & (1 << 6)) materialIdDst[idx] = materialIdSrc[srcIdx];    // bit 6: material ID
-    if (enableMask & (1 << 7)) {                                              // bit 7: object ID
+    if (enableMask & (1 << 6)) channelIdDst[idx] = channelIdSrc[srcIdx];      // bit 6: channel ID
+    if (enableMask & (1 << 7)) materialIdDst[idx] = materialIdSrc[srcIdx];    // bit 7: material ID
+    if (enableMask & (1 << 8)) tickIdDst[idx] = tickIdSrc[srcIdx];            // bit 8: tick ID
+    if (enableMask & (1 << 9)) normalDst[idx] = normalSrc[srcIdx];            // bit 9: normal
+    if (enableMask & (1 << 10)) velocityDst[idx] = velocitySrc[srcIdx];        // bit 10: velocity
+    if (enableMask & (1 << 11)) {                                              // bit 11: object ID
         for (size_t i = 0; i < 16; i++) {   // handle striding
             objectIdDst[idx * 16 + i] = objectIdSrc[srcIdx * 16 + i];
         }
     }
-    if (enableMask & (1 << 8)) normalDst[idx] = normalSrc[srcIdx];            // bit 8: normal
-    if (enableMask & (1 << 9)) velocityDst[idx] = velocitySrc[srcIdx];        // bit 9: velocity
+    if (enableMask & (1 << 12)) echoIdDst[idx] = echoIdSrc[srcIdx];            // bit 12: echo ID
+    if (enableMask & (1 << 13)) tickStateDst[idx] = tickStateSrc[srcIdx];    // bit 13: tick states
+    if (enableMask & (1 << 14)) radialVelocityMSDst[idx] = radialVelocityMSSrc[srcIdx]; // bit 14: radial velocity MS
 }
 
 // Host function to launch the required outputs kernel
@@ -246,10 +269,28 @@ void selectRequiredValidPoints(
 
 // Host function to launch the optional outputs kernel
 void selectOptionalValidPoints(
-    const uint64_t* __restrict__ timestampSrc, const uint32_t* __restrict__ emitterIdSrc, const uint32_t* __restrict__ materialIdSrc, const uint8_t* __restrict__ objectIdSrc,
-    const float3* __restrict__ normalSrc, const float3* __restrict__ velocitySrc,
-    uint64_t* __restrict__ timestampDst, uint32_t* __restrict__ emitterIdDst, uint32_t* __restrict__ materialIdDst, uint8_t* __restrict__ objectIdDst,
-    float3* __restrict__ normalDst, float3* __restrict__ velocityDst,
+    const uint64_t* __restrict__ timestampSrc,
+    const uint32_t* __restrict__ emitterIdSrc,
+    const uint32_t* __restrict__ channelIdSrc,
+    const uint32_t* __restrict__ materialIdSrc,
+    const uint32_t* __restrict__ tickIdSrc,
+    const float3* __restrict__ normalSrc,
+    const float3* __restrict__ velocitySrc,
+    const uint8_t* __restrict__ objectIdSrc,
+    const uint8_t* __restrict__ echoIdSrc,
+    const uint8_t* __restrict__ tickStateSrc,
+    const float* __restrict__ radialVelocityMSSrc,
+    uint64_t* __restrict__ timestampDst,
+    uint32_t* __restrict__ emitterIdDst,
+    uint32_t* __restrict__ channelIdDst,
+    uint32_t* __restrict__ materialIdDst,
+    uint32_t* __restrict__ tickIdDst,
+    float3* __restrict__ normalDst,
+    float3* __restrict__ velocityDst,
+    uint8_t* __restrict__ objectIdDst,
+    uint8_t* __restrict__ echoIdDst,
+    uint8_t* __restrict__ tickStateDst,
+    float* __restrict__ radialVelocityMSDst,
     const size_t* __restrict__ validIndices, int* __restrict__ numValidPoints, size_t maxPoints,
     uint32_t enableMask, int maxThreadsPerBlock, int cudaDeviceIndex, cudaStream_t stream)
 {
@@ -262,10 +303,10 @@ void selectOptionalValidPoints(
     const int nb = (maxPoints + nt - 1) / nt;
 
     selectOptionalValidPointsKernel<<<nb, nt, 0, stream>>>(
-        timestampSrc, emitterIdSrc, materialIdSrc, objectIdSrc,
-        normalSrc, velocitySrc,
-        timestampDst, emitterIdDst, materialIdDst, objectIdDst,
-        normalDst, velocityDst,
+        timestampSrc, emitterIdSrc, channelIdSrc, materialIdSrc, tickIdSrc,
+        normalSrc, velocitySrc, objectIdSrc, echoIdSrc, tickStateSrc, radialVelocityMSSrc,
+        timestampDst, emitterIdDst, channelIdDst, materialIdDst, tickIdDst,
+        normalDst, velocityDst, objectIdDst, echoIdDst, tickStateDst, radialVelocityMSDst,
         validIndices, numValidPoints, enableMask);
 }
 

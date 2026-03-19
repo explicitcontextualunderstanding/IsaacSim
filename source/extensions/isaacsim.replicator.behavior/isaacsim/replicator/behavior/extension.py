@@ -13,12 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension module that provides behavior-based functionality for Isaac Sim Replicator."""
+
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
+    """Extension for the isaacsim.replicator.behavior module.
+
+    This extension provides behavior-based functionality for Isaac Sim Replicator, enabling
+    advanced simulation scenarios with dynamic object behaviors and interactions.
+    """
+
     def on_startup(self, ext_id):
+        """Called when the extension is started.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         pass
 
     def on_shutdown(self):
+        """Called when the extension is stopped."""
         pass

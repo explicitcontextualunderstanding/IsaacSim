@@ -13,21 +13,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import isaacsim.asset.importer.mjcf._mjcf as mjcf_bindings
+
+"""Docstring tests for MJCF importer APIs."""
+
 import isaacsim.core.experimental.utils.impl.stage as stage_utils
 import isaacsim.test.docstring
+from isaacsim.asset.importer.mjcf import MJCFImporter, MJCFImporterConfig
 
 
 class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
-    async def setUp(self):
-        """Method called to prepare the test fixture"""
+    """Run docstring tests for MJCF importer APIs.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.test.docstring
+        >>> issubclass(isaacsim.test.docstring.AsyncDocTestCase, object)
+        True
+    """
+
+    async def setUp(self) -> None:
+        """Prepare the test fixture and create a stage.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import isaacsim.core.experimental.utils.impl.stage as stage_utils
+            >>> stage_utils.create_new_stage_async()  # doctest: +SKIP
+        """
         super().setUp()
         # create new stage
         await stage_utils.create_new_stage_async()
 
-    async def tearDown(self):
-        """Method called immediately after the test method has been called"""
+    async def tearDown(self) -> None:
+        """Clean up the test fixture.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import isaacsim.test.docstring
+            >>> issubclass(isaacsim.test.docstring.AsyncDocTestCase, object)
+            True
+        """
         super().tearDown()
 
-    async def test_mjcf_docstrings(self):
-        await self.assertDocTests(mjcf_bindings)
+    async def test_mjcf_docstrings(self) -> None:
+        """Validate docstring examples for MJCF importer classes.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.asset.importer.mjcf import MJCFImporterConfig
+            >>> MJCFImporterConfig()
+            <...>
+        """
+        await self.assertDocTests(MJCFImporter)
+        await self.assertDocTests(MJCFImporterConfig)

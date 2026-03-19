@@ -17,15 +17,15 @@ from isaacsim.core.prims import SingleArticulation
 
 
 class RMPFlowController(mg.MotionPolicyController):
-    """[summary]
+    """RMPflow motion controller for the Franka robot.
 
     Args:
-        name (str): [description]
-        robot_articulation (SingleArticulation): [description]
-        physics_dt (float, optional): [description]. Defaults to 1.0/60.0.
+        name: Name identifier for the controller.
+        robot_articulation: The robot articulation to control.
+        physics_dt: Physics timestep.
     """
 
-    def __init__(self, name: str, robot_articulation: SingleArticulation, physics_dt: float = 1.0 / 60.0) -> None:
+    def __init__(self, name: str, robot_articulation: SingleArticulation, physics_dt: float = 1.0 / 60.0):
         self.rmp_flow_config = mg.interface_config_loader.load_supported_motion_policy_config("Franka", "RMPflow")
         self.rmp_flow = mg.lula.motion_policies.RmpFlow(**self.rmp_flow_config)
 
@@ -42,6 +42,10 @@ class RMPFlowController(mg.MotionPolicyController):
         return
 
     def reset(self):
+        """Resets the RMPFlow controller to its default state.
+
+        Resets the parent motion policy controller and restores the robot base pose to its default position and orientation.
+        """
         mg.MotionPolicyController.reset(self)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position, robot_orientation=self._default_orientation

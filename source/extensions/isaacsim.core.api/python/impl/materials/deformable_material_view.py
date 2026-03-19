@@ -21,10 +21,12 @@ import numpy as np
 
 # isaac-core
 import omni.kit.app
-import torch
 from isaacsim.core.api.simulation_context.simulation_context import SimulationContext
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.prims import find_matching_prim_paths, get_prim_at_path, is_prim_path_valid
 from pxr import PhysxSchema
+
+torch = import_module("torch")
 
 
 class DeformableMaterialView:
@@ -149,7 +151,6 @@ class DeformableMaterialView:
 
     def post_reset(self) -> None:
         """Resets the deformables to their initial states."""
-        # TODO:
         return
 
     def initialize(self, physics_sim_view: omni.physics.tensors.SimulationView = None) -> None:
@@ -168,11 +169,6 @@ class DeformableMaterialView:
         )
         self._count = self._physics_view.count
         carb.log_info("Deformable material View Device: {}".format(self._device))
-        return
-
-    def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
         return
 
     def set_dynamic_frictions(

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0] - 2026-02-25
+### Added
+- Add USD `Camera`
+- Add the `colors` parameter to shape classes to set display colors
+
+## [0.5.0] - 2025-12-01
+### Changed
+- Define the `reset_xform_op_properties` parameter to True by default for all objects
+
 ## [0.4.0] - 2025-10-08
 ### Added
 - Add `GroundPlane` object
@@ -31,7 +40,7 @@
 
 ## [0.1.3] - 2025-05-23
 ### Changed
-- rename test utils.py to common.py
+- Rename test utils.py to common.py
 
 ## [0.1.2] - 2025-05-19
 ### Changed

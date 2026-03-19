@@ -13,18 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension class for managing the lifecycle of the isaacsim.replicator.writers.impl extension."""
+
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    """Object that tracks the lifetime of the Python part of the extension loading"""
+    """Object that tracks the lifetime of the Python part of the extension loading."""
 
     def on_startup(self):
-        """Set up initial conditions for the Python part of the extension"""
+        """Set up initial conditions for the Python part of the extension."""
         from isaacsim.replicator.writers.scripts.writers import register_writers
 
         register_writers()
 
     def on_shutdown(self):
-        """Shutting down this part of the extension prepares it for hot reload"""
+        """Shutting down this part of the extension prepares it for hot reload."""
         pass

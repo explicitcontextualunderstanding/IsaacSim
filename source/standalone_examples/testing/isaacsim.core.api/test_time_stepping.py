@@ -30,18 +30,18 @@ asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka
 
 simulation_context = SimulationContext(physics_dt=1.0 / 60.0, rendering_dt=1.0 / 60.0, stage_units_in_meters=1.0)
 if not math.isclose(simulation_context.get_physics_dt(), 1.0 / 60.0):
-    print(f"[FAIL] Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
+    print(f"[fatal] Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
     sys.exit(1)
 if not math.isclose(simulation_context.get_rendering_dt(), 1.0 / 60.0):
-    print(f"[FAIL] Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
+    print(f"[fatal] Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
     sys.exit(1)
 simulation_context.clear_instance()
 simulation_context = SimulationContext(stage_units_in_meters=1.0)
 if not math.isclose(simulation_context.get_physics_dt(), 1.0 / 60.0):
-    print(f"[FAIL] Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
+    print(f"[fatal] Physics dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_physics_dt()}")
     sys.exit(1)
 if not math.isclose(simulation_context.get_rendering_dt(), 1.0 / 60.0):
-    print(f"[FAIL] Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
+    print(f"[fatal] Rendering dt mismatch: expected {1.0 / 60.0}, got {simulation_context.get_rendering_dt()}")
     sys.exit(1)
 add_reference_to_stage(asset_path, "/Franka")
 # need to initialize physics getting any articulation..etc
@@ -194,8 +194,39 @@ tester.check_dt(1.0 / 60.0, 0)
 tester.check_steps(0, 1)
 tester.reset_values()
 
+print("Test physics update on render call")
+# Test from test_rendering.py - verify physics state updates during render
+simulation_context.clear_instance()
+
+from isaacsim.core.api import World
+from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.deprecation_manager import import_module
+from isaacsim.core.prims import XFormPrim
+
+torch = import_module("torch")
+
+my_world = World(stage_units_in_meters=1.0, device="cuda:0", backend="torch")
+cube_2 = my_world.scene.add(
+    DynamicCuboid(
+        prim_path="/new_cube_2",
+        name="cube_1",
+        position=torch.tensor([0, 0, 1.0]),
+        scale=torch.tensor([0.6, 0.5, 0.2]),
+        size=1.0,
+        color=torch.tensor([255, 0, 0]),
+    )
+)
+xfrom_cube = XFormPrim("/new_cube_2")
+my_world.scene.add_default_ground_plane()
+my_world.reset()
+for i in range(500):
+    my_world.step(render=False)
+my_world.render()
+if not (xfrom_cube.get_world_poses(usd=False)[0][:, -1].item() < 10e-02):
+    print(f"[fatal] PhysX status is not updated in the rendering call")
+    simulation_app.close()
+    sys.exit(1)
 
 print("cleanup and exit")
-simulation_context.stop()
-simulation_context.clear_instance()
+my_world.clear_instance()
 simulation_app.close()

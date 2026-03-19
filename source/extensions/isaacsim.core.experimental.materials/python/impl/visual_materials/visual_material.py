@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+import carb
 import isaacsim.core.experimental.utils.ops as ops_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
@@ -130,10 +131,10 @@ class VisualMaterial(Prim, ABC):
         """
         assert self.valid, _MSG_PRIM_NOT_VALID
         # USD API
-        type_name = self._inputs.get(name, None)
-        if type_name is None:
+        spec = self._inputs.get(name)
+        if spec is None:
             raise ValueError(f"Invalid input name: {name}. Supported inputs: {', '.join(self._inputs.keys())}")
-        self._set_input_values(name=name, values=values, type_name=type_name, indices=indices)
+        self._set_input_values(name=name, values=values, spec=spec, indices=indices)
 
     def get_input_values(self, name: str, *, indices: int | list | np.ndarray | wp.array | None = None) -> wp.array:
         """Get shaders' input values.
@@ -177,10 +178,10 @@ class VisualMaterial(Prim, ABC):
         """
         assert self.valid, _MSG_PRIM_NOT_VALID
         # USD API
-        type_name = self._inputs.get(name, None)
-        if type_name is None:
+        spec = self._inputs.get(name)
+        if spec is None:
             raise ValueError(f"Invalid input name: {name}. Supported inputs: {', '.join(self._inputs.keys())}")
-        return self._get_input_values(name=name, type_name=type_name, indices=indices)
+        return self._get_input_values(name=name, spec=spec, indices=indices)
 
     """
     Static methods.
@@ -257,15 +258,21 @@ class VisualMaterial(Prim, ABC):
         *,
         name: str,
         values: str | bool | int | float | list | np.ndarray | wp.array,
-        type_name: str | Sdf.ValueTypeName,
+        spec: dict,
         indices: int | list | np.ndarray | wp.array | None = None,
     ) -> None:
         """Set shader input values."""
-        sdf_type, sdf_type_class = self._parse_sdf_type(type_name)
+        sdf_type, sdf_type_class = self._parse_sdf_type(spec["type"])
         place_func, _, set_func, _, _ = self._get_sdf_type_spec(sdf_type, sdf_type_class)
-        # set values
+        # accommodate values
         indices = ops_utils.resolve_indices(indices, count=len(self), device="cpu")
         values = place_func(values, indices)
+        # clip values (if range is provided)
+        range_ = spec.get("range")
+        if range_ is not None and not np.all((values >= range_[0]) & (values <= range_[1])):
+            carb.log_warn(f"Input values for '{name}' are out of range. Values will be clipped to the range {range_}")
+            values = np.clip(values, range_[0], range_[1])
+        # set values
         for i, index in enumerate(indices.numpy()):
             shader = self.shaders[index]
             if shader.GetInput(name).Get() is None:
@@ -276,11 +283,11 @@ class VisualMaterial(Prim, ABC):
         self,
         *,
         name: str,
-        type_name: str | Sdf.ValueTypeName,
+        spec: dict,
         indices: int | list | np.ndarray | wp.array | None = None,
     ) -> list | wp.array:
         """Get shader input values."""
-        sdf_type, sdf_type_class = self._parse_sdf_type(type_name)
+        sdf_type, sdf_type_class = self._parse_sdf_type(spec["type"])
         _, create_func, _, get_func, return_func = self._get_sdf_type_spec(sdf_type, sdf_type_class)
         # get values
         indices = ops_utils.resolve_indices(indices, count=len(self), device="cpu")

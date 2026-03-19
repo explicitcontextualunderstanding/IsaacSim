@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides utilities for loading robot motion generation configuration files and discovering supported robot-policy combinations."""
+
+
 import json
 import os
 from typing import List
@@ -29,7 +33,7 @@ def get_supported_robot_policy_pairs() -> dict:
     """Get a dictionary of MotionPolicy names that are supported for each given robot name
 
     Returns:
-        supported_policy_names_by_robot (dict): dictionary mapping robot names (keys) to a list of supported MotionPolicy config files (values)
+        Dictionary mapping robot names (keys) to a list of supported MotionPolicy config files (values).
     """
     mg_extension_path = get_extension_path_from_name("isaacsim.robot_motion.motion_generation")
     policy_config_dir = os.path.join(mg_extension_path, "motion_policy_configs")
@@ -44,6 +48,11 @@ def get_supported_robot_policy_pairs() -> dict:
 
 
 def get_supported_robots_with_lula_kinematics() -> List[str]:
+    """Robot names that have supported lula kinematics configurations.
+
+    Returns:
+        List of robot names with supported lula kinematics.
+    """
     # Currently just uses robots that have RmpFlow supported
     robots = []
 
@@ -58,7 +67,7 @@ def get_supported_robot_path_planner_pairs() -> dict:
     """Get a dictionary of PathPlanner names that are supported for each given robot name
 
     Returns:
-        supported_planner_names_by_robot (dict): dictionary mapping robot names (keys) to a list of supported PathPlanner config files (values)
+        Dictionary mapping robot names (keys) to a list of supported PathPlanner config files (values).
     """
     mg_extension_path = get_extension_path_from_name("isaacsim.robot_motion.motion_generation")
     policy_config_dir = os.path.join(mg_extension_path, "path_planner_configs")
@@ -77,12 +86,12 @@ def load_supported_lula_kinematics_solver_config(robot_name: str, policy_config_
     Use get_supported_robots_with_lula_kinematics() to get a list of robots with supported kinematics.
 
     Args:
-        robot_name (str): name of robot
+        robot_name: Name of robot.
+        policy_config_dir: Path to directory where a policy_map.json file is stored.
 
     Returns:
-        solver_config (dict): a dictionary whose keyword arguments are sufficient to load the lula kinematics solver.
+        A dictionary whose keyword arguments are sufficient to load the lula kinematics solver.
             e.g. lula.LulaKinematicsSolver(**load_supported_lula_kinematics_solver_config("Franka"))
-
     """
     policy_name = "RMPflow"
 
@@ -122,13 +131,13 @@ def load_supported_motion_policy_config(robot_name: str, policy_name: str, polic
     in the motion_generation extension, passing in a path to a directory containing a "policy_map.json"
 
     Args:
-        robot_name (str): name of robot
-        policy_name (str): name of MotionPolicy
-        policy_config_dir (str): path to directory where a policy_map.json file is stored,
-            defaults to ".../isaacsim.robot_motion.motion_generation/motion_policy_configs"
+        robot_name: Name of robot.
+        policy_name: Name of MotionPolicy.
+        policy_config_dir: Path to directory where a policy_map.json file is stored,
+            defaults to ".../isaacsim.robot_motion.motion_generation/motion_policy_configs".
 
     Returns:
-        policy_config (dict): a dictionary whose keyword arguments are sufficient to load the desired motion policy
+        A dictionary whose keyword arguments are sufficient to load the desired motion policy
             e.g. lula.motion_policies.RmpFlow(**load_supported_motion_policy_config("Franka","RMPflow"))
     """
 
@@ -158,6 +167,16 @@ def load_supported_motion_policy_config(robot_name: str, policy_name: str, polic
 
 
 def load_supported_path_planner_config(robot_name: str, planner_name: str, policy_config_dir: str = None) -> dict:
+    """Load a PathPlanner configuration by specifying the robot name and planner name.
+
+    Args:
+        robot_name: Name of robot.
+        planner_name: Name of PathPlanner.
+        policy_config_dir: Path to directory where a path_planner_map.json file is stored.
+
+    Returns:
+        A dictionary whose keyword arguments are sufficient to load the desired path planner.
+    """
 
     if policy_config_dir is None:
         mg_extension_path = get_extension_path_from_name("isaacsim.robot_motion.motion_generation")
@@ -184,7 +203,15 @@ def load_supported_path_planner_config(robot_name: str, planner_name: str, polic
     return config
 
 
-def _process_policy_config(mg_config_file):
+def _process_policy_config(mg_config_file) -> dict:
+    """Process a motion generation config file by resolving relative asset paths.
+
+    Args:
+        mg_config_file: Path to the motion generation config file.
+
+    Returns:
+        The processed configuration dictionary with resolved asset paths.
+    """
     mp_config_dir = os.path.dirname(mg_config_file)
     with open(mg_config_file) as config_file:
         config = json.load(config_file)

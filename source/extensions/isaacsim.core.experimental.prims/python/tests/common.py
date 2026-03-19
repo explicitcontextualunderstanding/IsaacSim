@@ -16,6 +16,7 @@
 import os
 from typing import Callable, Literal
 
+import carb
 import numpy as np
 import omni.kit.test
 import warp as wp
@@ -27,12 +28,28 @@ def cprint(message):
         print(message)
 
 
+# simple decorator to skip test if default engine is not in supported engines
+def requires_engines(supported_engines: list[Literal["physx", "newton"]] = ["physx", "newton"]):
+    def decorator(func):
+        async def wrapper(self, *args, **kwargs):
+            default_engine = SimulationManager.get_default_engine()
+            if default_engine and default_engine.lower() not in supported_engines:
+                cprint(f"  |-- Skipping test: engine '{default_engine}' not in supported engines {supported_engines}")
+                return
+            return await func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def parametrize(
     *,
     devices: list[Literal["cpu", "cuda"]] = ["cpu", "cuda"],
     backends: list[Literal["usd", "usdrt", "fabric", "tensor"]] = ["usd", "usdrt", "fabric", "tensor"],
     instances: list[Literal["one", "many"]] = ["one", "many"],
     operations: list[Literal["wrap", "create"]] = ["wrap", "create"],
+    supported_engines: list[Literal["physx", "newton"]] = ["physx", "newton"],
     prim_class: type,
     prim_class_kwargs: dict = {},
     populate_stage_func: Callable[[int, Literal["wrap", "create"]], None],
@@ -41,6 +58,22 @@ def parametrize(
 ):
     def decorator(func):
         async def wrapper(self):
+            # Switch to the default engine if specified in settings
+            default_engine = SimulationManager.get_default_engine()
+            if default_engine:
+                if default_engine.lower() not in supported_engines:
+                    cprint(
+                        f"  |-- Skipping test: engine '{default_engine}' not in supported engines {supported_engines}"
+                    )
+                    return
+                current_engine = SimulationManager.get_active_physics_engine()
+                if current_engine != default_engine.lower():
+                    success = SimulationManager.switch_physics_engine(default_engine)
+                    if not success:
+                        carb.log_warn(f"Failed to switch to {default_engine} engine")
+                    await omni.kit.app.get_app().next_update_async()
+                cprint(f"  |-- Testing with engine: {default_engine}")
+            current_engine = SimulationManager.get_active_physics_engine()
             for device in devices:
                 for backend in backends:
                     for instance in instances:
@@ -49,7 +82,7 @@ def parametrize(
                             assert instance in ["one", "many"], f"Invalid instance: {instance}"
                             assert operation in ["wrap", "create"], f"Invalid operation: {operation}"
                             cprint(
-                                f"  |-- device: {device}, backend: {backend}, instance: {instance}, operation: {operation}"
+                                f"      |-- engine: {current_engine} |-- device: {device}, backend: {backend}, instance: {instance}, operation: {operation}"
                             )
                             # populate stage
                             await populate_stage_func(max_num_prims, operation, **populate_stage_func_kwargs)
@@ -84,7 +117,7 @@ def check_array(
     a: wp.array | list[wp.array],
     shape: list[int] | None = None,
     dtype: type | None = None,
-    device: str | wp.context.Device | None = None,
+    device: str | wp.Device | None = None,
 ):
     for i, x in enumerate(a if isinstance(a, (list, tuple)) else [a]):
         assert isinstance(x, wp.array), f"[{i}]: {repr(x)} ({type(x)}) is not a Warp array"

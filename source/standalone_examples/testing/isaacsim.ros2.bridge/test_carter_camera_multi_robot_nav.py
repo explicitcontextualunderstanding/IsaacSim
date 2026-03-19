@@ -20,7 +20,7 @@ from isaacsim import SimulationApp
 
 ENV_USD_PATH = "/Isaac/Samples/ROS2/Scenario/multiple_robot_carter_hospital_navigation.usd"
 
-CONFIG = {"renderer": "RaytracedLighting", "headless": False}
+CONFIG = {"renderer": "RealTimePathTracing", "headless": False}
 
 # Example ROS2 bridge sample demonstrating the manual loading of Multiple Robot Navigation scenario
 simulation_app = SimulationApp(CONFIG)

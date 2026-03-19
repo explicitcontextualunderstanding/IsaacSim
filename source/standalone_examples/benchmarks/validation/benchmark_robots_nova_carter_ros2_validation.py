@@ -95,18 +95,20 @@ import omni.graph.core as og
 import omni.kit.test
 import omni.replicator.core as rep
 from isaacsim.core.api import PhysicsContext
+from isaacsim.core.experimental.utils.stage import get_current_stage
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.stage import get_current_stage
 from isaacsim.core.utils.viewports import set_camera_view
 from isaacsim.robot.wheeled_robots.robots import WheeledRobot
 from pxr import Usd
 
 enable_extension("isaacsim.benchmark.services")
 
-from isaacsim.benchmark.services import BaseIsaacBenchmark
+from isaacsim.benchmark.services import DEFAULT_RECORDERS, BaseIsaacBenchmark
 from isaacsim.benchmark.services.validation import CoordinateValidator, Validator
 
 # Create the benchmark
+# Define recorders to use, use default set, other combinations, or custom data recorders
+recorders = DEFAULT_RECORDERS + ["gpu_frametime"] if gpu_frametime else DEFAULT_RECORDERS
 benchmark = BaseIsaacBenchmark(
     benchmark_name="benchmark_robots_nova_carter_ros2",
     workflow_metadata={
@@ -119,7 +121,7 @@ benchmark = BaseIsaacBenchmark(
         ]
     },
     backend_type=args.backend_type,
-    gpu_frametime=gpu_frametime,
+    recorders=recorders,
 )
 
 

@@ -13,5 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Base sample framework for creating interactive Isaac Sim examples with UI templates."""
+
+
 from isaacsim.examples.interactive.base_sample.base_sample import BaseSample
 from isaacsim.examples.interactive.base_sample.base_sample_extension import BaseSampleUITemplate

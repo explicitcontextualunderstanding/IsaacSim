@@ -1,4 +1,22 @@
 # Changelog
+
+## [2.2.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md and update docstrings
+
+## [2.1.0] - 2026-01-26
+### Changed
+- Update deprecated onclick_fn to on_click_action
+- Added missing docstring and cleanup code
+
+## [2.0.13] - 2025-12-07
+### Changed
+- Update description
+
+## [2.0.12] - 2025-12-03
+### Changed
+- Remove TODOs.
+
 ## [2.0.11] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0
@@ -21,11 +39,11 @@
 
 ## [2.0.6] - 2024-12-09
 ### Fixed
-- startup test
+- Startup test
 
 ## [2.0.5] - 2024-12-07
 ### Fixed
-- moved from deprecated editor_menu.add_item to omni.kit.menu.utils
+- Moved from deprecated editor_menu.add_item to omni.kit.menu.utils
 
 ## [2.0.4] - 2024-11-19
 ### Fixed

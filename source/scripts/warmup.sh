@@ -44,8 +44,8 @@ echo "Python app shader cache is warmed up."
     --/app/asyncRendering=0 \
     --/app/quitAfter=1000 \
     --/app/fastShutdown=1 \
-    --/app/file/ignoreUnsavedOnExit=1 \
-    --/app/warmupMode=1 \
+    --/app/file/ignoreUnsavedStage=1 \
+    --/app/warmupMode=0 \
     --/exts/omni.kit.registry.nucleus/registries/0/name=0 \
     --/plugins/carb.tasking.plugin/threadCount=$TASKING_THREAD_CNT
 echo "Shader cache is warmed up."

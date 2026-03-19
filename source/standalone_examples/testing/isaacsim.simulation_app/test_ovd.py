@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import sys
 from pathlib import Path
 
 from isaacsim import SimulationApp
@@ -29,6 +30,8 @@ pvd_output_dir = carb.settings.get_settings().get_as_string("/persistent/physics
 
 print("omniPvdOvdRecordingDirectory: ", pvd_output_dir)
 my_file = Path(os.path.join(pvd_output_dir, "tmp.ovd"))
-assert my_file.is_file()
+if not my_file.is_file():
+    print(f"[fatal] {my_file} does not exist")
+    sys.exit(1)
 
 kit.close()

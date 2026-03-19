@@ -57,13 +57,15 @@ import numpy as np
 
 
 class State(object):
-    """
-    Class representing the state of a vehicle.
+    """Class representing the state of a vehicle.
 
-    :param x: (float) x-coordinate
-    :param y: (float) y-coordinate
-    :param yaw: (float) yaw angle
-    :param v: (float) speed
+    Args:
+        wheel_base: Wheel base length of the vehicle.
+        x: x-coordinate.
+        y: y-coordinate.
+        yaw: Yaw angle.
+        v: Speed.
+        Ks: Maximum steering angle.
     """
 
     def __init__(self, wheel_base, x=0.0, y=0.0, yaw=0.0, v=0.0, Ks=np.radians(5.0)):
@@ -78,11 +80,13 @@ class State(object):
         self.Ks = Ks
 
     def update(self, acceleration, delta, dt):
-        """
-        Update the state of the vehicle.
-        Stanley Control uses bicycle model.
-        :param acceleration: (float) Acceleration
-        :param delta: (float) Steering
+        """Update the state of the vehicle.
+            Stanley Control uses bicycle model.
+
+        Args:
+            acceleration: Acceleration.
+            delta: Steering angle.
+            dt: Time step.
         """
         delta = np.clip(delta, -self.Ks, self.Ks)
 
@@ -94,25 +98,46 @@ class State(object):
         self.v += acceleration * dt
 
 
-def pid_control(target, current, Kp=0.1):
-    """
-    Proportional control for the speed.
-    :param target: (float)
-    :param current: (float)
-    :return: (float)
+def pid_control(target: float, current: float, Kp: float = 0.1) -> float:
+    """Proportional control for the speed.
+
+    Args:
+        target: Target speed value.
+        current: Current speed value.
+        Kp: Proportional gain coefficient.
+
+    Returns:
+        Control output for speed adjustment.
     """
     return Kp * (target - current)
 
 
-def stanley_control(state, cx, cy, cyaw, last_target_idx, p=0.5, i=0.01, d=10, k=0.5):
-    """
-    Stanley steering control.
-    :param state: (State object)
-    :param cx: ([float])
-    :param cy: ([float])
-    :param cyaw: ([float])
-    :param last_target_idx: (int)
-    :return: (float, int)
+def stanley_control(
+    state,
+    cx: list[float],
+    cy: list[float],
+    cyaw: list[float],
+    last_target_idx: int,
+    p: float = 0.5,
+    i: float = 0.01,
+    d: float = 10,
+    k: float = 0.5,
+) -> tuple[float, int]:
+    """Stanley steering control.
+
+    Args:
+        state: State object containing vehicle position and orientation.
+        cx: X-coordinates of the reference path.
+        cy: Y-coordinates of the reference path.
+        cyaw: Yaw angles of the reference path.
+        last_target_idx: Previous target index in the trajectory.
+        p: Proportional gain parameter.
+        i: Integral gain parameter.
+        d: Derivative gain parameter.
+        k: Cross track error gain.
+
+    Returns:
+        A tuple containing (steering angle, current target index).
     """
     current_target_idx, error_front_axle = calc_target_index(state, cx, cy)
 
@@ -131,11 +156,14 @@ def stanley_control(state, cx, cy, cyaw, last_target_idx, p=0.5, i=0.01, d=10, k
     return delta, current_target_idx
 
 
-def normalize_angle(angle):
-    """
-    Normalize an angle to [-pi, pi].
-    :param angle: (float)
-    :return: (float) Angle in radian in [-pi, pi]
+def normalize_angle(angle: float) -> float:
+    """Normalize an angle to [-pi, pi].
+
+    Args:
+        angle: Input angle in radians.
+
+    Returns:
+        Angle in radian in [-pi, pi].
     """
     while angle > np.pi:
         angle -= 2.0 * np.pi
@@ -146,13 +174,16 @@ def normalize_angle(angle):
     return angle
 
 
-def calc_target_index(state, cx, cy):
-    """
-    Compute index in the trajectory list of the target.
-    :param state: (State object)
-    :param cx: [float]
-    :param cy: [float]
-    :return: (int, float)
+def calc_target_index(state, cx: list[float], cy: list[float]) -> tuple[int, float]:
+    """Compute index in the trajectory list of the target.
+
+    Args:
+        state: State object containing vehicle position and orientation.
+        cx: X-coordinates of the reference path.
+        cy: Y-coordinates of the reference path.
+
+    Returns:
+        A tuple containing (target index, cross track error projected onto front axle vector).
     """
     # Calc front axle position
     fx = state.x + state.wheel_base * np.cos(state.yaw)

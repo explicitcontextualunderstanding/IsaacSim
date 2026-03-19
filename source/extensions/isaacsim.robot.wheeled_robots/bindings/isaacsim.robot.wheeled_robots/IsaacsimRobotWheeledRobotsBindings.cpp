@@ -20,15 +20,6 @@
 
 CARB_BINDINGS("isaacsim.robot.wheeled_robots.python")
 
-namespace isaacsim
-{
-namespace robot
-{
-namespace wheeled_robots
-{
-} // namespace wheeled_robots
-} // namespace robot
-} // namespace isaacsim
 
 namespace
 {

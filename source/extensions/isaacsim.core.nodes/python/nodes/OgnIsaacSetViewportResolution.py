@@ -15,7 +15,6 @@
 
 import carb
 import omni
-from isaacsim.core.utils.carb import set_carb_setting
 from omni.kit.viewport.utility import get_active_viewport, get_viewport_from_window_name
 
 
@@ -34,8 +33,9 @@ class OgnIsaacSetViewportResolution:
 
         if viewport_api:
             viewport_api.set_texture_resolution((db.inputs.width, db.inputs.height))
-            set_carb_setting(carb.settings.get_settings(), "/app/hydra/aperture/conform", 3)
-            set_carb_setting(carb.settings.get_settings(), "/app/hydra/aperture/conform", 4)
+            settings = carb.settings.get_settings()
+            settings.set_int("/app/hydra/aperture/conform", 3)
+            settings.set_int("/app/hydra/aperture/conform", 4)
 
         db.outputs.execOut = omni.graph.core.ExecutionAttributeState.ENABLED
         return True

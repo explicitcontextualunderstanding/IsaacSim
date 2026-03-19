@@ -39,14 +39,46 @@ def run_custom_fps_example(duration_seconds):
     # Create a new stage
     omni.usd.get_context().new_stage()
 
+    # Disable capture on play to capture data manually using step
+    rep.orchestrator.set_capture_on_play(False)
+
     # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
     carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
-    # Disable capture on play (data will only be accessed at custom times)
-    carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
-
     # Make sure fixed time stepping is set (the timeline will be advanced with the same delta time)
     carb.settings.get_settings().set("/app/player/useFixedTimeStepping", True)
+
+    # Create scene with a semantically annotated cube with physics
+    rep.functional.create.xform(name="World")
+    rep.functional.create.dome_light(intensity=250, parent="/World", name="DomeLight")
+    cube = rep.functional.create.cube(position=(0, 0, 2), parent="/World", name="Cube", semantics={"class": "cube"})
+    rep.functional.physics.apply_collider(cube)
+    rep.functional.physics.apply_rigid_body(cube)
+
+    # Create render product (disabled until data capture is needed)
+    cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+    rp = rep.create.render_product(cam, resolution=(512, 512), name="rp")
+    rp.hydra_texture.set_updates_enabled(False)
+
+    # Create the backend for the writer
+    out_dir_rgb = os.path.join(os.getcwd(), "_out_writer_fps_rgb")
+    print(f"Writer data will be written to: {out_dir_rgb}")
+    backend = rep.backends.get("DiskBackend")
+    backend.initialize(output_dir=out_dir_rgb)
+
+    # Create a writer and an annotator as examples of different ways of accessing data
+    writer_rgb = rep.WriterRegistry.get("BasicWriter")
+    writer_rgb.initialize(backend=backend, rgb=True)
+    writer_rgb.attach(rp)
+
+    # Create an annotator to access the data directly
+    annot_depth = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
+    annot_depth.attach(rp)
+
+    # Run the simulation for the given number of frames and access the data at the desired framerates
+    print(
+        f"Starting simulation: {duration_seconds:.2f}s duration, {SENSOR_FPS:.0f} FPS sensor, {STAGE_FPS:.0f} FPS timeline"
+    )
 
     # Set the timeline parameters
     timeline = omni.timeline.get_timeline_interface()
@@ -57,30 +89,7 @@ def run_custom_fps_example(duration_seconds):
     timeline.play()
     timeline.commit()
 
-    # Create scene with a semantically annotated cube with physics
-    rep.functional.create.dome_light(intensity=250)
-    cube = rep.functional.create.cube(position=(0, 0, 3), semantics={"class": "cube"})
-    rep.functional.physics.apply_collider(cube)
-    rep.functional.physics.apply_rigid_body(cube)
-
-    # Create render product (disabled until data capture is needed)
-    rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512), name="rp")
-    rp.hydra_texture.set_updates_enabled(False)
-
-    # Create a writer and an annotator as examples of different ways of accessing data
-    out_dir_rgb = os.path.join(os.getcwd(), "_out_writer_fps_rgb")
-    print(f"Writer data will be written to: {out_dir_rgb}")
-    writer_rgb = rep.WriterRegistry.get("BasicWriter")
-    writer_rgb.initialize(output_dir=out_dir_rgb, rgb=True)
-    writer_rgb.attach(rp)
-    annot_depth = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
-    annot_depth.attach(rp)
-
     # Run the simulation for the given number of frames and access the data at the desired framerates
-    print(
-        f"Starting simulation: {duration_seconds:.2f}s duration, {SENSOR_FPS:.0f} FPS sensor, {STAGE_FPS:.0f} FPS timeline"
-    )
-
     frame_count = 0
     previous_time = timeline.get_current_time()
     elapsed_time = 0.0
@@ -115,6 +124,12 @@ def run_custom_fps_example(duration_seconds):
 
     # Wait for writer to finish
     rep.orchestrator.wait_until_complete()
+
+    # Cleanup
+    timeline.pause()
+    writer_rgb.detach()
+    annot_depth.detach()
+    rp.destroy()
 
 
 # Run example with duration for all captures plus a buffer of 5 frames

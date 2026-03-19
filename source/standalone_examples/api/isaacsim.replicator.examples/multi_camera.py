@@ -22,20 +22,14 @@ import os
 import carb.settings
 import omni.replicator.core as rep
 import omni.usd
-from omni.replicator.core import AnnotatorRegistry, Writer
-from PIL import Image
-from pxr import Sdf, UsdGeom
+from omni.replicator.core import Writer
+from omni.replicator.core.backends import DiskBackend
+from omni.replicator.core.functional import write_image
 
 NUM_FRAMES = 5
 
 
-# Save rgb image to file
-def save_rgb(rgb_data, file_name):
-    rgb_img = Image.fromarray(rgb_data).convert("RGBA")
-    rgb_img.save(file_name + ".png")
-
-
-# Randomize cube color every frame using a replicator randomizer
+# Randomize cube color every frame using a graph-based replicator randomizer
 def cube_color_randomizer():
     cube_prims = rep.get.prims(path_pattern="Cube")
     with cube_prims:
@@ -43,89 +37,98 @@ def cube_color_randomizer():
     return cube_prims.node
 
 
-# Access data through a custom replicator writer
+# Example of custom writer class to access the annotator data
 class MyWriter(Writer):
     def __init__(self, rgb: bool = True):
-        self._frame_id = 0
+        # Organize data from render product perspective (legacy, annotator, renderProduct)
+        self.data_structure = "renderProduct"
         self.annotators = []
+        self._frame_id = 0
         if rgb:
-            self.annotators.append(AnnotatorRegistry.get_annotator("rgb"))
-        # Create writer output directory
-        self.file_path = os.path.join(os.getcwd(), "_out_mc_writer", "")
-        print(f"Writing writer data to {self.file_path}")
-        dir = os.path.dirname(self.file_path)
-        os.makedirs(dir, exist_ok=True)
+            # Create a new rgb annotator and add it to the writer's list of annotators
+            self.annotators.append(rep.annotators.get("rgb"))
+        # Create writer output directory and initialize DiskBackend
+        output_dir = os.path.join(os.getcwd(), "_out_mc_writer")
+        print(f"Writing writer data to {output_dir}")
+        self.backend = DiskBackend(output_dir=output_dir, overwrite=True)
 
     def write(self, data):
-        for annotator in data.keys():
-            annotator_split = annotator.split("-")
-            if len(annotator_split) > 1:
-                render_product_name = annotator_split[-1]
-            if annotator.startswith("rgb"):
-                save_rgb(data[annotator], f"{self.file_path}/{render_product_name}_frame_{self._frame_id}")
+        if "renderProducts" in data:
+            for rp_name, rp_data in data["renderProducts"].items():
+                if "rgb" in rp_data:
+                    file_path = f"{rp_name}_frame_{self._frame_id}.png"
+                    self.backend.schedule(write_image, data=rp_data["rgb"]["data"], path=file_path)
         self._frame_id += 1
 
 
 rep.WriterRegistry.register(MyWriter)
 
-# Create a new stage with a dome light
+# Create a new stage
 omni.usd.get_context().new_stage()
+
+# Set global random seed for the replicator randomizer
+rep.set_global_seed(11)
+
+# Disable capture on play to capture data manually using step
+rep.orchestrator.set_capture_on_play(False)
 
 # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
 carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
-stage = omni.usd.get_context().get_stage()
-dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
-dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(900.0)
+# Setup stage
+rep.functional.create.xform(name="World")
+rep.functional.create.dome_light(intensity=900, parent="/World", name="DomeLight")
+cube = rep.functional.create.cube(parent="/World", name="Cube", semantics={"class": "my_cube"})
 
-# Create cube
-cube_prim = stage.DefinePrim("/World/Cube", "Cube")
-UsdGeom.Xformable(cube_prim).AddTranslateOp().Set((0.0, 5.0, 1.0))
-
-# Register cube color randomizer to trigger on every frame
+# Register the graph-based cube color randomizer to trigger on every frame
 rep.randomizer.register(cube_color_randomizer)
 with rep.trigger.on_frame():
     rep.randomizer.cube_color_randomizer()
 
 # Create cameras
-camera_prim1 = stage.DefinePrim("/World/Camera1", "Camera")
-UsdGeom.Xformable(camera_prim1).AddTranslateOp().Set((0.0, 10.0, 20.0))
-UsdGeom.Xformable(camera_prim1).AddRotateXYZOp().Set((-15.0, 0.0, 0.0))
+cam_top = rep.functional.create.camera(position=(0, 0, 5), look_at=(0, 0, 0), parent="/World", name="CamTop")
+cam_side = rep.functional.create.camera(position=(2, 2, 0), look_at=(0, 0, 0), parent="/World", name="CamSide")
+cam_persp = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="CamPersp")
 
-camera_prim2 = stage.DefinePrim("/World/Camera2", "Camera")
-UsdGeom.Xformable(camera_prim2).AddTranslateOp().Set((-10.0, 15.0, 15.0))
-UsdGeom.Xformable(camera_prim2).AddRotateXYZOp().Set((-45.0, 0.0, 45.0))
+# Create the render products
+rp_top = rep.create.render_product(cam_top, resolution=(320, 320), name="RpTop")
+rp_side = rep.create.render_product(cam_side, resolution=(640, 640), name="RpSide")
+rp_persp = rep.create.render_product(cam_persp, resolution=(1024, 1024), name="RpPersp")
 
-# Create render products
-rp1 = rep.create.render_product(str(camera_prim1.GetPrimPath()), resolution=(320, 320))
-rp2 = rep.create.render_product(str(camera_prim2.GetPrimPath()), resolution=(640, 640))
-rp3 = rep.create.render_product("/OmniverseKit_Persp", (1024, 1024))
-
-# Acess the data through a custom writer
+# Example of accessing the data through a custom writer
 writer = rep.WriterRegistry.get("MyWriter")
 writer.initialize(rgb=True)
-writer.attach([rp1, rp2, rp3])
+writer.attach([rp_top, rp_side, rp_persp])
 
-# Acess the data through annotators
+# Example of accessing the data directly through annotators
 rgb_annotators = []
-for rp in [rp1, rp2, rp3]:
-    rgb = rep.AnnotatorRegistry.get_annotator("rgb")
+for rp in [rp_top, rp_side, rp_persp]:
+    # Create a new rgb annotator for each render product
+    rgb = rep.annotators.get("rgb")
+    # Attach the annotator to the render product
     rgb.attach(rp)
     rgb_annotators.append(rgb)
 
 # Create annotator output directory
-file_path = os.path.join(os.getcwd(), "_out_mc_annot", "")
-print(f"Writing annotator data to {file_path}")
-dir = os.path.dirname(file_path)
-os.makedirs(dir, exist_ok=True)
-
-# Data will be captured manually using step
-rep.orchestrator.set_capture_on_play(False)
+output_dir_annot = os.path.join(os.getcwd(), "_out_mc_annot")
+print(f"Writing annotator data to {output_dir_annot}")
+os.makedirs(output_dir_annot, exist_ok=True)
 
 for i in range(NUM_FRAMES):
-    # The step function provides new data to the annotators, triggers the randomizers and the writer
-    rep.orchestrator.step(rt_subframes=4)
+    print(f"Step {i}")
+    # The step function triggers registered graph-based randomizers, collects data from annotators,
+    # and invokes the write function of attached writers with the annotator data
+    rep.orchestrator.step(rt_subframes=32)
     for j, rgb_annot in enumerate(rgb_annotators):
-        save_rgb(rgb_annot.get_data(), f"{dir}/rp{j}_step_{i}")
+        file_path = os.path.join(output_dir_annot, f"rp{j}_step_{i}.png")
+        write_image(path=file_path, data=rgb_annot.get_data())
+
+# Wait for the data to be written and release resources
+rep.orchestrator.wait_until_complete()
+writer.detach()
+for annot in rgb_annotators:
+    annot.detach()
+for rp in [rp_top, rp_side, rp_persp]:
+    rp.destroy()
 
 simulation_app.close()

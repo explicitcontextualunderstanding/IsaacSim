@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Isaac Sim content browser collection implementation for browsing Isaac Sim asset folders."""
+
+
 import asyncio
 from datetime import datetime
 from pathlib import Path
@@ -29,13 +33,12 @@ SETTING_FOLDER = "/exts/isaacsim.gui.content_browser/folders"
 
 
 class IsaacConnectionItem(NucleusItem):
-    """
-    A item for a Isaac connection
+    """An item for an Isaac connection.
     Sub-classed from :obj:`NucleusItem`.
 
     Args:
-        name (str): Name of the item.
-        path (str): Path of the item.
+        name: Name of the item.
+        path: Path of the item.
     """
 
     def __init__(self, name: str, path: str):
@@ -43,14 +46,33 @@ class IsaacConnectionItem(NucleusItem):
         fields = FileBrowserItemFields(name, datetime.now(), 0, access)
         super().__init__(path, fields, is_folder=True)
         self._models = (ui.SimpleStringModel(name), datetime.now(), ui.SimpleStringModel(""))
+        self.icon = f"{ICON_PATH}/folder.svg"
 
 
 class IsaacCollection(CollectionItem):
+    """A collection item for Isaac Sim assets in the content browser.
+
+    This class provides access to Isaac Sim asset folders through the file browser interface. It automatically
+    detects the protocol (Omniverse or HTTPS) based on the default asset root configuration and populates
+    the collection with configured folders from settings. The collection appears as "Isaac Sim" in the
+    content browser with a cloud icon and allows users to browse Isaac Sim asset directories.
+
+    The collection is read-only and does not support adding new connections. Asset folders are loaded
+    asynchronously from the application settings and displayed as browsable items in the file browser.
+    """
+
     def __init__(self):
+        protocol = ""
+        default_asset_root = carb.settings.get_settings().get_as_string("/persistent/isaac/asset_root/default")
+        if default_asset_root.startswith("omniverse://"):
+            protocol = "omniverse"
+        elif default_asset_root.startswith("https://"):
+            protocol = "https"
         super().__init__(
-            "https",
-            "Isaac Sim",
-            f"{ICON_PATH}/cloud.svg",
+            identifier="Isaac Sim",
+            title="Isaac Sim",
+            protocol=protocol,
+            icon=f"{ICON_PATH}/cloud.svg",
             access=omni.client.AccessFlags.READ,
             populated=False,
             order=5,
@@ -58,13 +80,33 @@ class IsaacCollection(CollectionItem):
         self._folders = carb.settings.get_settings().get(SETTING_FOLDER)
 
     def create_add_new_item(self) -> Optional[AddNewItem]:
+        """Creates an "Add New Connection" item for the Isaac Sim collection.
+
+        Returns:
+            None to hide the "Add New Connection" option from the collection.
+        """
         # Do not show "Add New Connection ..."
         return None
 
     def create_child_item(self, name: str, path: str, is_folder: bool = True) -> Optional[IsaacConnectionItem]:
+        """Creates a child connection item for the Isaac Sim collection.
+
+        Args:
+            name: Name of the connection item.
+            path: Path of the connection item.
+            is_folder: Whether the item represents a folder.
+
+        Returns:
+            A new IsaacConnectionItem instance.
+        """
         return IsaacConnectionItem(name, path)
 
     async def populate_children_async(self) -> Any:
+        """Populates the Isaac Sim collection with configured folder connections.
+
+        Adds child items for each folder configured in the Isaac Sim asset root settings,
+        extracting the folder name from the URL path.
+        """
         if self._folders:
             for folder in self._folders:
                 # Extract the last part of the URL path

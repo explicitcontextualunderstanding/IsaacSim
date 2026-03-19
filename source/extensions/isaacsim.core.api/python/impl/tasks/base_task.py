@@ -52,16 +52,16 @@ class BaseTask(object):
         """Scene of the world
 
         Returns:
-            Scene: [description]
+            Scene: The scene instance associated with this task.
         """
         return self._scene
 
     @property
     def name(self) -> str:
-        """[summary]
+        """Get the name of the task.
 
         Returns:
-            str: [description]
+            The task name.
         """
         return self._name
 
@@ -70,7 +70,7 @@ class BaseTask(object):
            to the task_objects happens here.
 
         Args:
-            scene (Scene): [description]
+            scene (Scene): The scene to set up with task assets.
         """
         self._scene = scene
         return
@@ -92,10 +92,10 @@ class BaseTask(object):
         return
 
     def get_task_objects(self) -> dict:
-        """[summary]
+        """Get all objects registered with the task.
 
         Returns:
-            dict: [description]
+            Dictionary of task objects keyed by name.
         """
         return self._task_objects
 
@@ -103,18 +103,18 @@ class BaseTask(object):
         """Returns current observations from the objects needed for the behavioral layer.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
-            dict: [description]
+            dict: Dictionary containing task-specific observations.
         """
         raise NotImplementedError
 
     def calculate_metrics(self) -> dict:
-        """[summary]
+        """Calculate and return task metrics.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
         """
         raise NotImplementedError
 
@@ -122,7 +122,7 @@ class BaseTask(object):
         """Returns True of the task is done.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
         """
         raise NotImplementedError
 
@@ -130,8 +130,8 @@ class BaseTask(object):
         """called before stepping the physics simulation.
 
         Args:
-            time_step_index (int): [description]
-            simulation_time (float): [description]
+            time_step_index (int): Current physics step index.
+            simulation_time (float): Current simulation time in seconds.
         """
         return
 
@@ -140,10 +140,10 @@ class BaseTask(object):
         return
 
     def get_description(self) -> str:
-        """[summary]
+        """Get a description of the task.
 
         Returns:
-            str: [description]
+            A string describing the task.
         """
         return ""
 
@@ -157,7 +157,7 @@ class BaseTask(object):
         """Changes the modifiable parameters of the task
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
         """
         raise NotImplementedError
 
@@ -169,7 +169,7 @@ class BaseTask(object):
            should have the form of params_representation["param_name"] = {"value": param_value, "modifiable": bool}
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
             dict: defined parameters of the task.

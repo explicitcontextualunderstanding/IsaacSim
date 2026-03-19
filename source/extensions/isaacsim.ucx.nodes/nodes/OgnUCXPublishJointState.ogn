@@ -1,0 +1,54 @@
+{
+    "UCXPublishJointState":{
+        "version": 1,
+        "icon": "icons/isaac-sim.svg",
+        "description": [
+            "This node publishes joint states of a robot via UCX communication"
+        ],
+        "metadata": {
+            "uiName": "UCX Publish Joint State"
+        },
+        "categoryDefinitions": "config/CategoryDefinition.json",
+        "categories": "isaacUcx",
+        "inputs": {
+            "execIn": {
+                "type": "execution",
+                "description": "The input execution port"
+            },
+            "port": {
+                "type": "uint",
+                "description": "Port number for UCX communication",
+                "default": 13337
+            },
+            "tag": {
+                "type": "uint64",
+                "description": "UCX tag for message identification",
+                "default": 1
+            },
+            "targetPrim":{
+                "type": "target",
+                "description": "USD reference to the robot prim"
+            },
+            "timeStamp": {
+                "type": "double",
+                "description": "Timestamp in seconds",
+                "uiName": "Timestamp",
+                "default": 0.0
+            },
+            "timeoutMs": {
+                "type": "uint",
+                "description": "Timeout in milliseconds for UCX send requests. If 0, waits indefinitely.",
+                "uiName": "Timeout (ms)",
+                "default": 1
+            }
+        },
+        "outputs": {
+            "execOut": {
+                "type": "execution",
+                "description": "The output execution port"
+            }
+        }
+    }
+}
+
+

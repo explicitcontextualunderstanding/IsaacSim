@@ -62,7 +62,7 @@ libdirs {
     extsbuild_dir .. "/omni.usd.core/bin",
 }
 
-extra_usd_libs = {}
+extra_usd_libs = { "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -71,7 +71,7 @@ add_usd(extra_usd_libs)
 filter { "system:linux" }
 disablewarnings { "error=pragmas" }
 includedirs {
-    "%{root}/_build/target-deps/python/include/python3.11",
+    "%{root}/_build/target-deps/python/include/python3.12",
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include/boost",
 }
 buildoptions("-fvisibility=default")

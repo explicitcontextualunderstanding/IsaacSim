@@ -1,5 +1,22 @@
 # Changelog
 
+## [5.0.0] - 2025-11-02
+### Changed
+- Split extension into multiple extensions.
+- isaacsim.ros2.core: Core ROS 2 libraries and backend functionality
+- isaacsim.ros2.examples: ROS 2 examples
+- isaacsim.ros2.nodes: ROS 2 OmniGraph nodes and components
+- isaacsim.ros2.ui: ROS 2 UI components
+
+## [4.12.6] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch in tests
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [4.12.5] - 2025-10-22
+### Changed
+- Remove deprecated dependencies
+
 ## [4.12.4] - 2025-10-04
 ### Fixed
 - Nitros bridge tasking
@@ -257,11 +274,11 @@
 
 ## [4.4.10] - 2025-04-29
 ### Fixed
-- prim validation in OgnROS2PublishJointState and OgnROS2PublishTransformTree nodes
+- Prim validation in OgnROS2PublishJointState and OgnROS2PublishTransformTree nodes
 
 ## [4.4.9] - 2025-04-17
 ### Changed
-- changed add_update_semantics to add_labels
+- Changed add_update_semantics to add_labels
 
 ## [4.4.8] - 2025-04-15
 ### Fixed
@@ -420,7 +437,7 @@
 
 ## [3.4.1] - 2024-11-05
 ### Changed
-- updated menu location for examples and OG shortcuts
+- Updated menu location for examples and OG shortcuts
 
 ## [3.4.0] - 2024-11-04
 ### Added
@@ -431,7 +448,7 @@
 
 ## [3.3.0] - 2024-10-29
 ### Changed
-- moved examples from menu to browser
+- Moved examples from menu to browser
 
 ## [3.2.0] - 2024-10-28
 ### Added
@@ -463,7 +480,7 @@
 
 ## [2.32.7] - 2024-09-13
 ### Fixed
-- changed pxr.OmniGraphSchema import to OmniGraphSchema
+- Changed pxr.OmniGraphSchema import to OmniGraphSchema
 
 ## [2.32.6] - 2024-09-05
 ### Changed
@@ -504,7 +521,7 @@
 
 ## [2.31.4] - 2024-07-17
 ### Added
-- added a joint state subscriber test where the jointNames are connected
+- Added a joint state subscriber test where the jointNames are connected
 
 ## [2.31.3] - 2024-07-12
 ### Removed
@@ -520,9 +537,9 @@
 
 ## [2.31.0] - 2024-07-05
 ### Changed
-- use register_*_with_telemetry functions to simplify registration code
-- use OgnIsaacPassthroughImagePtr node for depth
-- switch to using ptr for depth data to avoid extra cpu copy
+- Use register_*_with_telemetry functions to simplify registration code
+- Use OgnIsaacPassthroughImagePtr node for depth
+- Switch to using ptr for depth data to avoid extra cpu copy
 
 ## [2.30.0] - 2024-07-03
 ### Added
@@ -541,7 +558,7 @@
 - JointState Subscriber fills in nans when receiving empty arrays for command modes that are not used
 
 ### Added
-- jointstate subscriber test for mixed controls
+- Jointstate subscriber test for mixed controls
 
 ## [2.28.0] - 2024-06-17
 ### Added
@@ -581,7 +598,7 @@
 
 ## [2.25.2] - 2024-05-17
 ### Changed
-- default subscriber topic in ROS2 jointstate omnigraph shortcut uses /joint_command and not /cmd
+- Default subscriber topic in ROS2 jointstate omnigraph shortcut uses /joint_command and not /cmd
 
 ## [2.25.1] - 2024-05-16
 ### Changed
@@ -728,8 +745,8 @@
 
 ## [2.13.4] - 2024-04-02
 ### Changed
-- used IsaacCreateRenderProduct for the camera OG shortcuts
-- default to enable semanticlabels for some camera topics
+- Used IsaacCreateRenderProduct for the camera OG shortcuts
+- Default to enable semanticlabels for some camera topics
 
 ## [2.13.3] - 2024-04-02
 ### Changed
@@ -742,8 +759,8 @@
 ## [2.13.1] - 2024-03-20
 ### Added
 - OG shortcuts to RTX lidar, odometry, tf pub
-- node namespace options for all the shortcuts
-- popup notifications instead of print statements for errors in OG shortcuts
+- Node namespace options for all the shortcuts
+- Popup notifications instead of print statements for errors in OG shortcuts
 
 ## [2.13.0] - 2024-03-19
 ### Added
@@ -820,7 +837,7 @@
 ## [2.7.1] - 2024-01-19
 ### Fixed
 - Missing DLLs for local windows usage
-- empty semantics test
+- Empty semantics test
 
 ## [2.7.0] - 2024-01-19
 ### Changed
@@ -875,7 +892,7 @@
 ## [2.3.6] - 2023-10-09
 ### Fixed
 - Joint State Subscriber supports input state messages with only one mode of drive specified
-- camera noise example errors
+- Camera noise example errors
 
 ## [2.3.5] - 2023-10-09
 ### Fixed
@@ -912,7 +929,7 @@
 - Made several warnings into print and log statements
 
 ### Fixed
-- rclpy not working in script editor
+- Rclpy not working in script editor
 
 ## [2.2.2] - 2023-09-25
 ### Fixed
@@ -920,10 +937,10 @@
 
 ## [2.2.1] - 2023-09-22
 ### Fixed
-- missing ros2 libs when running using internal libs
-- windows startup issues
-- rclpy not working on windows
-- clock subscriber not properly getting time
+- Missing ros2 libs when running using internal libs
+- Windows startup issues
+- Rclpy not working on windows
+- Clock subscriber not properly getting time
 
 ## [2.2.0] - 2023-09-20
 ### Changed
@@ -932,11 +949,11 @@
 
 ## [2.1.0] - 2023-09-18
 ### Fixed
-- error when shutting down extension
-- properly handle case where ROS2 bridge carb plugin did not startup correctly
+- Error when shutting down extension
+- Properly handle case where ROS2 bridge carb plugin did not startup correctly
 
 ### Changed
-- load system rclpy, fallback onto internal rclpy if its not found
+- Load system rclpy, fallback onto internal rclpy if its not found
 
 ## [2.0.0] - 2023-09-06
 ### Changed
@@ -948,7 +965,7 @@
 
 ## [1.13.4] - 2023-08-25
 ### Changed
-- added stdout fail pattern for the expected no prim found edge case for the ogn test
+- Added stdout fail pattern for the expected no prim found edge case for the ogn test
 - Changed test_camera test to expect identical fx and fy as vertical aperture is computed from horizontal aperture.
 
 ## [1.13.3] - 2023-08-25
@@ -974,13 +991,13 @@
 ## [1.12.3] - 2023-06-12
 ### Changed
 - Update to kit 105.1
-- rename synthetic data writer templates to match rendervar names
+- Rename synthetic data writer templates to match rendervar names
 
 ## [1.12.2] - 2023-03-13
 ### Fixed
 - Incorrect 2D, 3D bbox data
 - Bug with RTX Lidar not publishing flatscan correctly
-- invalid json string if semantic message was empty
+- Invalid json string if semantic message was empty
 
 ## [1.12.1] - 2023-03-09
 ### Changed
@@ -1010,7 +1027,7 @@
 
 ## [1.10.6] - 2023-01-25
 ### Fixed
-- remove un-needed cpp ogn files from extension
+- Remove un-needed cpp ogn files from extension
 
 ## [1.10.5] - 2023-01-21
 ### Fixed
@@ -1042,10 +1059,10 @@
 
 ## [1.8.0] - 2022-11-17
 ### Added
-- node template for rtx_radar
+- Node template for rtx_radar
 
 ### Changed
-- changed node template name for rtx_lidar
+- Changed node template name for rtx_lidar
 
 ## [1.7.0] - 2022-11-14
 ### Changed
@@ -1220,11 +1237,11 @@
 
 ## [0.1.1] - 2021-12-08
 ### Fixed
-- odometry frame matches robot's starting frame, not the world frame.
-- horizontal and vertical aperture use camera prim values instead of computing vertical aperture
-- lidar components publish point cloud data as PCL2 messages instead of PCL
-- lidar PCL2 messages only contain points that hit
-- lidar publisher publishes a full scan for point cloud data
+- Odometry frame matches robot's starting frame, not the world frame.
+- Horizontal and vertical aperture use camera prim values instead of computing vertical aperture
+- Lidar components publish point cloud data as PCL2 messages instead of PCL
+- Lidar PCL2 messages only contain points that hit
+- Lidar publisher publishes a full scan for point cloud data
 
 ### Added
 - usePhysicsStepSimTime setting and use_physics_step_sim_time to use physics step events to update simulation time

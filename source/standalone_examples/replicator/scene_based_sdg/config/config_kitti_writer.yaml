@@ -14,12 +14,13 @@
 # limitations under the License.
 
 launch_config:
-  renderer: RaytracedLighting
+  renderer: RealTimePathTracing
   headless: true
 resolution: [512, 512]
 num_frames: 5
 clear_previous_semantics: false
 writer: KittiWriter
+backend_type: null
 writer_config:
   output_dir: _out_kitti
   colorize_instance_segmentation: true

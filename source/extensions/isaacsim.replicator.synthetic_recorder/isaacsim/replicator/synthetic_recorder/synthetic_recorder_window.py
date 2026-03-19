@@ -13,20 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""UI window for configuring and controlling synthetic data recording in Isaac Sim."""
+
+
 import asyncio
 import json
 import os
-from functools import lru_cache
 
 import carb
+import carb.eventdispatcher
 import omni.kit.app
 import omni.ui as ui
 import omni.usd
+from isaacsim.gui.components.ui_utils import get_style
 from omni.kit.menu.utils import MenuHelperWindow
 from omni.kit.viewport.utility import get_active_viewport
 from omni.kit.window.extensions.utils import open_file_using_os_default
 
 from .synthetic_recorder import RecorderState, SyntheticRecorder
+
+GLYPHS = {
+    "delete": ui.get_custom_glyph_code("${glyphs}/menu_delete.svg"),
+    "open_folder": ui.get_custom_glyph_code("${glyphs}/folder_open.svg"),
+    "reset": ui.get_custom_glyph_code("${glyphs}/menu_refresh.svg"),
+}
 
 PARAM_TOOLTIPS = {
     "rgb": (
@@ -80,6 +90,9 @@ PARAM_TOOLTIPS = {
         "Outputs a depth map from objects to the image plane of the camera.\n"
         "Produces a 2d array of type np.float32 with 1 channel."
     ),
+    "colorize_depth": (
+        "If True, will output an additional grayscale PNG image (0-255) for depth visualization using logarithmic scaling."
+    ),
     "bounding_box_3d": (
         "Outputs 3D bounding box of each entity with semantics in the camera's viewport, generated regardless of occlusion."
     ),
@@ -121,25 +134,19 @@ PARAM_TOOLTIPS = {
 }
 
 
-@lru_cache()
-def _ui_get_delete_glyph():
-    return ui.get_custom_glyph_code("${glyphs}/menu_delete.svg")
-
-
-@lru_cache()
-def _ui_get_open_folder_glyph():
-    return ui.get_custom_glyph_code("${glyphs}/folder_open.svg")
-
-
-@lru_cache()
-def _ui_get_reset_glyph():
-    return ui.get_custom_glyph_code("${glyphs}/menu_refresh.svg")
-
-
 class SyntheticRecorderWindow(MenuHelperWindow):
-    """Synthetic Recorder UI window."""
+    """Synthetic Recorder UI window.
 
-    def __init__(self, title, ext_id):
+    Provides a graphical interface for configuring and controlling synthetic data recording in Isaac Sim.
+    Allows users to set up render products, configure writer parameters, manage output settings, and control
+    the recording process through an intuitive UI.
+
+    Args:
+        title: The window title.
+        ext_id: The extension ID.
+    """
+
+    def __init__(self, title: str, ext_id: str):
         self._ext_id = ext_id
         # Create the window
         super().__init__(title, verbose=False)
@@ -149,18 +156,21 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         self._recorder = None
 
         # UI frame collapsed states
-        self._writer_frame_collapsed = False
-        self._writer_params_frame_collapsed = True
-        self._rp_frame_collapsed = False
-        self._output_frame_collapsed = False
-        self._s3_params_frame_collapsed = True
-        self._config_frame_collapsed = True
-        self._control_frame_collapsed = False
-        self._control_params_frame_collapsed = False
+        self._collapsed_states = {}
 
         # UI buttons
         self._start_stop_button = None
         self._pause_resume_button = None
+
+        # UI frames
+        self._writer_frame = None
+        self._control_frame = None
+        self._rp_frame = None
+        self._params_frame = None
+        self._output_frame = None
+        self._s3_frame = None
+        self._config_frame = None
+        self._control_params_frame = None
 
         # Create the recorder with the default values
         self._recorder = SyntheticRecorder()
@@ -168,12 +178,19 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         self._recorder.rt_subframes = 0
         self._recorder.control_timeline = False
         self._recorder.verbose = False
+        self._recorder.backend_type = "DiskBackend"
+        self._recorder.backend_params = {}
         self._recorder.writer_name = "BasicWriter"
-        self._recorder.out_dir = "_out_sdrec"
-        self._recorder.out_working_dir = os.getcwd()
-        self._recorder.use_s3 = False
-        self._recorder.s3_params = {"s3_bucket": "", "s3_region": "", "s3_endpoint": ""}
-        self._recorder.basic_writer_params = {
+        self._recorder.writer_params = {}
+        self._recorder.rp_data = [["/OmniverseKit_Persp", 1280, 720, ""]]
+
+        # UI-only fields
+        self._out_working_dir = ""  # Empty = use current working directory
+        self._out_dir = "_out_sdrec"
+        self._use_s3 = False
+        self._s3_params = {"s3_bucket": "", "s3_region": "", "s3_endpoint": ""}
+        self._custom_writer_params = {}
+        self._basic_writer_params = {
             "rgb": True,
             "bounding_box_2d_tight": False,
             "bounding_box_2d_loose": False,
@@ -185,6 +202,7 @@ class SyntheticRecorderWindow(MenuHelperWindow):
             "colorize_instance_segmentation": False,
             "distance_to_camera": False,
             "distance_to_image_plane": False,
+            "colorize_depth": False,
             "bounding_box_3d": False,
             "occlusion": False,
             "normals": False,
@@ -194,7 +212,6 @@ class SyntheticRecorderWindow(MenuHelperWindow):
             "pointcloud_include_unlabelled": False,
             "skeleton_data": False,
         }
-        self._recorder.rp_data = [["/OmniverseKit_Persp", 512, 512, ""]]
 
         # Overwrite parmaters with custom config files if available
         self._config_dir = os.path.abspath(
@@ -216,22 +233,19 @@ class SyntheticRecorderWindow(MenuHelperWindow):
             self._load_config(os.path.join(self._config_dir, "default_config.json"))
 
         # Listen to stage closing event to stop the recorder
-        self._sub_stage_event = (
-            omni.usd.get_context()
-            .get_stage_event_stream()
-            .create_subscription_to_pop_by_type(int(omni.usd.StageEventType.CLOSING), self._on_stage_closing_event)
+        self._usd_context = omni.usd.get_context()
+        self._sub_stage_event = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.CLOSING),
+            on_event=self._on_stage_closing_event,
+            observer_name="isaacsim.replicator.synthetic_recorder._on_stage_closing_event",
         )
 
         # Listen to editor quit event to stop the recorder, and save the last config file
-        self._sub_shutdown = (
-            omni.kit.app.get_app()
-            .get_shutdown_event_stream()
-            .create_subscription_to_pop_by_type(
-                omni.kit.app.POST_QUIT_EVENT_TYPE,
-                self._on_editor_quit_event,
-                name="isaacsim.replicator.synthetic_recorder::shutdown_callback",
-                order=0,
-            )
+        self._sub_shutdown = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.kit.app.GLOBAL_EVENT_POST_QUIT,
+            on_event=self._on_editor_quit_event,
+            observer_name="isaacsim.replicator.synthetic_recorder._on_editor_quit_event",
+            order=0,
         )
 
         # Build the window UI
@@ -241,9 +255,7 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         self._recorder.subscribe_state_changed(self._on_state_changed)
 
     def destroy(self):
-        """
-        overwriting the destroy method to clean up the window
-        """
+        """Overwriting the destroy method to clean up the window."""
         self._recorder.clear_recorder()
         self._save_config(self._last_config_path)
         self._sub_stage_event = None
@@ -251,26 +263,87 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         self._start_stop_button = None
         self._pause_resume_button = None
         self._recorder = None
+
         super().destroy()
 
+    def _on_collapsed_changed(self, key, collapsed):
+        """Keep track in a dict of the collapsed state of the frames.
+
+        Args:
+            key: The frame key identifier.
+            collapsed: Whether the frame is collapsed.
+        """
+        self._collapsed_states[key] = collapsed
+
     def _on_stage_closing_event(self, e: carb.events.IEvent):
-        """Callback function for stage closing event."""
+        """Callback function for stage closing event.
+
+        Args:
+            e: The stage closing event.
+        """
         self._recorder.clear_recorder()
 
     def _on_editor_quit_event(self, e: carb.events.IEvent):
-        """Callback function for editor quit event."""
+        """Callback function for editor quit event.
+
+        Args:
+            e: The editor quit event.
+        """
         self._recorder.clear_recorder()
         self._save_config(self._last_config_path)
 
     def _open_dir(self, path):
-        """Open the directory through the editor."""
+        """Open the directory through the editor.
+
+        Args:
+            path: The directory path to open.
+        """
         if not os.path.isdir(path):
             carb.log_warn(f"Could not open directory {path}.")
             return
         open_file_using_os_default(path)
 
+    def _configure_disk_backend(self):
+        """Configure DiskBackend parameters from UI fields."""
+        if self._out_working_dir:
+            self._recorder.backend_params["output_dir"] = os.path.join(self._out_working_dir, self._out_dir)
+        else:
+            self._recorder.backend_params["output_dir"] = self._out_dir
+
+    def _configure_s3_backend(self):
+        """Configure S3Backend parameters from UI fields."""
+        backend_params = self._recorder.backend_params
+
+        key_prefix = self._out_dir or None
+        if key_prefix:
+            backend_params["key_prefix"] = key_prefix
+        else:
+            backend_params.pop("key_prefix", None)
+
+        bucket = self._s3_params.get("s3_bucket") or None
+        if bucket:
+            backend_params["bucket"] = bucket
+        else:
+            backend_params.pop("bucket", None)
+
+        region = self._s3_params.get("s3_region") or None
+        if region:
+            backend_params["region"] = region
+        else:
+            backend_params.pop("region", None)
+
+        endpoint = self._s3_params.get("s3_endpoint") or None
+        if endpoint:
+            backend_params["endpoint_url"] = endpoint
+        else:
+            backend_params.pop("endpoint_url", None)
+
     def _load_config(self, path):
-        """Load the json config file and set the recorder parameters."""
+        """Load the json config file and set the recorder parameters.
+
+        Args:
+            path: The path to the config file.
+        """
         if not os.path.isfile(path):
             carb.log_warn(f"Could not find config file: '{path}'.")
             return
@@ -297,15 +370,35 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         self._recorder.num_frames = config.get("num_frames", self._recorder.num_frames)
         self._recorder.rt_subframes = config.get("rt_subframes", self._recorder.rt_subframes)
         self._recorder.control_timeline = config.get("control_timeline", self._recorder.control_timeline)
-        self._recorder.out_working_dir = config.get("out_working_dir", self._recorder.out_working_dir)
-        self._recorder.out_dir = config.get("out_dir", self._recorder.out_dir)
-        self._recorder.use_s3 = config.get("use_s3", self._recorder.use_s3)
 
+        # Load UI-only fields
+        self._out_working_dir = config.get("out_working_dir", self._out_working_dir)
+        self._out_dir = config.get("out_dir", self._out_dir)
+        self._use_s3 = config.get("use_s3", False)
+        s3_params = config.get("s3_params")
+        if isinstance(s3_params, dict):
+            self._s3_params = s3_params
+
+        # Load backend configuration
+        self._recorder.backend_type = config.get("backend_type", self._recorder.backend_type)
+        backend_params = config.get("backend_params")
+        if isinstance(backend_params, dict):
+            self._recorder.backend_params = backend_params
+        else:
+            self._recorder.backend_params = {}
+
+        # Construct backend_params based on backend type and UI fields
+        if self._recorder.backend_type == "DiskBackend":
+            self._configure_disk_backend()
+        elif self._recorder.backend_type == "S3Backend":
+            self._configure_s3_backend()
+
+        # Load writer params (UI-only fields)
         basic_writer_params = config.get("basic_writer_params")
         if isinstance(basic_writer_params, dict):
             for key, value in basic_writer_params.items():
-                if key in self._recorder.basic_writer_params:
-                    self._recorder.basic_writer_params[key] = value
+                if key in self._basic_writer_params:
+                    self._basic_writer_params[key] = value
 
         rp_data = config.get("rp_data")
         if isinstance(rp_data, list):
@@ -320,12 +413,31 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         self._custom_writer_name = config.get("custom_writer_name", self._custom_writer_name)
 
     def _load_config_and_refresh_ui(self, directory, filename):
-        """Load the config file and refresh the UI to reflect the changes."""
+        """Load the config file and refresh the UI to reflect the changes.
+
+        Args:
+            directory: The directory containing the config file.
+            filename: The config filename to load.
+        """
         self._load_config(os.path.join(directory, filename))
-        asyncio.ensure_future(self._build_window_ui_async())
+        # Rebuild all child frames directly to ensure they refresh with new config data
+        if self._rp_frame:
+            self._rp_frame.rebuild()
+        if self._params_frame:
+            self._params_frame.rebuild()
+        if self._output_frame:
+            self._output_frame.rebuild()
+        if self._config_frame:
+            self._config_frame.rebuild()
+        if self._control_params_frame:
+            self._control_params_frame.rebuild()
 
     def _save_config(self, path):
-        """Save the current recorder parameters to a json config file."""
+        """Save the current recorder parameters to a json config file.
+
+        Args:
+            path: The path where to save the config file.
+        """
         dir_name = os.path.dirname(path)
         if not dir_name:
             carb.log_warn(f"Could not save config file to '{path}', missing directory path.")
@@ -340,17 +452,28 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                     "num_frames": self._recorder.num_frames,
                     "rt_subframes": self._recorder.rt_subframes,
                     "control_timeline": self._recorder.control_timeline,
-                    "use_s3": self._recorder.use_s3,
-                    "s3_params": self._recorder.s3_params,
-                    "basic_writer_params": self._recorder.basic_writer_params,
                     "rp_data": self._recorder.rp_data,
                 }
                 if self._recorder.writer_name:
                     config["writer_name"] = self._recorder.writer_name
-                if self._recorder.out_working_dir:
-                    config["out_working_dir"] = self._recorder.out_working_dir
-                if self._recorder.out_dir:
-                    config["out_dir"] = self._recorder.out_dir
+
+                # Save UI-only fields
+                if self._out_working_dir is not None:
+                    config["out_working_dir"] = self._out_working_dir
+                if self._out_dir:
+                    config["out_dir"] = self._out_dir
+                if self._use_s3:
+                    config["use_s3"] = self._use_s3
+                if self._s3_params:
+                    config["s3_params"] = self._s3_params
+                if self._basic_writer_params:
+                    config["basic_writer_params"] = self._basic_writer_params
+
+                # Save backend configuration if specified
+                if self._recorder.backend_type:
+                    config["backend_type"] = self._recorder.backend_type
+                if self._recorder.backend_params:
+                    config["backend_params"] = self._recorder.backend_params
 
                 # UI
                 if self._custom_writer_name:
@@ -365,8 +488,16 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         except Exception as e:
             carb.log_warn(f"An error occurred while saving the config file '{path}': {e}")
 
-    def _get_custom_params(self, path):
-        """Load the custom writer parameters as a dict from the given json file."""
+    def _get_custom_params(self, path: str) -> dict:
+        """Load the custom writer parameters as a dict from the given json file.
+
+        Args:
+            path: Path to the JSON file containing custom writer parameters.
+
+        Returns:
+            Dictionary containing the loaded custom writer parameters. Returns empty dict if file doesn't exist
+            or contains invalid JSON.
+        """
         if not os.path.isfile(path):
             carb.log_warn(f"Could not find params file '{path}'.")
             return {}
@@ -383,6 +514,11 @@ class SyntheticRecorderWindow(MenuHelperWindow):
         return params
 
     def _reset_config_dir(self):
+        """Reset the configuration directory to the default extension data path.
+
+        Resets the config directory to the extension's data folder and rebuilds the config UI frame
+        to reflect the changes.
+        """
         self._config_dir = os.path.abspath(
             os.path.join(
                 omni.kit.app.get_app().get_extension_manager().get_extension_path(self._ext_id),
@@ -390,15 +526,24 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                 "",
             )
         )
-        asyncio.ensure_future(self._build_window_ui_async())
+        if self._config_frame:
+            self._config_frame.rebuild()
 
     def _reset_out_working_dir(self):
-        """Reset the working directory to the default value."""
-        self._recorder.out_working_dir = os.getcwd()
-        asyncio.ensure_future(self._build_window_ui_async())
+        """Reset the working directory to the default value.
+
+        Clears the output working directory field and rebuilds the output UI frame to reflect the changes.
+        """
+        self._out_working_dir = ""
+        if self._output_frame:
+            self._output_frame.rebuild()
 
     def _set_buttons_state(self):
-        """Set the state of the start/stop and pause/resume buttons based on the recorder state."""
+        """Set the state of the start/stop and pause/resume buttons based on the recorder state.
+
+        Updates button text and enabled state according to the current recorder state (STOPPED, RUNNING,
+        or PAUSED).
+        """
         if self._recorder.get_state() == RecorderState.STOPPED:
             self._start_stop_button.text = "Start"
             self._pause_resume_button.text = "Pause"
@@ -416,22 +561,46 @@ class SyntheticRecorderWindow(MenuHelperWindow):
             self._pause_resume_button.enabled = True
 
     def _start_stop_recorder(self):
-        """Start/stop the recorder, load custom writer params if the writer is a custom writer."""
-        # If the writer is a custom writer, load the custom parameters from the given json config file
-        if self._recorder.writer_name != "BasicWriter":
-            self._recorder.custom_writer_params = self._get_custom_params(self._custom_params_path)
+        """Start/stop the recorder, construct writer params from UI fields before starting.
+
+        Configures writer parameters based on the selected writer type (BasicWriter or custom writer)
+        and backend parameters, then starts or stops the recording process asynchronously.
+        """
+        # Construct writer_params from UI fields before recording
+        if self._recorder.writer_name == "BasicWriter":
+            self._recorder.writer_params = self._basic_writer_params.copy()
+        else:
+            # If custom writer, load parameters from the given json config file
+            self._recorder.writer_params = self._get_custom_params(self._custom_params_path)
+
+        # Configure backend params from UI fields before recording
+        if self._recorder.backend_type == "DiskBackend":
+            self._configure_disk_backend()
+        elif self._recorder.backend_type == "S3Backend":
+            self._configure_s3_backend()
+
         asyncio.ensure_future(self._recorder.start_stop_async())
 
     def _pause_resume_recorder(self):
-        """Pause/resume the recorder."""
+        """Pause/resume the recorder.
+
+        Toggles the recorder between paused and running states asynchronously.
+        """
         asyncio.ensure_future(self._recorder.pause_resume_async())
 
     def _on_state_changed(self):
-        """Callback function when the recorder state changes (finished/running/paused) to update the buttons state."""
+        """Callback function when the recorder state changes (finished/running/paused) to update the buttons state.
+
+        Updates the UI button states to reflect the current recorder state.
+        """
         self._set_buttons_state()
 
     def _build_config_ui(self):
-        """Build the config part of the UI."""
+        """Build the config part of the UI.
+
+        Creates UI elements for managing configuration files, including directory path input, file name
+        field, and load/save buttons for configuration management.
+        """
         with ui.VStack(spacing=5):
             with ui.HStack():
                 ui.Spacer(width=10)
@@ -448,14 +617,14 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
                 ui.Spacer(width=5)
                 ui.Button(
-                    f"{_ui_get_open_folder_glyph()}",
+                    f"{GLYPHS['open_folder']}",
                     width=20,
                     clicked_fn=lambda: self._open_dir(self._config_dir),
                     tooltip="Open config directory",
                 )
 
                 ui.Button(
-                    f"{_ui_get_reset_glyph()}",
+                    f"{GLYPHS['reset']}",
                     width=20,
                     clicked_fn=lambda: self._reset_config_dir(),
                     tooltip="Reset config directory to default",
@@ -483,20 +652,24 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                 )
 
     def _build_s3_ui(self):
-        """Build the S3 part of the UI."""
+        """Build the S3 part of the UI.
+
+        Creates UI elements for configuring S3 backend parameters including the S3 enable checkbox
+        and input fields for bucket, region, and endpoint settings.
+        """
         with ui.VStack(spacing=5):
             with ui.HStack():
                 ui.Spacer(width=10)
-                ui.Label("Use S3", alignment=ui.Alignment.LEFT, tooltip="Write data to S3 buckets")
-                s3_model = ui.CheckBox().model
-                s3_model.set_value(self._recorder.use_s3)
+                ui.Label("Use S3", width=250, alignment=ui.Alignment.LEFT, tooltip="Write data to S3 buckets")
+                s3_model = ui.CheckBox(width=10, height=0).model
+                s3_model.set_value(self._use_s3)
 
                 def value_changed(m):
-                    self._recorder.use_s3 = m.as_bool
+                    self._use_s3 = m.as_bool
 
                 s3_model.add_value_changed_fn(value_changed)
 
-            for key, val in self._recorder.s3_params.items():
+            for key, val in self._s3_params.items():
                 with ui.HStack():
                     ui.Spacer(width=10)
                     ui.Label(key, alignment=ui.Alignment.LEFT, tooltip=PARAM_TOOLTIPS[key])
@@ -507,12 +680,16 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                         model.set_value("")
 
                     def value_changed(m, k=key):
-                        self._recorder.s3_params[k] = m.as_string
+                        self._s3_params[k] = m.as_string
 
                     model.add_value_changed_fn(value_changed)
 
     def _build_output_ui(self):
-        """Build the output part of the UI."""
+        """Build the output part of the UI.
+
+        Creates UI elements for configuring output settings including working directory path, output
+        directory name, and the collapsible S3 configuration frame.
+        """
         with ui.VStack(spacing=5):
             with ui.HStack():
                 ui.Spacer(width=10)
@@ -520,23 +697,23 @@ class SyntheticRecorderWindow(MenuHelperWindow):
             with ui.HStack():
                 ui.Spacer(width=10)
                 out_working_dir_model = ui.StringField().model
-                out_working_dir_model.set_value(self._recorder.out_working_dir)
+                out_working_dir_model.set_value(self._out_working_dir)
 
                 def out_working_dir_changed(model):
-                    self._recorder.out_working_dir = model.as_string
+                    self._out_working_dir = model.as_string
 
                 out_working_dir_model.add_value_changed_fn(out_working_dir_changed)
 
                 ui.Spacer(width=5)
                 ui.Button(
-                    f"{_ui_get_open_folder_glyph()}",
+                    f"{GLYPHS['open_folder']}",
                     width=20,
-                    clicked_fn=lambda: self._open_dir(self._recorder.out_working_dir),
+                    clicked_fn=lambda: self._open_dir(self._out_working_dir if self._out_working_dir else os.getcwd()),
                     tooltip="Open working directory",
                 )
 
                 ui.Button(
-                    f"{_ui_get_reset_glyph()}",
+                    f"{GLYPHS['reset']}",
                     width=20,
                     clicked_fn=lambda: self._reset_out_working_dir(),
                     tooltip="Reset directory to default",
@@ -545,30 +722,40 @@ class SyntheticRecorderWindow(MenuHelperWindow):
             with ui.HStack(spacing=5):
                 ui.Spacer(width=5)
                 out_dir_model = ui.StringField().model
-                out_dir_model.set_value(self._recorder.out_dir)
+                out_dir_model.set_value(self._out_dir)
 
                 def out_dir_changed(model):
-                    self._recorder.out_dir = model.as_string
+                    self._out_dir = model.as_string
 
                 out_dir_model.add_value_changed_fn(out_dir_changed)
 
-            s3_frame = ui.CollapsableFrame("S3 Bucket", height=0, collapsed=self._s3_params_frame_collapsed)
-            with s3_frame:
-
-                def on_collapsed_changed(collapsed):
-                    self._s3_params_frame_collapsed = collapsed
-
-                s3_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                self._build_s3_ui()
+            # Create S3 Bucket frame
+            frame_name = "S3 Bucket"
+            frame_collapsed = self._collapsed_states.get(frame_name, True)
+            self._s3_frame = ui.CollapsableFrame(
+                frame_name, height=0, collapsed=frame_collapsed, style=get_style(), build_fn=self._build_s3_ui
+            )
+            self._s3_frame.set_collapsed_changed_fn(lambda collapsed: self._on_collapsed_changed(frame_name, collapsed))
 
     def _update_rp_entry(self, idx, field, value):
-        """Callback function to update the render product entry."""
+        """Callback function to update the render product entry.
+
+        Args:
+            idx: Index of the render product entry to update.
+            field: Field index within the entry to modify.
+            value: New value to set for the specified field.
+        """
         self._recorder.rp_data[idx][field] = value
 
     def _remove_rp_entry(self, idx):
-        """Callback function to remove the render product entry."""
+        """Callback function to remove the render product entry.
+
+        Args:
+            idx: Index of the render product entry to remove.
+        """
         del self._recorder.rp_data[idx]
-        asyncio.ensure_future(self._build_window_ui_async())
+        if self._rp_frame:
+            self._rp_frame.rebuild()
 
     def _add_new_rp_field(self):
         """Add a new UI render product entry."""
@@ -579,12 +766,13 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
         if selected_cameras:
             for path in selected_cameras:
-                self._recorder.rp_data.append([path, 512, 512, ""])
+                self._recorder.rp_data.append([path, 1280, 720, ""])
         else:
             active_vp = get_active_viewport()
             active_cam = active_vp.get_active_camera()
-            self._recorder.rp_data.append([str(active_cam), 512, 512, ""])
-        asyncio.ensure_future(self._build_window_ui_async())
+            self._recorder.rp_data.append([str(active_cam), 1280, 720, ""])
+        if self._rp_frame:
+            self._rp_frame.rebuild()
 
     def _build_rp_ui(self):
         """Build the render product part of the UI."""
@@ -617,7 +805,7 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                     name_field.model.set_value(entry[3])
                     name_field.model.add_value_changed_fn(lambda m, idx=i: self._update_rp_entry(idx, 3, m.as_string))
                     ui.Button(
-                        f"{_ui_get_delete_glyph()}",
+                        f"{GLYPHS['delete']}",
                         width=30,
                         clicked_fn=lambda idx=i: self._remove_rp_entry(idx),
                         tooltip="Remove entry",
@@ -646,7 +834,8 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                         self._recorder.writer_name = "BasicWriter"
                     else:
                         self._recorder.writer_name = self._custom_writer_name
-                    asyncio.ensure_future(self._build_window_ui_async())
+                    if self._params_frame:
+                        self._params_frame.rebuild()
 
                 writer_type_collection.model.add_value_changed_fn(writer_type_collection_changed)
 
@@ -664,29 +853,32 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
     def _build_basic_writer_ui(self):
         """Build the basic writer part of the UI."""
-        for key, val in self._recorder.basic_writer_params.items():
+        for key, val in self._basic_writer_params.items():
             with ui.HStack(spacing=5):
                 ui.Spacer(width=10)
-                ui.Label(key, alignment=ui.Alignment.LEFT, tooltip=PARAM_TOOLTIPS[key])
-                model = ui.CheckBox().model
+                ui.Label(key, width=300, alignment=ui.Alignment.LEFT, tooltip=PARAM_TOOLTIPS[key])
+                model = ui.CheckBox(width=10, height=0).model
                 model.set_value(val)
 
                 def value_changed(m, k=key):
-                    self._recorder.basic_writer_params[k] = m.as_bool
+                    self._basic_writer_params[k] = m.as_bool
 
                 model.add_value_changed_fn(value_changed)
 
-        with ui.HStack():
+        with ui.HStack(spacing=5):
+            ui.Spacer(width=10)
 
             def select_all():
-                for k in self._recorder.basic_writer_params:
-                    self._recorder.basic_writer_params[k] = True
-                asyncio.ensure_future(self._build_window_ui_async())
+                for k in self._basic_writer_params:
+                    self._basic_writer_params[k] = True
+                if self._params_frame:
+                    self._params_frame.rebuild()
 
             def toggle_all():
-                for k in self._recorder.basic_writer_params:
-                    self._recorder.basic_writer_params[k] = not self._recorder.basic_writer_params[k]
-                asyncio.ensure_future(self._build_window_ui_async())
+                for k in self._basic_writer_params:
+                    self._basic_writer_params[k] = not self._basic_writer_params[k]
+                if self._params_frame:
+                    self._params_frame.rebuild()
 
             ui.Button(text="Select All", clicked_fn=select_all, tooltip="Select all parameters")
             ui.Button(text="Toggle All", clicked_fn=toggle_all, tooltip="Toggle all parameters")
@@ -715,44 +907,44 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
             path_model.add_value_changed_fn(path_changed)
 
+    def _create_writer_child_frames(self):
+        """Create all child frames within the writer frame container."""
+        # Render Products frame
+        frame_name = "Render Products"
+        frame_collapsed = self._collapsed_states.get(frame_name, False)
+        self._rp_frame = ui.CollapsableFrame(
+            frame_name, height=0, collapsed=frame_collapsed, style=get_style(), build_fn=self._build_rp_ui
+        )
+        self._rp_frame.set_collapsed_changed_fn(lambda collapsed: self._on_collapsed_changed(frame_name, collapsed))
+
+        # Parameters frame
+        frame_name = "Parameters"
+        frame_collapsed = self._collapsed_states.get(frame_name, True)
+        self._params_frame = ui.CollapsableFrame(
+            frame_name, height=0, collapsed=frame_collapsed, style=get_style(), build_fn=self._build_params_ui
+        )
+        self._params_frame.set_collapsed_changed_fn(lambda collapsed: self._on_collapsed_changed(frame_name, collapsed))
+
+        # Output frame
+        frame_name = "Output"
+        frame_collapsed = self._collapsed_states.get(frame_name, False)
+        self._output_frame = ui.CollapsableFrame(
+            frame_name, height=0, collapsed=frame_collapsed, style=get_style(), build_fn=self._build_output_ui
+        )
+        self._output_frame.set_collapsed_changed_fn(lambda collapsed: self._on_collapsed_changed(frame_name, collapsed))
+
+        # Config frame
+        frame_name = "Config"
+        frame_collapsed = self._collapsed_states.get(frame_name, True)
+        self._config_frame = ui.CollapsableFrame(
+            frame_name, height=0, collapsed=frame_collapsed, style=get_style(), build_fn=self._build_config_ui
+        )
+        self._config_frame.set_collapsed_changed_fn(lambda collapsed: self._on_collapsed_changed(frame_name, collapsed))
+
     def _build_writer_ui(self):
-        """Build the writer UI frame."""
+        """Build the writer UI frame container."""
         with ui.VStack(spacing=5):
-            rp_frame = ui.CollapsableFrame("Render Products", height=0, collapsed=self._rp_frame_collapsed)
-            with rp_frame:
-
-                def on_collapsed_changed(collapsed):
-                    self._rp_frame_collapsed = collapsed
-
-                rp_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                self._build_rp_ui()
-
-            params_frame = ui.CollapsableFrame("Parameters", height=0, collapsed=self._writer_params_frame_collapsed)
-            with params_frame:
-
-                def on_collapsed_changed(collapsed):
-                    self._writer_params_frame_collapsed = collapsed
-
-                params_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                self._build_params_ui()
-
-            output_frame = ui.CollapsableFrame("Output", height=0, collapsed=self._output_frame_collapsed)
-            with output_frame:
-
-                def on_collapsed_changed(collapsed):
-                    self._output_frame_collapsed = collapsed
-
-                output_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                self._build_output_ui()
-
-            config_frame = ui.CollapsableFrame("Config", height=0, collapsed=self._config_frame_collapsed)
-            with config_frame:
-
-                def on_collapsed_changed(collapsed):
-                    self._config_frame_collapsed = collapsed
-
-                config_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                self._build_config_ui()
+            self._create_writer_child_frames()
 
     def _build_control_params_ui(self):
         """Build the control parameters part of the UI."""
@@ -779,8 +971,8 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
             with ui.HStack(spacing=5):
                 ui.Spacer(width=10)
-                ui.Label("Control Timeline", tooltip="Start/Stop/Pause timeline as well with the recorder")
-                control_timeline_model = ui.CheckBox().model
+                ui.Label("Control Timeline", width=130, tooltip="Start/Stop/Pause timeline as well with the recorder")
+                control_timeline_model = ui.CheckBox(width=10, height=0).model
                 control_timeline_model.set_value(self._recorder.control_timeline)
 
                 def control_timeline_value_changed(m):
@@ -788,9 +980,9 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
                 control_timeline_model.add_value_changed_fn(control_timeline_value_changed)
 
-                ui.Spacer(width=10)
-                ui.Label("Verbose", tooltip="Print recorder status to the terminal (e.g. current frame)")
-                verbose_model = ui.CheckBox().model
+                ui.Spacer(width=180)
+                ui.Label("Verbose", width=80, tooltip="Print recorder status to the terminal (e.g. current frame)")
+                verbose_model = ui.CheckBox(width=10, height=0).model
                 verbose_model.set_value(self._recorder.verbose)
 
                 def verbose_value_changed(m):
@@ -798,19 +990,26 @@ class SyntheticRecorderWindow(MenuHelperWindow):
 
                 verbose_model.add_value_changed_fn(verbose_value_changed)
 
+    def _create_control_child_frames(self):
+        """Create child frame within the control frame container."""
+        # Control Parameters frame
+        frame_name = "Control Parameters"
+        frame_collapsed = self._collapsed_states.get(frame_name, False)
+        self._control_params_frame = ui.CollapsableFrame(
+            frame_name,
+            height=0,
+            collapsed=frame_collapsed,
+            style=get_style(),
+            build_fn=self._build_control_params_ui,
+        )
+        self._control_params_frame.set_collapsed_changed_fn(
+            lambda collapsed: self._on_collapsed_changed(frame_name, collapsed)
+        )
+
     def _build_control_ui(self):
-        """Build the control UI frame."""
+        """Build the control UI frame container."""
         with ui.VStack(spacing=5):
-            control_params_frame = ui.CollapsableFrame(
-                "Parameters", height=0, collapsed=self._control_params_frame_collapsed
-            )
-            with control_params_frame:
-
-                def on_collapsed_changed(collapsed):
-                    self._control_params_frame_collapsed = collapsed
-
-                control_params_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                self._build_control_params_ui()
+            self._create_control_child_frames()
 
             with ui.HStack(spacing=5):
                 ui.Spacer(width=5)
@@ -826,30 +1025,36 @@ class SyntheticRecorderWindow(MenuHelperWindow):
                     enabled=False,
                     tooltip="Pause/resume recording",
                 )
+            self._set_buttons_state()
 
     def _build_window_ui(self):
         """Build the window UI."""
         with self.frame:
             with ui.ScrollingFrame():
                 with ui.VStack(spacing=5):
-                    writer_frame = ui.CollapsableFrame("Writer", height=0, collapsed=self._writer_frame_collapsed)
-                    with writer_frame:
+                    # Create stored CollapsableFrames with build_fn
+                    frame_name = "Writer"
+                    frame_collapsed = self._collapsed_states.get(frame_name, False)
+                    self._writer_frame = ui.CollapsableFrame(
+                        frame_name,
+                        height=0,
+                        collapsed=frame_collapsed,
+                        style=get_style(),
+                        build_fn=self._build_writer_ui,
+                    )
+                    self._writer_frame.set_collapsed_changed_fn(
+                        lambda collapsed: self._on_collapsed_changed(frame_name, collapsed)
+                    )
 
-                        def on_collapsed_changed(collapsed):
-                            self._writer_frame_collapsed = collapsed
-
-                        writer_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                        self._build_writer_ui()
-
-                    control_frame = ui.CollapsableFrame("Control", height=0, collapsed=self._control_frame_collapsed)
-                    with control_frame:
-
-                        def on_collapsed_changed(collapsed):
-                            self._control_frame_collapsed = collapsed
-
-                        control_frame.set_collapsed_changed_fn(on_collapsed_changed)
-                        self._build_control_ui()
-
-    async def _build_window_ui_async(self):
-        """Build the window UI asynchronously on the next update."""
-        self._build_window_ui()
+                    frame_name = "Control"
+                    frame_collapsed = self._collapsed_states.get(frame_name, False)
+                    self._control_frame = ui.CollapsableFrame(
+                        frame_name,
+                        height=0,
+                        collapsed=frame_collapsed,
+                        style=get_style(),
+                        build_fn=self._build_control_ui,
+                    )
+                    self._control_frame.set_collapsed_changed_fn(
+                        lambda collapsed: self._on_collapsed_changed(frame_name, collapsed)
+                    )

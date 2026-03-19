@@ -1,11 +1,11 @@
 [package]
-version = "15.8.4"
+version = "15.14.1"
 category = "Simulation"
 title = "Isaac Sim Isaac Sensor Simulation"
 description = "Provides APIs for RTX-based sensors, including RTX Lidar & RTX Radar."
 keywords = ["isaac", "physics", "robotics"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -42,6 +42,9 @@ name = "isaacsim.sensors.rtx"
 name = "isaacsim.sensors.rtx.generic_model_output"
 
 [[python.module]]
+name = "isaacsim.sensors.rtx.sensor_checker"
+
+[[python.module]]
 name = "isaacsim.sensors.rtx.tests"
 public = false
 
@@ -50,7 +53,7 @@ path = "bin/*.plugin"
 recursive = false
 
 [settings]
-# List of directories which renderer will search to find Lidar profile for (deprecated) camera-based Lidar
+# List of directories that the renderer searches for lidar profiles used by the deprecated camera-based lidar.
 app.sensors.nv.lidar.profileBaseFolder=[
     "${omni.sensors.nv.common}/data/lidar/",
     "${isaacsim.sensors.rtx}/data/lidar_configs/HESAI/",
@@ -66,16 +69,30 @@ app.sensors.nv.lidar.profileBaseFolder=[
 ]
 
 # Renderer keeps Lidar return buffer on GPU for post-processing.
-app.sensors.nv.lidar.outputBufferOnGPU = true
+app.sensors.nv.lidar.outputBufferOnGPU = false
 # Renderer keeps Radar return buffer on GPU for post-processing.
-app.sensors.nv.radar.outputBufferOnGPU = true
-# Enable non-visual materials using USD attributes
+app.sensors.nv.radar.outputBufferOnGPU = false
+# Enable non-visual materials using USD attributes.
 rtx.materialDb.nonVisualMaterialCSV.enabled=false
-# Specify non-visual material USD attribute prefix
+# Specify the non-visual material USD attribute prefix.
 rtx.materialDb.nonVisualMaterialSemantics.prefix="omni:simready:nonvisual"
+# Use Hydra time (`omni.timeline`) in RTX sensor models.
+rtx.rtxsensor.useHydraTimeAlways = true
+
+[[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
 
 [[test]]
 timeout = 1200
+dependencies = [
+    "omni.isaac.ml_archive",
+]
 stdoutFailPatterns.exclude = [
     # This is excluded in at least 3 kit tests.
     "*Missing call to destroyResourceBindingSignature()*",
@@ -93,6 +110,7 @@ stdoutFailPatterns.exclude = [
     "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a valid USD prim*",
     "*[Error] [isaacsim.sensors.rtx.impl.nonvisual_materials] Provided prim is not a material prim*",
     "*Annotator parameters cannot be initialized, it is already attached.*",
+    '*The NumPy module was reloaded*',
 ]
 stdoutFailPatterns.include = [
     "*Could not open asset * for reference*",
@@ -106,7 +124,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -122,6 +140,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -142,13 +161,13 @@ args = [
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
     ### Extension specific args
-    "--/app/hydraEngine/waitIdle=1",
-    "--/app/updateOrder/checkForHydraRenderComplete=1000",
+    #"--/app/hydraEngine/waitIdle=1",
+    #"--/app/updateOrder/checkForHydraRenderComplete=1000",
     "--/rtx-transient/stableIds/enabled=true",
+    "--/renderer/raytracingMotion/enabled=true",
+    "--/renderer/raytracingMotion/enableHydraEngineMasking=true",
+    "--/renderer/raytracingMotion/enabledForHydraEngines=0,1,2,3",
 ]
 
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
-]
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

@@ -19,13 +19,15 @@ from collections import OrderedDict
 from typing import List, Optional, Tuple, Union
 
 import carb
+import carb.eventdispatcher
 import isaacsim.core.utils.numpy as numpy_utils
 import numpy as np
 import omni.kit.app
 import omni.physics.tensors
 import omni.physx
-import torch
+import omni.timeline
 import warp as wp
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.simulation_manager import IsaacEvents, SimulationManager
 from isaacsim.core.utils.prims import (
     get_articulation_root_api_prim_path,
@@ -38,6 +40,8 @@ from isaacsim.core.utils.types import ArticulationActions, JointsState, XFormPri
 from pxr import PhysxSchema, Usd, UsdGeom, UsdPhysics
 
 from .xform_prim import XFormPrim
+
+torch = import_module("torch")
 
 
 class Articulation(XFormPrim):
@@ -84,7 +88,6 @@ class Articulation(XFormPrim):
                                                 (i.e: translate, orient and scale) ONLY and in that order.
                                                 Set this parameter to False if the object were cloned using using
                                                 the cloner api in isaacsim.core.cloner. Defaults to True.
-        enable_residual_reports (bool optional): Setting to True will enable using the residual reporting APIs. Defaults to False.
 
     Example:
 
@@ -124,7 +127,6 @@ class Articulation(XFormPrim):
         scales: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None,
         visibilities: Optional[Union[np.ndarray, torch.Tensor, wp.array]] = None,
         reset_xform_properties: bool = True,
-        enable_residual_reports: bool = False,
     ) -> None:
         self._physics_view = None
         if isinstance(prim_paths_expr, list):
@@ -162,22 +164,14 @@ class Articulation(XFormPrim):
         )
         # reset default state here because of the difference in the articulation root transform in USD vs tensor API
         self._default_state = XFormPrimViewState(positions=None, orientations=None)
-        self._joint_residual_apis = None
-        self._articulation_residual_apis = None
-        self._enable_residual_reports = enable_residual_reports
-        if enable_residual_reports:
-            self._articulation_residual_apis = []
-            for i in range(self.count):
-                self._articulation_residual_apis.append(self._apply_residual_reporting_api(self._prims[i]))
 
-        self._invalidation_callback = (
-            SimulationManager._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-                int(omni.timeline.TimelineEventType.STOP),
-                lambda event, obj=weakref.proxy(self): obj._invalidate_physics_handle_callback(event),
-            )
+        self._invalidation_callback = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=lambda event, obj=weakref.proxy(self): obj._invalidate_physics_handle_callback(event),
+            observer_name="isaacsim.core.prims.Articulation.initialize._invalidate_physics_handle_callback",
         )
         if SimulationManager.get_physics_sim_view() is not None:
-            SimulationManager._physx_sim_interface.flush_changes()
+            SimulationManager._physics_sim_interface.flush_changes()
             Articulation._on_physics_ready(self, None)
 
     def __del__(self):
@@ -353,14 +347,6 @@ class Articulation(XFormPrim):
 
     def _convert_joint_names_to_indices(self, joint_names):
         return [self._joint_names_to_idx[joint_name] for joint_name in joint_names]
-
-    def _apply_residual_reporting_api(self, prim):
-        if prim.HasAPI(PhysxSchema.PhysxResidualReportingAPI):
-            residual_api = PhysxSchema.PhysxResidualReportingAPI(prim)
-        else:
-            residual_api = PhysxSchema.PhysxResidualReportingAPI.Apply(prim)
-
-        return residual_api
 
     def get_body_index(self, body_name: str) -> int:
         """Get a ridig body (link) index in the articulation view given its name
@@ -2372,82 +2358,6 @@ class Articulation(XFormPrim):
         else:
             carb.log_warn("Physics Simulation View is not created yet in order to use get_angular_velocities")
             return None
-
-    def get_position_residuals(
-        self,
-        indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-        report_max: bool = True,
-    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
-        """Get physics solver position residuals for articulations. This is the residual across all joints that are part of articulations.
-            The solver residuals are computed according to impulse variation normalized by the effective mass.
-
-        Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view)
-            report_max (Optional[bool]): whether to report max or RMS residual. Defaults to True, i.e. max criteria
-
-        Returns:
-            Union[np.ndarray, torch.Tensor, wp.indexedarray]: Solver residuals for rigid bodies of the view
-
-        """
-        if not self._enable_residual_reports:
-            raise Exception(
-                "To use get_position_residuals API you must enable residual reporting by setting enable_residual_reports in the constructor of Articulation/ArticulationView."
-            )
-
-        indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
-        residuals = np.zeros(indices.shape[0], dtype=np.float32)
-        write_idx = 0
-        indices = self._backend_utils.to_list(indices)
-        for i in indices:
-            residual_api = self._articulation_residual_apis[i]
-            if report_max:
-                residuals[write_idx] = residual_api.GetPhysxResidualReportingMaxResidualPositionIterationAttr().Get()
-            else:
-                residuals[write_idx] = residual_api.GetPhysxResidualReportingRmsResidualPositionIterationAttr().Get()
-            write_idx += 1
-        residuals = self._backend_utils.convert(residuals, dtype="float32", device=self._device, indexed=True)
-        return residuals
-
-    def get_velocity_residuals(
-        self,
-        indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-        report_max: bool = True,
-    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
-        """Get physics solver velocity residuals for articulations. This is the residual across all joints that are part of articulations.
-            The solver residuals are computed according to impulse variation normalized by the effective mass.
-
-        Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view)
-            report_max (Optional[bool]): whether to report max or RMS residual. Defaults to True, i.e. max criteria
-
-        Returns:
-            Union[np.ndarray, torch.Tensor, wp.indexedarray]: Solver residuals for rigid bodies of the view
-
-        """
-        if not self._enable_residual_reports:
-            raise Exception(
-                "To use get_velocity_residuals API you must enable residual reporting by setting enable_residual_reports in the constructor of Articulation/ArticulationView."
-            )
-
-        indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
-        residuals = np.zeros(indices.shape[0], dtype=np.float32)
-        write_idx = 0
-        indices = self._backend_utils.to_list(indices)
-        for i in indices:
-            residual_api = self._articulation_residual_apis[i]
-            if report_max:
-                residuals[write_idx] = residual_api.GetPhysxResidualReportingMaxResidualVelocityIterationAttr().Get()
-            else:
-                residuals[write_idx] = residual_api.GetPhysxResidualReportingRmsResidualVelocityIterationAttr().Get()
-            write_idx += 1
-        residuals = self._backend_utils.convert(residuals, dtype="float32", device=self._device, indexed=True)
-        return residuals
 
     def set_joints_default_state(
         self,

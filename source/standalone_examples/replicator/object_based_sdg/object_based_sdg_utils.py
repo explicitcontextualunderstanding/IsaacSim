@@ -16,32 +16,13 @@
 import random
 
 import numpy as np
+import omni.replicator.core as rep
 from omni.kit.viewport.utility import get_active_viewport
 from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
 
 
-# Add transformation properties to the prim (if not already present)
-def set_transform_attributes(prim, location=None, orientation=None, rotation=None, scale=None):
-    if location is not None:
-        if not prim.HasAttribute("xformOp:translate"):
-            UsdGeom.Xformable(prim).AddTranslateOp()
-        prim.GetAttribute("xformOp:translate").Set(location)
-    if orientation is not None:
-        if not prim.HasAttribute("xformOp:orient"):
-            UsdGeom.Xformable(prim).AddOrientOp()
-        prim.GetAttribute("xformOp:orient").Set(orientation)
-    if rotation is not None:
-        if not prim.HasAttribute("xformOp:rotateXYZ"):
-            UsdGeom.Xformable(prim).AddRotateXYZOp()
-        prim.GetAttribute("xformOp:rotateXYZ").Set(rotation)
-    if scale is not None:
-        if not prim.HasAttribute("xformOp:scale"):
-            UsdGeom.Xformable(prim).AddScaleOp()
-        prim.GetAttribute("xformOp:scale").Set(scale)
-
-
-# Enables collisions with the asset (without rigid body dynamics the asset will be static)
-def add_colliders(root_prim):
+def add_colliders(root_prim: Usd.Prim) -> None:
+    """Enable collisions on the asset (without rigid body dynamics the asset will be static)."""
     # Iterate descendant prims (including root) and add colliders to mesh or primitive types
     for desc_prim in Usd.PrimRange(root_prim):
         if desc_prim.IsA(UsdGeom.Mesh) or desc_prim.IsA(UsdGeom.Gprim):
@@ -70,45 +51,16 @@ def add_colliders(root_prim):
             mesh_collision_api.CreateApproximationAttr().Set("convexHull")
 
 
-# Check if prim (or its descendants) has colliders
-def has_colliders(root_prim):
-    for desc_prim in Usd.PrimRange(root_prim):
-        if desc_prim.HasAPI(UsdPhysics.CollisionAPI):
-            return True
-    return False
-
-
-# Enables rigid body dynamics (physics simulation) on the prim
-def add_rigid_body_dynamics(prim, disable_gravity=False, angular_damping=None):
-    if has_colliders(prim):
-        # Physics
-        if not prim.HasAPI(UsdPhysics.RigidBodyAPI):
-            rigid_body_api = UsdPhysics.RigidBodyAPI.Apply(prim)
-        else:
-            rigid_body_api = UsdPhysics.RigidBodyAPI(prim)
-        rigid_body_api.CreateRigidBodyEnabledAttr(True)
-        # PhysX
-        if not prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI):
-            physx_rigid_body_api = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
-        else:
-            physx_rigid_body_api = PhysxSchema.PhysxRigidBodyAPI(prim)
-        physx_rigid_body_api.GetDisableGravityAttr().Set(disable_gravity)
-        if angular_damping is not None:
-            physx_rigid_body_api.CreateAngularDampingAttr().Set(angular_damping)
-    else:
-        print(f"Prim '{prim.GetPath()}' has no colliders. Skipping rigid body dynamics properties.")
-
-
-# Add dynamics properties to the prim (if mesh or primitive) (rigid body to root + colliders to the meshes)
-def add_colliders_and_rigid_body_dynamics(prim, disable_gravity=False):
-    # Add colliders to mesh or primitive types of the descendants of the prim (including root)
-    add_colliders(prim)
-    # Add rigid body dynamics properties (to the root only) only if it has colliders
-    add_rigid_body_dynamics(prim, disable_gravity=disable_gravity)
-
-
-# Createa  collision box area wrapping the given working area with origin in (0, 0, 0) with thickness towards outside
-def create_collision_box_walls(stage, path, width, depth, height, thickness=0.5, visible=False):
+def create_collision_box_walls(
+    stage: Usd.Stage,
+    path: str,
+    width: float,
+    depth: float,
+    height: float,
+    thickness: float = 0.5,
+    visible: bool = False,
+) -> None:
+    """Create a collision box area wrapping the given working area with origin at (0, 0, 0)."""
     # Define the walls (name, location, size) with thickness towards outside of the working area
     walls = [
         ("floor", (0, 0, (height + thickness) / -2.0), (width, depth, thickness)),
@@ -121,16 +73,20 @@ def create_collision_box_walls(stage, path, width, depth, height, thickness=0.5,
     for name, location, size in walls:
         prim = stage.DefinePrim(f"{path}/{name}", "Cube")
         scale = (size[0] / 2.0, size[1] / 2.0, size[2] / 2.0)
-        set_transform_attributes(prim, location=location, scale=scale)
+        rep.functional.modify.pose(prim, position_value=location, scale_value=scale)
         add_colliders(prim)
         if not visible:
             UsdGeom.Imageable(prim).MakeInvisible()
 
 
-# Create a random transformation values for location, rotation, and scale
 def get_random_transform_values(
-    loc_min=(0, 0, 0), loc_max=(1, 1, 1), rot_min=(0, 0, 0), rot_max=(360, 360, 360), scale_min_max=(0.1, 1.0)
-):
+    loc_min: tuple[float, float, float] = (0, 0, 0),
+    loc_max: tuple[float, float, float] = (1, 1, 1),
+    rot_min: tuple[float, float, float] = (0, 0, 0),
+    rot_max: tuple[float, float, float] = (360, 360, 360),
+    scale_min_max: tuple[float, float] = (0.1, 1.0),
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    """Create random transformation values for location, rotation, and scale."""
     location = (
         random.uniform(loc_min[0], loc_max[0]),
         random.uniform(loc_min[1], loc_max[1]),
@@ -145,9 +101,12 @@ def get_random_transform_values(
     return location, rotation, scale
 
 
-# Generate a random pose on a sphere looking at the origin
-# https://docs.isaacsim.omniverse.nvidia.com/latest/reference_material/reference_conventions.html
-def get_random_pose_on_sphere(origin, radius, camera_forward_axis=(0, 0, -1)):
+def get_random_pose_on_sphere(
+    origin: tuple[float, float, float],
+    radius: float,
+    camera_forward_axis: tuple[float, float, float] = (0, 0, -1),
+) -> tuple[Gf.Vec3f, Gf.Quatf]:
+    """Generate a random pose on a sphere looking at the origin."""
     origin = Gf.Vec3f(origin)
     camera_forward_axis = Gf.Vec3f(camera_forward_axis)
 
@@ -173,9 +132,43 @@ def get_random_pose_on_sphere(origin, radius, camera_forward_axis=(0, 0, -1)):
     return location, orientation
 
 
-# Enable or disable the render products and viewport rendering
-def set_render_products_updates(render_products, enabled, include_viewport=False):
+def set_render_products_updates(render_products: list, enabled: bool, include_viewport: bool = False) -> None:
+    """Enable or disable the render products and viewport rendering."""
     for rp in render_products:
         rp.hydra_texture.set_updates_enabled(enabled)
     if include_viewport:
         get_active_viewport().updates_enabled = enabled
+
+
+def apply_velocities_towards_target(
+    prims: list[Usd.Prim],
+    target: tuple[float, float, float] = (0, 0, 0),
+    strength_range: tuple[float, float] = (0.1, 1.0),
+) -> None:
+    """Apply velocities to prims directing them towards a target point."""
+    for prim in prims:
+        loc = prim.GetAttribute("xformOp:translate").Get()
+        strength = random.uniform(strength_range[0], strength_range[1])
+        velocity = ((target[0] - loc[0]) * strength, (target[1] - loc[1]) * strength, (target[2] - loc[2]) * strength)
+        prim.GetAttribute("physics:velocity").Set(velocity)
+
+
+def apply_random_velocities(
+    prims: list[Usd.Prim],
+    linear_range: tuple[float, float] = (-2.5, 2.5),
+    angular_range: tuple[float, float] = (-45, 45),
+) -> None:
+    """Apply random linear and angular velocities to prims."""
+    for prim in prims:
+        lin_vel = (
+            random.uniform(linear_range[0], linear_range[1]),
+            random.uniform(linear_range[0], linear_range[1]),
+            random.uniform(linear_range[0], linear_range[1]),
+        )
+        ang_vel = (
+            random.uniform(angular_range[0], angular_range[1]),
+            random.uniform(angular_range[0], angular_range[1]),
+            random.uniform(angular_range[0], angular_range[1]),
+        )
+        prim.GetAttribute("physics:velocity").Set(lin_vel)
+        prim.GetAttribute("physics:angularVelocity").Set(ang_vel)

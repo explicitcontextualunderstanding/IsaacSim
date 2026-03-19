@@ -112,7 +112,25 @@ class ArticulationSubset:
         Returns:
             np.array: joint efforts
         """
-        return self.articulation.get_joint_efforts()[self._get_joint_indices()]
+        return self.get_measured_joint_efforts()
+
+    @require_initialized
+    def get_measured_joint_efforts(self) -> np.array:
+        """Get measured joint efforts for this subset's joints.
+
+        Returns:
+            np.array: measured joint efforts
+        """
+        return self.articulation.get_measured_joint_efforts()[self._get_joint_indices()]
+
+    @require_initialized
+    def get_applied_joint_efforts(self) -> np.array:
+        """Get applied joint efforts for this subset's joints.
+
+        Returns:
+            np.array: applied joint efforts
+        """
+        return self.articulation.get_applied_joint_efforts()[self._get_joint_indices()]
 
     @require_initialized
     def set_joint_positions(self, positions: np.array) -> None:
@@ -161,6 +179,7 @@ class ArticulationSubset:
         Returns:
             np.array: a set of joint values that is padded with None to match the shape and order expected by the robot Articulation.
         """
+        joint_values = np.asarray(joint_values)
         joint_indices = self._get_joint_indices()
 
         is_single_action = joint_values.ndim == 1

@@ -9,35 +9,26 @@
 # its affiliates is strictly prohibited.
 
 [package]
-version = "2.4.30"
+version = "3.2.1"
 category = "Simulation"
-title = "Urdf Importer Extension"
-description = "URDF Importer"
+title = "Omniverse URDF Importer Core"
+description = "Imports URDF (Unified Robot Description Format) files into Omniverse USD scenes, converting robot models with their visual meshes, collision geometries, joints, and physics properties."
 keywords = ["urdf", "importer", "isaac"]
 changelog = "docs/CHANGELOG.md"
 readme = "docs/README.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
+writeTarget.platform = true # pip prebundle makes this extension OS specific
 
 [dependencies]
-"isaacsim.examples.browser" = {order = 1000}
-"isaacsim.gui.components" = {order = 1000}
-"isaacsim.robot.schema" = {}
-"omni.kit.asset_converter" = {}
-"omni.kit.browser.folder.core" = {}
-"omni.kit.commands" = {}
-"omni.kit.helper.file_utils" = {}
-"omni.kit.pip_archive" = {} # pulls in pillow
-"omni.kit.tool.asset_importer" = {}
-"omni.kit.uiapp" = {}
-"omni.kit.viewport.utility" = {}
-"omni.kit.window.content_browser" = {}
-"omni.kit.window.extensions" = {}
-"omni.kit.window.filepicker" = {}
-"omni.kit.window.property" = {}
-"omni.usd.libs" = {}
-"omni.usd.schema.physx" = {}
+"isaacsim.asset.importer.utils" = {}
+"isaacsim.asset.transformer.rules" = {}
+"isaacsim.pip.newton" = {}
+"omni.usdex.libs" = {}
+
+[[python.module]]
+path = "pip_prebundle"
 
 [[python.module]]
 name = "isaacsim.asset.importer.urdf"
@@ -45,41 +36,10 @@ name = "isaacsim.asset.importer.urdf"
 [[python.module]]
 name = "isaacsim.asset.importer.urdf.tests"
 
-[[python.module]]
-name = "isaacsim.asset.importer.urdf.impl.ui"
-
-[[python.module]]
-name = "isaacsim.asset.importer.urdf.impl.samples.import_carter"
-
-[[python.module]]
-name = "isaacsim.asset.importer.urdf.impl.samples.import_franka"
-
-[[python.module]]
-name = "isaacsim.asset.importer.urdf.impl.samples.import_kaya"
-
-[[python.module]]
-name = "isaacsim.asset.importer.urdf.impl.samples.import_ur10"
-
-[[native.plugin]]
-path = "bin/*.plugin"
-recursive = false
-
-[settings]
-# Set the initial width of the file picker to 390
-exts."omni.kit.window.filepicker".detail_width_init = 390
-# Set the minimum width of the file picker to 390
-exts."omni.kit.window.filepicker".detail_width_min = 390
-# Set the maximum width of the file picker to 600
-exts."omni.kit.window.filepicker".detail_width_max = 600
-
 [[test]]
-dependencies = [
-    "omni.hydra.usdrt_delegate",
-    "isaacsim.test.docstring",
-    "isaacsim.core.experimental.utils",
-]
+dependencies = []
 stdoutFailPatterns.exclude = [
-    "*[Error] [isaacsim.asset.importer.urdf] Failed to resolve mesh 'does_not/exist.obj'*",
+    '*The NumPy module was reloaded*',
 ]
 
 args = [
@@ -90,7 +50,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -106,6 +66,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -129,6 +90,6 @@ args = [
 
 [documentation]
 pages = [
-    "docs/Overview.md",
+    "docs/README.md",
     "docs/CHANGELOG.md",
 ]

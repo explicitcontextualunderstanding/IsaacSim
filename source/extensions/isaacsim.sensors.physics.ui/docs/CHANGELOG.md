@@ -1,4 +1,35 @@
 # Changelog
+## [1.1.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [1.0.2] - 2026-02-18
+### Fixed
+- Replaced deprecated `onclick_fn` with `onclick_action` in menu items to eliminate deprecation warnings
+- Registered proper actions for Contact Sensor and IMU Sensor creation menu items
+
+## [1.0.1] - 2026-02-10
+### Changed
+- IMU and Contact sensor creation commands renamed to include Experimental in their name to avoid name collision with deprecated sensor commands
+
+## [1.0.0] - 2026-02-01
+### Added
+- Updated to use interfaces from isaacsim.sensors.experimental.physics extension
+- Updated menu actions to use new sensor creation commands and experimental prim helpers
+- Improved context menu handling and visibility control for created sensor prims
+
+## [0.2.1] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [0.2.0] - 2025-12-22
+### Added
+- Add unit tests.
+
+## [0.1.13] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [0.1.12] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 0.1.11)

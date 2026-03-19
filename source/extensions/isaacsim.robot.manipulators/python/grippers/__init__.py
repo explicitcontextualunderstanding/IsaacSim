@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides gripper implementations for robotic manipulators including parallel and surface grippers."""
+
+
 from isaacsim.robot.manipulators.grippers.gripper import Gripper
 from isaacsim.robot.manipulators.grippers.parallel_gripper import ParallelGripper
 from isaacsim.robot.manipulators.grippers.surface_gripper import SurfaceGripper

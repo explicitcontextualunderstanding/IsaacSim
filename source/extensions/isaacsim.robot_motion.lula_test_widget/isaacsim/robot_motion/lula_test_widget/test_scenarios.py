@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test scenarios for Lula motion planning and control algorithms."""
+
+
 import carb
 import numpy as np
 from isaacsim.core.api.objects.cone import VisualCone
@@ -36,6 +39,28 @@ from .controllers import KinematicsController, TrajectoryController
 
 
 class LulaTestScenarios:
+    """Test scenarios for Lula motion planning and control algorithms.
+
+    This class provides a comprehensive testing framework for robotic motion planning scenarios using Lula
+    kinematics solvers, RmpFlow motion policies, and trajectory generation. It enables users to create and
+    manage various test scenarios including inverse kinematics target following, obstacle avoidance with
+    RmpFlow, custom trajectory execution, and sinusoidal target tracking.
+
+    The class manages visual elements like targets, obstacles, coordinate frames, and trajectory waypoints,
+    providing both interactive control and automated scenario execution. It supports real-time visualization
+    of end-effector frames, collision spheres for debugging RmpFlow, and dynamic target updates.
+
+    Key features include:
+    - Inverse kinematics solving with target following
+    - RmpFlow-based motion planning with obstacle avoidance
+    - Custom trajectory generation and execution
+    - Sinusoidal target tracking scenarios
+    - Visual debugging tools for motion planning
+    - Dynamic waypoint management for trajectories
+    - End-effector frame visualization
+    - Collision sphere visualization for RmpFlow debugging
+    """
+
     def __init__(self):
         self._target = None
         self._obstacles = []
@@ -60,6 +85,12 @@ class LulaTestScenarios:
         self.art_ik = None
 
     def visualize_ee_frame(self, articulation, ee_frame):
+        """Visualizes the end effector frame for the given articulation.
+
+        Args:
+            articulation: The articulation for which to visualize the end effector frame.
+            ee_frame: The end effector frame to visualize.
+        """
         if self.lula_ik is None or articulation is None:
             return
 
@@ -72,12 +103,18 @@ class LulaTestScenarios:
         self._ee_frame_prim = self._create_frame_prim(position, orientation, "/Lula/end_effector")
 
     def stop_visualize_ee_frame(self):
+        """Stops visualizing the end effector frame and cleans up associated resources."""
         if self._ee_frame_prim is not None:
             delete_prim(self._ee_frame_prim.prim_path)
         self._ee_frame_prim = None
         self.art_ik = None
 
     def toggle_rmpflow_debug_mode(self):
+        """Toggles the RMPFlow debug mode on or off.
+
+        When enabled, visualization of collision spheres is activated and state updates are ignored.
+        When disabled, collision sphere visualization is stopped and state updates resume.
+        """
         self.rmpflow_debug_mode = not self.rmpflow_debug_mode
         if self.rmpflow is None:
             return
@@ -90,14 +127,31 @@ class LulaTestScenarios:
             self.rmpflow.stop_visualizing_collision_spheres()
 
     def initialize_ik_solver(self, robot_description_path, urdf_path):
+        """Initializes the Lula inverse kinematics solver.
+
+        Args:
+            robot_description_path: Path to the robot description file.
+            urdf_path: Path to the URDF file for the robot.
+        """
         self.lula_ik = LulaKinematicsSolver(robot_description_path, urdf_path)
 
     def get_ik_frames(self):
+        """Gets all available frame names from the inverse kinematics solver.
+
+        Returns:
+            List of frame names, or empty list if IK solver is not initialized.
+        """
         if self.lula_ik is None:
             return []
         return self.lula_ik.get_all_frame_names()
 
     def on_ik_follow_target(self, articulation, ee_frame_name):
+        """Sets up an inverse kinematics scenario where the robot follows a target.
+
+        Args:
+            articulation: The articulation to control.
+            ee_frame_name: Name of the end effector frame to use for tracking.
+        """
         self.scenario_reset()
         if self.lula_ik is None:
             return
@@ -107,6 +161,12 @@ class LulaTestScenarios:
         self._create_target()
 
     def on_custom_trajectory(self, robot_description_path, urdf_path):
+        """Sets up a custom trajectory scenario with waypoints forming a rectangular path.
+
+        Args:
+            robot_description_path: Path to the robot description file.
+            urdf_path: Path to the URDF file for the robot.
+        """
         self.scenario_reset()
         if self.lula_ik is None:
             return
@@ -124,6 +184,12 @@ class LulaTestScenarios:
             self._trajectory_targets.append(frame_prim)
 
     def create_trajectory_controller(self, articulation, ee_frame):
+        """Creates a trajectory controller for following waypoints in the custom trajectory scenario.
+
+        Args:
+            articulation: The articulation to control.
+            ee_frame: The end effector frame to use for trajectory following.
+        """
         if self.traj_gen is None:
             return
 
@@ -138,12 +204,20 @@ class LulaTestScenarios:
         self._controller = TrajectoryController("Trajectory Controller", art_traj)
 
     def delete_waypoint(self):
+        """Deletes the last waypoint from the custom trajectory scenario.
+
+        Only removes waypoints if there are more than 2 remaining to maintain a valid trajectory.
+        """
         if self.scenario_name == "Custom Trajectory" and len(self._trajectory_targets) > 2:
             waypoint = self._trajectory_targets[-1]
             delete_prim(waypoint.prim_path)
             self._trajectory_targets = self._trajectory_targets[:-1]
 
     def add_waypoint(self):
+        """Adds a new waypoint to the custom trajectory scenario.
+
+        The new waypoint is positioned at the average location of existing waypoints.
+        """
         if self.scenario_name == "Custom Trajectory":
             orientation = self._trajectory_targets[-1].get_world_pose()[1]
             positions = []
@@ -155,6 +229,15 @@ class LulaTestScenarios:
             self._trajectory_targets.append(waypoint)
 
     def on_rmpflow_follow_target_obstacles(self, articulation, **rmp_config):
+        """Sets up RmpFlow scenario for target following with obstacle avoidance.
+
+        Creates a motion policy controller using RmpFlow for the articulation to follow a target
+        while avoiding wall obstacles. The scenario includes a red target cube and two wall obstacles.
+
+        Args:
+            articulation: The articulation to control.
+            **rmp_config: Configuration parameters passed to RmpFlow initialization.
+        """
         self.scenario_reset()
         self.rmpflow = RmpFlow(**rmp_config)
         if self.rmpflow_debug_mode:
@@ -173,6 +256,15 @@ class LulaTestScenarios:
             self.rmpflow.add_obstacle(obstacle)
 
     def on_rmpflow_follow_sinusoidal_target(self, articulation, **rmp_config):
+        """Sets up RmpFlow scenario for following a sinusoidal target trajectory.
+
+        Creates a motion policy controller using RmpFlow for the articulation to follow a target
+        that moves in a sinusoidal pattern when updated via scenario parameters.
+
+        Args:
+            articulation: The articulation to control.
+            **rmp_config: Configuration parameters passed to RmpFlow initialization.
+        """
         self.scenario_reset()
         self.scenario_name = "Sinusoidal Target"
         self.rmpflow = RmpFlow(**rmp_config)
@@ -186,9 +278,20 @@ class LulaTestScenarios:
         self._create_target()
 
     def get_rmpflow(self):
+        """The RmpFlow motion policy instance.
+
+        Returns:
+            The current RmpFlow instance, or None if not initialized.
+        """
         return self.rmpflow
 
     def _create_target(self, position=None, orientation=None):
+        """Creates a red target cube for motion control scenarios.
+
+        Args:
+            position: World position for the target cube.
+            orientation: World orientation for the target cube.
+        """
         if position is None:
             position = np.array([0.5, 0, 0.5])
         if orientation is None:
@@ -198,6 +301,19 @@ class LulaTestScenarios:
         )
 
     def _create_frame_prim(self, position, orientation, parent_prim_path):
+        """Creates a coordinate frame visualization with colored axes.
+
+        The frame consists of X (red), Y (green), and Z (blue) axes represented by
+        cylinders with cone tips.
+
+        Args:
+            position: World position for the frame.
+            orientation: World orientation for the frame.
+            parent_prim_path: USD prim path where the frame will be created.
+
+        Returns:
+            The SingleXFormPrim representing the coordinate frame.
+        """
         frame_xform = SingleXFormPrim(parent_prim_path, position=position, orientation=orientation)
 
         line_len = 0.04
@@ -259,6 +375,12 @@ class LulaTestScenarios:
         return frame_xform
 
     def _create_wall(self, position=None, orientation=None):
+        """Creates a blue wall obstacle and adds it to the obstacles list.
+
+        Args:
+            position: World position for the wall obstacle.
+            orientation: World orientation for the wall obstacle.
+        """
         cube_prim_path = find_unique_string_name(
             initial_name="/World/WallObstacle", is_unique_fn=lambda x: not is_prim_path_valid(x)
         )
@@ -277,9 +399,19 @@ class LulaTestScenarios:
         self._obstacles.append(cube)
 
     def set_use_orientation(self, use_orientation):
+        """Sets whether orientation constraints are used in motion control.
+
+        Args:
+            use_orientation: Whether to use orientation constraints in target following.
+        """
         self.use_orientation = use_orientation
 
     def full_reset(self):
+        """Performs a complete reset of all scenario data and Lula components.
+
+        Clears the current scenario and resets the Lula IK solver, end effector visualization,
+        and orientation usage setting to defaults.
+        """
         self.scenario_reset()
 
         self.lula_ik = None
@@ -291,6 +423,11 @@ class LulaTestScenarios:
         self.art_ik = None
 
     def scenario_reset(self):
+        """Resets the current scenario by clearing targets, obstacles, and trajectories.
+
+        Deletes all scenario-specific prims from the stage and resets internal state,
+        including timestep and scenario name.
+        """
         if self._target is not None:
             delete_prim(self._target.prim_path)
         if self._trajectory_base_frame is not None:
@@ -311,6 +448,16 @@ class LulaTestScenarios:
         self.scenario_name = ""
 
     def update_scenario(self, **scenario_params):
+        """Updates the current scenario based on its type and provided parameters.
+
+        For "Sinusoidal Target" scenarios, moves the target in a sinusoidal pattern
+        based on frequency and radius parameters.
+
+        Args:
+            **scenario_params: Scenario-specific parameters. For sinusoidal target scenarios,
+                includes w_z (vertical frequency), w_xy (horizontal frequency),
+                rad_z (vertical radius), rad_xy (horizontal radius), and height (base height).
+        """
         if self.scenario_name == "Sinusoidal Target":
             w_z = scenario_params["w_z"]
             w_xy = scenario_params["w_xy"]
@@ -333,6 +480,18 @@ class LulaTestScenarios:
         self.timestep += 1
 
     def get_next_action(self, **scenario_params):
+        """Computes the next articulation action for the current scenario.
+
+        Updates the end effector visualization if active, advances the scenario state, and generates the
+        appropriate control action based on the current target position and orientation.
+
+        Args:
+            **scenario_params: Parameters specific to the active scenario. For "Sinusoidal Target" scenario,
+                expects w_z, w_xy, rad_z, rad_xy, and height parameters.
+
+        Returns:
+            The articulation action for the next timestep. Returns an empty action if no controller is active.
+        """
         if self._ee_frame_prim is not None:
             position, orientation = self.art_ik.compute_end_effector_pose()
             orientation = rot_matrices_to_quats(orientation)

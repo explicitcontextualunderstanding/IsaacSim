@@ -1,4 +1,118 @@
 # Changelog
+## [15.14.1] - 2026-03-09
+### Fixed
+- Fixed occasional segfault when running with many lidars doing full-scan processing at the same time by copying GenericModelOutput buffers into local copies rather than manipulating AOV
+
+## [15.14.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md, and SETTINGS.md and updated docstrings
+
+## [15.13.0] - 2026-03-02
+### Changed
+- Shifted RTX sensor scan accumulation and post-processing back to host by default to reduce GPU resource contention and improve frametime & frametime consistency. Post-processing-on-device still available as option by setting app.sensors.nv.[modality].outputBufferOnGPU=true.
+
+## [15.12.3] - 2026-02-13
+### Changed
+- Re-enable object ID test in CI to track fix
+
+## [15.12.2] - 2026-02-04
+### Added
+- Test for scan tearing when --/app/player/useFixedTimeStepping=True
+
+## [15.12.1] - 2026-02-03
+### Removed
+- Tools for manipulating deprecated JSONs
+
+### Fixed
+- IsaacCreateRTXLidarScanBuffer.transform output no longer resets frame-to-frame
+
+## [15.12.0] - 2026-01-30
+### Added
+- Use Hydra time (omni.timeline) in RTX Sensor models
+
+### Changed
+- Refactor Annotator tests to include soak tests and comparisons against upstream Annotator outputs
+- TestSupportedLidarConfigs tests only prims without saving a new USD for each test
+
+### Removed
+- Test only specific lidar configs in Annotator tests, rather than all configs
+- Unused Lidar USDA test
+
+### Fixed
+- Only reset outputs in IsaacCreateRTXLidarScanBuffer if enablePerFrameOutput == True, preventing output "flickering"
+- Prevent USD path warnings when using IsaacSensorCreateRtxSensor commands
+
+## [15.11.9] - 2026-01-28
+### Changed
+- IsaacSensorCreateRtxSensor commands accept usd_path argument to enable adding arbitrary RTX Sensor USDs to the stage
+- IsaacSensorCreateRtxRadar command validates if user has enabled Motion BVH before creating prim
+
+## [15.11.8] - 2026-01-23
+### Changed
+- Cleanup and make docstrings consistent and add missing docstrings, example strings and type hints
+
+## [15.11.7] - 2026-01-09
+### Changed
+- Cleanup unused imports
+
+## [15.11.6] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [15.11.5] - 2025-12-18
+### Fixed
+- IsaacSensorCreateRTXSensor commands resolve prim paths as expected when using Replicator APIs as a fallback
+
+## [15.11.4] - 2025-12-12
+### Changed
+- RtxLidar.get_object_ids correctly handles GenericModelOutput.objId
+
+## [15.11.3] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [15.11.2] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [15.11.1] - 2025-12-01
+### Changed
+- OgnIsaacCreateRTXLidarScanBuffer uses lambda function to initialize and allocate buffers
+
+## [15.11.0] - 2025-11-26
+### Added
+- IsaacCreateRTXRadarPointCloud annotator to explicitly support RTX Radar
+
+### Changed
+- OgnIsaacCreateRTXLidarScanBuffer includes support for RTX Radar metadata
+
+## [15.10.1] - 2025-11-25
+### Changed
+- Fix tests after updating to kit 109.0.1.
+
+## [15.10.0] - 2025-11-20
+### Changed
+- Compute maximum points per Lidar scan from Lidar configuration
+
+### Removed
+- No longer dependent on RtxSensorMetadata AOV
+
+## [15.9.0] - 2025-11-10
+### Added
+- Link sensor_checker utility as Python module
+- Add sensor_checker to unit tests to verify supported Lidar configs
+
+## [15.8.7] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [15.8.6] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [15.8.5] - 2025-10-22
+### Changed
+- Exclude Simple Example Solid State config from tests
 
 ## [15.8.4] - 2025-10-07
 ### Fixed
@@ -6,7 +120,7 @@
 
 ## [15.8.3] - 2025-09-26
 ### Added
-- kwargs to LidarRtx.attach_annotator and LidarRtx.attach_writer to specify keywords upon Annotator or Writer initialization
+- Kwargs to LidarRtx.attach_annotator and LidarRtx.attach_writer to specify keywords upon Annotator or Writer initialization
 
 ### Fixed
 - Fixed docstring references to nonexistent annotators
@@ -257,7 +371,7 @@
 
 ## [14.4.0] - 2025-05-09
 ### Changed
-- rtx lidar ["rendering_frame"] contains both the rational time numerator and denominator and not just the numerator
+- Rtx lidar ["rendering_frame"] contains both the rational time numerator and denominator and not just the numerator
 
 ## [14.3.1] - 2025-04-30
 ### Changed
@@ -345,7 +459,7 @@
 
 ## [13.4.3] - 2024-12-09
 ### Fixed
-- menu icon glyph call
+- Menu icon glyph call
 
 ## [13.4.2] - 2024-12-05
 ### Changed
@@ -353,7 +467,7 @@
 
 ## [13.4.1] - 2024-12-04
 ### Changed
-- glyph for the create menu
+- Glyph for the create menu
 
 ## [13.4.0] - 2024-11-26
 ### Added
@@ -373,7 +487,7 @@
 
 ## [13.2.0] - 2024-11-01
 ### Changed
-- menu names and location
+- Menu names and location
 
 ## [13.1.2] - 2024-10-29
 ### Changed
@@ -467,8 +581,8 @@
 
 ## [12.5.0] - 2024-07-05
 ### Added
-- use register_*_with_telemetry functions to simplify registration code
-- rename registered_template to registered_templates
+- Use register_*_with_telemetry functions to simplify registration code
+- Rename registered_template to registered_templates
 
 ## [12.4.2] - 2024-07-05
 ### Added
@@ -535,8 +649,8 @@
 - Added `test_camera_view_sensor.py` with golden images for testing `get_rgb`, `get_depth`, `get_rgb_tiled`, and `get_depth_tiled` methods
 
 ### Changed
-- removed replicator step function call inside `camera_view.py`
-- removed deleting stage camera prims in `camera_view.py`
+- Removed replicator step function call inside `camera_view.py`
+- Removed deleting stage camera prims in `camera_view.py`
 
 ## [11.2.5] - 2024-05-14
 ### Changed
@@ -559,7 +673,7 @@
 ## [11.2.2] - 2024-05-07
 ### Fixed
 - OgnROS2PublishLaserScan publishes correct flat scan
-    - buffers are now sorted by azimuth, min -> max
+    - Buffers are now sorted by azimuth, min -> max
     - Accumulates then publishes full scan, rather than partial scans
     - Updated output descriptions
     - Output angles now all in degrees, rather than mixed degrees/radians
@@ -583,7 +697,7 @@
 
 ## [11.0.6] - 2024-05-03
 ### Fixed
-- incorrect rendervar in RtxSensorCpuIsaacRTXLidarOutput
+- Incorrect rendervar in RtxSensorCpuIsaacRTXLidarOutput
 
 ## [11.0.5] - 2024-05-03
 ### Fixed
@@ -628,7 +742,7 @@
 - Includes RTX nonvisual material support
 
 ### Removed
-- up/downElevationDeg and start/endAzimuthDeg because they are no longer used.
+- Up/downElevationDeg and start/endAzimuthDeg because they are no longer used.
 
 ## [10.0.0] - 2024-04-09
 ### Changed
@@ -686,7 +800,7 @@
 ## [9.13.5] - 2024-02-22
 ### Changed
 - Using externally built omni.sensors for rtx lidar and rtx radar
-- use intensityScalePercent in IsaacComputeRTXLidarPointCloud if present
+- Use intensityScalePercent in IsaacComputeRTXLidarPointCloud if present
 - Location of default and temp lidar config files set to ${app}/../extsbuild/omni.sensors.nv.common/data/lidar/
 
 ### Fixed
@@ -725,7 +839,7 @@
 
 ## [9.10.1] - 2023-11-29
 ### Fixed
-- aperture setters and getters in Camera.py
+- Aperture setters and getters in Camera.py
 - Camera Matrix calculation in set_matching_fisheye_polynomial_properties method in Camera.py
 - Camera class to work with torch backend
 
@@ -739,8 +853,8 @@
 
 ## [9.9.1] - 2023-10-09
 ### Fixed
-- removed extra frame transformation in the LidarRtx wrapper
-- changed physX lidar tests and samples to use Carter V1
+- Removed extra frame transformation in the LidarRtx wrapper
+- Changed physX lidar tests and samples to use Carter V1
 
 ## [9.9.0] - 2023-10-08
 ### Changed
@@ -774,8 +888,8 @@
 - numEchos, numChannels, and numTicks output to IsaacReadRTXLidarData
 
 ### Changed
-- changed IU names for CreateRTXLidarScanBuffer outputs to be more user friendly.
-- set default RXT sensor space to be the same as isaac-sim so rotations in IsaacSensorCreateRtxLidar make sense
+- Changed IU names for CreateRTXLidarScanBuffer outputs to be more user friendly.
+- Set default RXT sensor space to be the same as isaac-sim so rotations in IsaacSensorCreateRtxLidar make sense
 
 ### Fixed
 - Fixed bug with ReadRTXLidarData node output when using keepOnlyPositiveDistance.
@@ -786,7 +900,7 @@
 
 ## [9.6.2] - 2023-09-27
 ### Changed
-- updated data acquisition callback for Camera objects to be on the next frame event
+- Updated data acquisition callback for Camera objects to be on the next frame event
 - Used frameTime annotator instead of the dispather node inputs for better accuracy in the data acquisition callback
 - Moved initializing render products to the initialize method in Camera to reduce overhead and decoupling the usage of pose utils and render product related methods
 
@@ -864,7 +978,7 @@
 - Sick_TiM781 lidar config file.
 
 ### Changed
-- on CreateRTXLidarScanBuffer returnsPerScan output to numReturnsPerScan
+- On CreateRTXLidarScanBuffer returnsPerScan output to numReturnsPerScan
 
 ### Fixed
 -  CreateRTXLidarScanBuffer works when input data wraps around the output buffer
@@ -893,7 +1007,7 @@
 ### Changed
 - RtxSensorCpuIsaacComputeRTXRadarPointCloud template to Annotator
 - Radar Point Cloud creator now gets transform from render_product
-- changed PrintRTX templates to Writers
+- Changed PrintRTX templates to Writers
 
 ### Removed
 - RtxRadarGetPrimLocalToWorldTransform
@@ -937,7 +1051,7 @@
 
 ## [7.2.1] - 2023-08-10
 ### Added
-- docstrings to Camera class for functions adding annotators
+- Docstrings to Camera class for functions adding annotators
 
 ## [7.2.0] - 2023-08-08
 ### Added
@@ -952,7 +1066,7 @@
 - Error when removing an annotator that had not been added yet
 
 ### Changed
-- store and destroy internaly created renderproduct
+- Store and destroy internaly created renderproduct
 
 ## [7.1.0] - 2023-08-04
 ### Added
@@ -966,7 +1080,7 @@
 
 ## [7.0.0] - 2023-08-03
 ### Added
-- added get_sensor_reading function
+- Added get_sensor_reading function
 
 ### Changed
 - RTX Nodes updated to work with dataPtr/cudaDeviceIndex/bufferSize inputs and outputs.
@@ -1038,7 +1152,7 @@
 ## [5.8.0] - 2023-06-21
 ### Added
 - Test Mode for PrintRTXLidarInfo node.
-- synthetic data templates for Noop, RtxSensorCpuIsaacPrintRTXLidarInfo, and TestIsaacPrintRTXLidarInfo
+- Synthetic data templates for Noop, RtxSensorCpuIsaacPrintRTXLidarInfo, and TestIsaacPrintRTXLidarInfo
 
 ## [5.7.0] - 2023-06-12
 ### Added
@@ -1049,9 +1163,9 @@
 - RTX Lidar/Radar Nodes cleanup
 - Location of default and temp lidar config files set to ${app}/../data/lidar/
 - Removed pxr::Simulation Gate from Rtx[Lidar|Radar]DebugDrawPointCloud writers
-- renamed pxr::IsaacSensorSchemaIsaacBaseSensor to pxr::IsaacSensorIsaacBaseSensor
-- renamed pxr::IsaacSensorSchemaIsaacContactSensor to pxr::IsaacSensorIsaacContactSensor
-- renamed pxr::IsaacSensorSchemaIsaacImuSensor to pxr::IsaacSensorIsaacImuSensor
+- Renamed pxr::IsaacSensorSchemaIsaacBaseSensor to pxr::IsaacSensorIsaacBaseSensor
+- Renamed pxr::IsaacSensorSchemaIsaacContactSensor to pxr::IsaacSensorIsaacContactSensor
+- Renamed pxr::IsaacSensorSchemaIsaacImuSensor to pxr::IsaacSensorIsaacImuSensor
 
 ## [5.6.4] - 2023-05-09
 ### Fixed
@@ -1074,11 +1188,11 @@
 - Unlabeled points can be ignored when enabling pointcloud
 
 ### Changed
-- removing an annotator detaches it
-- update rtx lidar on app update
+- Removing an annotator detaches it
+- Update rtx lidar on app update
 
 ### Fixed
-- occlusion could not be enabled
+- Occlusion could not be enabled
 - RTX lidar not returning data
 
 ## [5.5.1] - 2023-02-20
@@ -1103,15 +1217,15 @@
 
 ## [5.4.2] - 2023-01-25
 ### Fixed
-- remove un-needed cpp ogn files from extension
+- Remove un-needed cpp ogn files from extension
 
 ## [5.4.1] - 2023-01-19
 ### Fixed
-- crashes during testing
+- Crashes during testing
 
 ## [5.4.0] - 2023-01-17
 ### Added
-- normal at hit for rtx lidar
+- Normal at hit for rtx lidar
 
 ## [5.3.2] - 2023-01-06
 ### Fixed
@@ -1119,14 +1233,14 @@
 
 ## [5.3.1] - 2022-12-14
 ### Fixed
-- crash when deleting
+- Crash when deleting
 - test_rtx_lidar passes now
 
 ## [5.3.0] - 2022-12-11
 ### Changed
 - Switch debug draw nodes to use replicator writer backend
-- hide rtx lidar menu from windows as rtx sensor is not supported
-- disable rtx sensor tests on windows
+- Hide rtx lidar menu from windows as rtx sensor is not supported
+- Disable rtx sensor tests on windows
 
 ## [5.2.4] - 2022-12-11
 ### Fixed
@@ -1154,7 +1268,7 @@
 
 ## [5.1.1] - 2022-11-28
 ### Fixed
-- crash with Solid State Lidar.
+- Crash with Solid State Lidar.
 
 ## [5.1.0] - 2022-11-22
 ### Added
@@ -1166,16 +1280,16 @@
 
 ## [4.0.0] - 2022-11-16
 ### Added
-- node template for rtx_radar
-- nodes for rtx_radar: PrintRTXRadarInfo, ComputeRTXRadarPointCloud
+- Node template for rtx_radar
+- Nodes for rtx_radar: PrintRTXRadarInfo, ComputeRTXRadarPointCloud
 - ReadRTXLidarData node for getting lidar data without computing point cloud
 - Added profile support for Lidar Point Cloud creation
 - IsaacSensorCreateRtxRadar command
 
 ### Changed
-- changed node template name for rtx_lidar
-- renamed ReadRTXLidar nodes to ComputeRTXLidar
-- nvlidar dep to nvsensor and updated version.
+- Changed node template name for rtx_lidar
+- Renamed ReadRTXLidar nodes to ComputeRTXLidar
+- Nvlidar dep to nvsensor and updated version.
 
 ## [3.0.1] - 2022-11-14
 ### Fixed
@@ -1189,7 +1303,7 @@
 - ReadRTXRaw node and moved pointer pass through functionality to IsaacRenderVarToCpuPointer
 
 ### Changed
-- inputs to ReadRTXLidar[PointCloud|FlatScan] nodes to use IsaacRenderVarToCpuPointer cpuPointer
+- Inputs to ReadRTXLidar[PointCloud|FlatScan] nodes to use IsaacRenderVarToCpuPointer cpuPointer
 
 ## [2.1.0] - 2022-11-01
 ### Added
@@ -1205,7 +1319,7 @@
 - ReadRTXLidarPointCloud code doc and ignore 0 values.
 
 ### Fixed
-- accuracy error calculation in ReadRTXLidarPointCloud
+- Accuracy error calculation in ReadRTXLidarPointCloud
 
 ## [1.6.1] - 2022-10-18
 ### Added
@@ -1226,12 +1340,12 @@
 ## [1.5.0] - 2022-10-06
 ### Added
 - keepOnlyPositiveDistance flag to ReadRTXLidarPointCloud Node
-- intensity output to ReadRTXLidarPointCloud Node
-- accuracy error post process to ReadRTXLidarPointCloud Node
-- synthetic data template for DebugDrawPointCloud
+- Intensity output to ReadRTXLidarPointCloud Node
+- Accuracy error post process to ReadRTXLidarPointCloud Node
+- Synthetic data template for DebugDrawPointCloud
 
 ### Fixed
-- positions of points in ReadRTXLidarPointCloud
+- Positions of points in ReadRTXLidarPointCloud
 
 ## [1.4.0] - 2022-09-28
 ### Added
@@ -1239,10 +1353,10 @@
 
 ## [1.3.0] - 2022-09-27
 ### Changed
-- tests to use nucleus assets
+- Tests to use nucleus assets
 
 ### Removed
-- usd files local to extension
+- Usd files local to extension
 
 ## [1.2.1] - 2022-09-07
 ### Fixed

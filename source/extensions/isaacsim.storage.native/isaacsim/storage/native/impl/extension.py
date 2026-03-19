@@ -22,8 +22,17 @@ import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    def on_startup(self, ext_id):
+    """Isaac Sim storage native extension for Omniverse client authentication.
+
+    This extension registers an authentication callback for the Omniverse client
+    when the ETM_ACTIVE environment variable is set. It enables automatic
+    authentication using credentials stored in environment variables.
+    """
+
+    def on_startup(self, ext_id: str):
         """Initialize the extension.
+
+        Registers an authentication callback if ETM_ACTIVE environment variable is set.
 
         Args:
             ext_id: The extension ID.
@@ -34,14 +43,17 @@ class Extension(omni.ext.IExt):
         if os.getenv("ETM_ACTIVE"):
             self._auth_cb = omni.client.register_authentication_callback(self._authenticate)
 
-    def _authenticate(self, prefix):
+    def _authenticate(self, prefix: str) -> tuple[str, str] | None:
         """Authentication callback for Omniverse client.
+
+        Retrieves credentials from ISAACSIM_OMNI_USER and ISAACSIM_OMNI_PASS
+        environment variables.
 
         Args:
             prefix: URL prefix for authentication.
 
         Returns:
-            tuple: (username, password) if credentials are available, None otherwise.
+            Tuple of (username, password) if credentials are available, None otherwise.
         """
         omniuser = os.getenv("ISAACSIM_OMNI_USER")
         omnipass = os.getenv("ISAACSIM_OMNI_PASS")

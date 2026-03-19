@@ -20,15 +20,15 @@ from isaacsim.robot_motion.motion_generation.kinematics import InverseKinematics
 
 
 class InverseKinematicsSolver(BaseInverseKinematicsSolver):
-    """[summary]
+    """Inverse kinematics solver for the UR10 robot.
 
     Args:
-        name (str): [description]
-        robot_prim_path (str): [description]
-        robot_urdf_path (Optional[str], optional): [description]. Defaults to None.
-        robot_description_yaml_path (Optional[str], optional): [description]. Defaults to None.
-        end_effector_frame_name (Optional[str], optional): [description]. Defaults to None.
-        attach_gripper (bool, optional): [description]. Defaults to False.
+        name: Name identifier for the solver.
+        robot_prim_path: USD prim path for the robot.
+        robot_urdf_path: Path to robot URDF file. Defaults to None.
+        robot_description_yaml_path: Path to robot description YAML. Defaults to None.
+        end_effector_frame_name: Name of end effector frame. Defaults to None.
+        attach_gripper: Whether gripper is attached. Defaults to False.
     """
 
     def __init__(

@@ -13,9 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Isaac Sim RTX Sensors extension.
+
+This module provides the extension class for RTX sensors in Isaac Sim, including
+annotator registration and utility functions for working with Generic Model Output (GMO) data.
+"""
+
 import ctypes
 import gc
-from typing import List, Tuple, Union
+from typing import Any
 
 import carb
 import carb.settings
@@ -39,29 +45,51 @@ EXTENSION_NAME = "Isaac Sensor"
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for Isaac Sim RTX sensors.
+
+    This extension registers annotators and writers for RTX sensors including Lidar and Radar.
+    It provides functionality for point cloud extraction, flat scan computation, and debug
+    visualization.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initialize the extension when it is loaded.
+
+        Args:
+            ext_id: Extension identifier provided by the extension manager.
+        """
         self.__interface = _acquire()
         self._lidar_point_accumulator_count = 0
-        self.registered_templates = []
-        self.registered_annotators = []
+        self.registered_templates: list[str] = []
+        self.registered_annotators: list[str] = []
         try:
-            self.register_nodes()
+            self._register_nodes()
         except Exception as e:
             carb.log_warn(f"Could not register node templates {e}")
 
     def on_shutdown(self):
-
+        """Clean up resources when the extension is unloaded."""
         _release(self.__interface)
         self.__interface = None
 
         try:
-            self.unregister_nodes()
+            self._unregister_nodes()
         except Exception as e:
             carb.log_warn(f"Could not unregister node templates {e}")
         gc.collect()
 
-    def _update_upstream_node_attributes(self, upstream_node_type_name: str, attribute: str, value, node: og.Node):
-        # Test if the originating node is of the appropriate type
+    def _update_upstream_node_attributes(self, upstream_node_type_name: str, attribute: str, value: Any, node: og.Node):
+        """Update attributes on upstream nodes of a specific type.
+
+        Traverses the upstream graph to find nodes of the specified type and sets
+        the given attribute to the provided value.
+
+        Args:
+            upstream_node_type_name: Type name of the upstream node to find.
+            attribute: Name of the attribute to set.
+            value: Value to set for the attribute.
+            node: Starting node for upstream traversal.
+        """
         if node.get_type_name == upstream_node_type_name:
             carb.log_warn(
                 f"Provided node {node} is of type {upstream_node_type_name}. Setting attribute {attribute} to {value}."
@@ -83,23 +111,26 @@ class Extension(omni.ext.IExt):
         carb.log_warn(
             f"Could not find node of type {upstream_node_type_name} upstream of {node}. Attribute will not be set."
         )
-        return
 
     def _on_attach_callback_base(
-        self, annotator_name: str, connections: List[Tuple[str, str, str, str]], node: og.Node
+        self, annotator_name: str, connections: list[tuple[str, str, str, str]], node: og.Node
     ):
-        """
-        Callback function for annotator attachment. Will connect ancestral upstream node(s) to each other and annotator node, if user
-        desires connections beyond immediate parent nodes.
+        """Connect upstream nodes when an annotator is attached.
+
+        Callback function for annotator attachment. Will connect ancestral upstream node(s)
+        to each other and annotator node, if user desires connections beyond immediate
+        parent nodes.
 
         Args:
-            annotator_name (str): Name of annotator being attached.
-            connections (List[Tuple[str, str, str, str]]): List of connections to create between nodes, specified as (source_node, source_attr, target_node, target_attr). source_node and target_node are node types; if desired target is annotator node, provide node prim path.
-            node (og.Node): Annotator node being attached.
+            annotator_name: Name of annotator being attached.
+            connections: List of connections to create between nodes, specified as
+                (source_node, source_attr, target_node, target_attr). source_node and
+                target_node are node types; if desired target is annotator node, provide
+                node prim path.
+            node: Annotator node being attached.
         """
-
         # Define map of parent node types to their prim paths
-        parent_nodes = {}
+        parent_nodes: dict[str, str | None] = {}
         for source_node, _, target_node, _ in connections:
             parent_nodes[source_node] = None
             if target_node != node.get_prim_path() and target_node not in parent_nodes:
@@ -119,12 +150,14 @@ class Extension(omni.ext.IExt):
                 return
 
         # Generate properly formatted connection list, using node prim paths collected earlier
-        controller_connections = []
+        controller_connections: list[tuple[str, str]] = []
         for source_node, source_attr, target_node, target_attr in connections:
-            if target_node in parent_nodes:
-                target_node = parent_nodes[target_node]
+            resolved_target = parent_nodes[target_node] if target_node in parent_nodes else target_node
+            source_path = parent_nodes[source_node]
+            if source_path is None or resolved_target is None:
+                continue
             controller_connections.append(
-                (f"{parent_nodes[source_node]}.outputs:{source_attr}", f"{target_node}.inputs:{target_attr}")
+                (f"{source_path}.outputs:{source_attr}", f"{resolved_target}.inputs:{target_attr}")
             )
 
         # Now connect the nodes
@@ -136,18 +169,17 @@ class Extension(omni.ext.IExt):
         except Exception as e:
             carb.log_error(f"Error connecting {annotator_name}: {e}. Annotator will not be attached correctly.")
 
-        return
+    def _register_nodes(self):
+        """Register RTX sensor annotators and writers.
 
-    def register_nodes(self):
-
+        Registers various annotators for RTX sensor data extraction including point cloud,
+        flat scan, and radar annotators. Also registers debug draw writers for visualization.
+        """
         annotator_name = "IsaacExtractRTXSensorPointCloud" + "NoAccumulator"
         register_annotator_from_node_with_telemetry(
             name=annotator_name,
             input_rendervars=[
                 "GenericModelOutputPtr",
-                omni.syntheticdata.SyntheticData.NodeConnectionTemplate(
-                    "RtxSensorMetadataPtr", attributes_mapping={"outputs:dataPtr": "inputs:metadataPtr"}
-                ),
             ],
             node_type_id="isaacsim.sensors.rtx.IsaacCreateRTXLidarScanBuffer",
             init_params={"enablePerFrameOutput": True},
@@ -156,45 +188,103 @@ class Extension(omni.ext.IExt):
         )
         self.registered_annotators.append(annotator_name)
 
+        def _on_attach_isaac_create_rtx_lidar_scan_buffer(node: og.Node) -> None:
+            """Handle attachment callback for IsaacCreateRTXLidarScanBuffer annotator.
+
+            Args:
+                node: The annotator node being attached.
+            """
+            # Repeat annotator name definition in callback to avoid scope issues
+            annotator_name = "IsaacCreateRTXLidarScanBuffer"
+
+            self._on_attach_callback_base(
+                annotator_name=annotator_name,
+                connections=[
+                    (
+                        "omni.syntheticdata.SdOnNewRenderProductFrame",
+                        "renderProductPath",
+                        node.get_prim_path(),
+                        "renderProductPath",
+                    ),
+                ],
+                node=node,
+            )
+
         annotator_name = "IsaacCreateRTXLidarScanBuffer"
         register_annotator_from_node_with_telemetry(
             name=annotator_name,
             input_rendervars=[
                 "GenericModelOutputPtr",
-                omni.syntheticdata.SyntheticData.NodeConnectionTemplate(
-                    "RtxSensorMetadataPtr", attributes_mapping={"outputs:dataPtr": "inputs:metadataPtr"}
-                ),
             ],
             node_type_id="isaacsim.sensors.rtx.IsaacCreateRTXLidarScanBuffer",
             output_data_type=np.float32,
             output_channels=3,
+            on_attach_callback=_on_attach_isaac_create_rtx_lidar_scan_buffer,
         )
         self.registered_annotators.append(annotator_name)
+
+        def _on_attach_isaac_create_rtx_lidar_scan_buffer_for_flatscan(node: og.Node) -> None:
+            """Handle attachment callback for IsaacCreateRTXLidarScanBufferForFlatScan annotator.
+
+            Args:
+                node: The annotator node being attached.
+            """
+            # Repeat annotator name definition in callback to avoid scope issues
+            annotator_name = "IsaacCreateRTXLidarScanBuffer" + "ForFlatScan"
+
+            self._on_attach_callback_base(
+                annotator_name=annotator_name,
+                connections=[
+                    (
+                        "omni.syntheticdata.SdOnNewRenderProductFrame",
+                        "renderProductPath",
+                        node.get_prim_path(),
+                        "renderProductPath",
+                    ),
+                ],
+                node=node,
+            )
 
         annotator_name = "IsaacCreateRTXLidarScanBuffer" + "ForFlatScan"
         register_annotator_from_node_with_telemetry(
             name=annotator_name,
             input_rendervars=[
                 "GenericModelOutputPtr",
-                omni.syntheticdata.SyntheticData.NodeConnectionTemplate(
-                    "RtxSensorMetadataPtr", attributes_mapping={"outputs:dataPtr": "inputs:metadataPtr"}
-                ),
             ],
             node_type_id="isaacsim.sensors.rtx.IsaacCreateRTXLidarScanBuffer",
             init_params={"outputAzimuth": True, "outputDistance": True, "outputIntensity": True},
             output_data_type=np.float32,
             output_channels=3,
             hidden=True,
+            on_attach_callback=_on_attach_isaac_create_rtx_lidar_scan_buffer_for_flatscan,
+        )
+        self.registered_annotators.append(annotator_name)
+
+        annotator_name = "IsaacCreateRTXRadarPointCloud"
+        register_annotator_from_node_with_telemetry(
+            name=annotator_name,
+            input_rendervars=[
+                "GenericModelOutputPtr",
+            ],
+            node_type_id="isaacsim.sensors.rtx.IsaacCreateRTXLidarScanBuffer",
+            init_params={"enablePerFrameOutput": True},
+            output_data_type=np.float32,
+            output_channels=3,
         )
         self.registered_annotators.append(annotator_name)
 
         annotator_name = "IsaacComputeRTXLidarFlatScan"
 
-        def _on_attach_gmo_flatscan(node: og.Node):
+        def _on_attach_gmo_flatscan(node: og.Node) -> None:
+            """Handle attachment callback for IsaacComputeRTXLidarFlatScan annotator.
+
+            Args:
+                node: The annotator node being attached.
+            """
             # Repeat annotator name definition in callback to avoid scope issues
             annotator_name = "IsaacComputeRTXLidarFlatScan"
 
-            return self._on_attach_callback_base(
+            self._on_attach_callback_base(
                 annotator_name=annotator_name,
                 connections=[
                     (
@@ -211,9 +301,6 @@ class Extension(omni.ext.IExt):
             name=annotator_name,
             input_rendervars=[
                 "IsaacCreateRTXLidarScanBuffer" + "ForFlatScan",
-                omni.syntheticdata.SyntheticData.NodeConnectionTemplate(
-                    "RtxSensorMetadataPtr", attributes_mapping={"outputs:dataPtr": "inputs:metaDataPtr"}
-                ),
             ],
             node_type_id="isaacsim.sensors.rtx.IsaacComputeRTXLidarFlatScan",
             output_data_type=np.float32,
@@ -252,7 +339,11 @@ class Extension(omni.ext.IExt):
             category="isaacsim.sensors.rtx",
         )
 
-    def unregister_nodes(self):
+    def _unregister_nodes(self):
+        """Unregister RTX sensor annotators and writers.
+
+        Removes all annotators and writers registered by this extension.
+        """
         for writer in rep.WriterRegistry.get_writers(category="isaacsim.sensors.rtx"):
             rep.writers.unregister_writer(writer)
         for annotator in self.registered_annotators:
@@ -261,14 +352,29 @@ class Extension(omni.ext.IExt):
             sensors.get_synthetic_data().unregister_node_template(template)
 
 
-def get_gmo_data(dataPtr: Union[int, np.ndarray]) -> gmo_utils.GenericModelOutput:
-    """Retrieves GMO buffer from pointer to GMO buffer.
+def get_gmo_data(dataPtr: int | np.ndarray) -> gmo_utils.GenericModelOutput:
+    """Retrieve GMO buffer from pointer to GMO buffer.
 
     Args:
-        dataPtr (int): Expected uint64 pointer to GMO buffer.
+        dataPtr: Pointer to GMO buffer. Can be either a uint64 pointer address or a
+            numpy array containing the buffer data.
 
     Returns:
-        gmo_utils.GenericModelOutput: GMO buffer at dataPtr. Empty struct if dataPtr is 0 or None.
+        GMO buffer at dataPtr. Empty struct if dataPtr is 0 or None.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.sensors.rtx import get_gmo_data
+        >>> import omni.replicator.core as rep
+        >>>
+        >>> # Get GMO data from an annotator
+        >>> annotator = rep.AnnotatorRegistry.get_annotator("GenericModelOutput")
+        >>> annotator.attach([render_product_path])
+        >>> # After simulation steps...
+        >>> gmo_ptr = annotator.get_data()
+        >>> gmo_data = get_gmo_data(gmo_ptr)
     """
     if dataPtr is None:
         carb.log_warn(
@@ -285,7 +391,7 @@ def get_gmo_data(dataPtr: Union[int, np.ndarray]) -> gmo_utils.GenericModelOutpu
     # Reach 28 bytes into the GMO data buffer using the pointer address
     size_buffer = (ctypes.c_char * 28).from_address(dataPtr)
     # Resolve bytes 16-23 as a uint64, corresponding to GMO size_in_bytes field
-    gmo_size = int(np.frombuffer((size_buffer[16:24]), np.uint64)[0])
+    gmo_size = int(np.frombuffer(bytes(size_buffer[16:24]), np.uint64)[0])  # type: ignore[arg-type]
     # Use size_in_bytes field to get full GMO buffer
     buffer = (ctypes.c_char * gmo_size).from_address(dataPtr)
     # Retrieve GMO data from buffer as struct with well-defined fields

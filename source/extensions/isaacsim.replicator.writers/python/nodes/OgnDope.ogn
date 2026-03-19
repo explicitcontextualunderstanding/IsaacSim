@@ -2,7 +2,10 @@
     "Dope": {
         "version": 1,
         "scheduling": "compute-on-request",
-        "description": "Gets poses of assets as required by ground truth file for DOPE training",
+        "description": [
+            "NOTE: DEPRECATED and will be removed in the next major release.",
+            "Gets poses of assets as required by ground truth file for DOPE training"
+        ],
         "language": "Python",
         "metadata": {
             "uiName": "Dope"

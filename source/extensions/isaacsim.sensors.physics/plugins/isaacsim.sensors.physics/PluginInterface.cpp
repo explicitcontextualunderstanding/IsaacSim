@@ -37,7 +37,6 @@
 #include <isaacsim/core/includes/Buffer.h>
 #include <isaacsim/sensors/physics/IPhysicsSensor.h>
 #include <omni/fabric/usd/PathConversion.h>
-#include <omni/graph/core/ogn/Registration.h>
 #include <omni/kit/IStageUpdate.h>
 #include <omni/physics/tensors/IRigidBodyView.h>
 #include <omni/physics/tensors/IRigidContactView.h>
@@ -57,12 +56,7 @@ CARB_PLUGIN_IMPL(g_kPluginDesc,
                  isaacsim::sensors::physics::ContactSensorInterface,
                  isaacsim::sensors::physics::ImuSensorInterface)
 
-CARB_PLUGIN_IMPL_DEPS(omni::physx::IPhysx,
-                      omni::physx::IPhysxSceneQuery,
-                      omni::kit::IStageUpdate,
-                      omni::graph::core::IGraphRegistry)
-
-DECLARE_OGN_NODES()
+CARB_PLUGIN_IMPL_DEPS(omni::physx::IPhysx, omni::physx::IPhysxSceneQuery, omni::kit::IStageUpdate)
 
 
 // private stuff
@@ -77,7 +71,9 @@ omni::physics::tensors::ISimulationView* g_simulationView = nullptr;
 omni::physics::tensors::IRigidBodyView* g_rigidBodyView = nullptr;
 omni::physics::tensors::TensorDesc g_rigidBodyVelocitiesTensor;
 isaacsim::core::includes::GenericBufferBase<float> g_rigidBodyVelocitiesBuffer;
-std::vector<float> g_rigidBodyVelocitiesData;
+float* g_rigidBodyVelocitiesData = nullptr;
+size_t g_rigidBodyVelocitiesDataSize = 0;
+cudaStream_t g_velocityCopyStream = nullptr;
 std::vector<std::string> g_rigidBodyPaths;
 carb::settings::ISettings* g_settings = nullptr;
 std::unique_ptr<isaacsim::sensors::physics::IsaacSensorManager> g_isaacSensorManager;
@@ -228,8 +224,8 @@ void onPlay()
     // First create the sensors and find the sensor parents to create physics views
     for (const usdrt::SdfPath& usdrtPath : imuSensorPaths)
     {
-        const omni::fabric::PathC pathC(usdrtPath);
-        const pxr::SdfPath usdPath = omni::fabric::toSdfPath(pathC);
+        const omni::fabric::Path path(usdrtPath);
+        const pxr::SdfPath usdPath = omni::fabric::toSdfPath(path);
         pxr::UsdPrim prim = g_stage->GetPrimAtPath(usdPath);
         if (prim)
         {
@@ -258,8 +254,8 @@ void onPlay()
         // First create the sensors and find the sensor parents to create physics views
         for (const usdrt::SdfPath& usdrtPath : contactSensorPaths)
         {
-            const omni::fabric::PathC pathC(usdrtPath);
-            const pxr::SdfPath usdPath = omni::fabric::toSdfPath(pathC);
+            const omni::fabric::Path path(usdrtPath);
+            const pxr::SdfPath usdPath = omni::fabric::toSdfPath(path);
             pxr::UsdPrim prim = g_stage->GetPrimAtPath(usdPath);
 
             if (prim)
@@ -285,29 +281,65 @@ void onPlay()
         g_rigidBodyToDataBufferMap[g_rigidBodyPaths[i]] = i * 6;
     }
 
-    g_rigidBodyVelocitiesData.resize(6 * g_rigidBodyPaths.size(), 0);
-    g_rigidBodyVelocitiesBuffer.resize(6 * g_rigidBodyPaths.size());
-    g_rigidBodyVelocitiesBuffer.setDevice(g_simulationView->getDeviceOrdinal());
+    size_t newSize = 6 * g_rigidBodyPaths.size();
+    int deviceOrdinal = g_simulationView->getDeviceOrdinal();
+    if (g_rigidBodyVelocitiesData && g_rigidBodyVelocitiesDataSize != newSize)
+    {
+        if (deviceOrdinal >= 0)
+        {
+            CUDA_CHECK(cudaFreeHost(g_rigidBodyVelocitiesData));
+        }
+        else
+        {
+            free(g_rigidBodyVelocitiesData);
+        }
+        g_rigidBodyVelocitiesData = nullptr;
+    }
+    if (g_rigidBodyVelocitiesData == nullptr && newSize > 0)
+    {
+        if (deviceOrdinal >= 0)
+        {
+            CUDA_CHECK(cudaHostAlloc(&g_rigidBodyVelocitiesData, newSize * sizeof(float), cudaHostAllocDefault));
+        }
+        else
+        {
+            g_rigidBodyVelocitiesData = static_cast<float*>(malloc(newSize * sizeof(float)));
+            if (!g_rigidBodyVelocitiesData)
+            {
+                CARB_LOG_ERROR("Failed to allocate CPU memory for rigid body velocities");
+                return;
+            }
+        }
+        g_rigidBodyVelocitiesDataSize = newSize;
+        memset(g_rigidBodyVelocitiesData, 0, newSize * sizeof(float));
+    }
+    g_rigidBodyVelocitiesBuffer.resize(newSize);
+    g_rigidBodyVelocitiesBuffer.setDevice(deviceOrdinal);
     g_rigidBodyVelocitiesTensor.dtype = omni::physics::tensors::TensorDataType::eFloat32;
     g_rigidBodyVelocitiesTensor.numDims = 2;
     g_rigidBodyVelocitiesTensor.dims[0] = static_cast<int>(g_rigidBodyPaths.size());
     g_rigidBodyVelocitiesTensor.dims[1] = 6;
     g_rigidBodyVelocitiesTensor.data = g_rigidBodyVelocitiesBuffer.data();
     g_rigidBodyVelocitiesTensor.ownData = true;
-    g_rigidBodyVelocitiesTensor.device = g_simulationView->getDeviceOrdinal();
+    g_rigidBodyVelocitiesTensor.device = deviceOrdinal;
+
+    if (g_velocityCopyStream == nullptr && deviceOrdinal >= 0)
+    {
+        CUDA_CHECK(cudaStreamCreate(&g_velocityCopyStream));
+    }
 
     // pass in the view data and index to the sensor
     for (const usdrt::SdfPath& usdrtPath : imuSensorPaths)
     {
-        const omni::fabric::PathC pathC(usdrtPath);
-        const pxr::SdfPath usdPath = omni::fabric::toSdfPath(pathC);
+        const omni::fabric::Path path(usdrtPath);
+        const pxr::SdfPath usdPath = omni::fabric::toSdfPath(path);
         pxr::UsdPrim prim = g_stage->GetPrimAtPath(usdPath);
 
         isaacsim::sensors::physics::ImuSensor* imuSensor = g_isaacSensorManager->getImuSensor(prim);
         if (imuSensor != nullptr)
         {
             size_t sensorDataIndex = g_rigidBodyToDataBufferMap[imuSensor->getParentPrim().GetPath().GetString()];
-            imuSensor->initialize(&g_rigidBodyVelocitiesData, sensorDataIndex);
+            imuSensor->initialize(g_rigidBodyVelocitiesData, sensorDataIndex);
         }
     }
 }
@@ -344,7 +376,25 @@ static void onStop(void* userData)
         g_rigidBodyView = nullptr;
     }
     g_rigidBodyPaths.clear();
-    g_rigidBodyVelocitiesData.clear();
+    if (g_rigidBodyVelocitiesData)
+    {
+        int deviceOrdinal = g_simulationView ? g_simulationView->getDeviceOrdinal() : -1;
+        if (deviceOrdinal >= 0)
+        {
+            CUDA_CHECK(cudaFreeHost(g_rigidBodyVelocitiesData));
+        }
+        else
+        {
+            free(g_rigidBodyVelocitiesData);
+        }
+        g_rigidBodyVelocitiesData = nullptr;
+    }
+    g_rigidBodyVelocitiesDataSize = 0;
+    if (g_velocityCopyStream)
+    {
+        CUDA_CHECK(cudaStreamDestroy(g_velocityCopyStream));
+        g_velocityCopyStream = nullptr;
+    }
     g_rigidBodyToDataBufferMap.clear();
 }
 
@@ -371,7 +421,18 @@ void onPhysicsStep(float dt, void* userData)
         if (g_rigidBodyView != nullptr)
         {
             g_rigidBodyView->getVelocities(&g_rigidBodyVelocitiesTensor);
-            g_rigidBodyVelocitiesBuffer.copyTo(g_rigidBodyVelocitiesData.data(), g_rigidBodyVelocitiesBuffer.size());
+            int deviceOrdinal = g_simulationView->getDeviceOrdinal();
+            if (deviceOrdinal >= 0)
+            {
+                g_rigidBodyVelocitiesBuffer.copyToAsync(
+                    g_rigidBodyVelocitiesData, g_rigidBodyVelocitiesBuffer.size(), g_velocityCopyStream);
+                CUDA_CHECK(cudaStreamSynchronize(g_velocityCopyStream));
+            }
+            else
+            {
+                memcpy(g_rigidBodyVelocitiesData, g_rigidBodyVelocitiesBuffer.data(),
+                       g_rigidBodyVelocitiesBuffer.size() * sizeof(float));
+            }
         }
 
         g_isaacSensorManager->onPhysicsStep(static_cast<double>(dt));
@@ -437,13 +498,11 @@ CARB_EXPORT void carbOnPluginStartup()
         CARB_LOG_ERROR("*** Failed to create stage update node\n");
         return;
     }
-    INITIALIZE_OGN_NODES()
 }
 
 
 CARB_EXPORT void carbOnPluginShutdown()
 {
-    RELEASE_OGN_NODES()
     g_isaacSensorManager.reset();
     g_stageUpdate->destroyStageUpdateNode(g_stageUpdateNode);
     g_physx->unsubscribePhysicsOnStepEvents(g_stepSubscription);

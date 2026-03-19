@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""User interface components and extensions for robotic grasping functionality in Isaac Sim."""
+
+
 from .grasping_ui_extension import *
+
+__all__ = ["GraspingWindow"]

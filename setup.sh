@@ -18,26 +18,17 @@
 set -e
 set -u
 
-# Tested on bare installs of:
-#  - Ubuntu 18.04 / bionic
-#  - Ubuntu 16.04 / xenial
-#  - CentOS7
+# Tested on:
+#  - Ubuntu 22.04 / 24.04
 
 install_hostdeps_ubuntu() {
-    # Historically we take care of installing these deps for devs. We really
-    # shouldn't be doing this given that installing some of these deps will
-    # potentially uninstall other things (competing python versions for
-    # example)
+    # Historically we take care of installing these deps for devs.
     echo "Warning: about to run potentially destructive apt-get commands."
     echo "         waiting 5 seconds..."
     sleep 5
     sudo apt-get update
-    sudo apt-get install -y python2.7 curl
-}
-
-install_hostdeps_centos() {
-    # libatomic needed by streamsdk at runtime
-    sudo yum install -y libatomic
+    # Removed python2.7 as it is EOL. Added build-essential and git which are commonly needed.
+    sudo apt-get install -y curl git build-essential
 }
 
 do_usermod_and_end() {
@@ -52,21 +43,24 @@ do_usermod_and_end() {
 
 install_docker_ubuntu() {
     sudo apt-get update
-    sudo apt-get install -y apt-transport-https ca-certificates software-properties-common
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable"
+    sudo apt-get install -y ca-certificates curl gnupg
+    
+    sudo install -m 0755 -d /etc/apt/keyrings
+    # Check if the key already exists, if so remove it to ensure we get a fresh one
+    if [ -f /etc/apt/keyrings/docker.gpg ]; then
+        sudo rm -f /etc/apt/keyrings/docker.gpg
+    fi
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+    # Add the repository to Apt sources:
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
     sudo apt-get update
-    sudo apt-get install -y docker-ce
-
-    do_usermod_and_end
-}
-
-install_docker_centos() {
-    sudo yum install -y yum-utils device-mapper-persistent-data lvm2
-    sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-    sudo yum install -y docker-ce
-    sudo systemctl start docker
-    sudo systemctl enable docker
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     do_usermod_and_end
 }
@@ -84,13 +78,19 @@ main() {
         . /etc/os-release
         if [[ "x$NAME" == "xUbuntu" ]]; then
             install_hostdeps_ubuntu
-            [[ "x$DOCKER" = "x" ]] && install_docker_ubuntu
-        elif [[ "x$NAME" == "xCentOS Linux" ]]; then
-            install_hostdeps_centos
-            [[ "x$DOCKER" = "x" ]] && install_docker_centos
+            if ! command -v docker &> /dev/null; then
+                install_docker_ubuntu
+            else
+                echo "Docker is already installed."
+            fi
+        else
+            echo "Only Ubuntu based OSs are supported."
+            exit 1
         fi
     else
         echo "Unable to determine distribution. Can't read /etc/os-release" | tee /dev/stderr
         exit 1
     fi
 }
+
+main

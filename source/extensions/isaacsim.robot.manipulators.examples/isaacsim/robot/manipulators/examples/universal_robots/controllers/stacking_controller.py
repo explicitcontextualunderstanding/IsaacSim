@@ -23,14 +23,14 @@ from isaacsim.robot.manipulators.grippers import SurfaceGripper
 
 
 class StackingController(manipulators_controllers.StackingController):
-    """[summary]
+    """Stacking controller for the UR10 robot.
 
     Args:
-        name (str): [description]
-        gripper (SurfaceGripper): [description]
-        robot_articulation(SingleArticulation): [description]
-        picking_order_cube_names (List[str]): [description]
-        robot_observation_name (str): [description]
+        name: Name identifier for the controller.
+        gripper: The surface gripper to use.
+        robot_articulation: The robot articulation to control.
+        picking_order_cube_names: Ordered list of cube names to stack.
+        robot_observation_name: Name key for robot observations.
     """
 
     def __init__(
@@ -40,7 +40,7 @@ class StackingController(manipulators_controllers.StackingController):
         robot_articulation: SingleArticulation,
         picking_order_cube_names: List[str],
         robot_observation_name: str,
-    ) -> None:
+    ):
         manipulators_controllers.StackingController.__init__(
             self,
             name=name,
@@ -58,15 +58,15 @@ class StackingController(manipulators_controllers.StackingController):
         end_effector_orientation: Optional[np.ndarray] = None,
         end_effector_offset: Optional[np.ndarray] = None,
     ) -> ArticulationAction:
-        """[summary]
+        """Execute one step of the stacking controller.
 
         Args:
-            observations (dict): [description]
-            end_effector_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
-            end_effector_offset (Optional[np.ndarray], optional): [description]. Defaults to None.
+            observations: Dictionary of observations including cube positions.
+            end_effector_orientation: Orientation for end effector.
+            end_effector_offset: Offset for end effector.
 
         Returns:
-            ArticulationAction: [description]
+            The articulation action to execute.
         """
         return super().forward(
             observations, end_effector_orientation=end_effector_orientation, end_effector_offset=end_effector_offset

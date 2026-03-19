@@ -1,14 +1,13 @@
 [package]
 description = "Base Isaac Sim App"
 title = "Isaac Sim Base"
-version = "5.1.0"
+version = "6.0.0"
 keywords = ["experience", "app", "usd"] # That makes it browsable in UI with "experience" filter
 
 
 [dependencies]
 # Isaac Sim extensions
 "isaacsim.app.about" = {}
-"isaacsim.asset.browser" = {}
 "isaacsim.core.api" = {}
 "isaacsim.core.cloner" = {}
 "isaacsim.core.deprecation_manager" = { order = -100 }
@@ -17,72 +16,59 @@ keywords = ["experience", "app", "usd"] # That makes it browsable in UI with "ex
 "isaacsim.core.experimental.prims" = {}
 "isaacsim.core.experimental.utils" = {}
 "isaacsim.core.nodes" = {}
+"isaacsim.core.rendering_manager" = {}
 "isaacsim.core.simulation_manager" = {}
 "isaacsim.core.throttling" = {}
 "isaacsim.core.utils" = {}
 "isaacsim.core.version" = {}
 "isaacsim.cortex.behaviors" = {}
 "isaacsim.cortex.framework" = {}
-"isaacsim.gui.menu" = {}
 "isaacsim.gui.content_browser" = {}
+"isaacsim.gui.menu" = {}
 "isaacsim.gui.property" = {}
 "isaacsim.gui.sensors.icon" = {}
 "isaacsim.replicator.behavior" = {}
 "isaacsim.replicator.domain_randomization" = {}
+"isaacsim.replicator.experimental.domain_randomization" = {}
 "isaacsim.replicator.writers" = {}
 "isaacsim.robot_motion.lula" = {}
 "isaacsim.robot_motion.motion_generation" = {}
+"isaacsim.robot_motion.experimental.motion_generation" = {}
+"isaacsim.robot_motion.cumotion" = {}
+"isaacsim.robot_motion.schema" = {}
 "isaacsim.robot.manipulators" = {}
 "isaacsim.robot.policy.examples" = {}
 "isaacsim.robot.schema" = {}
 "isaacsim.robot.surface_gripper" = {}
 "isaacsim.robot.wheeled_robots" = {}
+"isaacsim.robot.experimental.wheeled_robots" = {}
 "isaacsim.sensors.camera" = {}
+"isaacsim.sensors.experimental.camera" = {}
 "isaacsim.sensors.physics" = {}
+"isaacsim.sensors.experimental.physics" = {}
+"isaacsim.sensors.physics.nodes" = {}
 "isaacsim.sensors.physx" = {}
 "isaacsim.sensors.rtx" = {}
 "isaacsim.simulation_app" = {}
 "isaacsim.storage.native" = {}
 "isaacsim.util.debug_draw" = {}
 "omni.isaac.core_archive" = {}
-"omni.isaac.ml_archive" = {}
+"omni.isaac.ml_archive" = { order = -100 }
 "omni.kit.loop-isaac" = {}
 "omni.pip.cloud" = {}
 "omni.pip.compute" = {}
 
-# Deprecated extensions for backwards compatibility
-"omni.isaac.asset_browser" = {}
-"omni.isaac.assets_check" = {}
-"omni.isaac.cloner" = {}
-"omni.isaac.core_nodes" = {}
-"omni.isaac.core" = {}
-"omni.isaac.cortex.sample_behaviors" = {}
-"omni.isaac.cortex" = {}
-"omni.isaac.dynamic_control" = {}
-"omni.isaac.franka" = {}
-"omni.isaac.kit" = {}
-"omni.isaac.lula_test_widget" = {}
-"omni.isaac.lula" = {}
-"omni.isaac.manipulators" = {}
-"omni.isaac.menu" = {}
-"omni.isaac.motion_generation" = {}
-"omni.isaac.nucleus" = {}
-"omni.isaac.quadruped" = {}
-"omni.isaac.range_sensor" = {}
-"omni.isaac.sensor" = {}
-"omni.isaac.surface_gripper" = {}
-"omni.isaac.universal_robots" = {}
-"omni.isaac.utils" = {}
-"omni.isaac.version" = {}
-"omni.isaac.wheeled_robots" = {}
-"omni.isaac.window.about" = {}
-"omni.kit.property.isaac" = {}
-"omni.replicator.isaac" = {}
-"omni.usd.schema.isaac" = {}
-
 # Isaac Sim Extra
+"isaacsim.asset.importer.utils" = {}
 "isaacsim.asset.importer.mjcf" = {}
 "isaacsim.asset.importer.urdf" = {}
+"isaacsim.anim.robot.schema" = {}
+"isaacsim.replicator.agent.schema" = {}
+"omni.metropolis.schema" = {}
+"omni.behavior.tree.schema" = {}
+"omni.physx.commands" = {}
+"isaacsim.asset.transformer" = {}
+"isaacsim.asset.transformer.rules" = {}
 "omni.physx.tensors" = {}
 "omni.replicator.core" = {}
 "omni.replicator.replicator_yaml" = {}
@@ -91,6 +77,7 @@ keywords = ["experience", "app", "usd"] # That makes it browsable in UI with "ex
 "semantics.schema.property" = {}
 
 # Kit based editor extensions
+"omni.anim.behavior.schema" = {}
 "omni.anim.curve.core" = {}
 "omni.anim.graph.schema" = {}
 "omni.anim.navigation.schema" = {}
@@ -101,6 +88,7 @@ keywords = ["experience", "app", "usd"] # That makes it browsable in UI with "ex
 "omni.graph.ui_nodes" = {}
 "omni.hydra.engine.stats" = {}
 "omni.hydra.rtx" = {}
+"omni.hydra.usdrt_delegate" = {}
 "omni.kit.mainwindow" = {}
 "omni.kit.manipulator.camera" = {}
 "omni.kit.manipulator.prim" = {}
@@ -139,7 +127,6 @@ keywords = ["experience", "app", "usd"] # That makes it browsable in UI with "ex
 "omni.usd.schema.flow" = {}
 "omni.usd.schema.metrics.assembler" = {}
 "omni.warp.core" = {}
-"omni.hydra.usdrt_delegate" = {}
 
 [settings]
 exts."omni.kit.material.library".ui_show_list = [
@@ -194,11 +181,11 @@ show_menu_titles = true
 
 [settings.app]
 name = "Isaac-Sim Base"
-version = "5.1.0"
+version = "6.0.0"
 versionFile = "${app}/../VERSION"
 content.emptyStageOnStart = true
 fastShutdown = true
-file.ignoreUnsavedOnExit = true
+file.ignoreUnsavedStage = true
 font.file = "${fonts}/OpenSans-SemiBold.ttf"
 font.size = 16
 gatherRenderResults = true # True to prevent artifacts in multiple viewport configurations, can be set to false for better performance in some cases
@@ -263,6 +250,8 @@ app.primCreation.PrimCreationWithDefaultXformOps = true
 app.stage.timeCodeRange = [0, 1000000]
 app.stage.upAxis = "Z" # Isaac Sim default Z up
 app.viewport.camMoveVelocity = 0.05 # Meters default
+app.viewport.camVelocityMin = 0.0001 # Meters default
+app.viewport.camVelocityMax = 0.2 # Meters default
 app.viewport.gizmo.scale = 0.01 # Meters default
 app.viewport.grid.scale = 1.0 # Meters default
 app.viewport.camShowSpeedOnStart = false # Hide camera speed on startup
@@ -276,10 +265,7 @@ renderer.startupMessageDisplayed = true # hides the IOMMU popup window
 resourcemonitor.timeBetweenQueries = 100 # improves performance
 simulation.defaultMetersPerUnit = 1.0 # Meters default
 omni.replicator.captureOnPlay = true
+UJITSO.geometry = false
 
-[settings.exts."omni.kit.registry.nucleus"]
-registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
-	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
-	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
-]
+# Sync materials in parallel from within Hydra
+omnihydra.parallelHydraSprimSync = true

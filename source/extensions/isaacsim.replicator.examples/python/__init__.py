@@ -14,3 +14,5 @@
 # limitations under the License.
 
 from .impl import Extension
+
+__all__ = []

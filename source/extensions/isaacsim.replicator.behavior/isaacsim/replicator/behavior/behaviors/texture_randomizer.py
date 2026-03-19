@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 import string
 
 import carb
+import numpy as np
 import omni.kit.window.property
 import omni.usd
 from isaacsim.replicator.behavior.global_variables import EXPOSED_ATTR_NS, SCOPE_NAME
@@ -29,7 +29,7 @@ from isaacsim.replicator.behavior.utils.behavior_utils import (
 )
 from isaacsim.replicator.behavior.utils.scene_utils import create_mdl_material
 from isaacsim.storage.native import get_assets_root_path
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade
 
 
@@ -85,10 +85,17 @@ class TextureRandomizer(BehaviorScript):
             "default_value": Gf.Vec2f(0.0, 45.0),
             "doc": "Texture rotation range in degrees as (min, max).",
         },
+        {
+            "attr_name": "seed",
+            "attr_type": Sdf.ValueTypeNames.Int,
+            "default_value": -1,
+            "doc": "Random seed for reproducible randomization. Use -1 for non-deterministic behavior.",
+        },
     ]
 
     def on_init(self):
         """Called when the script is assigned to a prim."""
+        self._rng = None
         self._update_counter = 0
         self._interval = 0
         self._texture_urls = []
@@ -142,6 +149,11 @@ class TextureRandomizer(BehaviorScript):
         self._project_uvw_probability = self._get_exposed_variable("projectUvwProbability")
         self._texture_scale_range = self._get_exposed_variable("textureScaleRange")
         self._texture_rotate_range = self._get_exposed_variable("textureRotateRange")
+        seed = self._get_exposed_variable("seed")
+
+        # Initialize the random number generator (use seed if valid, otherwise non-deterministic)
+        if self._rng is None:
+            self._rng = np.random.default_rng(seed if seed >= 0 else None)
 
         # Get the valid prims
         if include_children:
@@ -199,22 +211,22 @@ class TextureRandomizer(BehaviorScript):
 
         self._valid_prims.clear()
         self._update_counter = 0
+        self._rng = None
 
     def _apply_behavior(self):
         # Randomize the textures and parameters for each material
         for mat in self._texture_materials:
             shader = UsdShade.Shader(omni.usd.get_shader_from_material(mat.GetPrim(), get_prim=True))
-            diffuse_texture = random.choice(self._texture_urls)
+            diffuse_texture = self._rng.choice(self._texture_urls)
             shader.GetInput("diffuse_texture").Set(diffuse_texture)
-            project_uvw = random.choices(
+            project_uvw = self._rng.choice(
                 [True, False],
-                weights=[self._project_uvw_probability, 1 - self._project_uvw_probability],
-                k=1,
-            )[0]
+                p=[self._project_uvw_probability, 1 - self._project_uvw_probability],
+            )
             shader.GetInput("project_uvw").Set(bool(project_uvw))
-            texture_scale = random.uniform(self._texture_scale_range[0], self._texture_scale_range[1])
+            texture_scale = self._rng.uniform(self._texture_scale_range[0], self._texture_scale_range[1])
             shader.GetInput("texture_scale").Set((texture_scale, texture_scale))
-            texture_rotate = random.uniform(self._texture_rotate_range[0], self._texture_rotate_range[1])
+            texture_rotate = self._rng.uniform(self._texture_rotate_range[0], self._texture_rotate_range[1])
             shader.GetInput("texture_rotate").Set(texture_rotate)
 
     def _create_materials(self):
@@ -230,7 +242,7 @@ class TextureRandomizer(BehaviorScript):
         looks_path = omni.usd.get_stage_next_free_path(self.stage, f"{SCOPE_NAME}/{self.BEHAVIOR_NS}/Looks", False)
         for prim in self._valid_prims:
             # Create a unique path for the material (WAR for ISIM-4054)
-            rand_postfix = "".join(random.choices(string.ascii_letters + string.digits, k=4))
+            rand_postfix = "".join(self._rng.choice(list(string.ascii_letters + string.digits), size=4))
             mtl_path = omni.usd.get_stage_next_free_path(self.stage, f"{looks_path}/{mtl_name}_{rand_postfix}", False)
 
             # Create the material and bind it to the prim
@@ -259,3 +271,11 @@ class TextureRandomizer(BehaviorScript):
             UsdShade.MaterialBindingAPI(mat.GetPrim()).UnbindAllBindings()
             self.stage.RemovePrim(mat.GetPath())
         self._texture_materials.clear()
+
+    def set_rng(self, rng: np.random.Generator | None = None):
+        """Set the random number generator, overriding the USD seed attribute.
+
+        Args:
+            rng: Numpy random generator. If None, creates a new default generator.
+        """
+        self._rng = rng if rng is not None else np.random.default_rng()

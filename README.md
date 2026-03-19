@@ -1,36 +1,40 @@
 ![Isaac Sim](docs/readme/hero_shot_compressed.png)
 
 ---
-
 # Isaac Sim
 
-[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://docs.python.org/3/whatsnew/3.12.html)
 [![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/22.04/)
+[![Linux aarch64 platform](https://img.shields.io/badge/platform-linux--aarch64-orange.svg)](https://docs.nvidia.com/dgx/dgx-os-7-user-guide/introduction.html)
 [![Windows platform](https://img.shields.io/badge/platform-windows--64-orange.svg)](https://www.microsoft.com/en-us/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-yellow.svg)](https://opensource.org/license/apache-2-0)
+[![License](https://img.shields.io/badge/license-Apache--2.0-yellow.svg)](LICENSE)
+
+> **⚠️ PRE-RELEASE SOFTWARE NOTICE**
+> This is pre-release, currently in development. You may encounter bugs, incomplete features, and other issues that will be addressed in future releases. Please [report](#support) any issues you encounter. This will be finalized into a stable release in the future.
 
 NVIDIA Isaac Sim™ is a simulation platform built on NVIDIA Omniverse, designed to develop, test, train, and deploy AI-powered robots in realistic virtual environments. It supports importing robotic systems from common formats such as URDF, MJCF, and CAD. The simulator leverages high-fidelity, GPU-accelerated physics engines to simulate accurate dynamics and support multi-sensor RTX rendering at scale. It comes equipped with end-to-end workflows including synthetic data generation, reinforcement learning, ROS integration, and digital twin simulation. Isaac Sim provides the infrastructure needed to support robotics development at any stage.
 
 ## Key Features
 
-- [Asset Import & Export](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/importer_exporter/importers_exporters.html): Importing and exporting robots and environments from and to non-USD format.
-- [Robot Tuning](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/robot_setup/index.html): Optimize robot for physics accuracy, computation efficiency, or photorealism
-- [Robot Simulation](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/robot_simulation/index.html): Tools for moving robots, such as controllers, motion generation and kinematics solvers, and policy integration.
-- [Sensors](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/sensors/index.html): RTX and physics-based sensors
+- [Asset Import & Export](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/importer_exporter/importers_exporters.html): Importing and exporting robots and environments from and to non-USD format.
+- [Robot Tuning](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/robot_setup/index.html): Optimize robot for physics accuracy, computation efficiency, or photorealism
+- [Robot Simulation](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/robot_simulation/index.html): Tools for moving robots, such as controllers, motion generation and kinematics solvers, and policy integration.
+- [Sensors](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/sensors/index.html): RTX and physics-based sensors
 
 ## Key Applications
 
-- [Isaac Lab](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/isaac_lab_tutorials/index.html): GPU-accelerated framework built for reinforcement learning, imitation learning, and motion planning.
-- [ROS Bridge](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/ros2_tutorials/ros2_landing_page.html): Integration with Robot Operating System (ROS).
-- [Synthetic Data Generation](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/synthetic_data_generation/index.html): Collection of SDG tools
+- [Isaac Lab](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/isaac_lab_tutorials/index.html): GPU-accelerated framework built for reinforcement learning, imitation learning, and motion planning.
+- [ROS Bridge](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/ros2_tutorials/ros2_landing_page.html): Integration with Robot Operating System (ROS).
+- [Synthetic Data Generation](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/synthetic_data_generation/index.html): Collection of SDG tools
 
 ## Documentation
 
 For the latest Isaac Sim documentation, see [Isaac Sim Documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
 Follow these links to get started:
 
-- [Tutorials](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/introduction/quickstart_index.html)
-- [Assets](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/assets/usd_assets_overview.html)
+- [Tutorials](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/introduction/quickstart_index.html)
+- [Assets](https://docs.isaacsim.omniverse.nvidia.com/6.0.0/assets/usd_assets_overview.html)
+
 
 ## Prerequisites and Environment Setup
 
@@ -39,7 +43,7 @@ Ensure your system is set up with the following before building Isaac Sim:
 - **Operating System**: Windows 10/11 or Linux (Ubuntu 22.04)
 
   > **(Linux) Ubuntu 24.04**
-  > Ubuntu 24.04 is not fully supported at this time. Building with Ubuntu 24.04 requires GCC/G++ 11 to be installed, GCC/G++ 12+ is not supported.
+  > Building with Ubuntu 24.04 requires GCC/G++ 11 to be installed, GCC/G++ 12+ is not supported.
 
 - **GPU**: For additional information on GPU features and requirements, see [NVIDIA GPU Requirements](https://docs.omniverse.nvidia.com/dev-guide/latest/common/technical-requirements.html)
 
@@ -61,15 +65,24 @@ Ensure your system is set up with the following before building Isaac Sim:
 
 - **Internet Access**: Required for downloading the Omniverse Kit SDK, extensions, and tools.
 
+
+
 ### Required Software Dependencies
 
 - [**Git**](https://git-scm.com/downloads): For version control and repository management
 
 - [**Git LFS**](https://git-lfs.com/): For managing large files within the repository
 
-- **(Windows - C++ Only) Microsoft Visual Studio (2019 or 2022)**: You can install the latest version from [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/). Ensure that the **Desktop development with C++** workload is selected.  [Additional information on Windows development configuration](docs/readme/windows_developer_configuration.md)
+- **(Windows - C++ Only) Microsoft Visual Studio 2022 or 2026**: 
 
-- **(Windows - C++ Only) Windows SDK**: Install this alongside MSVC. You can find it as part of the Visual Studio Installer. [Additional information on Windows development configuration](docs/readme/windows_developer_configuration.md)
+- Install Visual Studio 2026, Windows SDK, MSVC using Winget by running the following command in PowerShell:
+
+  ```powershell
+  winget install --id=Microsoft.VisualStudio.Community -e --override "--add Microsoft.VisualStudio.Workload.NativeDesktop --includeRecommended"
+  ```
+  
+  [Additional information on Windows development configuration](docs/readme/windows_developer_configuration.md)
+
 
 - **(Linux) build-essentials**: A package that includes `make` and other essential tools for building applications.  For Ubuntu, install with:
 
@@ -79,11 +92,16 @@ Ensure your system is set up with the following before building Isaac Sim:
 
   > **(Linux) ⚠️**
   > Please use GCC/G++ 11, higher versions are not supported yet. To install GCC/G++ 11, run the following commands:
->
   > ```bash
   > sudo apt-get install gcc-11 g++-11
   > sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 200
   > sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 200
+  > ```
+
+  > **(Linux aarch64) ⚠️**
+  > On aarch64 hosts (e.g. DGX Spark), X11 development headers are required to build Python packages that lack pre-built wheels:
+  > ```bash
+  > sudo apt-get install -y libx11-dev xorg-dev
   > ```
 
   > **Compiler Version Check ⚠️**
@@ -103,8 +121,9 @@ This section guides you through building Isaac Sim from source code.
 
 ### 1. Clone the Repository
 
+
 ```bash
-git clone https://github.com/isaac-sim/IsaacSim.git isaacsim
+git clone -b develop https://github.com/isaac-sim/IsaacSim.git isaacsim
 cd isaacsim
 git lfs install
 git lfs pull
@@ -141,75 +160,57 @@ build.bat
 > **⚠️ Startup Time**
 > The first time loading Isaac Sim may take up to several minutes as Extensions and Shader are loaded and cached. The subsequent startup time should be in the ranges of 10-30 seconds depending on hardware configuration.
 
+
+
 Navigate to the corresponding binary directory for your platform and run the executable.
 
 **Linux (x86_64):**
-
 ```bash
 cd _build/linux-x86_64/release
 ./isaac-sim.sh
 ```
 
 **Linux (aarch64):**
-
 ```bash
 cd _build/linux-aarch64/release
 ./isaac-sim.sh
 ```
 
 **Windows:**
-
 ```powershell
 cd _build/windows-x86_64/release
 isaac-sim.bat
 ```
 
-### ✅ Headless GPU Validation (Linux / Cloud Pods)
-
-For headless machines (cloud GPUs, containers, or CI), run the built-in validation script to confirm driver compatibility, RTX pipeline initialization, and headless rendering:
-
-```bash
-./scripts/validate_container.sh --headless
-```
-
-If you prefer to run just the GPU compatibility checker, use:
-
-```bash
-cd _build/linux-x86_64/release
-./isaac-sim.compatibility_check.sh --headless --/app/quitAfter=10
-```
-
-> Tip: For complete headless behavior, set:
->
-> - `ENABLE_CAMERAS=1`
-> - `HEADLESS=1`
-
 > NOTE: If this is your first time building Isaac Sim, you will be prompted to accept the Omniverse Licensing Terms.
+
+
 
 ## Advanced Build Options
 
+
 Isaac Sim uses a custom build system with the following key options:
 
-### Core Build Options
 
+### Core Build Options
 - `-c, --clean`: Clean the repository and exit
 - `-x, --rebuild`: Clean the repository before building (full rebuild)
 - `-h, --help`: Show all available build options
 
-### Configuration Options
 
+### Configuration Options
 - `--config [debug|release]`: Specify build configuration (default: both)
 - `-d, --debug`: Build only debug configuration
 - `-r, --release`: Build only release configuration
 
-### Advanced Options
 
+### Advanced Options
 - `-j NUM_CORES, --jobs NUM_CORES`: Limit the number of parallel compilation jobs
 - `-v, --verbose`: Enable verbose build output
 - `-q, --quiet`: Suppress build output
 
-### Build Steps Control
 
+### Build Steps Control
 - `--fetch-only`: Only fetch dependencies and stop
 - `-g, --generate`: Generate projects, stage files and stop
 - `-s, --stage`: Stage files, skip generation step
@@ -217,8 +218,36 @@ Isaac Sim uses a custom build system with the following key options:
 - `--post-build-only`: Only perform post-build step
 
 ## Usage
-
 Congratulations on installing Isaac Sim! To get started with using Isaac Sim, follow these [Quick Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/introduction/quickstart_index.html). For more information, visit our full [documentation](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html).
+
+## Additional Build Tools
+
+Beyond building and running from source (see [Quick Start](#quick-start)), Isaac Sim can also be packaged as a standalone binary archive or deployed as a Docker container.
+
+### Binary Package
+
+Build a standalone redistributable binary package from source. A successful [build](#quick-start) is required before packaging.
+
+**Linux:**
+
+```bash
+./repo.sh package --config release -m isaac-sim-standalone
+```
+
+> **Note:** The same command works on both x86_64 and aarch64 hosts. The build system detects the platform automatically.
+
+**Windows:**
+
+```powershell
+.\repo.bat package --config release -m isaac-sim-standalone
+```
+
+The packaged archive is written to the `_build/packages/` directory.
+
+### Container (Docker)
+
+For building a Docker image, running with Docker Compose, and web-based streaming, see [tools/docker/README.md](tools/docker/README.md).
+
 
 ## Troubleshooting
 
@@ -233,15 +262,16 @@ Congratulations on installing Isaac Sim! To get started with using Isaac Sim, fo
 
   - Note: The above command should be used only if you have enabled a proxy software or behind a corporate firewall. Port 7890 should be replaced with the proxy port set by the proxy software.
 
+
 ## Support
 
-- Please use GitHub [Discussions](https://github.com/isaac-sim/IsaacSim/discussions) for discussing ideas, asking questions, and requests for new features.
-- Github [Issues](https://github.com/isaac-sim/IsaacSim/issues) should only be used to track executable pieces of work with a definite scope and a clear deliverable. These can be fixing bugs, documentation issues, new features, or general updates.
+* Please use GitHub [Discussions](https://github.com/isaac-sim/IsaacSim/discussions) for discussing ideas, asking questions, and requests for new features.
+* Github [Issues](https://github.com/isaac-sim/IsaacSim/issues) should only be used to track executable pieces of work with a definite scope and a clear deliverable. These can be fixing bugs, documentation issues, new features, or general updates.
 
 ## Connect with the NVIDIA Omniverse Community
 
 Have a project or resource you'd like to share more widely? We'd love to hear from you! Reach out to the
-NVIDIA Omniverse Community team at <OmniverseCommunity@nvidia.com> to discuss potential opportunities
+NVIDIA Omniverse Community team at OmniverseCommunity@nvidia.com to discuss potential opportunities
 for broader dissemination of your work.
 
 ## License
@@ -255,3 +285,4 @@ To cite Isaac Sim, click on "Cite this repository" in the right sidebar of the [
 ## Contributing
 
 We do not support direct community contributions at the moment.
+

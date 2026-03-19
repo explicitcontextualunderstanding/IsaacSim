@@ -13,11 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Functions for manipulating and performing operations on Warp arrays and other types.
+"""
+
 from __future__ import annotations
 
+import carb
 import numpy as np
 import warp as wp
-from warp.types import np_dtype_to_warp_type
+from warp._src.types import np_dtype_to_warp_type
 
 
 def _broadcastable_shape(src: tuple[int], dst: tuple[int]) -> tuple[tuple[int] | None, tuple[bool] | None]:
@@ -47,11 +52,56 @@ def _astype(src: wp.array, dtype: type) -> wp.array:
     return dst
 
 
+def parse_device(device: str | wp.Device | None, *, raise_on_invalid: bool = False) -> wp.Device:
+    """Parse the input device and return a Warp :py:class:`~warp.Device` instance.
+
+    Args:
+        device: Device specification. If the specified device is ``None`` or it cannot be resolved,
+            the default available device will be returned instead.
+        raise_on_invalid: Whether to raise an exception if the device is invalid.
+            If ``False``, a warning is logged and the default available device is returned instead.
+
+    Returns:
+        Warp Device.
+
+    Raises:
+        ValueError: If the input device is invalid and ``raise_on_invalid`` is ``True``.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.ops as ops_utils
+        >>>
+        >>> device = ops_utils.parse_device("cpu")
+        >>> print(type(device), device)
+        <class 'warp._src.context.Device'> cpu
+        >>> device = ops_utils.parse_device("cuda")
+        >>> print(type(device), device)
+        <class 'warp._src.context.Device'> cuda:0
+        >>> device = ops_utils.parse_device("cuda:0")
+        >>> print(type(device), device)
+        <class 'warp._src.context.Device'> cuda:0
+    """
+    if isinstance(device, wp.Device):
+        return device
+    elif isinstance(device, str):
+        try:
+            return wp.get_device(device)
+        except ValueError as e:
+            if raise_on_invalid:
+                raise ValueError(f"Invalid device specification ({device}): {e}")
+            _default_device = wp.get_device()
+            carb.log_warn(f"Invalid device specification ({device}): {e}. Using default device ({_default_device})")
+            return _default_device
+    return wp.get_device()
+
+
 def place(
     x: bool | int | float | list | np.ndarray | wp.array,
     *,
     dtype: type | None = None,
-    device: str | wp.context.Device | None = None,
+    device: str | wp.Device | None = None,
 ) -> wp.array:
     """Create a Warp array from a Python primitive or list, a NumPy array, or a Warp array.
 
@@ -80,30 +130,30 @@ def place(
         >>> # - bool
         >>> array = ops_utils.place(True, device="cpu")  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
-        [ True] <class 'warp.types.bool'> cpu (1,)
+        [ True] <class 'warp._src.types.bool'> cpu (1,)
         >>> # - int
         >>> array = ops_utils.place(1, device="cpu")  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
-        [1] <class 'warp.types.int64'> cpu (1,)
+        [1] <class 'warp._src.types.int64'> cpu (1,)
         >>> # - float
         >>> array = ops_utils.place(1.0, device="cpu")  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
-        [1.] <class 'warp.types.float64'> cpu (1,)
+        [1.] <class 'warp._src.types.float64'> cpu (1,)
         >>>
         >>> # Python list
         >>> array = ops_utils.place([1.0, 2.0, 3.0], device="cpu")  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
-        [1. 2. 3.] <class 'warp.types.float64'> cpu (3,)
+        [1. 2. 3.] <class 'warp._src.types.float64'> cpu (3,)
         >>>
         >>> # NumPy array (with shape (3, 1))
         >>> array = ops_utils.place(np.array([[1], [2], [3]], dtype=np.uint8), dtype=wp.float32)  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
-        [[1.] [2.] [3.]] <class 'warp.types.float32'> cuda:0 (3, 1)
+        [[1.] [2.] [3.]] <class 'warp._src.types.float32'> cuda:0 (3, 1)
         >>>
         >>> # Warp array (with different device)
         >>> array = ops_utils.place(wp.array([1.0, 2.0, 3.0], device="cpu"), device="cuda")  # doctest: +NO_CHECK
         >>> print(array, array.dtype, array.device, array.shape)
-        [1. 2. 3.] <class 'warp.types.float64'> cuda:0 (3,)
+        [1. 2. 3.] <class 'warp._src.types.float64'> cuda:0 (3,)
     """
     # hint: don't use wp.from_numpy as it returns vector/matrix for arrays of dimensions 2/3
     if isinstance(x, wp.array):
@@ -129,7 +179,7 @@ def resolve_indices(
     *,
     count: int | None = None,
     dtype: type | None = wp.int32,
-    device: str | wp.context.Device | None = None,
+    device: str | wp.Device | None = None,
 ) -> wp.array:
     """Create a flattened (1D) Warp array to be used as indices from a Python primitive or list, a NumPy array, or a Warp array.
 
@@ -161,30 +211,30 @@ def resolve_indices(
         >>> # - bool
         >>> indices = ops_utils.resolve_indices(True, device="cpu")  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
-        [1] <class 'warp.types.int32'> cpu (1,)
+        [1] <class 'warp._src.types.int32'> cpu (1,)
         >>> # - int
         >>> indices = ops_utils.resolve_indices(2, device="cpu")  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
-        [2] <class 'warp.types.int32'> cpu (1,)
+        [2] <class 'warp._src.types.int32'> cpu (1,)
         >>> # - float
         >>> indices = ops_utils.resolve_indices(3.0, device="cpu")  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
-        [3] <class 'warp.types.int32'> cpu (1,)
+        [3] <class 'warp._src.types.int32'> cpu (1,)
         >>>
         >>> # Python list
         >>> indices = ops_utils.resolve_indices([1, 2, 3], device="cpu")  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
-        [1 2 3] <class 'warp.types.int32'> cpu (3,)
+        [1 2 3] <class 'warp._src.types.int32'> cpu (3,)
         >>>
         >>> # NumPy array (with shape (3, 1))
         >>> indices = ops_utils.resolve_indices(np.array([[1], [2], [3]], dtype=np.uint8))  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
-        [1 2 3] <class 'warp.types.int32'> cuda:0 (3,)
+        [1 2 3] <class 'warp._src.types.int32'> cuda:0 (3,)
         >>>
         >>> # Warp array (with different device)
         >>> indices = ops_utils.resolve_indices(wp.array([1, 2, 3], device="cpu"), device="cuda")  # doctest: +NO_CHECK
         >>> print(indices, indices.dtype, indices.device, indices.shape)
-        [1 2 3] <class 'warp.types.int32'> cuda:0 (3,)
+        [1 2 3] <class 'warp._src.types.int32'> cuda:0 (3,)
     """
     # hint: don't use wp.from_numpy as it returns vector/matrix for arrays of dimensions 2/3
     if dtype is None:
@@ -214,7 +264,7 @@ def broadcast_to(
     *,
     shape: list[int],
     dtype: type | None = None,
-    device: str | wp.context.Device | None = None,
+    device: str | wp.Device | None = None,
 ) -> wp.array:
     """Broadcast a Python primitive or list, a NumPy array, or a Warp array to a Warp array with a new shape.
 

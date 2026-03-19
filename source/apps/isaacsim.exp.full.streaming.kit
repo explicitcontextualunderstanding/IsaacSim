@@ -2,18 +2,18 @@
 description = "Headless Isaac Sim with Livestream using WebRTC"
 execFile = "isaac-sim.streaming"
 title = "Isaac Sim Full Streaming"
-version = "5.1.0"
+version = "6.0.0"
 
 # That makes it browsable in UI with "experience" filter
 keywords = ["experience", "app", "usd"]
 
 [dependencies]
 "isaacsim.exp.full" = {}
-"omni.services.livestream.nvcf" = {}
+"omni.kit.livestream.app" = {}
 
 [settings]
 app.name = "Isaac-Sim Streaming"
-app.version = "5.1.0"
+app.version = "6.0.0"
 app.vulkan = true                        # Explicitly enable Vulkan
 app.enableDeveloperWarnings = false      # disable developer warnings to reduce log noise
 
@@ -35,9 +35,29 @@ drawMouse = false
 allowResize = true
 outDirectory = "${data}"
 
-[settings.exts."omni.kit.registry.nucleus"]
-registries = [
-	{ name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/107/shared" },
-	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
-	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
+[settings.log.channels]
+# Carb log channel based logging (consistent with other Kit extensions)
+# "omni.kit.livestream.streamsdk" = "error" # StreamSDK specific logging
+# "omni.kit.livestream.webrtc" = "info"     # WebRTC extension logging
+# "omni.kit.livestream.app" = "info"        # App extension logging
+
+[settings.exts."omni.kit.livestream.app"]
+# Primary application stream settings
+primaryStream.signalPort = 49100
+primaryStream.streamPort = 47998
+# primaryStream.publicIp = ""
+primaryStream.allowDynamicResize = true
+primaryStream.enableEventTracing = true
+primaryStream.enableOpenTelemetry = false
+primaryStream.streamType = "webrtc"
+
+[settings.exts."omni.services.livestream.session"]
+# Session management settings
+quitOnSessionEnded = true
+resumeTimeoutSeconds = 30
+waitForSessionReadyEvent = false
+
+[settings.exts."omni.kit.registry.nucleus".registries]
+++ = [
+    { name = "isaacsim/prod/6.0", url = "https://ovextensionsprod.blob.core.windows.net/exts/isaacsim/prod/6.0/shared" },
 ]

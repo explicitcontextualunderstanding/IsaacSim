@@ -30,18 +30,6 @@
 
 CARB_BINDINGS("isaacsim.asset.gen.omap.python")
 
-namespace isaacsim
-{
-namespace asset
-{
-namespace gen
-{
-namespace omap
-{
-}
-}
-}
-}
 
 namespace
 {

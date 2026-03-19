@@ -1,5 +1,50 @@
 # Changelog
 
+## [5.0.1] - 2026-03-03
+### Fixed
+- Fix issues with incorrect API usage in ArticulationSubset
+
+## [5.0.0] - 2026-01-20
+### Removed
+- Remove deprecated PhysX residual reporting APIs (`enable_residual_reporting`, `get_solver_velocity_residual`, `get_solver_position_residual`) from `PhysicsContext`.
+
+## [4.11.5] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [4.11.4] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [4.11.3] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [4.11.2] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [4.11.1] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [4.11.0] - 2025-10-31
+### Changed
+- Remove unused omni.pip.cloud from dependencies
+
+## [4.10.0] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [4.9.1] - 2025-10-18
+### Changed
+- Remove extra carb settings from tests
+
+## [4.9.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [4.8.0] - 2025-09-23
 ### Added
 - Expose PhysX scene attribute to reorder the articulation contact constraints to be solved last
@@ -103,7 +148,7 @@
 ### Changed
 - Allow for more control over time stepping behavior
 - "/app/runLoops/main/rateLimitFrequency" and timeline.set_target_framerate(rendering_hz) are only set if the app has "/app/runLoops/main/rateLimitEnabled" set to true
-- isaac sim loop runner set_manual_mode is always used if rendering rate is specified
+- Isaac sim loop runner set_manual_mode is always used if rendering rate is specified
 
 ## [4.4.2] - 2025-05-14
 ### Changed
@@ -123,7 +168,7 @@
 
 ## [4.3.5] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [4.3.4] - 2025-05-04
 ### Changed
@@ -223,7 +268,7 @@
 
 ## [4.2.9] - 2024-12-19
 ### Fixed
-- rename articulation_handle to articulation_view
+- Rename articulation_handle to articulation_view
 
 ## [4.2.8] - 2024-12-16
 ### Fixed
@@ -233,7 +278,7 @@
 ### Changed
 - Move unit tests to isaacsim.core.utils
 - Improve unit test performance
-- fix test_scale_units_resolve
+- Fix test_scale_units_resolve
 
 ## [4.2.6] - 2024-12-05
 ### Fixed
@@ -269,8 +314,8 @@
 
 ## [4.1.3] - 2024-11-05
 ### Changed
-- removed backend and device arguments from PhysicsContext
-- warm start, simulation view creation and post reset ported to SimulationManager
+- Removed backend and device arguments from PhysicsContext
+- Warm start, simulation view creation and post reset ported to SimulationManager
 
 ## [4.1.2] - 2024-10-29
 ### Changed
@@ -307,7 +352,7 @@
 
 ## [3.19.2] - 2024-08-09
 ### Fixed
-- missing omni.kit.stage_templates dependency
+- Missing omni.kit.stage_templates dependency
 
 ## [3.19.1] - 2024-07-31
 ### Fixed
@@ -365,7 +410,7 @@
 
 ## [3.12.0] - 2024-05-14
 ### Added
-- added getting world poses through fabric selections in XFormPrimView through usd=False argument
+- Added getting world poses through fabric selections in XFormPrimView through usd=False argument
 
 ### Changed
 - reset_xform_properties arguments defaults to False instead of True in the prim classes initialization.
@@ -392,7 +437,7 @@
 
 ## [3.9.1] - 2024-04-17
 ### Fixed
-- removed the deprecated physX force sensor
+- Removed the deprecated physX force sensor
 
 ## [3.9.0] - 2024-04-16
 ### Added
@@ -499,10 +544,10 @@
 
 ### Fixed
 - quats_to_rot_matrices under torch utils to handle 1 dimensional input and batched
-- pad method under torch utils
+- Pad method under torch utils
 
 ### Added
-- added rot_matrices_to_quats method to torch utils
+- Added rot_matrices_to_quats method to torch utils
 
 ## [3.0.5] - 2023-11-28
 ### Fixed
@@ -547,10 +592,10 @@
 
 ## [2.11.0] - 2023-10-31
 ### Added
-- test for get_joint_position in test_articulation to catch the sign switch that happens when articulation joints have different body0 and body1 than expected.
+- Test for get_joint_position in test_articulation to catch the sign switch that happens when articulation joints have different body0 and body1 than expected.
 
 ### Fixed
-- renamed utils.torch.rotations quat_to_rot_matrices to quats_to_rot_matrices to be consistent with numpy, originally named function is now a redirect function
+- Renamed utils.torch.rotations quat_to_rot_matrices to quats_to_rot_matrices to be consistent with numpy, originally named function is now a redirect function
 
 ## [2.10.2] - 2023-10-12
 ### Fixed
@@ -564,10 +609,10 @@
 ## [2.10.0] - 2023-10-04
 ### Added
 - euler_to_rot_matrix returns the pre multiplicative matrix and not the post multiplicative one as before and in numpy format instead of Gf.Rotation.
-- added extrinsic argument to torch rotation utils: compute_rot, quat_from_euler_xyz, get_euler_xyz, euler_angles_to_quats
-- added methods to torch rotation utils: quat_to_rot_matrices, matrices_to_euler_angles
-- added extrinsic argument to numpy rotation utils: quats_to_euler_angles, euler_angles_to_quats
-- added extrinsic argument to rotation utils: euler_angles_to_quat, quat_to_euler_angles, matrix_to_euler_angles, euler_to_rot_matrix
+- Added extrinsic argument to torch rotation utils: compute_rot, quat_from_euler_xyz, get_euler_xyz, euler_angles_to_quats
+- Added methods to torch rotation utils: quat_to_rot_matrices, matrices_to_euler_angles
+- Added extrinsic argument to numpy rotation utils: quats_to_euler_angles, euler_angles_to_quats
+- Added extrinsic argument to rotation utils: euler_angles_to_quat, quat_to_euler_angles, matrix_to_euler_angles, euler_to_rot_matrix
 
 ## [2.9.4] - 2023-09-30
 ### Fixed
@@ -640,7 +685,7 @@
 
 ### Changed
 - XFormPrimView get_local_poses and get_world_poses uses the new methods available in xforms utils to query the poses from Fabric and USD alike
-- timeline is stopped if initialize simulation context is called
+- Timeline is stopped if initialize simulation context is called
 
 ### Fixed
 - Crash when initializing world if is_playing was true
@@ -721,11 +766,11 @@
 
 ## [1.45.2] - 2023-02-05
 ### Fixed
-- several unit test errors/warnings
+- Several unit test errors/warnings
 
 ## [1.45.1] - 2023-02-03
 ### Fixed
-- fixed minor issues in cloth prims
+- Fixed minor issues in cloth prims
 
 ## [1.45.0] - 2023-01-31
 ### Added
@@ -750,7 +795,7 @@
 
 ## [1.41.1] - 2022-12-10
 ### Fixed
-- refactored cloth API for consistency with other core prims
+- Refactored cloth API for consistency with other core prims
 
 ## [1.41.0] - 2022-12-10
 ### Added
@@ -763,7 +808,7 @@
 
 ## [1.40.3] - 2022-12-08
 ### Fixed
-- deprecated get_joint_efforts in favor of get_applied_joint_efforts
+- Deprecated get_joint_efforts in favor of get_applied_joint_efforts
 
 ## [1.40.2] - 2022-12-07
 ### Fixed
@@ -790,7 +835,7 @@
 ## [1.37.1] - 2022-11-29
 ### Fixed
 
-- unit test for get_body_index function
+- Unit test for get_body_index function
 
 ## [1.37.0] - 2022-11-23
 ### Added
@@ -818,8 +863,8 @@
 
 ## [1.33.0] - 2022-11-18
 ### Changed
-- moved util functions from core/utils/pose_generation.py to coreutils /transformations.py, /mesh.py, /random.py
-- updated ycb_video_writer.py get_mesh_vertices_relative_to utils import to mesh.py
+- Moved util functions from core/utils/pose_generation.py to coreutils /transformations.py, /mesh.py, /random.py
+- Updated ycb_video_writer.py get_mesh_vertices_relative_to utils import to mesh.py
 
 ### Added
 - mesh.py and random.py
@@ -854,15 +899,15 @@
 
 ## [1.30.0] - 2022-10-17
 ### Added
-- allow applying rigid body forces in local coordinates and also at a position
+- Allow applying rigid body forces in local coordinates and also at a position
 
 ## [1.29.0] - 2022-10-16
 ### Added
-- moved standalone pose estimation example utils to core.utils
+- Moved standalone pose estimation example utils to core.utils
 
 ## [1.28.2] - 2022-10-15
 ### Fixed
-- bug in sphere.py and cylinder.py where incorrect prim type was used in IsA check
+- Bug in sphere.py and cylinder.py where incorrect prim type was used in IsA check
 
 ## [1.28.1] - 2022-10-03
 ### Changed
@@ -899,13 +944,13 @@
 ## [1.25.0] - 2022-08-31
 ### Changed
 
-- removed unused velocity argument from set_camera_view
-- removed default arguments from set_camera_view to make it more general
-- switch to omni.kit.viewport.utility instead of viewport legacy
+- Removed unused velocity argument from set_camera_view
+- Removed default arguments from set_camera_view to make it more general
+- Switch to omni.kit.viewport.utility instead of viewport legacy
 
 ### Added
 
-- viewport helper functions: get_viewport_names and get_window_from_id
+- Viewport helper functions: get_viewport_names and get_window_from_id
 
 ## [1.24.4] - 2022-08-31
 ### Changed
@@ -919,7 +964,7 @@
 ## [1.24.3] - 2022-08-17
 ### Fixed
 
-- fixes `set_max_efforts` function: device must be on cpu
+- Fixes `set_max_efforts` function: device must be on cpu
 
 ## [1.24.2] - 2022-08-17
 ### Fixed
@@ -966,11 +1011,11 @@
 
 ## [1.20.0] - 2022-07-17
 ### Changed
-- single prim classes inheritance structure to avoid duplication of code
+- Single prim classes inheritance structure to avoid duplication of code
 
 ## [1.19.0] - 2022-07-16
 ### Added
-- added get_first_matching_parent_prim, is_prim_non_root_articulation_link to prim utils
+- Added get_first_matching_parent_prim, is_prim_non_root_articulation_link to prim utils
 
 ### Changed
 - get_all_matching_child_prims to return a list of prims instead of a list of prim_paths
@@ -1001,7 +1046,7 @@
 
 ## [1.15.0] - 2022-05-30
 ### Changed
-- move and rename persistent.isaac.asset_root.cloud from assets_check extension
+- Move and rename persistent.isaac.asset_root.cloud from assets_check extension
 
 ## [1.14.0] - 2022-05-26
 ### Changed
@@ -1098,18 +1143,18 @@
 - API to track whether GPU pipeline is enabled
 
 ### Fixed
-- issue with getting next stage free path slash parsing
+- Issue with getting next stage free path slash parsing
 
 ## [1.6.4] - 2022-04-27
 ### Added
-- density in rigid prim view
+- Density in rigid prim view
 
 ### Removed
 - Sim start in XFormPrim view and ArticulationView doesn't create a dummy physics view anymore
 
 ## [1.6.3] - 2022-04-27
 ### Fixed
-- missing args for `convert()` method
+- Missing args for `convert()` method
 
 ## [1.6.2] - 2022-04-26
 ### Fixed
@@ -1122,7 +1167,7 @@
 - Added checks for setters/getters of Geometry prim in the case collision is disabled
 
 ### Changed
-- replaced find_nucleus_server() with get_assets_root_path()
+- Replaced find_nucleus_server() with get_assets_root_path()
 - Adapts the hierarchy of classes in object prims: The inheritance is as follows:
     - Visual<Obj>(GeometryPrim): collision is disabled
     - Fixed<Obj>(Visual<Obj>): collision is enabled
@@ -1134,21 +1179,21 @@
 ## [1.6.0] - 2022-04-18
 ### Fixed
 - Fixed assets version file check.
-- acceleration spelling mistake in articulation_controller
+- Acceleration spelling mistake in articulation_controller
 
 ## [1.5.2] - 2022-04-18
 ### Fixed
-- cleaned up imports and comments in the utils
+- Cleaned up imports and comments in the utils
 
 ## [1.5.1] - 2022-04-15
 ### Fixed
-- fixing visibility on XFormPrimView
-- docstring issues
+- Fixing visibility on XFormPrimView
+- Docstring issues
 
 ## [1.5.0] - 2022-04-14
 ### Added
 - An argument to clear scene registry only
-- rotation and cross product util functions
+- Rotation and cross product util functions
 
 ### Fixed
 - Deleting a reference always when trying to delete a prim under the ref
@@ -1165,7 +1210,7 @@
 - Changed default value of visibility in the XFormPrim class
 
 ### Added
-- added rotation conversion functions to and from quaternions
+- Added rotation conversion functions to and from quaternions
 
 ## [1.2.0] - 2022-04-08
 ### Added
@@ -1176,7 +1221,7 @@
 
 ## [1.1.0] - 2022-04-05
 ### Added
-- added pose_from_tf_matrix() to isaacsim.core.api.utils.transformations
+- Added pose_from_tf_matrix() to isaacsim.core.api.utils.transformations
 
 ## [1.0.0] - 2022-03-31
 ### Added
@@ -1184,23 +1229,23 @@
 
 ## [0.3.2] - 2022-03-17
 ### Fixed
-- converting gains from dc to usd units when saving to usd
+- Converting gains from dc to usd units when saving to usd
 
 ## [0.3.1] - 2022-03-16
 ### Changed
-- replaced find_nucleus_server() with get_assets_root_path()
+- Replaced find_nucleus_server() with get_assets_root_path()
 
 ### Added
-- added get_assets_server()
+- Added get_assets_server()
 
 ## [0.3.0] - 2022-02-23
 ### Added
-- set gains in usd option is added to the articulation controller
+- Set gains in usd option is added to the articulation controller
 
 ## [0.2.9] - 2022-02-14
 ### Added
-- get/set_rigid_body_enabled to isaacsim.core.api.utils.physics
-- default predicate to isaacsim.core.api.utils.prims.get_all_matching_child_prims
+- Get/set_rigid_body_enabled to isaacsim.core.api.utils.physics
+- Default predicate to isaacsim.core.api.utils.prims.get_all_matching_child_prims
 - test_prims to isaacsim.core.api.tests
 
 ### Changed
@@ -1232,7 +1277,7 @@
 
 ## [0.2.3] - 2022-01-26
 ### Added
-- enable/disable rigid_body_physics for RigidPrims
+- Enable/disable rigid_body_physics for RigidPrims
 - enable_gravity() for Articulation
 
 ### Fixed
@@ -1241,7 +1286,7 @@
 ## [0.2.2] - 2022-01-21
 ### Added
 - remove_all_semantics util function
-- add set_intrinsics_matrix function
+- Add set_intrinsics_matrix function
 
 ### Changed
 - get_intrinsics_matrix uses vertical_aperture set on camera prim
@@ -1253,7 +1298,7 @@
 
 ## [0.2.0] - 2022-01-11
 ### Changed
-- physx and usd transformations update parameters are read from carb
+- Physx and usd transformations update parameters are read from carb
 
 ### Added
 - Added set_defaults to SimulationContext, World and PhysicsContext
@@ -1298,30 +1343,30 @@
 - create_bbox_cache, compute_aabb, compute_combined_aabb
 
 ### Changed
-- moving offset logic to base task to move the task assets accordingly
-- changed name of PhysicsScene to PhysicsContext
-- renamed mesh.py to bounds.py
+- Moving offset logic to base task to move the task assets accordingly
+- Changed name of PhysicsScene to PhysicsContext
+- Renamed mesh.py to bounds.py
 
 ## [0.1.6] - 2021-11-04
 ### Added
 - OmniPBR visual material
 - Added get_physics_scene in SimulationContext
-- clear in world
+- Clear in world
 - get_extension_path_from_name
 - is_prim_no_delete
 
 ### Changed
-- default visual materials and physics materials prim paths
+- Default visual materials and physics materials prim paths
 - prim_type is default to Xform for create_prim
-- type changed to prim_type for add_reference_to_stage
+- Type changed to prim_type for add_reference_to_stage
 - get_prim_at_descendent_path -> get_first_matching_child_prim
 - get_prims_path_at_descendent_tree -> get_all_matching_child_prims
 - check_ancestral -> is_prim_ancestral
 
 ### Fixed
-- default pose was resetting using local pose
-- local pose in Rigid Body was missing an argument
-- clear in Scene
+- Default pose was resetting using local pose
+- Local pose in Rigid Body was missing an argument
+- Clear in Scene
 
 ### Removed
 - set_extension_enabled
@@ -1352,7 +1397,7 @@
 ## [0.1.3] - 2021-10-21
 ### Changed
 - Renamed view_ports.py to viewports.py
-- renamed nucleus_utils.py to nucleus.py
+- Renamed nucleus_utils.py to nucleus.py
 
 ### Added
 - disable_extension isaacsim.core.api.utils.extensions

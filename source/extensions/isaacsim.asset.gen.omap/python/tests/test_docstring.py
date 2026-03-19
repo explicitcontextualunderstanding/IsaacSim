@@ -15,7 +15,7 @@
 
 import isaacsim.asset.gen.omap.bindings._omap as omap_bindings
 import isaacsim.test.docstring
-from isaacsim.core.utils.stage import create_new_stage_async
+from isaacsim.core.experimental.utils.stage import create_new_stage_async
 
 
 class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):

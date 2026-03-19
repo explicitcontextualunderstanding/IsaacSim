@@ -60,14 +60,21 @@ enum class PhysxActionType
  */
 struct PhysxAction
 {
+    /** @brief Action kind for this queued PhysX operation. */
     PhysxActionType type = PhysxActionType::Attach;
 
     // Common
+    /** @brief Joint to attach or detach. */
+    physx::PxJoint* joint = nullptr;
+    /** @brief USD path for the joint, used for lookups and diagnostics. */
     std::string jointPath;
 
     // For Attach
+    /** @brief First rigid actor participating in the attachment. */
     physx::PxRigidActor* actor0 = nullptr;
+    /** @brief Second rigid actor participating in the attachment. */
     physx::PxRigidActor* actor1 = nullptr;
+    /** @brief Joint-local pose for actor1 when attaching. */
     physx::PxTransform localPose1;
 };
 
@@ -96,21 +103,29 @@ enum class Axis
  */
 struct UsdAction
 {
+    /** @brief Action kind for this queued USD operation. */
     UsdActionType type = UsdActionType::WriteStatus;
 
     // Common
+    /** @brief USD prim path for the gripper. */
     std::string primPath;
 
     // For WriteStatus
+    /** @brief Status token to write ("Open", "Closed", or "Closing"). */
     std::string statusToken; // "Open", "Closed", or "Closing"
 
     // For WriteGrippedObjectsAndFilters
+    /** @brief Paths of prims currently gripped by this gripper. */
     std::vector<std::string> grippedObjectPaths;
+    /** @brief Body-0 path used to build filtered collision pairs. */
     std::string body0PathForFilterPairs;
 
     // For WriteAttachmentPointBatch
+    /** @brief Attachment point API paths that should be applied. */
     std::vector<std::string> apiPathsToApply;
+    /** @brief Attachment paths excluded from articulation updates. */
     std::vector<std::string> excludeFromArticulationPaths;
+    /** @brief Per-attachment clearance offsets to persist to USD. */
     std::vector<std::pair<std::string, float>> clearanceOffsets;
 };
 
@@ -189,6 +204,7 @@ public:
      * @brief Initializes the surface gripper component
      * @param[in] prim USD prim representing the surface gripper
      * @param[in] stage USD stage containing the prim
+     * @param[in] writeToUsd Whether to write to USD or keep state in memory only
      */
     virtual void initialize(const pxr::UsdPrim& prim, const pxr::UsdStageWeakPtr stage, bool writeToUsd);
 
@@ -231,18 +247,6 @@ public:
     virtual bool setGripperStatus(GripperStatus status);
 
     /**
-     * @brief Drains this component's queued PhysX actions into the provided vector.
-     * @param[out] outActions Destination vector where actions will be appended.
-     */
-    void consumePhysxActions(std::vector<PhysxAction>& outActions);
-
-    /**
-     * @brief Drains this component's queued USD actions into the provided vector.
-     * @param[out] outActions Destination vector where actions will be appended.
-     */
-    void consumeUsdActions(std::vector<UsdAction>& outActions);
-
-    /**
      * @brief Gets the current status of the gripper.
      * @return Current status.
      */
@@ -261,13 +265,10 @@ public:
     }
 
     /**
-     * @brief Gets the list of currently gripped objects
-     * @return Vector of prim paths for gripped objects
+     * @brief Gets the list of currently gripped objects.
+     * @return Const reference to a cached vector of prim paths for gripped objects.
      */
-    std::vector<std::string> getGrippedObjects() const
-    {
-        return std::vector<std::string>(m_grippedObjects.begin(), m_grippedObjects.end());
-    }
+    const std::vector<std::string>& getGrippedObjects() const;
 
     /**
      * @brief Sets whether to write to USD or keep state in memory only
@@ -278,17 +279,31 @@ public:
         m_writeToUsd = writeToUsd;
     }
 
+    /**
+     * @brief Returns whether there are queued PhysX actions.
+     * @return True if the PhysX action queue is non-empty.
+     */
     bool hasPhysxActions() const
     {
         return !m_physxActions.empty();
     }
 
+    /**
+     * @brief Returns whether there are queued USD actions.
+     * @return True if the USD action queue is non-empty.
+     */
     bool hasUsdActions() const
     {
         return !m_usdActions.empty();
     }
 
+    /**
+     * @brief Checks force limits on attachment joints and releases if limits are exceeded
+     */
+    void checkForceLimits();
+
 private:
+    friend class SurfaceGripperManager;
     /**
      * @brief Updates gripper properties from the USD prim
      */
@@ -309,10 +324,6 @@ private:
      */
     void updateClosedGripper();
 
-    /**
-     * @brief Checks force limits on attachment joints and releases if limits are exceeded
-     */
-    void checkForceLimits();
 
     /**
      * @brief Finds objects that can be gripped and attaches them
@@ -323,16 +334,14 @@ private:
      * @brief Processes a single attachment point to attempt a grip.
      * @details
      * Executes the raycast and attachment logic for one attachment point, updating
-     * the provided collections under the given mutexes when changes are detected.
+     * the provided collections when changes are detected.
      *
-     * @param[in] attachmentPath The USD path string of the attachment joint to process.
-     * @param[out] apToRemove Collection to append the attachment path to when it should transition to active.
-     * @param[out] clearanceOffsetsToPersist Collection to append clearance offset updates to persist to USD.
-     * @param[in,out] apMutex Mutex protecting per-attachment shared maps and vectors.
-     * @param[in,out] clearanceMutex Mutex protecting the clearance offsets collection.
+     * @param[in] attachmentIndex Index of the attachment point to process.
+     * @param[out] apToRemove Indices to remove when an attachment becomes active.
+     * @param[out] clearanceOffsetsToPersist Clearance offsets to persist to USD.
      */
-    void _processAttachmentForGrip(const std::string& attachmentPath,
-                                   std::vector<std::string>& apToRemove,
+    void _processAttachmentForGrip(size_t attachmentIndex,
+                                   std::vector<size_t>& apToRemove,
                                    std::vector<std::pair<std::string, float>>& clearanceOffsetsToPersist);
 
     /**
@@ -353,12 +362,12 @@ private:
     /**
      * @brief Queue helper: detach joint (will enable constraints and collisions).
      */
-    void _queueDetachJoint(const std::string& jointPath);
+    void _queueDetachJoint(physx::PxJoint* joint);
 
     /**
      * @brief Queue helper: attach joint to actors and set pose/flags.
      */
-    void _queueAttachJoint(const std::string& jointPath,
+    void _queueAttachJoint(physx::PxJoint* joint,
                            physx::PxRigidActor* actor0,
                            physx::PxRigidActor* actor1,
                            const physx::PxTransform& localPose1);
@@ -384,7 +393,7 @@ private:
     /**
      * @brief Returns cached forward axis for an attachment or default 'Z'.
      */
-    Axis _getJointForwardAxis(const std::string& attachmentPath) const;
+    Axis _getJointForwardAxis(size_t attachmentIndex) const;
 
     /**
      * @brief Computes world transform at joint actor0 frame.
@@ -395,6 +404,16 @@ private:
      * @brief Computes normalized world-space direction vector from axis and world transform.
      */
     physx::PxVec3 _directionFromAxisAndWorld(Axis axis, const physx::PxTransform& worldTransform) const;
+
+    /**
+     * @brief Returns cached PhysX joint pointer for an attachment index, or nullptr if unavailable.
+     */
+    physx::PxJoint* _getCachedJoint(size_t attachmentIndex) const;
+
+    /**
+     * @brief Returns cached PhysX actor for a prim path, fetching and caching if needed.
+     */
+    physx::PxRigidActor* _getOrCacheActor(const std::string& actorPath);
 
     pxr::SdfPath m_primPath; ///< The USD prim path of this gripper
     std::string m_activationRule = "FullSet"; ///< How the surface gripper is activated
@@ -407,15 +426,15 @@ private:
     float m_maxGripDistance = 0.0f; ///< Maximum distance the gripper can check to grab an object
 
 
-    std::unordered_set<std::string> m_attachmentPoints; ///< List of D6 joints as attachment points
-    std::unordered_set<std::string> m_activeAttachmentPoints; ///< List of filtered bodies for gripping
-    std::unordered_set<std::string> m_inactiveAttachmentPoints; ///< List of filtered bodies for gripping
-    std::unordered_set<std::string> m_grippedObjects; ///< List of currently gripped objects
-    std::unordered_set<std::string> m_grippedObjectsBuffer; ///< Buffer used to check currently gripped objects at
-                                                            ///< runtime
+    std::vector<std::string> m_attachmentPaths; ///< Attachment joint paths indexed by attachment index
+    std::unordered_set<size_t> m_activeAttachmentIndices; ///< Active attachment indices
+    std::unordered_set<size_t> m_inactiveAttachmentIndices; ///< Inactive attachment indices
+    mutable std::unordered_set<std::string> m_grippedObjects; ///< List of currently gripped objects (mutable for
+                                                              ///< caching)
+    mutable std::unordered_set<std::string> m_grippedObjectsBuffer; ///< Buffer for runtime checks (mutable for caching)
 
     size_t m_settlingDelay = 10; ///< Number of physics steps to wait for the joint to settle
-    std::unordered_map<std::string, size_t> m_jointSettlingCounters; ///< Map of joint paths to settling counters
+    std::vector<size_t> m_jointSettlingCounters; ///< Settling counters per attachment index
 
 
     bool m_isInitialized = false; ///< Whether the component is initialized
@@ -424,10 +443,19 @@ private:
 
     bool m_writeToUsd = false; ///< Whether to write to USD or keep state in memory only
 
+    // Dirty/decimation flags for reducing per-step work
+    bool m_grippedObjectsDirty = false; ///< Marks when gripped objects changed and USD needs update
+    int m_usdWriteDecimationCounter = 0; ///< Counter for throttling periodic USD writes (frames)
+    int m_usdWriteDecimationInterval = 0; ///< Interval for throttling; 0 disables throttling
+
     // Cached USD-derived data to avoid mid-step reads
-    std::unordered_map<std::string, Axis> m_jointForwardAxis; ///< Per-joint forward axis
-    std::unordered_map<std::string, float> m_jointClearanceOffset; ///< Per-joint clearance offset (meters)
+    std::vector<Axis> m_jointForwardAxis; ///< Per-joint forward axis by index
+    std::vector<float> m_jointClearanceOffset; ///< Per-joint clearance offset (meters) by index
     std::string m_body0PathForFilterPairs; ///< Cached body0 path used for filtered pairs updates
+
+    // Cached PhysX pointers
+    std::vector<physx::PxJoint*> m_attachmentJoints; ///< Cached PhysX joints aligned with m_attachmentPaths
+    std::unordered_map<std::string, physx::PxRigidActor*> m_actorCache; ///< Cached actors by prim path
 
     // USD writes are handled via queued actions consumed by the manager
 
@@ -436,6 +464,12 @@ private:
 
     // Queued USD actions (protected by mutex)
     std::vector<UsdAction> m_usdActions;
+
+    // Reusable buffers for physics-step operations to avoid reallocations
+    std::vector<size_t> m_apIndicesToDetach; ///< Temp indices to detach due to force limits
+    std::vector<size_t> m_apIndicesToActivate; ///< Temp indices to activate after successful grip
+    std::vector<std::pair<std::string, float>> m_clearanceOffsetsToPersist; ///< Temp clearance updates to persist
+    mutable std::vector<std::string> m_grippedObjectsVector; ///< Cached vector view of gripped objects
 };
 
 } // namespace surface_gripper

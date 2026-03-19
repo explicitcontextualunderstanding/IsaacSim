@@ -14,8 +14,10 @@
 # limitations under the License.
 
 import carb
+import carb.eventdispatcher
 import omni
 import omni.replicator.core as rep
+import omni.timeline
 from isaacsim.core.nodes import BaseResetNode
 from isaacsim.core.nodes.ogn.OgnIsaacCreateRenderProductDatabase import OgnIsaacCreateRenderProductDatabase
 from pxr import Gf, Usd, UsdRender
@@ -28,16 +30,20 @@ class OgnIsaacCreateRenderProductInternalState(BaseResetNode):
         self.factory = None
         self.resolution = [0, 0]
         self.camera_path = ""
+        self.rp_sub_stop = None
+        self.rp_sub_play = None
         super().__init__(initialize=False)
 
-    def on_stage_event(self, event: carb.events.IEvent):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            if self.handle:
-                self.handle.hydra_texture.set_updates_enabled(False)
-            self.initialized = False
-        elif event.type == int(omni.timeline.TimelineEventType.PLAY):
-            if self.handle:
-                self.handle.hydra_texture.set_updates_enabled(True)
+    def on_timeline_stop(self, event: carb.eventdispatcher.Event):
+        """Timeline stop event callback - disable hydra texture updates."""
+        if self.handle:
+            self.handle.hydra_texture.set_updates_enabled(False)
+        self.initialized = False
+
+    def on_timeline_play(self, event: carb.eventdispatcher.Event):
+        """Timeline play event callback - enable hydra texture updates."""
+        if self.handle:
+            self.handle.hydra_texture.set_updates_enabled(True)
 
 
 class OgnIsaacCreateRenderProduct:
@@ -73,10 +79,15 @@ class OgnIsaacCreateRenderProduct:
                 state.camera_path = db.inputs.cameraPrim[0].GetString()
                 db.outputs.renderProductPath = state.handle.path
 
-                state.rp_sub = (
-                    omni.timeline.get_timeline_interface()
-                    .get_timeline_event_stream()
-                    .create_subscription_to_pop(state.on_stage_event, name="IsaacSimOGNCoreNodesRPEventHandler")
+                state.rp_sub_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                    event_name=omni.timeline.GLOBAL_EVENT_STOP,
+                    on_event=state.on_timeline_stop,
+                    observer_name="isaacsim.core.nodes.OgnIsaacCreateRenderProduct.on_timeline_stop",
+                )
+                state.rp_sub_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                    event_name=omni.timeline.GLOBAL_EVENT_PLAY,
+                    on_event=state.on_timeline_play,
+                    observer_name="isaacsim.core.nodes.OgnIsaacCreateRenderProduct.on_timeline_play",
                 )
             render_prod_prim = UsdRender.Product(stage.GetPrimAtPath(state.handle.path))
             if not render_prod_prim:
@@ -105,4 +116,5 @@ class OgnIsaacCreateRenderProduct:
             # Manually calling destroy() here leads to a crash in some cases.
             # Instead it will be destroyed when the node is deleted.
             state.handle = None
-            state.rp_sub = None
+            state.rp_sub_stop = None
+            state.rp_sub_play = None

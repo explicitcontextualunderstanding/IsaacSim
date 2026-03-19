@@ -1,4 +1,21 @@
 # Changelog
+
+## [4.1.1] - 2026-03-04
+### Changed
+- Updated Overview.md with note about newer cumotion extension.
+
+## [4.1.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [4.0.10] - 2025-11-26
+### Fixed
+- Issue with python bindings for lula working with numpy 2.x
+
+## [4.0.9] - 2025-11-17
+### Changed
+- Update fix build issues with py 3.12 lula package
+
 ## [4.0.8] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

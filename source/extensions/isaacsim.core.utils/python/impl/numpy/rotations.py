@@ -23,10 +23,10 @@ def gf_quat_to_tensor(orientation: typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternio
     """Converts a pxr Quaternion type to a numpy array following [w, x, y, z] convention.
 
     Args:
-        orientation (typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternion]): [description]
+        orientation (typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternion]): Input quaternion from USD.
 
     Returns:
-        np.ndarray: [description]
+        np.ndarray: Quaternion as numpy array in [w, x, y, z] format.
     """
     quat = np.zeros(4)
     quat[1:] = orientation.GetImaginary()

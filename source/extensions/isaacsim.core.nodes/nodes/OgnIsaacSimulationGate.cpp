@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    u_int m_frame = 0;
+    unsigned int m_frame = 0;
     omni::timeline::ITimeline* m_timeline = nullptr;
 };
 REGISTER_OGN_NODE()

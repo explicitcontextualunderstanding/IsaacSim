@@ -21,10 +21,10 @@ from isaacsim.core.utils.types import ArticulationAction
 
 
 class BaseGripperController(BaseController):
-    """[summary]
+    """Abstract base class for gripper controllers.
 
     Args:
-        name (str): [description]
+        name: Name identifier for the controller.
     """
 
     def __init__(self, name: str) -> None:
@@ -36,13 +36,13 @@ class BaseGripperController(BaseController):
 
         Args:
             action (str): "open" or "close"
-            current_joint_positions (np.ndarray): [description]
+            current_joint_positions (np.ndarray): Current positions of the gripper joints.
 
         Raises:
-            Exception: [description]
+            Exception: If action is not "open" or "close".
 
         Returns:
-            ArticulationAction: [description]
+            ArticulationAction: Action to apply to the gripper joints.
         """
         if action == "open":
             return self.open(current_joint_positions)
@@ -53,34 +53,34 @@ class BaseGripperController(BaseController):
 
     @abstractmethod
     def open(self, current_joint_positions: np.ndarray) -> ArticulationAction:
-        """[summary]
+        """Open the gripper.
 
         Args:
-            current_joint_positions (np.ndarray): [description]
+            current_joint_positions: Current positions of the gripper joints.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
-            ArticulationAction: [description]
+            Action to open the gripper.
         """
         raise NotImplementedError
 
     @abstractmethod
     def close(self, current_joint_positions: np.ndarray) -> ArticulationAction:
-        """[summary]
+        """Close the gripper.
 
         Args:
-            current_joint_positions (np.ndarray): [description]
+            current_joint_positions: Current positions of the gripper joints.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
-            ArticulationAction: [description]
+            Action to close the gripper.
         """
         raise NotImplementedError
 
     def reset(self) -> None:
-        """[summary]"""
+        """Reset the gripper controller state."""
         return

@@ -16,14 +16,16 @@
 import numpy as np
 import omni.kit.commands
 import omni.kit.test
-import torch
 from isaacsim.core.api.objects import DynamicCuboid, VisualCuboid
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import SingleXFormPrim
 from isaacsim.core.utils.prims import find_matching_prim_paths, get_all_matching_child_prims
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path_async
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 
 class TestPrims(CoreTestCase):

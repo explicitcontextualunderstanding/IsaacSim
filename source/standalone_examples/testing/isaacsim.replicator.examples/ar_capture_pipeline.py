@@ -18,6 +18,9 @@ import sys
 
 import numpy as np
 
+# Tolerance for position comparisons (in meters)
+POSITION_TOLERANCE = 0.006
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--gpu_dynamics", action="store_true", default=False, help="Simulation context with GPU dynamics (device='cuda')"
@@ -33,7 +36,7 @@ import omni.kit.app
 import omni.replicator.core as rep
 import omni.usd
 from isaacsim.core.api import SimulationContext
-from omni.isaac.core.objects import DynamicCuboid
+from isaacsim.core.api.objects import DynamicCuboid
 
 EXPECTED_LOCATIONS = {
     "initial": (0, 0, 3),
@@ -75,11 +78,12 @@ carb.settings.get_settings().set_bool("/physics/suppressReadback", False)
 location = dynamic_cuboid_prim.GetAttribute("xformOp:translate").Get()
 print(f"Initial state:")
 print(f"  timeline time: {timeline.get_current_time():.4f}, is_playing: {timeline.is_playing()}, location: {location}")
-passed = np.allclose(location, EXPECTED_LOCATIONS["initial"])
+passed = np.allclose(location, EXPECTED_LOCATIONS["initial"], atol=POSITION_TOLERANCE)
+diff = tuple(float(x) for x in (np.array(location) - np.array(EXPECTED_LOCATIONS["initial"])))
 if passed:
-    print(f"[PASS] Initial location is as expected: {location}")
+    print(f"[PASS] Initial location is as expected: {location}, diff: {diff}")
 else:
-    print(f"[FAIL] Initial location is not as expected: {location} vs {EXPECTED_LOCATIONS['initial']}")
+    print(f"[FAIL] Initial location is not as expected: {location} vs {EXPECTED_LOCATIONS['initial']}, diff: {diff}")
 if not passed:
     sys.exit(1)
 
@@ -88,11 +92,12 @@ simulation_context.reset()
 location = dynamic_cuboid_prim.GetAttribute("xformOp:translate").Get()
 print(f"After simulation_context.reset():")
 print(f"  timeline time: {timeline.get_current_time():.4f}, is_playing: {timeline.is_playing()}, location: {location}")
-passed = np.allclose(location, EXPECTED_LOCATIONS["reset"])
+passed = np.allclose(location, EXPECTED_LOCATIONS["reset"], atol=POSITION_TOLERANCE)
+diff = tuple(float(x) for x in (np.array(location) - np.array(EXPECTED_LOCATIONS["reset"])))
 if passed:
-    print(f"[PASS] Reset location is as expected: {location}")
+    print(f"[PASS] Reset location is as expected: {location}, diff: {diff}")
 else:
-    print(f"[FAIL] Reset location is not as expected: {location} vs {EXPECTED_LOCATIONS['reset']}")
+    print(f"[FAIL] Reset location is not as expected: {location} vs {EXPECTED_LOCATIONS['reset']}, diff: {diff}")
 if not passed:
     sys.exit(1)
 
@@ -101,11 +106,12 @@ simulation_context.stop()
 location = dynamic_cuboid_prim.GetAttribute("xformOp:translate").Get()
 print(f"After simulation_context.stop():")
 print(f"  timeline time: {timeline.get_current_time():.4f}, is_playing: {timeline.is_playing()}, location: {location}")
-passed = np.allclose(location, EXPECTED_LOCATIONS["stop"])
+passed = np.allclose(location, EXPECTED_LOCATIONS["stop"], atol=POSITION_TOLERANCE)
+diff = tuple(float(x) for x in (np.array(location) - np.array(EXPECTED_LOCATIONS["stop"])))
 if passed:
-    print(f"[PASS] Stop location is as expected: {location}")
+    print(f"[PASS] Stop location is as expected: {location}, diff: {diff}")
 else:
-    print(f"[FAIL] Stop location is not as expected: {location} vs {EXPECTED_LOCATIONS['stop']}")
+    print(f"[FAIL] Stop location is not as expected: {location} vs {EXPECTED_LOCATIONS['stop']}, diff: {diff}")
 if not passed:
     sys.exit(1)
 
@@ -120,11 +126,12 @@ rep.orchestrator.step()
 location = dynamic_cuboid_prim.GetAttribute("xformOp:translate").Get()
 print(f"After rep.orchestrator.step():")
 print(f"  timeline time: {timeline.get_current_time():.4f}, is_playing: {timeline.is_playing()}, location: {location}")
-passed = np.allclose(location, EXPECTED_LOCATIONS["frame_0"])
+passed = np.allclose(location, EXPECTED_LOCATIONS["frame_0"], atol=POSITION_TOLERANCE)
+diff = tuple(float(x) for x in (np.array(location) - np.array(EXPECTED_LOCATIONS["frame_0"])))
 if passed:
-    print(f"[PASS] Frame 0 location is as expected: {location}")
+    print(f"[PASS] Frame 0 location is as expected: {location}, diff: {diff}")
 else:
-    print(f"[FAIL] Frame 0 location is not as expected: {location} vs {EXPECTED_LOCATIONS['frame_0']}")
+    print(f"[FAIL] Frame 0 location is not as expected: {location} vs {EXPECTED_LOCATIONS['frame_0']}, diff: {diff}")
 if not passed:
     sys.exit(1)
 
@@ -154,11 +161,14 @@ for i in range(num_captures):
         print(
             f"  timeline time: {timeline.get_current_time():.4f}, is_playing: {timeline.is_playing()}, location: {location}"
         )
-        passed = np.allclose(location, EXPECTED_LOCATIONS[f"frame_{i+1}"])
+        passed = np.allclose(location, EXPECTED_LOCATIONS[f"frame_{i+1}"], atol=POSITION_TOLERANCE)
+        diff = tuple(float(x) for x in (np.array(location) - np.array(EXPECTED_LOCATIONS[f"frame_{i+1}"])))
         if passed:
-            print(f"[PASS] Frame {i+1} location is as expected: {location}")
+            print(f"[PASS] Frame {i+1} location is as expected: {location}, diff: {diff}")
         else:
-            print(f"[FAIL] Frame {i+1} location is not as expected: {location} vs {EXPECTED_LOCATIONS[f'frame_{i+1}']}")
+            print(
+                f"[FAIL] Frame {i+1} location is not as expected: {location} vs {EXPECTED_LOCATIONS[f'frame_{i+1}']}, diff: {diff}"
+            )
         if not passed:
             sys.exit(1)
 

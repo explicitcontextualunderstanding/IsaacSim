@@ -18,7 +18,7 @@ import time
 from isaacsim import SimulationApp
 
 # Example ROS2 bridge sample showing rclpy and rosclock interaction
-simulation_app = SimulationApp({"renderer": "RaytracedLighting", "headless": True})
+simulation_app = SimulationApp({"renderer": "RealTimePathTracing", "headless": True})
 import omni.graph.core as og
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.utils.extensions import enable_extension

@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-
 import carb
+import numpy as np
 import omni.kit.window.property
 from isaacsim.replicator.behavior.global_variables import EXPOSED_ATTR_NS
 from isaacsim.replicator.behavior.utils.behavior_utils import (
@@ -25,7 +24,7 @@ from isaacsim.replicator.behavior.utils.behavior_utils import (
     remove_exposed_variables,
 )
 from isaacsim.replicator.behavior.utils.scene_utils import get_world_location
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 
@@ -73,10 +72,17 @@ class LocationRandomizer(BehaviorScript):
             "default_value": 0,
             "doc": "Interval for updating the behavior. Value 0 means every frame.",
         },
+        {
+            "attr_name": "seed",
+            "attr_type": Sdf.ValueTypeNames.Int,
+            "default_value": -1,
+            "doc": "Random seed for reproducible randomization. Use -1 for non-deterministic behavior.",
+        },
     ]
 
     def on_init(self):
         """Called when the script is assigned to a prim."""
+        self._rng = None
         self._min_position = Gf.Vec3d(-1.0, -1.0, -1.0)
         self._max_position = Gf.Vec3d(1.0, 1.0, 1.0)
         self._use_relative_frame = False
@@ -132,6 +138,11 @@ class LocationRandomizer(BehaviorScript):
         target_prim_path = self._get_exposed_variable("frame:targetPrimPath")
         include_children = self._get_exposed_variable("includeChildren")
         self._interval = self._get_exposed_variable("interval")
+        seed = self._get_exposed_variable("seed")
+
+        # Initialize the random number generator (use seed if valid, otherwise non-deterministic)
+        if self._rng is None:
+            self._rng = np.random.default_rng(seed if seed >= 0 else None)
 
         # Get the prims to apply the behavior to
         if include_children:
@@ -174,6 +185,7 @@ class LocationRandomizer(BehaviorScript):
         self._target_prim = None
         self._interval = 0
         self._update_counter = 0
+        self._rng = None
 
     def _apply_behavior(self):
         # Run the randomization for each valid prim
@@ -226,9 +238,9 @@ class LocationRandomizer(BehaviorScript):
     def _randomize_location(self, prim):
         # Generate a random offset within the bounds
         random_offset = Gf.Vec3d(
-            random.uniform(self._min_position[0], self._max_position[0]),
-            random.uniform(self._min_position[1], self._max_position[1]),
-            random.uniform(self._min_position[2], self._max_position[2]),
+            self._rng.uniform(self._min_position[0], self._max_position[0]),
+            self._rng.uniform(self._min_position[1], self._max_position[1]),
+            self._rng.uniform(self._min_position[2], self._max_position[2]),
         )
 
         # Initialize location
@@ -251,3 +263,11 @@ class LocationRandomizer(BehaviorScript):
 
         # Set the randomized location to the prim
         self._set_location(prim, loc)
+
+    def set_rng(self, rng: np.random.Generator | None = None):
+        """Set the random number generator, overriding the USD seed attribute.
+
+        Args:
+            rng: Numpy random generator. If None, creates a new default generator.
+        """
+        self._rng = rng if rng is not None else np.random.default_rng()

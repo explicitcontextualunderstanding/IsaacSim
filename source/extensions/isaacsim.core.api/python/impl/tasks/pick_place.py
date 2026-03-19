@@ -25,15 +25,15 @@ from isaacsim.core.utils.string import find_unique_string_name
 
 
 class PickPlace(ABC, BaseTask):
-    """[summary]
+    """Abstract task for picking and placing a cube with a robot.
 
     Args:
-        name (str): [description]
-        cube_initial_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_initial_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
-        target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_size (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
+        name: Task name identifier.
+        cube_initial_position: Initial cube position. Defaults to None.
+        cube_initial_orientation: Initial cube orientation. Defaults to None.
+        target_position: Target position for placing. Defaults to None.
+        cube_size: Size of the cube. Defaults to None.
+        offset: Offset for all task objects. Defaults to None.
     """
 
     def __init__(
@@ -66,10 +66,10 @@ class PickPlace(ABC, BaseTask):
         return
 
     def set_up_scene(self, scene: Scene) -> None:
-        """[summary]
+        """Set up the scene with cube and robot.
 
         Args:
-            scene (Scene): [description]
+            scene: The scene to populate.
         """
         super().set_up_scene(scene)
         scene.add_default_ground_plane()
@@ -122,10 +122,10 @@ class PickPlace(ABC, BaseTask):
         return params_representation
 
     def get_observations(self) -> dict:
-        """[summary]
+        """Get current task observations.
 
         Returns:
-            dict: [description]
+            Dictionary with cube and robot observations.
         """
         joints_state = self._robot.get_joints_state()
         cube_position, cube_orientation = self._cube.get_local_pose()
@@ -143,11 +143,11 @@ class PickPlace(ABC, BaseTask):
         }
 
     def pre_step(self, time_step_index: int, simulation_time: float) -> None:
-        """[summary]
+        """Called before each physics step.
 
         Args:
-            time_step_index (int): [description]
-            simulation_time (float): [description]
+            time_step_index: Current simulation step index.
+            simulation_time: Current simulation time.
         """
         return
 
@@ -159,9 +159,9 @@ class PickPlace(ABC, BaseTask):
         return
 
     def calculate_metrics(self) -> dict:
-        """[summary]"""
+        """Calculate task metrics."""
         raise NotImplementedError
 
     def is_done(self) -> bool:
-        """[summary]"""
+        """Check if task is complete."""
         raise NotImplementedError

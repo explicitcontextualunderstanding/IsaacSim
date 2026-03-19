@@ -14,11 +14,12 @@
 # limitations under the License.
 
 launch_config:
-  renderer: RaytracedLighting
+  renderer: RealTimePathTracing
   headless: true
 resolution: [512, 512]
 num_frames: 5
 clear_previous_semantics: true
+backend_type: null
 writer: CocoWriter
 writer_config:
   output_dir: _out_coco

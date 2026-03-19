@@ -23,16 +23,12 @@ simulation_app = SimulationApp(launch_config={"headless": False})
 import carb.settings
 import omni.replicator.core as rep
 import omni.usd
-from isaacsim.core.utils.semantics import add_labels
-from pxr import UsdGeom
 
 
-# Custom randomizer function using USD API
+# Randomize the location of a prim without the graph-based randomizer
 def randomize_location(prim):
-    if not prim.GetAttribute("xformOp:translate"):
-        UsdGeom.Xformable(prim).AddTranslateOp()
-    translate = prim.GetAttribute("xformOp:translate")
-    translate.Set((random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1)))
+    random_pos = (random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1))
+    rep.functional.modify.position(prim, random_pos)
 
 
 def run_example():
@@ -46,28 +42,31 @@ def run_example():
     carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
     # Setup stage
-    stage = omni.usd.get_context().get_stage()
-    cube = stage.DefinePrim("/World/Cube", "Cube")
-    add_labels(cube, labels=["MyCube"], instance_name="class")
+    rep.functional.create.xform(name="World")
+    cube = rep.functional.create.cube(parent="/World", name="Cube")
+    rep.functional.modify.semantics(cube, {"class": "my_cube"}, mode="add")
 
     # Create a replicator randomizer with custom event trigger
     with rep.trigger.on_custom_event(event_name="randomize_dome_light_color"):
         rep.create.light(light_type="Dome", color=rep.distribution.uniform((0, 0, 0), (1, 1, 1)))
 
     # Create a render product using the viewport perspective camera
-    rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512))
+    cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+    rp = rep.create.render_product(cam, (512, 512))
 
     # Write data using the basic writer with the rgb and bounding box annotators
-    writer = rep.writers.get("BasicWriter")
+    backend = rep.backends.get("DiskBackend")
     out_dir = os.path.join(os.getcwd(), "_out_basic_writer_rand")
+    backend.initialize(output_dir=out_dir)
     print(f"Output directory: {out_dir}")
-    writer.initialize(output_dir=out_dir, rgb=True, semantic_segmentation=True, colorize_semantic_segmentation=True)
+    writer = rep.writers.get("BasicWriter")
+    writer.initialize(backend=backend, rgb=True, semantic_segmentation=True, colorize_semantic_segmentation=True)
     writer.attach(rp)
 
     # Trigger a data capture request (data will be written to disk by the writer)
     for i in range(3):
         print(f"Step {i}")
-        # Trigger the custom event randomizer every other step
+        # Trigger the custom graph-based event randomizer every second step
         if i % 2 == 1:
             rep.utils.send_og_event(event_name="randomize_dome_light_color")
 
@@ -77,12 +76,10 @@ def run_example():
         # Since the replicator randomizer is set to trigger on custom events, step will only trigger the writer
         rep.orchestrator.step(rt_subframes=32)
 
-    # Destroy the render product to release resources by detaching it from the writer first
+    # Wait for the data to be written to disk and clean up resources
+    rep.orchestrator.wait_until_complete()
     writer.detach()
     rp.destroy()
-
-    # Wait for the data to be written to disk
-    rep.orchestrator.wait_until_complete()
 
 
 # Run the example

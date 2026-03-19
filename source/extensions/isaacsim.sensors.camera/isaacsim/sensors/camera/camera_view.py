@@ -12,15 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides high level functions for managing batched camera data and sensor operations in Isaac Sim."""
+
+
 from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import omni.replicator.core as rep
-import torch
 import warp as wp
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import XFormPrim
-from isaacsim.core.utils.carb import get_carb_setting
-from pxr import Usd, Vt
+from pxr import Vt
+
+torch = import_module("torch")
 
 # from ROS camera convention to USD camera convention
 U_R_TRANSFORM = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
@@ -64,9 +69,10 @@ def reshape_tiled_image(
     Args:
         tiled_image_buffer: The input image buffer. Shape is ((height*width*num_channels*num_cameras,).
         batched_image: The output image. Shape is (num_cameras, height, width, num_channels).
-        image_width: The width of the image.
         image_height: The height of the image.
+        image_width: The width of the image.
         num_channels: The number of channels in the image.
+        num_output_channels: The number of output channels in the batched image.
         num_tiles_x: The number of tiles in x direction.
         offset: The offset in the image buffer. This is used when multiple image types are concatenated in the buffer.
     """
@@ -136,26 +142,23 @@ class CameraView(XFormPrim):
             - ``int32``
 
     Args:
-        prim_paths_expr: Prim paths regex to encapsulate all prims that match it. E.g.: "/World/Env[1-5]/Camera" will match
-                         /World/Env1/Camera, /World/Env2/Camera..etc. Additionally a list of regex can be provided.
+        prim_paths_expr: Prim paths regex to encapsulate all prims that match it.
+            E.g.: "/World/Env[1-5]/Camera" will match /World/Env1/Camera, /World/Env2/Camera..etc.
+            Additionally a list of regex can be provided.
+        name: Shortname to be used as a key by Scene class.
+            Note: needs to be unique if the object is added to the Scene.
         camera_resolution: Resolution of each sensor (width, height).
         output_annotators: Annotator/sensor types to configure.
-        name (str, optional): Shortname to be used as a key by Scene class.
-                              Note: needs to be unique if the object is added to the Scene.
-        positions Default positions in the world frame of the prim. Shape is (N, 3).
-                  Defaults to None, which means left unchanged.
-        translations: Default translations in the local frame of the prims (with respect to its parent prims). shape is (N, 3).
-                      Defaults to None, which means left unchanged.
+        positions: Default positions in the world frame of the prim. Shape is (N, 3).
+        translations: Default translations in the local frame of the prims (with respect to its parent prims).
+            Shape is (N, 3).
         orientations: Default quaternion orientations in the world/ local frame of the prim (depends if translation
-                      or position is specified). Quaternion is scalar-first (w, x, y, z). Shape is (N, 4).
-                      Defaults to None, which means left unchanged.
+            or position is specified). Quaternion is scalar-first (w, x, y, z). Shape is (N, 4).
         scales: Local scales to be applied to the prim's dimensions. Shape is (N, 3).
-                Defaults to None, which means left unchanged.
-        visibilities: Set to False for an invisible prim in the stage while rendering.
-                      Shape is (N,). Defaults to None.
+        visibilities: Set to False for an invisible prim in the stage while rendering. Shape is (N,).
         reset_xform_properties: True if the prims don't have the right set of xform properties (i.e: translate,
-                                orient and scale) ONLY and in that order. Set this parameter to False if the object
-                                were cloned using using the cloner api in isaacsim.core.cloner. Defaults to True.
+            orient and scale) ONLY and in that order. Set this parameter to False if the object
+            were cloned using using the cloner api in isaacsim.core.cloner.
 
     Raises:
         Exception: if translations and positions defined at the same time.
@@ -193,9 +196,11 @@ class CameraView(XFormPrim):
         self._setup_tiled_sensor()
 
     def __del__(self):
+        """Clean up resources when the CameraView object is destroyed."""
         self.destroy()
 
-    def destroy(self) -> None:
+    def destroy(self):
+        """Destroy the CameraView by cleaning up the tiled sensor and calling the parent destructor."""
         self._clean_up_tiled_sensor()
         super().destroy()
 
@@ -211,11 +216,11 @@ class CameraView(XFormPrim):
         """Calculate the resolution for the tiled sensor based on the number of cameras and individual camera resolution.
 
         Args:
-            num_cameras (int): Total number of cameras.
-            resolution (Tuple[int, int]): Resolution of each individual camera.
+            num_cameras: Total number of cameras.
+            resolution: Resolution of each individual camera.
 
         Returns:
-            Tuple[int, int]: The total resolution for the tiled sensor layout.
+            The total resolution for the tiled sensor layout.
         """
         num_rows = round(num_cameras**0.5)
         num_columns = (num_cameras + num_rows - 1) // num_rows
@@ -261,16 +266,16 @@ class CameraView(XFormPrim):
         """Retrieve the file path of the render product associated with the tiled sensor.
 
         Returns:
-            str: The path to the render product, or None if not available.
+            The path to the render product, or None if not available.
         """
         return self._render_product_path
 
     # TODO: add functionality to pause and resume tiled sensor, similar to camera.py
-    def set_resolutions(self, resolution: Tuple[int, int]) -> None:
+    def set_resolutions(self, resolution: Tuple[int, int]):
         """Set the resolutions for all cameras, updating the tiled sensor configuration if changed.
 
         Args:
-            resolution (Tuple[int, int]): The new resolution to apply to all cameras.
+            resolution: The new resolution to apply to all cameras.
         """
         if not resolution == self.camera_resolution:
             self.camera_resolution = resolution
@@ -281,7 +286,7 @@ class CameraView(XFormPrim):
         """Retrieve the current resolution setting for all cameras.
 
         Returns:
-            Tuple[int, int]: The resolution of the cameras.
+            The resolution of the cameras.
         """
         return self.camera_resolution
 
@@ -289,7 +294,7 @@ class CameraView(XFormPrim):
         """Calculate the aspect ratio of the cameras based on current resolution settings.
 
         Returns:
-            float: The aspect ratio, defined as width divided by height.
+            The aspect ratio, defined as width divided by height.
         """
         width, height = self.get_resolutions()
         return float(width) / float(height)
@@ -298,8 +303,8 @@ class CameraView(XFormPrim):
         """Convert orientations using the specified transformation matrix.
 
         Args:
-            orientations (Union[np.ndarray, torch.Tensor, wp.array]): Input orientations.
-            transform_matrix (np.ndarray): The transformation matrix to apply.
+            orientations: Input orientations.
+            transform_matrix: The transformation matrix to apply.
 
         Returns:
             The converted orientations.
@@ -336,19 +341,19 @@ class CameraView(XFormPrim):
         """Get the poses of the prims in the view with respect to the world's frame
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                 to query. Shape (M,).
-                                                                                 Where M <= size of the encapsulated prims in the view.
-                                                                                 Defaults to None (i.e: all prims in the view).
-            usd (bool, optional): True to query from usd. Otherwise False to query from Fabric data. Defaults to True.
+            indices: indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
+            camera_axes: The coordinate system to use ('world', 'ros', 'usd').
+            usd: True to query from usd. Otherwise False to query from Fabric data.
 
         Returns:
-            Union[Tuple[np.ndarray, np.ndarray], Tuple[torch.Tensor, torch.Tensor], Tuple[wp.indexedarray, wp.indexedarray]]: first index is positions in the world frame of the prims. shape is (M, 3).
-                                                                                     second index is quaternion orientations in the world frame of the prims.
-                                                                                     quaternion is scalar-first (w, x, y, z). shape is (M, 4).
+            first index is positions in the world frame of the prims. shape is (M, 3).
+            second index is quaternion orientations in the world frame of the prims.
+            quaternion is scalar-first (w, x, y, z). shape is (M, 4).
 
-        Example:
-
+        Raises:
+            Exception: If the provided camera_axes is not supported.
         """
         if camera_axes not in ["world", "ros", "usd"]:
             raise Exception(
@@ -382,11 +387,11 @@ class CameraView(XFormPrim):
         """Set the world poses for all cameras, adjusting their positions and orientations based on specified indices and coordinate system.
 
         Args:
-            positions (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): New positions for the cameras.
-            orientations (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): New orientations for the cameras.
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]]): Specific cameras to update.
-            camera_axes (str): The coordinate system to use ('world', 'ros', 'usd').
-            usd (bool, optional): True to query from usd. Otherwise False to query from Fabric data. Defaults to True.
+            positions: New positions for the cameras.
+            orientations: New orientations for the cameras.
+            indices: Specific cameras to update.
+            camera_axes: The coordinate system to use ('world', 'ros', 'usd').
+            usd: True to query from usd. Otherwise False to query from Fabric data.
 
         Raises:
             Exception: If the provided camera_axes is not supported.
@@ -420,18 +425,18 @@ class CameraView(XFormPrim):
         """Get prim poses in the view with respect to the local frame (the prim's parent frame)
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                 to query. Shape (M,).
-                                                                                 Where M <= size of the encapsulated prims in the view.
-                                                                                 Defaults to None (i.e: all prims in the view).
+            indices: indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
+            camera_axes: The coordinate system to use ('world', 'ros', 'usd').
 
         Returns:
-            Union[Tuple[np.ndarray, np.ndarray], Tuple[torch.Tensor, torch.Tensor], Tuple[wp.indexedarray, wp.indexedarray]]: first index is positions in the local frame of the prims. shape is (M, 3).
-                                                                                     second index is quaternion orientations in the local frame of the prims.
-                                                                                     quaternion is scalar-first (w, x, y, z). shape is (M, 4).
+            first index is positions in the local frame of the prims. shape is (M, 3).
+            second index is quaternion orientations in the local frame of the prims.
+            quaternion is scalar-first (w, x, y, z). shape is (M, 4).
 
-        Example:
-
+        Raises:
+            Exception: If the provided camera_axes is not supported.
         """
         if camera_axes not in ["world", "ros", "usd"]:
             raise Exception(
@@ -464,10 +469,10 @@ class CameraView(XFormPrim):
         """Set the local poses for all cameras, adjusting their positions and orientations based on specified indices and coordinate system.
 
         Args:
-            positions (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): New positions for the cameras.
-            orientations (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): New orientations for the cameras.
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]]): Specific cameras to update.
-            camera_axes (str): The coordinate system to use ('world', 'ros', 'usd').
+            positions: New positions for the cameras.
+            orientations: New orientations for the cameras.
+            indices: Specific cameras to update.
+            camera_axes: The coordinate system to use ('world', 'ros', 'usd').
 
         Raises:
             Exception: If the provided camera_axes is not supported.
@@ -542,15 +547,23 @@ class CameraView(XFormPrim):
         if tiled:
             shape = (*self.tiled_resolution, spec["channels"])
             if out is None:
-                out = wp.clone(tiled_data[:, :, :3]) if annotator_type == "rgb" else tiled_data.reshape(shape)
+                if annotator_type == "rgb":
+                    rgb_slice = tiled_data[:, :, :3]
+                    out = wp.clone(rgb_slice)
+                else:
+                    out = tiled_data.reshape(shape)
             else:
-                wp.copy(out, tiled_data[:, :, :3] if annotator_type == "rgb" else tiled_data.reshape(shape))
+                if annotator_type == "rgb":
+                    rgb_slice = tiled_data[:, :, :3]
+                    wp.copy(out, rgb_slice)
+                else:
+                    wp.copy(out, tiled_data.reshape(shape))
         # batched images
         else:
             # define internal variables
             channels = spec["channels"]
             output_channels = 3 if annotator_type == "rgb" else channels
-            height, width = self.camera_resolution
+            width, height = self.camera_resolution
             # check if the data should be copied to the pre-allocated memory
             if out is None:
                 shape = (len(self.prims), height, width, output_channels)
@@ -582,11 +595,11 @@ class CameraView(XFormPrim):
         """Fetch the RGB data for all cameras as a single tiled image.
 
         Args:
-            device (str, optional): The device to return the data on ("cpu" or "cuda"). Defaults to "cpu".
-            out (np.ndarray | torch.Tensor, optional): Pre-allocated array or tensor to fill with the RGBA data.
+            out: Pre-allocated array or tensor to fill with the RGBA data.
+            device: The device to return the data on ("cpu" or "cuda").
 
         Returns:
-            np.ndarray | torch.Tensor: containing the RGBA data for each camera. Depth channel is excluded if present.
+            containing the RGBA data for each camera. Depth channel is excluded if present.
         """
         if out is None:
             if device == "cuda":
@@ -604,11 +617,11 @@ class CameraView(XFormPrim):
         """Fetch the depth data for all cameras as a single tiled image.
 
         Args:
-            device (str, optional): The device to return the data on ("cpu" or "cuda"). Defaults to "cpu".
-            out (np.ndarray | torch.Tensor, optional): Pre-allocated array or tensor to fill with the depth data.
+            out: Pre-allocated array or tensor to fill with the depth data.
+            device: The device to return the data on ("cpu" or "cuda").
 
         Returns:
-            np.ndarray | torch.Tensor: containing the depth data for each camera.
+            containing the depth data for each camera.
         """
         if out is None:
             if device == "cuda":
@@ -625,8 +638,11 @@ class CameraView(XFormPrim):
     def get_rgb(self, out=None) -> torch.Tensor:
         """Get the RGB data for all cameras as a batch of images (num_cameras, height, width, 3).
 
+        Args:
+            out: Pre-allocated tensor to fill with the RGB data.
+
         Returns:
-            torch.Tensor: containing the RGB data for each camera.
+            containing the RGB data for each camera.
             Shape is (num_cameras, height, width, 3) with type torch.float32.
         """
         if out is None:
@@ -638,8 +654,11 @@ class CameraView(XFormPrim):
     def get_depth(self, out=None) -> torch.Tensor:
         """Get the depth data for all cameras as a batch of images (num_cameras, height, width, 1).
 
+        Args:
+            out: Pre-allocated tensor to fill with the depth data.
+
         Returns:
-            torch.Tensor: containing the depth data for each camera.
+            containing the depth data for each camera.
             Shape is (num_cameras, height, width, 1) with type torch.float32.
         """
         if out is None:
@@ -654,13 +673,12 @@ class CameraView(XFormPrim):
         """Get the focal length for all cameras
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[float]: list containing the focal lengths of the cameras.
+            list containing the focal lengths of the cameras.
         """
         focal_lengths = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -675,16 +693,15 @@ class CameraView(XFormPrim):
         self,
         values: List[float],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the focal length for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[float]): list containing the focal lengths to set for the cameras.
+            values: List containing the focal lengths to set for the cameras.
                 Length of values must match length of indices.
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -705,13 +722,12 @@ class CameraView(XFormPrim):
         """Get the focus distances for cameras specific in indices. If indices is None, get for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[float]: list containing the focal distances of the cameras.
+            List containing the focus distances of the cameras.
         """
         focus_distances = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -726,16 +742,15 @@ class CameraView(XFormPrim):
         self,
         values: List[float],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the focus distance for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[float]): list containing the focus distances to set for the cameras.
+            values: List containing the focus distances to set for the cameras.
                 Length of values must match length of indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -756,13 +771,12 @@ class CameraView(XFormPrim):
         """Get the lens apertures for cameras specific in indices. If indices is None, get for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[float]: list containing the focal distances of the cameras.
+            List containing the lens apertures of the cameras.
         """
         lens_apertures = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -777,18 +791,17 @@ class CameraView(XFormPrim):
         self,
         values: List[float],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the lens apertures for cameras specific in indices. If indices is None, set for all cameras.
 
         Controls Distance Blurring. Lower Numbers decrease focus range, larger numbers increase it.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[float]): list containing the lens apertures to set for the cameras.
+            values: List containing the lens apertures to set for the cameras.
                 Length of values must match length of indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -811,13 +824,12 @@ class CameraView(XFormPrim):
         Emulates sensor/film width on a camera.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[float]: list containing the focal distances of the cameras.
+            List containing the horizontal apertures of the cameras.
         """
         horizontal_apertures = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -832,16 +844,15 @@ class CameraView(XFormPrim):
         self,
         values: List[float],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the horizontal apertures for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[float]): list containing the horizontal apertures to set for the cameras.
+            values: List containing the horizontal apertures to set for the cameras.
                 Length of values must match length of indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -864,13 +875,12 @@ class CameraView(XFormPrim):
         Emulates sensor/film height on a camera.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[float]: list containing the focal distances of the cameras.
+            List containing the vertical apertures of the cameras.
         """
         vertical_apertures = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -885,18 +895,17 @@ class CameraView(XFormPrim):
         self,
         values: List[float],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the vertical apertures for cameras specific in indices. If indices is None, set for all cameras.
 
         Emulates sensor/film height on a camera.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[float]): list containing the vertical apertures to set for the cameras.
+            values: List containing the vertical apertures to set for the cameras.
                 Length of values must match length of indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -917,13 +926,12 @@ class CameraView(XFormPrim):
         """Get the projection types for cameras specific in indices. If indices is None, get for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
+                Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[str]: list of projection types (pinhole, fisheyeOrthographic, fisheyeEquidistant, fisheyeEquisolid, fisheyePolynomial or fisheyeSpherical)
+            List of projection types (pinhole, fisheyeOrthographic, fisheyeEquidistant, fisheyeEquisolid, fisheyePolynomial or fisheyeSpherical).
         """
         projection_types = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -941,16 +949,15 @@ class CameraView(XFormPrim):
         self,
         values: List[str],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the projection types for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[str]): list of projection types (pinhole, fisheyeOrthographic, fisheyeEquidistant, fisheyeEquisolid, fisheyePolynomial or fisheyeSpherical)
-                Length of values must match length of indices.
+            values: List of projection types (pinhole, fisheyeOrthographic, fisheyeEquidistant,
+                fisheyeEquisolid, fisheyePolynomial or fisheyeSpherical). Length of values must match length of
+                indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -971,13 +978,11 @@ class CameraView(XFormPrim):
         """Get the projection modes for cameras specific in indices. If indices is None, get for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
 
         Returns:
-            list[str]: list of projection modes (perspective, orthographic)
+            List of projection modes (perspective, orthographic).
         """
         projection_modes = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -992,16 +997,14 @@ class CameraView(XFormPrim):
         self,
         values: List[str],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the projection modes for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[str]): list of projection modes (perspective, orthographic)
-                Length of values must match length of indices.
+            values: List of projection modes (perspective, orthographic). Length of values must match length of
+                indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -1020,13 +1023,11 @@ class CameraView(XFormPrim):
         """Get the stereo roles for cameras specific in indices. If indices is None, get for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
 
         Returns:
-            list[str]: list of stereo roles (mono, left, right)
+            List of stereo roles (mono, left, right).
         """
         stereo_roles = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -1041,16 +1042,13 @@ class CameraView(XFormPrim):
         self,
         values: List[str],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the stereo roles for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[str]): list of stereo roles (mono, left, right)
-                Length of values must match length of indices.
+            values: List of stereo roles (mono, left, right). Length of values must match length of indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -1071,13 +1069,11 @@ class CameraView(XFormPrim):
         """Get the (delay_open, delay_close) of shutter for cameras specific in indices. If indices is None, get for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to query. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
+            indices: Indices to specify which prims to query. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
 
         Returns:
-            list[Tuple[float, float]]: list of tuple (delay_open, delay_close)
+            List of tuple (delay_open, delay_close).
         """
         shutter_properties = []
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
@@ -1094,16 +1090,13 @@ class CameraView(XFormPrim):
         self,
         values: List[Tuple[float, float]],
         indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
-    ) -> None:
+    ):
         """Set the (delay_open, delay_close) of shutter for cameras specific in indices. If indices is None, set for all cameras.
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
-                                                                                    to set. Shape (M,).
-                                                                                    Where M <= size of the encapsulated prims in the view.
-                                                                                    Defaults to None (i.e: all prims in the view).
-            values (List[Tuple[float, float]]): list of tuple (delay_open, delay_close)
-                Length of values must match length of indices.
+            values: List of tuple (delay_open, delay_close). Length of values must match length of indices.
+            indices: Indices to specify which prims to set. Shape (M,).
+                Where M <= size of the encapsulated prims in the view.
         """
 
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)

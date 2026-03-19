@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive sample demonstrating keyboard control of a cube's size using Omni Graph."""
+
+
 from isaacsim.examples.interactive.omnigraph_keyboard.omnigraph_keyboard import OmnigraphKeyboard
 from isaacsim.examples.interactive.omnigraph_keyboard.omnigraph_keyboard_extension import OmnigraphKeyboardExtension
+
+__all__ = ["OmnigraphKeyboard"]

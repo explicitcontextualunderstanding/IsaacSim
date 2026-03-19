@@ -16,6 +16,7 @@
 from typing import Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
+import numpy as np
 import omni.kit.commands
 import omni.kit.test
 import warp as wp
@@ -132,7 +133,9 @@ class TestOmniGlass(omni.kit.test.AsyncTestCase):
     async def test_input_values(self, prim, num_prims, device, backend):
         cases = {
             # Color
-            "glass_color": lambda count: draw_sample(shape=(count, 3), dtype=wp.float32),
+            "glass_color": lambda count: draw_sample(
+                shape=(count, 3), dtype=wp.float32, low=-0.1, high=1.1
+            ),  # out of range test
             "glass_color_texture": lambda count: draw_choice(shape=(count,), choices=["/a", "/bc", "/def"]),
             "depth": lambda count: draw_sample(shape=(count, 1), dtype=wp.float32),
             # Roughness
@@ -177,11 +180,14 @@ class TestOmniGlass(omni.kit.test.AsyncTestCase):
             assert name in cases, f"Missing case: {name}"
         # test cases
         for name, sample_func in cases.items():
-            sdf_type = prim._inputs[name]
+            sdf_type = prim._inputs[name]["type"]
+            range_ = prim._inputs[name].get("range")
             cprint(f"  |   input: {name}, sdf_type: {sdf_type}")
             for indices, expected_count in draw_indices(count=num_prims, step=2):
                 cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
                 for v0, expected_v0 in sample_func(expected_count):
+                    if range_ is not None:
+                        expected_v0 = np.clip(expected_v0, range_[0], range_[1])
                     prim.set_input_values(name, values=v0, indices=indices)
                     output = prim.get_input_values(name, indices=indices)
                     # check

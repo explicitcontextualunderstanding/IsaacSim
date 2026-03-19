@@ -13,133 +13,165 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-from typing import Optional
+"""Provides a policy controller for ANYmal quadruped robot executing flat terrain locomotion using an LSTM-based SEA network."""
 
-import numpy as np
+
+import io
+
 import omni
-from isaacsim.core.utils.rotations import quat_to_rot_matrix
+import warp as wp
+from isaacsim.core.deprecation_manager import import_module
+from isaacsim.core.experimental.utils.transform import quaternion_to_rotation_matrix
 from isaacsim.robot.policy.examples.controllers import PolicyController
 from isaacsim.robot.policy.examples.utils import LstmSeaNetwork
 from isaacsim.storage.native import get_assets_root_path
 
+torch = import_module("torch")
+
 
 class AnymalFlatTerrainPolicy(PolicyController):
-    """The ANYmal Robot running a Flat Terrain Locomotion Policy"""
+    """Policy controller for the ANYmal quadruped robot executing flat terrain locomotion.
+
+    This controller implements a learned policy for stable walking on flat terrain,
+    handling velocity commands for forward/backward motion, lateral motion, and turning.
+    Uses an LSTM-based Series Elastic Actuator (SEA) network for torque control.
+
+    Args:
+        prim_path: The prim path of the robot on the stage.
+        root_path: The path to the articulation root of the robot.
+        usd_path: The robot usd filepath in the directory.
+        position: The position of the robot.
+        orientation: The orientation of the robot.
+    """
 
     def __init__(
         self,
         prim_path: str,
-        root_path: Optional[str] = None,
-        name: str = "anymal",
-        usd_path: Optional[str] = None,
-        position: Optional[np.ndarray] = None,
-        orientation: Optional[np.ndarray] = None,
-    ) -> None:
+        root_path: str | None = None,
+        usd_path: str | None = None,
+        position: list[float] | None = None,
+        orientation: list[float] | None = None,
+    ):
         """
         Initialize anymal robot, import policy and actuator network.
 
         Args:
-            prim_path (str) -- prim path of the robot on the stage
-            root_path (Optional[str]): The path to the articulation root of the robot
-            name (str) -- name of the quadruped
-            usd_path (str) -- robot usd filepath in the directory
-            position (np.ndarray) -- position of the robot
-            orientation (np.ndarray) -- orientation of the robot
-
+            prim_path: The prim path of the robot on the stage
+            root_path: The path to the articulation root of the robot
+            usd_path: The robot usd filepath in the directory
+            position: The position of the robot
+            orientation: The orientation of the robot
         """
         assets_root_path = get_assets_root_path()
         if usd_path == None:
             usd_path = assets_root_path + "/Isaac/Robots/ANYbotics/anymal_c/anymal_c.usd"
 
-        super().__init__(name, prim_path, root_path, usd_path, position, orientation)
+        super().__init__(prim_path, root_path, usd_path, position, orientation)
+
         self.load_policy(
             assets_root_path + "/Isaac/Samples/Policies/Anymal_Policies/anymal_policy.pt",
             assets_root_path + "/Isaac/Samples/Policies/Anymal_Policies/anymal_env.yaml",
         )
         self._action_scale = 0.5
-        self._previous_action = np.zeros(12)
+        self._previous_action = torch.zeros(12)
         self._policy_counter = 0
 
     def _compute_observation(self, command):
-        """
-        Computes the the observation vector for the policy
+        """Compute the observation vector for the policy.
 
-        Argument:
-        command (np.ndarray) -- the robot command (v_x, v_y, w_z)
+        The observation includes base linear/angular velocities, gravity direction,
+        command velocities, joint positions/velocities, and previous actions.
+
+        Args:
+            command: The robot command velocities (v_x, v_y, w_z) in m/s and rad/s
 
         Returns:
-        np.ndarray -- The observation vector.
-
+            A 48-dimensional observation vector containing:
+            - [0:3]: Base linear velocity in body frame
+            - [3:6]: Base angular velocity in body frame
+            - [6:9]: Gravity direction in body frame
+            - [9:12]: Command velocities
+            - [12:24]: Joint position error from default
+            - [24:36]: Joint velocities
+            - [36:48]: Previous action
         """
-        lin_vel_I = self.robot.get_linear_velocity()
-        ang_vel_I = self.robot.get_angular_velocity()
-        pos_IB, q_IB = self.robot.get_world_pose()
+        lin_vel_I, ang_vel_I = self.robot.get_velocities()
+        pos_IB, q_IB = self.robot.get_world_poses()
 
-        R_IB = quat_to_rot_matrix(q_IB)
-        R_BI = R_IB.transpose()
-        lin_vel_b = np.matmul(R_BI, lin_vel_I)
-        ang_vel_b = np.matmul(R_BI, ang_vel_I)
-        gravity_b = np.matmul(R_BI, np.array([0.0, 0.0, -1.0]))
+        R_IB = wp.to_torch(quaternion_to_rotation_matrix(q_IB))
+        R_BI = R_IB.squeeze().t()
+        lin_vel_b = R_BI @ wp.to_torch(lin_vel_I).t()
+        ang_vel_b = R_BI @ wp.to_torch(ang_vel_I).t()
+        gravity_b = R_BI @ torch.tensor([0.0, 0.0, -1.0], device=torch.device(str(self.robot._device)))
 
-        obs = np.zeros(48)
+        obs = torch.zeros(48, device=torch.device(str(self.robot._device)))
         # Base lin vel
-        obs[:3] = lin_vel_b
+        obs[:3] = lin_vel_b.squeeze()
         # Base ang vel
-        obs[3:6] = ang_vel_b
+        obs[3:6] = ang_vel_b.squeeze()
         # Gravity
-        obs[6:9] = gravity_b
+        obs[6:9] = gravity_b.squeeze()
         # Command
         obs[9:12] = command
         # Joint states
-        current_joint_pos = self.robot.get_joint_positions()
-        current_joint_vel = self.robot.get_joint_velocities()
+        current_joint_pos = wp.to_torch(self.robot.get_dof_positions())
+        current_joint_vel = wp.to_torch(self.robot.get_dof_velocities())
         obs[12:24] = current_joint_pos - self.default_pos
-        obs[24:36] = current_joint_vel
-
+        obs[24:36] = current_joint_vel - self.default_vel
         # Previous Action
         obs[36:48] = self._previous_action
-
         return obs
 
     def forward(self, dt, command):
-        """
-        Compute the desired torques and apply them to the articulation
+        """Computes and applies joint torques for ANYmal locomotion based on the policy output.
+        The control runs at a decimated rate and uses an actuator network to convert
+        policy actions into joint torques. Joint order is:
+        FL (hip, thigh, calf) -> FR -> RL -> RR.
 
-        Argument:
-        dt (float) -- Timestep update in the world.
-        command (np.ndarray) -- the robot command (v_x, v_y, w_z)
-
+        Args:
+            dt: Physics timestep in seconds
+            command: Robot command as linear and angular velocities (v_x, v_y, w_z)
         """
         if self._policy_counter % self._decimation == 0:
             obs = self._compute_observation(command)
             self.action = self._compute_action(obs)
-            self._previous_action = self.action.copy()
+            self._previous_action = self.action.clone()
 
         # The learning controller uses the order of
         # FL_hip_joint FL_thigh_joint FL_calf_joint
         # FR_hip_joint FR_thigh_joint FR_calf_joint
         # RL_hip_joint RL_thigh_joint RL_calf_joint
         # RR_hip_joint RR_thigh_joint RR_calf_joint
-        current_joint_pos = self.robot.get_joint_positions()
-        current_joint_vel = self.robot.get_joint_velocities()
+        current_joint_pos = wp.to_torch(self.robot.get_dof_positions())
+        current_joint_vel = wp.to_torch(self.robot.get_dof_velocities())
 
         joint_torques, _ = self._actuator_network.compute_torques(
             current_joint_pos, current_joint_vel, self._action_scale * self.action
         )
-        self.robot.set_joint_efforts(joint_torques)
+        self.robot.set_dof_efforts(wp.from_torch(joint_torques))
         self._policy_counter += 1
 
-    def initialize(self, physics_sim_view=None) -> None:
-        """
-        Initialize the articulation interface, set up drive mode
+    def initialize(self, physics_sim_view=None):
+        """Initialize the articulation interface and set up drive mode.
+
+        Args:
+            physics_sim_view: The physics simulation view
         """
         super().initialize(physics_sim_view=physics_sim_view, control_mode="effort")
+
+        import warnings
+
+        # Suppress expected user warning from the actuation network, this is a limitation with the trained policy
+        warnings.filterwarnings(
+            "ignore",
+            message="RNN module weights are not part of single contiguous chunk of memory.*",
+            category=UserWarning,
+        )
 
         # Actuator network
         assets_root_path = get_assets_root_path()
         file_content = omni.client.read_file(
-            assets_root_path + "/Isaac/Samples/Policies/Anymal_Policies/sea_net_jit2.pt"
+            assets_root_path + "/Isaac/IsaacLab/ActuatorNets/ANYbotics/anydrive_3_lstm_jit.pt"
         )[2]
         file = io.BytesIO(memoryview(file_content).tobytes())
         self._actuator_network = LstmSeaNetwork()

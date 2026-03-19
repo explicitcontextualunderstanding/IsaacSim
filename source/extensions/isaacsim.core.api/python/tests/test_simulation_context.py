@@ -77,7 +77,6 @@ class TestSimulationContext(CoreTestCase):
     async def test_default_dt(self):
         await create_new_stage_async()
         stage = get_current_stage()
-        stage.SetTimeCodesPerSecond(90)
         set_stage_units(stage_units_in_meters=1.0)
         simulation_context = SimulationContext(set_defaults=False)
         await simulation_context.initialize_simulation_context_async()

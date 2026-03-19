@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive Franka Cortex extension module for Isaac Sim robotic simulation examples."""
+
+
 from isaacsim.examples.interactive.franka_cortex.franka_cortex_extension import FrankaCortexExtension
+
+__all__ = []

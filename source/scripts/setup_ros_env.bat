@@ -25,7 +25,7 @@ set ISAAC_SIM_ROOT=%SCRIPT_DIR%
 
 set DEFAULT_ROS_DISTRO=humble
 
-set BRIDGE_EXT_PATH=%ISAAC_SIM_ROOT%\exts\isaacsim.ros2.bridge
+set BRIDGE_EXT_PATH=%ISAAC_SIM_ROOT%\exts\isaacsim.ros2.core
 
 REM Set ROS_DISTRO if not already set
 if "%ROS_DISTRO%"=="" (

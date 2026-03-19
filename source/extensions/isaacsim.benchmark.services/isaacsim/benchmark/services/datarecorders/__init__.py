@@ -12,10 +12,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .cpu import CPUStatsRecorder
-from .frametime import FrametimeStats
-from .interface import InputContext, MeasurementDataRecorder, MeasurementDataRecorderRegistry
-from .memory import MemoryRecorder
 
-MeasurementDataRecorderRegistry.add("CPUStatsRecorder", CPUStatsRecorder)
-MeasurementDataRecorderRegistry.add("MemoryRecorder", MemoryRecorder)
+# New focused recorders (no legacy code)
+
+"""Data recorders for capturing various performance and system metrics during Isaac Sim benchmark execution."""
+
+
+from .app_frametime import AppFrametimeRecorder
+from .cpu_continuous import CPUContinuousRecorder
+from .gpu_frametime import GPUFrametimeRecorder
+from .hardware import HardwareSpecRecorder
+from .interface import InputContext, MeasurementData, MeasurementDataRecorder, MeasurementDataRecorderRegistry
+from .memory import MemoryRecorder
+from .physics_frametime import PhysicsFrametimeRecorder
+from .render_frametime import RenderFrametimeRecorder
+from .runtime import RuntimeRecorder
+from .stats_utils import Stats
+
+__all__ = [
+    # Base classes
+    "MeasurementDataRecorder",
+    "MeasurementDataRecorderRegistry",
+    "MeasurementData",
+    "InputContext",
+    # Frametime recorders
+    "AppFrametimeRecorder",
+    "PhysicsFrametimeRecorder",
+    "GPUFrametimeRecorder",
+    "RenderFrametimeRecorder",
+    # System recorders
+    "CPUContinuousRecorder",
+    "MemoryRecorder",
+    # Utility recorders
+    "RuntimeRecorder",
+    "HardwareSpecRecorder",
+    # Statistics
+    "Stats",
+]

@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pathlib import Path
+
+"""About dialog extension and helper accessors."""
+
+from typing import Any
 
 import carb
 import carb.settings
 import omni.client
 import omni.ext
+import omni.kit.actions.core
 import omni.kit.app
 import omni.kit.ui
 from isaacsim.core.version import get_version
@@ -33,10 +37,30 @@ _extension_instance = None
 
 
 class AboutExtension(omni.ext.IExt):
-    def on_startup(self, ext_id):
+    """Extension that provides the About dialog UI."""
+
+    def on_startup(self, ext_id: str):
+        """Initialize the extension when it is loaded.
+
+        Args:
+            ext_id: Extension identifier provided by the extension manager.
+        """
+        self._ext_id = ext_id
+        self._ext_name = omni.ext.get_extension_name(ext_id)
+
+        # Register the action
+        action_registry = omni.kit.actions.core.get_action_registry()
+        action_registry.register_action(
+            self._ext_name,
+            "show_about",
+            self._on_menu_show_about,
+            display_name="Show About Dialog",
+            description="Show the About dialog",
+        )
+
         menu_dict = build_submenu_dict(
             [
-                MenuItemDescription(name="Help/About", onclick_fn=lambda *_: self._on_menu_show_about()),
+                MenuItemDescription(name="Help/About", onclick_action=(self._ext_name, "show_about")),
             ],
         )
         for group in menu_dict:
@@ -48,19 +72,35 @@ class AboutExtension(omni.ext.IExt):
         _extension_instance = self
 
     def on_shutdown(self):
+        """Clean up resources when the extension is unloaded."""
         global _extension_instance
         _extension_instance = None
+
+        # Deregister the action
+        action_registry = omni.kit.actions.core.get_action_registry()
+        action_registry.deregister_action(self._ext_name, "show_about")
 
         self._about_menu = None
 
     def get_values(self):
+        """Load application and version values for the About dialog.
+
+        This populates cached values used by the About window, including
+        kit and client library versions, plus the app name and version.
+
+        Example:
+            .. code-block:: python
+
+                extension = get_instance()
+                if extension:
+                    extension.get_values()
+        """
         settings = carb.settings.get_settings()
         self.kit_version = omni.kit.app.get_app().get_build_version()
         # Minimize Kit SDK version for release
         if self.kit_version:
             kit_version, _ = self.kit_version.split("+")
             self.kit_version = kit_version
-        self.nucleus_version = DISCONNECTED
         self.client_library_version = omni.client.get_version()
         # Minimize Client Library version for release
         if self.client_library_version:
@@ -74,19 +114,47 @@ class AboutExtension(omni.ext.IExt):
 
     @staticmethod
     def _resize_window(window: ui.Window, scrolling_frame: ui.ScrollingFrame):
+        """Resize the scrolling area to match the window.
+
+        Args:
+            window: Window used to compute the scrolling frame size.
+            scrolling_frame: Scrolling frame to resize.
+        """
         scrolling_frame.width = ui.Pixel(window.width - 10)
         scrolling_frame.height = ui.Pixel(window.height - 235)
 
     def _on_menu_show_about(self):
+        """Handle the menu action to show the About dialog."""
         plugins = carb.get_framework().get_plugins()
         plugins = sorted(plugins, key=lambda x: x.impl.name)
         self.menu_show_about(plugins)
 
-    def menu_show_about(self, plugins):
+    def menu_show_about(self, plugins: list[Any]) -> ui.Window:
+        """Create and show the About dialog window.
+
+        Args:
+            plugins: Plugins to list in the dialog.
+
+        Returns:
+            The created About window.
+
+        Example:
+            .. code-block:: python
+
+                extension = get_instance()
+                if extension:
+                    plugins = carb.get_framework().get_plugins()
+                    window = extension.menu_show_about(plugins)
+        """
         info = f"App Name: {self.app_name}\nApp Version: {self.app_version}\nKit SDK Version{self.kit_version}\nClient Library Version: {self.client_library_version}"
 
         def hide(w):
             w.visible = False
+
+        def add_separator():
+            ui.Spacer(height=4)
+            ui.Line(style={"color": 0x338A8777}, width=ui.Fraction(1))
+            ui.Spacer(height=4)
 
         def copy_to_clipboard(x, y, button, modifier):
             if button != 1:
@@ -114,10 +182,9 @@ class AboutExtension(omni.ext.IExt):
                     ui.Label(f"App Version: {self.app_version}", style={"font_size": 18})
                     ui.Label(f"Kit SDK Version: {self.kit_version}", style={"font_size": 18})
                     ui.Label(f"Client Library Version: {self.client_library_version}", style={"font_size": 18})
-                    # ui.Label(f"Nucleus Server Version: {self.nucleus_version}", style={"font_size": 18})    # TODO JS
                     ui.Spacer(height=16)
                     ui.Label("Loaded plugins", style={"font_size": 16})
-                    ui.Separator()
+                    add_separator()
                     scrolling_frame = ui.ScrollingFrame(
                         width=790,
                         height=240,
@@ -130,7 +197,7 @@ class AboutExtension(omni.ext.IExt):
                             for p in plugins:
                                 ui.Label(f"{p.impl.name} {p.interfaces}", tooltip=p.libPath)
 
-                    ui.Separator()
+                    add_separator()
                     ui.Button("OK", width=64, clicked_fn=lambda w=window: hide(w))
                 ui.Button(" ", height=128, style={"background_color": 0x00000000}, mouse_pressed_fn=copy_to_clipboard)
 
@@ -141,5 +208,17 @@ class AboutExtension(omni.ext.IExt):
         return window
 
 
-def get_instance():
+def get_instance() -> AboutExtension | None:
+    """Get the current About extension instance.
+
+    Returns:
+        The extension instance if available, otherwise None.
+
+    Example:
+        .. code-block:: python
+
+            extension = get_instance()
+            if extension:
+                extension.menu_show_about(carb.get_framework().get_plugins())
+    """
     return _extension_instance

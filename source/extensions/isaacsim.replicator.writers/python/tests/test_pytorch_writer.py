@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test module for PytorchWriter functionality with single and multiple render products."""
+
+
 import os
 import unittest
 from pathlib import Path
@@ -22,14 +25,40 @@ import numpy as np
 import omni.kit
 import omni.replicator.core as rep
 import omni.usd
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.stage import create_new_stage_async
 from isaacsim.replicator.writers import PytorchListener
 from PIL import Image
 
+torch = import_module("torch")
+
 
 class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
+    """Test suite for validating PytorchWriter functionality with single and multiple render products.
+
+    Tests the PytorchWriter's ability to handle various configurations including single and multiple cameras,
+    with and without backend file writing, and on both CPU and GPU devices. The test suite creates a synthetic
+    scene with randomized geometric shapes (torus, sphere, cube) and multiple camera viewpoints to generate
+    diverse rendering data for validation.
+
+    Each test method verifies specific aspects of the PytorchWriter:
+    - Data tensor shapes and device placement (CPU/GPU)
+    - Backend file writing capabilities
+    - Multi-camera batched processing
+    - Cross-validation between in-memory tensors and saved image files
+
+    The test environment includes three render products with cameras positioned at different viewpoints,
+    ensuring comprehensive coverage of multi-camera scenarios commonly used in synthetic data generation
+    workflows.
+    """
+
     async def setUp(self):
+        """Set up test fixtures with render products, cameras, and scene objects.
+
+        Creates a new stage with three cameras at different positions, each with 512x512 render products.
+        Populates the scene with randomized torus, sphere, and cube objects with semantic labels.
+        Prepares output directory for backend writing tests.
+        """
         # Create new stage
         await omni.kit.app.get_app().next_update_async()
         await create_new_stage_async()
@@ -63,6 +92,7 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
+        """Clean up test fixtures by destroying render products and closing the stage."""
         await omni.kit.app.get_app().next_update_async()
         for rp in self.render_products:
             rp.destroy()
@@ -73,9 +103,14 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
         omni.usd.get_context().close_stage()
 
     async def _run_until_stopped(self):
+        """Run the replicator orchestrator for 10 frames until completion."""
         await rep.orchestrator.run_until_complete_async(num_frames=10)
 
     async def test_single_camera_writer_without_backend(self):
+        """Test PytorchWriter with a single camera using CPU device without file output.
+
+        Verifies that the writer produces a tensor with correct shape [1, 3, 512, 512] on CPU device.
+        """
         render_products = self.render_products[1:2]
         pytorch_listener = PytorchListener()
         pytorch_writer = rep.WriterRegistry.get("PytorchWriter")
@@ -91,6 +126,11 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
         pytorch_listener = None
 
     async def test_single_camera_writer_with_backend(self):
+        """Test PytorchWriter with a single camera using CPU device and file output.
+
+        Verifies that the writer produces both in-memory tensor data and saves PNG files to disk.
+        Compares the tensor data with the saved image file to ensure consistency.
+        """
         render_products = self.render_products[0:1]
         pytorch_listener = PytorchListener()
         pytorch_writer = rep.WriterRegistry.get("PytorchWriter")
@@ -115,6 +155,11 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
         pytorch_listener = None
 
     async def test_multiple_cameras_writer_without_backend(self):
+        """Test PytorchWriter with multiple cameras using CPU device without file output.
+
+        Verifies that the writer produces a tensor with correct shape [3, 3, 512, 512] on CPU device
+        for three render products.
+        """
         render_products = self.render_products
         pytorch_listener = PytorchListener()
         pytorch_writer = rep.WriterRegistry.get("PytorchWriter")
@@ -130,6 +175,11 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
         pytorch_listener = None
 
     async def test_multiple_cameras_writer_with_backend(self):
+        """Test PytorchWriter with multiple cameras using CPU device and file output.
+
+        Verifies that the writer produces both in-memory tensor data and saves PNG files for each camera.
+        Compares the concatenated tensor data with the saved image files to ensure consistency.
+        """
         render_products = self.render_products
         pytorch_listener = PytorchListener()
         pytorch_writer = rep.WriterRegistry.get("PytorchWriter")
@@ -165,6 +215,11 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
 
     @unittest.skipIf(torch.cuda.is_available() == False, "GPU is not available on this machine!")
     async def test_single_camera_writer_with_gpu(self):
+        """Test PytorchWriter with a single camera using CUDA GPU device.
+
+        Verifies that the writer produces a tensor with correct shape [1, 3, 512, 512] on CUDA device.
+        Skipped if GPU is not available on the machine.
+        """
         render_products = self.render_products[2:3]
         pytorch_listener = PytorchListener()
         pytorch_writer = rep.WriterRegistry.get("PytorchWriter")
@@ -181,6 +236,11 @@ class TestMultipleRenderProducts(omni.kit.test.AsyncTestCase):
 
     @unittest.skipIf(torch.cuda.is_available() == False, "GPU is not available on this machine!")
     async def test_multiple_cameras_writer_with_gpu(self):
+        """Test PytorchWriter with multiple cameras using CUDA GPU device.
+
+        Verifies that the writer produces a tensor with correct shape [3, 3, 512, 512] on CUDA device
+        for three render products. Skipped if GPU is not available on the machine.
+        """
         render_products = self.render_products
         pytorch_listener = PytorchListener()
         pytorch_writer = rep.WriterRegistry.get("PytorchWriter")

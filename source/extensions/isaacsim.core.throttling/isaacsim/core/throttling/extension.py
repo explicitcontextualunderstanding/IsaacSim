@@ -15,6 +15,7 @@
 
 
 import carb
+import carb.eventdispatcher
 import omni.ext
 import omni.kit.app
 import omni.timeline
@@ -43,9 +44,20 @@ class Extension(omni.ext.IExt):
         # Enable the developer throttling settings when extension starts
         carb.settings.get_settings().set("/app/show_developer_preference_section", True)
 
-        timeline = omni.timeline.get_timeline_interface()
-        self.timeline_event_sub = timeline.get_timeline_event_stream().create_subscription_to_pop(
-            self.on_stop_play, name="IsaacSimThrottlingEventHandler"
+        self.timeline_event_sub_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_PLAY,
+            on_event=self._on_play,
+            observer_name="isaacsim.core.throttling.Extension._on_play",
+        )
+        self.timeline_event_sub_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=self._on_stop,
+            observer_name="isaacsim.core.throttling.Extension._on_stop",
+        )
+        self.timeline_event_sub_pause = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_PAUSE,
+            on_event=self._on_pause,
+            observer_name="isaacsim.core.throttling.Extension._on_pause",
         )
 
         _settings = carb.settings.get_settings()
@@ -103,38 +115,49 @@ class Extension(omni.ext.IExt):
             observer_name="IsaacSimThrottling._on_frame_update",
         )
 
-    def on_stop_play(self, event: carb.events.IEvent):
-        # Disable eco mode if playing sim, enable if stopped
-        # Disable legacy gizmos during runtime
-        # Disable manual mode on stop, enable on play
-        # Disable async rendering during runtime (with frame delay)
+    def _on_play(self, event: carb.eventdispatcher.Event):
+        """Timeline play event callback - disable eco mode and gizmos during runtime."""
         _settings = carb.settings.get_settings()
-        if event.type == int(omni.timeline.TimelineEventType.PLAY):
-            _settings.set("/rtx/ecoMode/enabled", False)
-            _settings.set("/exts/omni.kit.hydra_texture/gizmos/enabled", False)
+        _settings.set("/rtx/ecoMode/enabled", False)
+        _settings.set("/exts/omni.kit.hydra_texture/gizmos/enabled", False)
 
-            if _settings.get(ASYNC_TOGGLE_SETTING):
-                _settings.set("/app/asyncRendering", False)
-                _settings.set("/app/asyncRenderingLowLatency", False)
+        if _settings.get(ASYNC_TOGGLE_SETTING):
+            _settings.set("/app/asyncRendering", False)
+            _settings.set("/app/asyncRenderingLowLatency", False)
 
-            if _settings.get(MANUAL_TOGGLE_SETTING):
-                self._set_loop_manual_mode(True)
+        if _settings.get(MANUAL_TOGGLE_SETTING):
+            self._set_loop_manual_mode(True)
 
-        elif event.type == int(omni.timeline.TimelineEventType.STOP) or event.type == int(
-            omni.timeline.TimelineEventType.PAUSE
-        ):
-            _settings.set("/rtx/ecoMode/enabled", True)
-            _settings.set("/exts/omni.kit.hydra_texture/gizmos/enabled", True)
+    def _on_stop(self, event: carb.eventdispatcher.Event):
+        """Timeline stop event callback - enable eco mode and gizmos when stopped."""
+        _settings = carb.settings.get_settings()
+        _settings.set("/rtx/ecoMode/enabled", True)
+        _settings.set("/exts/omni.kit.hydra_texture/gizmos/enabled", True)
 
-            if _settings.get(ASYNC_TOGGLE_SETTING):
-                # Start frame delay counting to give replicator time to finish
-                self._start_frame_counting()
+        if _settings.get(ASYNC_TOGGLE_SETTING):
+            # Start frame delay counting to give replicator time to finish
+            self._start_frame_counting()
 
-            if _settings.get(MANUAL_TOGGLE_SETTING):
-                self._set_loop_manual_mode(False)
+        if _settings.get(MANUAL_TOGGLE_SETTING):
+            self._set_loop_manual_mode(False)
+
+    def _on_pause(self, event: carb.eventdispatcher.Event):
+        """Timeline pause event callback - enable eco mode and gizmos when paused."""
+        _settings = carb.settings.get_settings()
+        _settings.set("/rtx/ecoMode/enabled", True)
+        _settings.set("/exts/omni.kit.hydra_texture/gizmos/enabled", True)
+
+        if _settings.get(ASYNC_TOGGLE_SETTING):
+            # Start frame delay counting to give replicator time to finish
+            self._start_frame_counting()
+
+        if _settings.get(MANUAL_TOGGLE_SETTING):
+            self._set_loop_manual_mode(False)
 
     def on_shutdown(self):
-        self.timeline_event_sub = None
+        self.timeline_event_sub_play = None
+        self.timeline_event_sub_stop = None
+        self.timeline_event_sub_pause = None
 
         if self._frame_update_subscription is not None:
             self._frame_update_subscription = None

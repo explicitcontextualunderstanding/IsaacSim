@@ -86,7 +86,9 @@ inline bool isTimeSampled(const pxr::UsdAttribute& attribute)
 inline bool hasTimeSample(const pxr::UsdAttribute& attribute, pxr::UsdTimeCode timeCode)
 {
     if (timeCode.IsDefault())
+    {
         return false;
+    }
 
     std::vector<double> times;
     if (attribute.GetTimeSamples(&times))
@@ -116,7 +118,9 @@ inline TimeSamplesOnLayer getAttributeEffectiveTimeSampleLayerInfo(const pxr::Us
                                                                    pxr::SdfLayerRefPtr* outLayer = nullptr)
 {
     if (attr.GetNumTimeSamples() == 0)
+    {
         return TimeSamplesOnLayer::eNoTimeSamples;
+    }
 
     auto authoringLayer = stage.GetEditTarget().GetLayer();
 
@@ -126,7 +130,7 @@ inline TimeSamplesOnLayer getAttributeEffectiveTimeSampleLayerInfo(const pxr::Us
     for (auto layer : layerStack)
     {
         auto attrSpec = layer->GetAttributeAtPath(attr.GetPath());
-        if (attrSpec && attrSpec->GetTimeSampleMap().size() > 0)
+        if (attrSpec && !attrSpec->GetTimeSampleMap().empty())
         {
             if (outLayer)
             {
@@ -761,7 +765,9 @@ inline bool setLocalTransformMatrix(pxr::UsdPrim prim,
                 changeBlock.reset(nullptr);
                 if (std::find(xformOpOrders.begin(), xformOpOrders.end(),
                               pxr::UsdGeomXformOp::GetOpName(xformOpType, opSuffix)) == xformOpOrders.end())
+                {
                     outXformOp = xform.AddXformOp(xformOpType, precision, opSuffix);
+                }
                 else
                 {
                     // Sometimes XformOp attributes and XformOpOrder don't match. GetOrderedXformOps() considers both

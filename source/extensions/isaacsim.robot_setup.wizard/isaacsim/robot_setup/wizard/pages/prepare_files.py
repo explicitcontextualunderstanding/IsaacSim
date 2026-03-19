@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI component for preparing robot configuration files in the Robot Setup Wizard."""
+
+
 import os
 
 import omni.ui as ui
@@ -25,6 +29,31 @@ from ..utils.utils import can_create_dir
 
 
 class PrepareFiles:
+    """A UI component for preparing robot configuration files in the Robot Setup Wizard.
+
+    This class provides an interface for users to configure file paths and settings before creating robot
+    configuration files. It handles the selection of robot names, root folders, stage saving options, and
+    file allocation for the robot setup process.
+
+    The component displays several key sections:
+    - Robot name and root folder selection with folder picker integration
+    - Current stage saving options with overwrite and copy functionality
+    - Original robot file information when available
+    - Preview of allocated robot files with color-coded status indicators
+
+    File status indicators use color coding where purple indicates existing files that will be overwritten,
+    red indicates files without write permission, and default color indicates new files that can be created.
+
+    The component integrates with the RobotRegistry to store configuration parameters and validates robot
+    names using USD path identifier rules. It also checks stage permissions and unsaved changes to determine
+    which saving options to present to the user.
+
+    Args:
+        visible: Whether the UI component should be visible when created.
+        *args: Variable length argument list passed to parent initialization.
+        **kwargs: Additional keyword arguments passed to parent initialization.
+    """
+
     def __init__(self, visible, *args, **kwargs):
         self.visible = visible
 
@@ -50,6 +79,10 @@ class PrepareFiles:
         self._reset_params()
 
     def destroy(self):
+        """Clean up resources and reset the PrepareFiles instance.
+
+        Destroys all UI frames, resets parameters, and clears the robot registry.
+        """
         self._reset_params()
         if self._additional_info_frame:
             self._additional_info_frame.destroy()
@@ -65,6 +98,10 @@ class PrepareFiles:
         RobotRegistry().reset()
 
     def _reset_params(self):
+        """Reset all internal parameters to their default values.
+
+        Sets robot files path, root folder, current stage path, robot name, and robot instance to default states.
+        """
         self._original_robot_files_path = "None"
         self._robot_root_folder = os.path.expanduser("~")
         self._current_stage_path = omni.usd.get_context().get_stage().GetRootLayer().realPath or os.path.expanduser(
@@ -74,6 +111,14 @@ class PrepareFiles:
         self._robot = None
 
     def __next_step(self, verfiy_fn=None):
+        """Create the next step button for navigating to Robot Hierarchy page.
+
+        Args:
+            verfiy_fn: Verification function to call before proceeding to the next step.
+
+        Returns:
+            The next step button widget.
+        """
         with ui.VStack():
             separator("Next: Robot Hierarchy")
             ui.Spacer(height=16)
@@ -87,6 +132,10 @@ class PrepareFiles:
         return button
 
     def _build_frame(self):
+        """Build the main UI frame for the Prepare Files page.
+
+        Creates all UI elements including robot name input, folder selection, stage saving options, and file allocation display.
+        """
         with ui.CollapsableFrame("Prepare Files", build_header_fn=custom_header):
             with ui.ScrollingFrame():
                 with ui.VStack(spacing=2, name="margin_vstack"):
@@ -255,7 +304,12 @@ class PrepareFiles:
                     self._next_step_button = self.__next_step(self._prepare_files)
                     self._build_robot_files_frame()
 
-    def set_visible(self, visible):
+    def set_visible(self, visible: bool):
+        """Set the visibility of the PrepareFiles frame.
+
+        Args:
+            visible: Whether the frame should be visible.
+        """
         if self.frame:
             self.frame.visible = visible
 
@@ -264,18 +318,32 @@ class PrepareFiles:
                 self._update_widgets()
 
     def _overwrite_current_stage_widget_changed(self, value):
+        """Handle changes to the overwrite current stage checkbox.
+
+        Args:
+            value: The new checkbox value.
+        """
         if value:
             self._overwrite_stage_frame.visible = True
         else:
             self._overwrite_stage_frame.visible = False
 
     def _save_copy_in_robot_root_folder_widget_changed(self, value):
+        """Handle changes to the save copy in robot root folder checkbox.
+
+        Args:
+            value: The new checkbox value.
+        """
         if value:
             self._save_copy_in_robot_root_folder_path_frame.visible = True
         else:
             self._save_copy_in_robot_root_folder_path_frame.visible = False
 
     def _build_robot_files_frame(self):
+        """Update the robot files frame with current file paths and validation status.
+
+        Validates robot name, constructs file paths, and updates UI labels with appropriate colors based on file existence and write permissions.
+        """
         robot_name = self._robot_name_widget.model.get_value_as_string()
         if not Sdf.Path.IsValidIdentifier(robot_name):
             self._invalid_robot_name_label.visible = True
@@ -344,14 +412,17 @@ class PrepareFiles:
             self._save_current_stage_widget_frame.visible = False
 
     def select_robot_folder(self, widget):
+        """Open a folder picker dialog to select a robot folder.
+
+        Args:
+            widget: The string field widget to update with the selected folder path.
+        """
         open_folder_picker(lambda filename, path: widget.model.set_value(path))
 
     def _preprocess_page(self):
-        """
-        processes to run every time the page is shown
-        - get stuff from the registry
-        - update the widgets
+        """Processes to run every time the page is shown.
 
+        Gets data from the registry and updates the widgets with current robot information, stage path, and original robot file path.
         """
         stage = omni.usd.get_context().get_stage()
         self._robot = RobotRegistry().get()
@@ -403,6 +474,11 @@ class PrepareFiles:
         self._current_stage_is_unsaved = is_unsaved or is_new_stage
 
     def _update_widgets(self):
+        """Updates all widget values from the current instance variables.
+
+        Synchronizes the UI widgets with the current state by setting widget model values from instance variables
+        like robot name, robot folder, current stage path, original robot path, and save copy path.
+        """
         if self._robot_name_widget:
             self._robot_name_widget.model.set_value(self._robot_name)
         if self._robot_folder_widget:
@@ -414,7 +490,15 @@ class PrepareFiles:
         if self._save_copy_in_robot_root_folder_path_widget:
             self._save_copy_in_robot_root_folder_path_widget.model.set_value(self._robot_root_folder)
 
-    def _prepare_files(self):
+    def _prepare_files(self) -> bool:
+        """Prepares and validates robot configuration files based on current UI settings.
+
+        Collects values from UI widgets and registers them with the RobotRegistry, including robot name,
+        root folder, file paths for base/physics/robot schema files, and stage save options.
+
+        Returns:
+            True if robot preparation was successful, False if no robot is registered.
+        """
         # register all the params collected in the current page to the registry
         self._robot = RobotRegistry().get()
         if not self._robot:

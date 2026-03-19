@@ -27,6 +27,8 @@ class OgnPose:
 
     @staticmethod
     def compute(db) -> bool:
+        db.log_warn("Deprecation warning: OgnPose has been deprecated and will be removed in the next major release.")
+
         include_occluded_prims = db.inputs.includeOccludedPrims
         get_centers = db.inputs.getCenters
 

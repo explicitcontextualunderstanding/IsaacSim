@@ -23,13 +23,13 @@ from isaacsim.robot.manipulators.examples.universal_robots import UR10
 
 
 class Stacking(BaseStacking):
-    """[summary]
+    """UR10 robot stacking task.
 
     Args:
-        name (str, optional): [description]. Defaults to "ur10_stacking".
-        target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_size (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
+        name: Task name.
+        target_position: Stack target position.
+        cube_size: Size of each cube.
+        offset: Task offset.
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class Stacking(BaseStacking):
         target_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         if target_position is None:
             target_position = np.array([0.7, 0.7, 0]) / get_stage_units()
         BaseStacking.__init__(
@@ -53,10 +53,10 @@ class Stacking(BaseStacking):
         return
 
     def set_robot(self) -> UR10:
-        """[summary]
+        """Create and configure the UR10 robot.
 
         Returns:
-            UR10: [description]
+            Configured UR10 robot instance.
         """
         ur10_prim_path = find_unique_string_name(
             initial_name="/World/ur10", is_unique_fn=lambda x: not is_prim_path_valid(x)
@@ -70,12 +70,12 @@ class Stacking(BaseStacking):
         )
         return self._ur10_robot
 
-    def pre_step(self, time_step_index: int, simulation_time: float) -> None:
-        """[summary]
+    def pre_step(self, time_step_index: int, simulation_time: float):
+        """Called before each physics step to update gripper.
 
         Args:
-            time_step_index (int): [description]
-            simulation_time (float): [description]
+            time_step_index: Current simulation step index.
+            simulation_time: Current simulation time.
         """
         BaseStacking.pre_step(self, time_step_index=time_step_index, simulation_time=simulation_time)
         self._ur10_robot.gripper.update()

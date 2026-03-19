@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Module providing custom UI widgets and components for GUI applications."""
+
+
 from collections import namedtuple
 from typing import Callable, List, Optional
 
@@ -26,12 +29,32 @@ from omni.kit.window.popup_dialog.dialog import get_field_value
 
 
 class DynamicComboBoxItem(ui.AbstractItem):
+    """A UI item for use in dynamic combo box widgets.
+
+    This class extends Omni UI's AbstractItem to create individual items that can be displayed
+    in combo box controls. Each item wraps a text value in a SimpleStringModel for integration
+    with the Omni UI framework.
+
+    Args:
+        text: The display text for this combo box item.
+    """
+
     def __init__(self, text):
         super().__init__()
         self.model = ui.SimpleStringModel(text)
 
 
 class DynamicComboBoxModel(ui.AbstractItemModel):
+    """A dynamic combo box model that manages a list of selectable items for UI combo box widgets.
+
+    This class extends omni.ui.AbstractItemModel to provide a data model for combo box UI elements
+    that can be populated with a dynamic list of string options. It maintains the current selection
+    state and notifies listeners when the selected item changes.
+
+    Args:
+        args: List of string values to populate the combo box options.
+    """
+
     def __init__(self, args):
         super().__init__()
 
@@ -42,22 +65,49 @@ class DynamicComboBoxModel(ui.AbstractItemModel):
             self._items.append(DynamicComboBoxItem(args[i]))
 
     def get_item_children(self, item):
+        """Returns the list of all combo box items.
+
+        Args:
+            item: The parent item (unused in this implementation).
+
+        Returns:
+            List of all combo box items.
+        """
         return self._items
 
     def get_item_value_model(self, item: ui.AbstractItem = None, column_id: int = 0):
+        """Returns the value model for the specified item or current selection.
+
+        Args:
+            item: The item to get the value model for. If None, returns the current index model.
+            column_id: The column identifier.
+
+        Returns:
+            The value model for the item or the current index model.
+        """
         if item is None:
             return self._current_index
         return item.model
 
     def set_item_value_model(self, item: ui.AbstractItem = None, column_id: int = 0):
+        """Sets the current index model and updates change listeners.
+
+        Args:
+            item: The item to set as the current index model.
+            column_id: The column identifier.
+        """
         self._current_index = item
         self._item_changed(None)
         self._current_index.add_value_changed_fn(lambda a: self._item_changed(None))
 
 
 class SelectPrimWidget:
-    """
-    modeled after FormWidget (from omni.kit.window.popup_dialog.form_dialog) to add a widget that opens relationship selector
+    """Modeled after FormWidget (from omni.kit.window.popup_dialog.form_dialog) to add a widget that opens relationship selector.
+
+    Args:
+        label: The label text for the widget.
+        default: The default prim path value.
+        tooltip: Tooltip text displayed when hovering over the label.
     """
 
     def __init__(self, label: str = None, default: str = None, tooltip: str = ""):
@@ -68,6 +118,10 @@ class SelectPrimWidget:
         self._build_ui()
 
     def _build_ui(self):
+        """Builds the UI components for the prim selection widget.
+
+        Creates a horizontal layout with a label, string field for the prim path, and an "Add" button that opens the relationship target picker.
+        """
         with ui.HStack(height=0):
             ui.Label(
                 self._label,
@@ -85,6 +139,10 @@ class SelectPrimWidget:
             ui.Button("Add", width=ui.Percent(19), clicked_fn=self._on_select_prim)
 
     def _on_select_prim(self):
+        """Opens the relationship target picker for prim selection.
+
+        Shows the RelationshipTargetPicker dialog to allow the user to select a prim from the stage.
+        """
         stage = omni.usd.get_context().get_stage()
         additional_widget_kwargs = {"target_name": "Prim"}
         self.stage_picker = RelationshipTargetPicker(
@@ -96,24 +154,36 @@ class SelectPrimWidget:
         self.stage_picker.show(1, on_targets_selected=self._on_target_selected)
 
     def _on_target_selected(self, paths):
+        """Updates the string field with the selected prim path.
+
+        Args:
+            paths: List of selected prim paths from the relationship target picker.
+        """
         self._prim.model.set_value(paths[0])
 
-    def get_value(self):
+    def get_value(self) -> str:
+        """The current prim path value from the string field.
+
+        Returns:
+            The prim path as a string.
+        """
         return self._prim.model.get_value_as_string()
 
     def destroy(self):
+        """Cleans up the widget by clearing the prim field reference."""
         self._prim = None
 
 
 class ParamWidget:
-    """
-        modified FormWidget (from omni.kit.window.popup_dialog.form_dialog) to better format for parameter collection use
+    """Modified FormWidget (from omni.kit.window.popup_dialog.form_dialog) to better format for parameter collection use.
+
+    Args:
+        field_def: A namedtuple defining the input field configuration.
 
     Note:
         ParamWidget.FieldDef:
             A namedtuple of (name, label, type, default value) for describing the input field,
             e.g. FormDialog.FieldDef("name", "Name:  ", omni.ui.StringField, "Bob").
-
     """
 
     FieldDef = namedtuple("FormDialogFieldDef", "name label type default tooltip focused", defaults=["", False])
@@ -123,6 +193,14 @@ class ParamWidget:
         self._build_ui(field_def)
 
     def _build_ui(self, field_def):
+        """Creates the user interface for the parameter widget.
+
+        Builds a horizontal layout with a label, spacer, and input field based on the field definition.
+        The field is populated with the default value if the field type supports it.
+
+        Args:
+            field_def: Field definition containing name, label, type, default value, tooltip, and focus state.
+        """
         with ui.HStack(height=0):
             ui.Label(
                 field_def.label,
@@ -138,7 +216,13 @@ class ParamWidget:
                 self._field.model.set_value(field_def.default)
 
     def get_value(self):
+        """Current value of the parameter field.
+
+        Returns:
+            The value from the parameter field.
+        """
         return get_field_value(self._field)
 
     def destroy(self):
+        """Cleans up the parameter widget by releasing the field reference."""
         self._field = None

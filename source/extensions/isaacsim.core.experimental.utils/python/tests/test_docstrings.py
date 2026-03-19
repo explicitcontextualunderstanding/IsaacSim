@@ -13,13 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import isaacsim.core.experimental.utils.impl.app as app_utils
 import isaacsim.core.experimental.utils.impl.backend as backend_utils
 import isaacsim.core.experimental.utils.impl.foundation as foundation_utils
 import isaacsim.core.experimental.utils.impl.ops as ops_utils
 import isaacsim.core.experimental.utils.impl.prim as prim_utils
+import isaacsim.core.experimental.utils.impl.semantics as semantics_utils
 import isaacsim.core.experimental.utils.impl.stage as stage_utils
 import isaacsim.core.experimental.utils.impl.transform as transform_utils
+import isaacsim.core.experimental.utils.impl.xform as xform_utils
 import isaacsim.test.docstring
+import warp as wp
+
+wp.init()  # init warp to avoid undesired stdout output
 
 
 class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
@@ -33,6 +39,9 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
         """Method called immediately after the test method has been called"""
         super().tearDown()
 
+    async def test_app_docstrings(self):
+        await self.assertDocTests(app_utils)
+
     async def test_backend_docstrings(self):
         await self.assertDocTests(backend_utils)
 
@@ -45,8 +54,16 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
     async def test_prim_docstrings(self):
         await self.assertDocTests(prim_utils)
 
+    async def test_semantics_docstrings(self):
+        await self.assertDocTests(semantics_utils)
+
     async def test_stage_docstrings(self):
         await self.assertDocTests(stage_utils)
 
     async def test_transform_docstrings(self):
         await self.assertDocTests(transform_utils)
+
+    async def test_xform_docstrings(self):
+        stage_utils.define_prim("/A")
+        stage_utils.define_prim("/A/B")
+        await self.assertDocTests(xform_utils)

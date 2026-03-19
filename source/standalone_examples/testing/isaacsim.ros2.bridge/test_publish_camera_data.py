@@ -28,7 +28,7 @@ from isaacsim import SimulationApp
 BACKGROUND_STAGE_PATH = "/background"
 BACKGROUND_USD_PATH = "/Isaac/Environments/Simple_Warehouse/warehouse_with_forklifts.usd"
 
-CONFIG = {"renderer": "RayTracedLighting", "headless": True}
+CONFIG = {"renderer": "RealTimePathTracing", "headless": True}
 
 # Example ROS2 bridge sample demonstrating the manual loading of stages and manual publishing of images
 simulation_app = SimulationApp(CONFIG)
@@ -40,9 +40,10 @@ import omni.replicator.core as rep
 import omni.syntheticdata._syntheticdata as sd
 from isaacsim.core.api import SimulationContext
 from isaacsim.core.nodes.scripts.utils import set_target_prims
-from isaacsim.core.utils import extensions, nucleus, stage
+from isaacsim.core.utils import extensions, stage
 from isaacsim.core.utils.prims import is_prim_path_valid
 from isaacsim.sensors.camera import Camera
+from isaacsim.storage.native import nucleus
 
 # Enable ROS2 bridge extension
 extensions.enable_extension("isaacsim.ros2.bridge")
@@ -98,7 +99,7 @@ class TimestampChecker(Node):
             # print(f"Timestamp: {time_val}")
             # Check for duplicate timestamps
             if time_val in self.topic_timestamps[topic_name]:
-                print(f"ERROR: Duplicate timestamp {time_val} detected on topic {topic_name}")
+                print(f"[error] Duplicate timestamp {time_val} detected on topic {topic_name}")
                 self.error_detected = True
                 return
 
@@ -114,7 +115,7 @@ class TimestampChecker(Node):
 
                 if current_total_ns < last_total_ns:
                     print(
-                        f"ERROR: Backwards timestamp detected on topic {topic_name}: "
+                        f"[error] Backwards timestamp detected on topic {topic_name}: "
                         f"current {time_val} < previous {last_timestamp}"
                     )
                     self.error_detected = True
@@ -237,7 +238,7 @@ def publish_camera_tf(camera: Camera):
 
 
 def publish_camera_info(camera: Camera, freq):
-    from isaacsim.ros2.bridge import read_camera_info
+    from isaacsim.ros2.core import read_camera_info
 
     # The following code will link the camera's render product and publish the data to the specified topic name.
     render_product = camera._render_product_path
@@ -392,7 +393,7 @@ simulation_context.play()
 for _ in range(args.test_steps):
     simulation_context.step(render=True)
     if checker.error_detected:
-        print("Exiting simulation loop due to timestamp error")
+        print("[error] Exiting simulation loop due to timestamp error")
         break
 
 # Clean up

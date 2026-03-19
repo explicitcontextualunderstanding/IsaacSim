@@ -13,12 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension module for robot manipulator functionality in Isaac Sim."""
+
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the isaacsim.robot.manipulators extension.
+
+    This extension provides functionality for robot manipulator systems within Isaac Sim.
+    It handles the initialization and management of manipulator-related components and services.
+    """
+
     def on_startup(self, ext_id: str):
+        """Called when the extension is starting up.
+
+        Args:
+            ext_id: The unique identifier of the extension being started.
+        """
         pass
 
     def on_shutdown(self):
+        """Called when the extension is shutting down."""
         pass

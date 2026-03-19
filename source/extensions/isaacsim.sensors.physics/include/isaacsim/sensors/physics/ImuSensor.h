@@ -61,7 +61,7 @@ public:
      * @param[in] rigidBodyDataBuffer Pointer to the buffer storing rigid body data
      * @param[in,out] m_dataBufferIndex Reference to the current buffer index
      */
-    void initialize(std::vector<float>* rigidBodyDataBuffer, size_t& m_dataBufferIndex);
+    void initialize(float* rigidBodyDataBuffer, size_t& m_dataBufferIndex);
 
     /**
      * @brief Virtual destructor for proper cleanup
@@ -133,7 +133,7 @@ private:
     size_t m_dataBufferIndex = 0;
 
     /** @brief Pointer to the rigid body data buffer */
-    std::vector<float>* m_rigidBodyDataBuffer = nullptr;
+    float* m_rigidBodyDataBuffer = nullptr;
 
     /** @brief Initial buffer state */
     IsRawData m_initBuffer;

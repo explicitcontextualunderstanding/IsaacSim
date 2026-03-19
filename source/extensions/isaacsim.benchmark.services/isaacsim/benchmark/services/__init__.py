@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import builtins
+# Export unified benchmark classes and constants
 
-if hasattr(builtins, "ISAAC_LAUNCHED_FROM_TERMINAL") and builtins.ISAAC_LAUNCHED_FROM_TERMINAL is False:
-    # ISAAC_LAUNCHED_FROM_TERMINAL is set to False by SimulationApp, so this will be triggered by standalone Python
-    # workflows only
-    from .base_isaac_benchmark import BaseIsaacBenchmark
-if (hasattr(builtins, "ISAAC_LAUNCHED_FROM_TERMINAL") and builtins.ISAAC_LAUNCHED_FROM_TERMINAL is True) or not hasattr(
-    builtins, "ISAAC_LAUNCHED_FROM_TERMINAL"
-):
-    # This will be triggered if running from an async workflow (non-standalone)
-    from .base_isaac_benchmark_async import BaseIsaacBenchmarkAsync
+"""Provides benchmark services for measuring Isaac Sim performance with data recorders and metrics collection."""
+
+
+from .base_benchmark import (
+    DEFAULT_RECORDERS,
+    BaseIsaacBenchmark,
+    BaseIsaacBenchmarkAsync,
+)
+
+__all__ = ["BaseIsaacBenchmarkAsync", "BaseIsaacBenchmark"]

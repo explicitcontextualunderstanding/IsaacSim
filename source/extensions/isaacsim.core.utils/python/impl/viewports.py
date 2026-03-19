@@ -415,7 +415,7 @@ def backproject_depth(depth_image: np.array, viewport_api: Any, max_clip_depth: 
         max_clip_depth (float): Depth values larger than this will be clipped
 
     Returns:
-        np.array: [description]
+        np.array: 3D point cloud with shape (height * width, 3) in camera space.
     """
 
     intrinsics_matrix = get_intrinsics_matrix(viewport_api)

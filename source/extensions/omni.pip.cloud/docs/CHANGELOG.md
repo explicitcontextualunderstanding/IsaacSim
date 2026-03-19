@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.5.1] - 2026-03-06
+### Changed
+- Update cryptography to 46.0.5
+- Update azure-core to 1.38.0
+- Update msal to 1.35.1
+
+## [1.5.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.4.5] - 2026-02-22
+### Changed
+- Downgrage boto3 to 1.40.61
+- Downgrage botocore to 1.40.61
+- Downgrage s3transfer to 0.14.0
+- Update aioboto3 to 15.5.0
+
+## [1.4.4] - 2025-11-25
+### Changed
+- Update to aioboto3==15.2.0
+- Update to aiobotocore==2.24.2
+- Update to boto3==1.40.18
+- Update to botocore==1.40.18
+- Update to msal==1.29.0
+
 ## [1.4.3] - 2025-09-26
 ### Changed
 - Update to aioboto3==15.1.0
@@ -55,8 +80,8 @@
 
 ## [1.3.0] - 2025-01-16
 ### Changed
-- updated boto3[crt]==1.36.1, botocore==1.36.1
-- added jmespath==1.0.1, python-dateutil==2.9.0.post0, six==1.17.0
+- Updated boto3[crt]==1.36.1, botocore==1.36.1
+- Added jmespath==1.0.1, python-dateutil==2.9.0.post0, six==1.17.0
 
 ## [1.2.0] - 2025-01-15
 ### Changed
@@ -92,11 +117,11 @@
 
 ## [1.1.0] - 2024-04-19
 ### Changed
-- update typing extensions to typing_extensions==4.10.0
+- Update typing extensions to typing_extensions==4.10.0
 
 ## [1.0.2] - 2023-08-02
 ### Fixed
-- unit test failure due to imports
+- Unit test failure due to imports
 
 ## [1.0.1] - 2023-08-02
 ### Fixed

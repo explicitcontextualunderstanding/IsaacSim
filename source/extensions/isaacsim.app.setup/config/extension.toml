@@ -1,11 +1,11 @@
 [package]
-version = "1.6.0"
+version = "1.10.0"
 category = "Setup"
 title = "Isaac Sim Setup"
 description = "This Extension does the setup of the Isaac Sim App"
 keywords = ["isaac"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 toggleable = false
@@ -27,39 +27,39 @@ writeTarget.kit = true
 name = "isaacsim.app.setup"
 
 [settings]
-# Creates a new stage when this extension is enabled so there is something visible in the viewport
+# Creates a new stage when this extension is enabled so that something is visible in the viewport.
 isaac.startup.create_new_stage = true 
 
 [settings."filter:platform"."windows-x86_64"]
-# Set this to specify the ROS bridge extension to use for windows, blank for no ROS bridge
+# Set this to specify the ROS bridge extension to use on Windows. Leave it blank for no ROS bridge.
 isaac.startup.ros_bridge_extension = ""
-# Set this to specify the sim control extension to use for windows, blank for no sim control
+# Set this to specify the sim control extension to use on Windows, or `false` for no sim control.
 isaac.startup.ros_sim_control_extension = false
 
 [settings."filter:platform"."linux-x86_64"]
-# Set this to specify the ROS bridge extension to use for linux, blank for no ROS bridge
+# Set this to specify the ROS bridge extension to use on Linux. Leave it blank for no ROS bridge.
 isaac.startup.ros_bridge_extension = ""
-# Set this to specify the sim control extension to use for linux, blank for no sim control
+# Set this to specify the sim control extension to use on Linux, or `false` for no sim control.
 isaac.startup.ros_sim_control_extension = false
 
 [[test]]
 dependencies = [
-    "isaacsim.asset.browser",            # isaac sim asset browser,
-    "isaacsim.asset.gen.omap.ui",            # extension with occupancy map,
-    "isaacsim.examples.browser",         # robotics examples,
-    "isaacsim.replicator.synthetic_recorder",    # extension with synthetic_recorder,
-    "omni.graph.window.action",          # window for action graph,
-    "omni.kit.viewport.window",                 # viewport,
-    "omni.kit.widget.layers",        # layer window,
-    "omni.kit.window.console",           # console,
-    "omni.kit.window.content_browser",     # content browser,
-    "omni.kit.window.script_editor",     # window with script editor,
-    "omni.kit.window.stage",       # Stage,
-    "omni.kit.window.toolbar",     # main tool bar,
-    "omni.pip.cloud",
-    "omni.rtx.settings.core",
-    "omni.rtx.settings.core",      # Render Settings window,
-    "semantics.schema.editor",            # the extension containing semantics schema editor,
+    "isaacsim.asset.gen.omap.ui", # extension with occupancy map,
+    "isaacsim.examples.browser", # robotics examples,
+    "isaacsim.replicator.synthetic_recorder", # extension with synthetic_recorder,
+    "isaacsim.robot.schema.ui", # Robot Inspector window,
+    "omni.graph.window.action", # window for action graph,
+    "omni.isaac.ml_archive",
+    "omni.kit.ui_test",
+    "omni.kit.viewport.window", # viewport,
+    "omni.kit.widget.layers", # layer window,
+    "omni.kit.window.console", # console,
+    "omni.kit.window.content_browser", # content browser,
+    "omni.kit.window.script_editor", # window with script editor,
+    "omni.kit.window.stage", # Stage,
+    "omni.kit.window.toolbar", # main tool bar,
+    "omni.rtx.settings.core", # Render Settings window,
+    "semantics.schema.editor" # the extension containing semantics schema editor,
 ]
 
 args = [
@@ -70,7 +70,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -86,6 +86,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -112,3 +113,6 @@ stdoutFailPatterns.exclude = [
     "*[isaacsim.ros2.bridge.scripts.extension]*",
     "*[Error] [carb.glinterop.plugin] GLInteropContext::init: carb::windowing is not available*",
 ]
+
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

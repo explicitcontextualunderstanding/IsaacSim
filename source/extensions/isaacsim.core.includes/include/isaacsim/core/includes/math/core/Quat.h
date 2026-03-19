@@ -83,6 +83,10 @@ public:
     /**
      * @brief Constructor that creates quaternion from rotation matrix
      * @param[in] m 3x3 rotation matrix to convert
+     * @details
+     * Converts a 3x3 rotation matrix to a quaternion using Shepperd's method.
+     * The algorithm selects the most numerically stable computation path based
+     * on the trace and diagonal elements of the matrix.
      */
     CUDA_CALLABLE explicit XQuat(const Matrix33& m);
 

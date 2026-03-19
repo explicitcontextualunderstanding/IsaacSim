@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Implementation of a physics-based IMU (Inertial Measurement Unit) sensor for Isaac Sim."""
+
+
 from typing import Optional
 
 import carb
@@ -19,7 +23,7 @@ import numpy as np
 import omni.isaac.IsaacSensorSchema as IsaacSensorSchema
 import omni.kit.commands
 from isaacsim.core.api.sensors.base_sensor import BaseSensor
-from isaacsim.core.nodes.bindings import _isaacsim_core_nodes
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from isaacsim.core.utils.stage import traverse_stage
 from isaacsim.sensors.physics import _sensor
@@ -27,6 +31,31 @@ from pxr import PhysxSchema
 
 
 class IMUSensor(BaseSensor):
+    """A physics-based IMU (Inertial Measurement Unit) sensor that measures linear acceleration, angular velocity, and orientation.
+
+    This sensor provides inertial measurements from a simulated IMU attached to a physics body. It measures three-axis linear acceleration, three-axis angular velocity, and orientation as a quaternion. The sensor supports configurable sampling rates and filtering for each measurement type.
+
+    The sensor can be created at an existing prim path or will automatically create a new IMU prim if the path doesn't exist. When creating a new prim, it uses physics simulation settings to determine default timing parameters.
+
+    Args:
+        prim_path: USD path where the IMU sensor prim is located or will be created.
+        name: Identifier name for the sensor instance.
+        frequency: Sampling frequency in Hz for sensor readings. Cannot be specified together with dt.
+        dt: Time interval in seconds between sensor readings. Cannot be specified together with frequency.
+        translation: Local translation offset of the sensor relative to its parent body.
+        position: Local position offset of the sensor relative to its parent body.
+        orientation: Local orientation offset of the sensor as a quaternion relative to its parent body.
+        linear_acceleration_filter_size: Number of samples for moving average filter applied to linear acceleration
+            measurements.
+        angular_velocity_filter_size: Number of samples for moving average filter applied to angular velocity
+            measurements.
+        orientation_filter_size: Number of samples for moving average filter applied to orientation measurements.
+
+    Raises:
+        Exception: If both frequency and dt are specified simultaneously.
+        Exception: If IMU sensor prim creation fails at the specified path.
+    """
+
     def __init__(
         self,
         prim_path: str,
@@ -39,7 +68,7 @@ class IMUSensor(BaseSensor):
         linear_acceleration_filter_size: Optional[int] = 1,
         angular_velocity_filter_size: Optional[int] = 1,
         orientation_filter_size: Optional[int] = 1,
-    ) -> None:
+    ):
         if frequency is not None and dt is not None:
             raise Exception("Sensor Frequency and Sensor dt can't be both specified")
 
@@ -49,7 +78,6 @@ class IMUSensor(BaseSensor):
         self._body_prim_path = "/".join(prim_path.split("/")[:-1])
         self._sensor_name = prim_path.split("/")[-1]
         self._imu_sensor_interface = _sensor.acquire_imu_sensor_interface()
-        self._core_nodes = _isaacsim_core_nodes.acquire_interface()
 
         linear_acceleration_filter_size = max(linear_acceleration_filter_size, 1)
         angular_velocity_filter_size = max(angular_velocity_filter_size, 1)
@@ -112,10 +140,28 @@ class IMUSensor(BaseSensor):
         self._current_frame["orientation"][0] = 1
         return
 
-    def initialize(self, physics_sim_view=None) -> None:
+    def initialize(self, physics_sim_view=None):
+        """Initialize the IMU sensor.
+
+        Args:
+            physics_sim_view: The physics simulation view to use for initialization.
+        """
         BaseSensor.initialize(self, physics_sim_view=physics_sim_view)
 
     def get_current_frame(self, read_gravity=True) -> dict:
+        """Gets the current sensor reading frame containing IMU data.
+
+        Args:
+            read_gravity: Whether to include gravity in the linear acceleration reading.
+
+        Returns:
+            Dictionary containing sensor data with keys:
+            - 'lin_acc': Linear acceleration as a 3D tensor
+            - 'ang_vel': Angular velocity as a 3D tensor
+            - 'orientation': Orientation quaternion as a 4D tensor
+            - 'time': Sensor reading timestamp
+            - 'physics_step': Current physics simulation step
+        """
         imu_sensor_reading = self._imu_sensor_interface.get_sensor_reading(self.prim_path, read_gravity=read_gravity)
         if imu_sensor_reading.is_valid:
             self._current_frame["lin_acc"] = self._backend_utils.create_tensor_from_list(
@@ -147,32 +193,59 @@ class IMUSensor(BaseSensor):
                 device=self._device,
             )
             self._current_frame["time"] = float(imu_sensor_reading.time)
-            self._current_frame["physics_step"] = float(self._core_nodes.get_physics_num_steps())
+            self._current_frame["physics_step"] = float(SimulationManager.get_num_physics_steps())
         return self._current_frame
 
-    def resume(self) -> None:
+    def resume(self):
+        """Resume the IMU sensor by enabling it."""
         self._isaac_sensor_prim.GetEnabledAttr().Set(True)
         return
 
-    def pause(self) -> None:
+    def pause(self):
+        """Pause the IMU sensor by disabling it."""
         self._isaac_sensor_prim.GetEnabledAttr().Set(False)
         return
 
     def is_paused(self) -> bool:
+        """Check if the IMU sensor is currently paused.
+
+        Returns:
+            True if the sensor is paused, False if enabled.
+        """
         if not self._isaac_sensor_prim.GetEnabledAttr().Get():
             return True
         return False
 
-    def set_frequency(self, value: int) -> None:
+    def set_frequency(self, value: int):
+        """Set the IMU sensor sampling frequency.
+
+        Args:
+            value: The sampling frequency in Hz.
+        """
         self._isaac_sensor_prim.GetSensorPeriodAttr().Set(1.0 / value)
         return
 
     def get_frequency(self) -> int:
+        """Get the current IMU sensor sampling frequency.
+
+        Returns:
+            The sampling frequency in Hz.
+        """
         return int(1.0 / self._isaac_sensor_prim.GetSensorPeriodAttr().Get())
 
     def get_dt(self) -> float:
+        """Get the current IMU sensor sampling period.
+
+        Returns:
+            The sampling period in seconds.
+        """
         return self._isaac_sensor_prim.GetSensorPeriodAttr().Get()
 
-    def set_dt(self, value: float) -> None:
+    def set_dt(self, value: float):
+        """Set the IMU sensor sampling period.
+
+        Args:
+            value: The sampling period in seconds.
+        """
         self._isaac_sensor_prim.GetSensorPeriodAttr().Set(value)
         return

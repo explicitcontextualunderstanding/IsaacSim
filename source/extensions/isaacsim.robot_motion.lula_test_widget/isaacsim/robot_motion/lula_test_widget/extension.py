@@ -13,16 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for testing robot motion planning using Lula kinematics solvers and RmpFlow motion generation."""
+
+
 import asyncio
 import gc
 import os
 import weakref
 
 import carb
+import carb.eventdispatcher
 import numpy as np
 import omni
 import omni.kit.commands
-import omni.physx as _physx
+import omni.physics.core
 import omni.timeline
 import omni.ui as ui
 import omni.usd
@@ -51,36 +55,89 @@ EXTENSION_NAME = "Lula Test Widget"
 MAX_DOF_NUM = 100
 
 
-def is_yaml_file(path: str):
+def is_yaml_file(path: str) -> bool:
+    """Check if a file path has a YAML extension.
+
+    Args:
+        path: File path to check.
+
+    Returns:
+        True if the file has a .yaml or .YAML extension.
+    """
     _, ext = os.path.splitext(path.lower())
     return ext in [".yaml", ".YAML"]
 
 
-def is_urdf_file(path: str):
+def is_urdf_file(path: str) -> bool:
+    """Check if a file path has a URDF extension.
+
+    Args:
+        path: File path to check.
+
+    Returns:
+        True if the file has a .urdf or .URDF extension.
+    """
     _, ext = os.path.splitext(path.lower())
     return ext in [".urdf", ".URDF"]
 
 
 def on_filter_yaml_item(item) -> bool:
+    """Filter function for YAML file browser items.
+
+    Args:
+        item: File browser item to filter.
+
+    Returns:
+        True if the item should be displayed in the YAML file browser.
+    """
     if not item or item.is_folder:
         return not (item.name == "Omniverse" or item.path.startswith("omniverse:"))
     return is_yaml_file(item.path)
 
 
 def on_filter_urdf_item(item) -> bool:
+    """Filter function for URDF file browser items.
+
+    Args:
+        item: File browser item to filter.
+
+    Returns:
+        True if the item should be displayed in the URDF file browser.
+    """
     if not item or item.is_folder:
         return not (item.name == "Omniverse" or item.path.startswith("omniverse:"))
     return is_urdf_file(item.path)
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the Lula Test Widget.
+
+    This extension provides a comprehensive testing interface for robot motion planning using Lula kinematics
+    solvers and RmpFlow motion generation. It enables users to select articulated robots from the scene,
+    load robot configuration files, and test various motion planning scenarios including inverse kinematics,
+    trajectory generation, and RmpFlow-based motion control.
+
+    The extension creates a dockable UI window with panels for robot selection, kinematics testing, trajectory
+    generation, and RmpFlow configuration. Users can visualize end-effector poses, follow targets, generate
+    custom trajectories, and test sinusoidal motion patterns with configurable parameters.
+
+    Key features include:
+    - Interactive robot articulation selection from the current stage
+    - Support for YAML robot description and URDF file loading
+    - Inverse kinematics solver testing with target following
+    - Custom trajectory generation and playback
+    - RmpFlow motion planning with obstacle avoidance
+    - Real-time end-effector visualization
+    - Debugging mode for motion planning analysis
+    """
+
     def on_startup(self, ext_id: str):
         """Initialize extension and UI elements"""
 
         # Events
         self._usd_context = omni.usd.get_context()
-        self._physxIFace = _physx.get_physx_interface()
-        self._physx_subscription = None
+        self._physics_simulation_interface = omni.physics.core.get_physics_simulation_interface()
+        self._physics_subscription = None
         self._stage_event_sub = None
         self._timeline = omni.timeline.get_timeline_interface()
 
@@ -135,7 +192,7 @@ class Extension(omni.ext.IExt):
         self._usd_context = None
         self._stage_event_sub = None
         self._timeline_event_sub = None
-        self._physx_subscription = None
+        self._physics_subscription = None
         self._models = {}
         remove_menu_items(self._menu_items, "Tools")
         if self._window:
@@ -146,10 +203,31 @@ class Extension(omni.ext.IExt):
         if self._window.visible:
             # Subscribe to Stage and Timeline Events
             self._usd_context = omni.usd.get_context()
-            events = self._usd_context.get_stage_event_stream()
-            self._stage_event_sub = events.create_subscription_to_pop(self._on_stage_event)
-            stream = self._timeline.get_timeline_event_stream()
-            self._timeline_event_sub = stream.create_subscription_to_pop(self._on_timeline_event)
+            self._stage_event_sub_selection = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SELECTION_CHANGED),
+                on_event=self._on_stage_selection_changed,
+                observer_name="isaacsim.robot_motion.lula_test_widget.Extension._on_stage_selection_changed",
+            )
+            self._stage_event_sub_opened = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.OPENED),
+                on_event=self._on_stage_opened,
+                observer_name="isaacsim.robot_motion.lula_test_widget.Extension._on_stage_opened",
+            )
+            self._stage_event_sub_closed = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.CLOSED),
+                on_event=self._on_stage_closed,
+                observer_name="isaacsim.robot_motion.lula_test_widget.Extension._on_stage_closed",
+            )
+            self._stage_event_sub_sim_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SIMULATION_START_PLAY),
+                on_event=self._on_timeline_play,
+                observer_name="isaacsim.robot_motion.lula_test_widget.Extension._on_timeline_play",
+            )
+            self._stage_event_sub_sim_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SIMULATION_STOP_PLAY),
+                on_event=self._on_timeline_stop,
+                observer_name="isaacsim.robot_motion.lula_test_widget.Extension._on_timeline_stop",
+            )
 
             self._build_ui()
             if not self._new_window and self.articulation:
@@ -157,8 +235,11 @@ class Extension(omni.ext.IExt):
             self._new_window = False
         else:
             self._usd_context = None
-            self._stage_event_sub = None
-            self._timeline_event_sub = None
+            self._stage_event_sub_selection = None
+            self._stage_event_sub_opened = None
+            self._stage_event_sub_closed = None
+            self._stage_event_sub_sim_play = None
+            self._stage_event_sub_sim_stop = None
 
     def _menu_callback(self):
         self._window.visible = not self._window.visible
@@ -222,8 +303,10 @@ class Extension(omni.ext.IExt):
             self._refresh_ui(self.articulation)
 
             # start event subscriptions
-            if not self._physx_subscription:
-                self._physx_subscription = self._physxIFace.subscribe_physics_step_events(self._on_physics_step)
+            if not self._physics_subscription:
+                self._physics_subscription = self._physics_simulation_interface.subscribe_physics_on_step_events(
+                    pre_step=False, order=0, on_update=self._on_physics_step
+                )
 
         # Deselect and Reset
         else:
@@ -330,7 +413,7 @@ class Extension(omni.ext.IExt):
         """Updates the GUI with a new Articulation's properties.
 
         Args:
-            articulation (SingleArticulation): [description]
+            articulation (SingleArticulation): The articulation to display in the UI.
         """
         # Get the latest articulation values and update the Properties UI
         self.get_articulation_values(articulation)
@@ -350,39 +433,63 @@ class Extension(omni.ext.IExt):
     # Callbacks
     ##################################
 
-    def _on_stage_event(self, event):
-        """Callback for Stage Events
+    def _on_stage_selection_changed(self, event):
+        """Callback for Stage Selection Changed Event
 
         Args:
-            event (omni.usd.StageEventType): Event Type
+            event (carb.eventdispatcher.Event): Event
         """
-
         # On every stage event check if any articulations have been added/removed from the Stage
         self._refresh_selection_combobox()
 
-        if event.type == int(omni.usd.StageEventType.SELECTION_CHANGED):
-            # self._on_selection_changed()
-            pass
+    def _on_stage_opened(self, event):
+        """Callback for Stage Opened Event
 
-        elif event.type == int(omni.usd.StageEventType.OPENED) or event.type == int(omni.usd.StageEventType.CLOSED):
-            # stage was opened or closed, cleanup
-            self._physx_subscription = None
+        Args:
+            event (carb.eventdispatcher.Event): Event
+        """
+        # On every stage event check if any articulations have been added/removed from the Stage
+        self._refresh_selection_combobox()
+        # stage was opened, cleanup
+        self._physics_subscription = None
 
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_START_PLAY):
-            self._refresh_selection_combobox()
-            index = self._models["ar_selection_model"].get_item_value_model().as_int
-            selected_articulation = self.articulation_list[index]
-            self._on_selection(selected_articulation)
+    def _on_stage_closed(self, event):
+        """Callback for Stage Closed Event
 
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_STOP_PLAY):
-            if self._timeline.is_stopped():
-                self._on_selection("None")
+        Args:
+            event (carb.eventdispatcher.Event): Event
+        """
+        # On every stage event check if any articulations have been added/removed from the Stage
+        self._refresh_selection_combobox()
+        # stage was closed, cleanup
+        self._physics_subscription = None
 
-    def _on_physics_step(self, step):
+    def _on_timeline_play(self, event):
+        """Callback for Timeline Played Event
+
+        Args:
+            event (carb.eventdispatcher.Event): Event
+        """
+        self._refresh_selection_combobox()
+        index = self._models["ar_selection_model"].get_item_value_model().as_int
+        selected_articulation = self.articulation_list[index]
+        self._on_selection(selected_articulation)
+
+    def _on_timeline_stop(self, event):
+        """Callback for Timeline Stopped Event
+
+        Args:
+            event (carb.eventdispatcher.Event): Event
+        """
+        if self._timeline.is_stopped():
+            self._on_selection("None")
+
+    def _on_physics_step(self, step, context):
         """Callback for Physics Step.
 
         Args:
-            step ([type]): [description]
+            step: Physics step size in seconds.
+            context: Physics context information.
         """
         if self.articulation is not None:
             if not self.articulation.handles_initialized:
@@ -396,6 +503,11 @@ class Extension(omni.ext.IExt):
         return
 
     def _get_next_action(self):
+        """Calculates the next control action for the selected articulation.
+
+        Returns:
+            The control action to apply to the articulation controller.
+        """
         if self._test_scenarios.scenario_name == "Sinusoidal Target":
             w_xy = self._models["rmpflow_follow_sinusoid_w_xy"].get_value_as_float()
             w_z = self._models["rmpflow_follow_sinusoid_w_z"].get_value_as_float()
@@ -407,19 +519,12 @@ class Extension(omni.ext.IExt):
         else:
             return self._test_scenarios.get_next_action()
 
-    def _on_timeline_event(self, e):
-        """Callback for Timeline Events
-
-        Args:
-            event (omni.timeline.TimelineEventType): Event Type
-        """
-        pass
-
     ##################################
     # UI Builders
     ##################################
 
     def _build_info_ui(self):
+        """Builds the information panel UI section with title, documentation link, and overview text."""
         title = EXTENSION_NAME
         doc_link = (
             "https://docs.isaacsim.omniverse.nvidia.com/latest/manipulators/manipulators_configure_rmpflow_denso.html"
@@ -432,6 +537,9 @@ class Extension(omni.ext.IExt):
         setup_ui_headers(self._ext_id, __file__, title, doc_link, overview)
 
     def _build_selection_ui(self):
+        """Builds the selection panel UI with articulation dropdown, file pickers for robot description and URDF,
+        and end effector frame selection controls.
+        """
         frame = ui.CollapsableFrame(
             title="Selection Panel",
             height=0,
@@ -561,6 +669,7 @@ class Extension(omni.ext.IExt):
                     SimpleCheckBox(1, on_vis_ee_clicked_fn, model=cb)
 
     def _build_kinematics_ui(self):
+        """Builds the Lula Kinematics Solver UI panel with inverse kinematics target following controls."""
         frame = ui.CollapsableFrame(
             title="Lula Kinematics Solver",
             height=0,
@@ -590,6 +699,9 @@ class Extension(omni.ext.IExt):
                 )
 
     def _build_trajectory_generation_ui(self):
+        """Builds the Lula Trajectory Generator UI panel with custom trajectory creation and waypoint
+        management controls.
+        """
         frame = ui.CollapsableFrame(
             title="Lula Trajectory Generator",
             height=0,
@@ -664,6 +776,9 @@ class Extension(omni.ext.IExt):
                         )
 
     def _build_rmpflow_ui(self):
+        """Builds the RmpFlow UI panel with configuration file selection, target following controls,
+        and sinusoidal trajectory parameters.
+        """
         frame = ui.CollapsableFrame(
             title="RmpFlow",
             height=0,
@@ -804,6 +919,7 @@ class Extension(omni.ext.IExt):
                         )
 
     def _disable_lula_dropdowns(self):
+        """Disables and collapses the Lula kinematics, trajectory, and RmpFlow UI panels."""
         frame_names = ["kinematics_frame", "trajectory_frame", "rmpflow_frame", "trajectory_panel"]
         for n in frame_names:
             frame = self._models[n]
@@ -811,9 +927,13 @@ class Extension(omni.ext.IExt):
             frame.collapsed = True
 
     def _enable_load_button(self):
+        """Enables the config file load button when valid robot description file is selected."""
         self._models["load_config_btn"].enabled = True
 
     def _enable_lula_dropdowns(self):
+        """Enables the Lula kinematics, trajectory, and RmpFlow UI panels when articulation and
+        configuration files are loaded.
+        """
         if self.articulation is None or self._robot_description_file is None or self._robot_urdf_file is None:
             return
 
@@ -828,15 +948,28 @@ class Extension(omni.ext.IExt):
         if self._visualize_end_effector:
             self._test_scenarios.visualize_ee_frame(self.articulation, self._get_selected_ee_frame())
 
-    def _set_enable_trajectory_panel(self, enable):
+    def _set_enable_trajectory_panel(self, enable: bool):
+        """Enables or disables the trajectory panel frame.
+
+        Args:
+            enable: Whether to enable the trajectory panel.
+        """
         frame = self._models["trajectory_panel"]
         frame.enabled = enable
         frame.collapsed = not enable
 
-    def _set_enable_rmpflow_buttons(self, enable):
+    def _set_enable_rmpflow_buttons(self, enable: bool):
+        """Enables or disables the RmpFlow buttons.
+
+        Args:
+            enable: Whether to enable the RmpFlow buttons.
+        """
         self._models["rmpflow_follow_target_btn"].enabled = enable
         self._models["rmpflow_follow_sinusoid_btn"].enabled = enable
 
-    def _get_selected_ee_frame(self):
+    def _get_selected_ee_frame(self) -> str:
+        """Returns:
+        The selected end effector frame name from the dropdown options.
+        """
         name = "ee_frame"
         return self._ee_frame_options[self._models[name].get_item_value_model().as_int]

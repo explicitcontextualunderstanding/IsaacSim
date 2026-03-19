@@ -12,33 +12,83 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Shared utility helpers for benchmark services."""
+
 import asyncio
 import dataclasses
 import functools
 import inspect
+import logging
 import os
 import platform
 import stat
 import sys
 import time
 import traceback
-import urllib
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Any
+from urllib import parse as urlparse
 
 import carb
+import carb.eventdispatcher
 import omni.kit.app
 
-original_persistent_settings = {}
-settings_interface = None
+original_persistent_settings: dict[str, dict[str, Any]] = {}
+settings_interface: Any | None = None
+
+logger = logging.getLogger(__name__)
 
 
-def set_persistent_setting(name, value, type):
+def set_up_logging(name: str) -> logging.Logger:
+    """Set up a logger with consistent formatting.
+
+    Args:
+        name: Logger name.
+
+    Returns:
+        Configured logger instance.
+
+    Example:
+
+    .. code-block:: python
+
+        logger = set_up_logging(__name__)
     """
-    NOTE: looks like this is not used in practice?
+    fmt = "{asctime} [{relativeCreated:,.0f}ms] [{levelname}] [{name}] {message}"
+    datfmt = "%Y-%m-%d %H:%M:%S"
+    formatter = logging.Formatter(fmt, datfmt, "{")
+    formatter.converter = time.gmtime
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(formatter)
+    logger = logging.getLogger(name)
+    logger.handlers = [stdout_handler]
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    return logger
+
+
+def set_persistent_setting(name: str, value: Any, type: type):
+    """Set a persistent setting and remember the original value.
+
+    Args:
+        name: Setting path.
+        value: Setting value.
+        type: Setting type.
+
+    Raises:
+        RuntimeError: If settings_interface is not initialized.
+
+    Example:
+
+    .. code-block:: python
+
+        set_persistent_setting("/app/window/title", "Benchmark", str)
     """
     global original_persistent_settings, settings_interface
+
+    if settings_interface is None:
+        raise RuntimeError("settings_interface is not initialized")
 
     _orig = settings_interface.get(name)  # noqa
     original_persistent_settings[name] = {"value": _orig, "type": type}
@@ -47,17 +97,49 @@ def set_persistent_setting(name, value, type):
 
 
 def restore_persistent_settings():
+    """Restore all previously captured persistent settings.
+
+    Example:
+
+    .. code-block:: python
+
+        restore_persistent_settings()
+    """
     for name, _dict in original_persistent_settings.items():
         _set_settings_value(name, _dict["value"], _dict["type"])
 
 
-def _set_settings_value(name, value, type):
+def _set_settings_value(name: str, value: Any, type: type):
+    """Set a settings value directly.
+
+    Args:
+        name: Setting path.
+        value: Setting value.
+        type: Setting type.
+
+    Raises:
+        RuntimeError: If settings_interface is not initialized.
+    """
     global settings_interface
+    if settings_interface is None:
+        raise RuntimeError("settings_interface is not initialized")
+
     settings_interface.set(name, value)
 
 
 @functools.lru_cache(maxsize=10)
-def generate_event_map():
+def generate_event_map() -> dict[int, str]:
+    """Build a mapping of stage event enum values to names.
+
+    Returns:
+        Mapping from event integer values to names.
+
+    Example:
+
+    .. code-block:: python
+
+        event_map = generate_event_map()
+    """
     event_map = {}
     for _val in dir(omni.usd.StageEventType):
         if _val.isupper():
@@ -66,20 +148,41 @@ def generate_event_map():
 
 
 async def stage_event() -> int:
-    """Calls `kit.stage_event` with logging"""
+    """Await the next stage event and log it.
+
+    Returns:
+        Integer event value.
+
+    Example:
+
+    .. code-block:: python
+
+        event = await stage_event()
+    """
     result = await omni.usd.get_context().next_stage_event_async()
     event, _ = result
     event = int(event)
-    carb.log_info(f"*** omni.kit.tests.basic_validation: stage_event() -> ({generate_event_map()[event]}, {_})")
+    logger.info(f"*** omni.kit.tests.basic_validation: stage_event() -> ({generate_event_map()[event]}, {_})")
     return event
 
 
-async def capture_next_frame(app, capture_file_path: str):
-    """
-    capture that works with old (editor-based) capture and new Kit 2.0 approach also
-    Not all Create's seem to have the new API available (e.g "omni.create.kit")
-    """
+async def capture_next_frame(app: Any, capture_file_path: str, timeout_sec: float = 2.0):
+    """Capture the next frame to a file using viewport capture APIs.
 
+    Args:
+        app: Kit application instance.
+        capture_file_path: Output image path.
+        timeout_sec: Timeout in seconds.
+
+    Raises:
+        RuntimeError: If the viewport never produces valid resources.
+
+    Example:
+
+    .. code-block:: python
+
+        await capture_next_frame(app, "/tmp/capture.png")
+    """
     _renderer = None
     _viewport_interface = None
 
@@ -87,17 +190,20 @@ async def capture_next_frame(app, capture_file_path: str):
         import omni.kit.viewport_legacy
         import omni.renderer_capture
     except ImportError as ie:
-        carb.log_error(f"*** screenshot: capture_next_frame: can't load {ie}")
+        logger.error(f"*** screenshot: capture_next_frame: can't load {ie}")
 
     _renderer = omni.renderer_capture.acquire_renderer_capture_interface()
     _viewport_interface = omni.kit.viewport_legacy.acquire_viewport_interface()
     viewport_ldr_rp = _viewport_interface.get_viewport_window(None).get_drawable_ldr_resource()
 
-    # TODO: Probably need to put a cap on this so doesnt hang forever
     # Wait until the viewport has valid resources
-    while viewport_ldr_rp == None:
+    start_time = time.time()
+    while viewport_ldr_rp == None and time.time() - start_time < timeout_sec:
         await app.next_update_async()
         viewport_ldr_rp = _viewport_interface.get_viewport_window(None).get_drawable_ldr_resource()
+
+    if viewport_ldr_rp == None:
+        raise RuntimeError(f"Timeout waiting for viewport to have valid resources after {timeout_sec} seconds.")
 
     _renderer.capture_next_frame_rp_resource(capture_file_path, viewport_ldr_rp)
     await app.next_update_async()
@@ -105,21 +211,51 @@ async def capture_next_frame(app, capture_file_path: str):
     print("written", capture_file_path)
 
 
-def omni_url_parser(url: str):
-    res = urllib.parse.urlparse(url)
+def omni_url_parser(url: str) -> tuple[str, str | None, str | None, str]:
+    """Parse an Omni URL into connection components.
+
+    Args:
+        url: Omni URL.
+
+    Returns:
+        A tuple containing (netloc, username, password, path).
+
+    Example:
+
+    .. code-block:: python
+
+        netloc, username, password, path = omni_url_parser("omniverse://server/asset.usd")
+    """
+    res = urlparse.urlparse(url)
     username = os.getenv("OMNI_USER")
     password = os.getenv("OMNI_PASS")
     return res.netloc, username, password, res.path
 
 
-async def load_stage(stage_path: str, syncloads: bool, num_assets_loaded: int = 2):
-    """
-    looks like this is not being used (in benchmark at least)
-    """
+async def load_stage(stage_path: str, syncloads: bool, num_assets_loaded: int = 2) -> float:
+    """Load a stage and wait for assets to finish loading.
 
+    Args:
+        stage_path: USD stage path.
+        syncloads: True to wait for a single asset load event.
+        num_assets_loaded: Number of asset load events to wait for.
+
+    Returns:
+        Stage load time in seconds.
+
+    Raises:
+        RuntimeError: If loading fails or assets load aborts.
+        SystemExit: If the stage closes while waiting.
+
+    Example:
+
+    .. code-block:: python
+
+        load_time = await load_stage("/path/to/stage.usd", syncloads=False, num_assets_loaded=3)
+    """
     start = time.time()
     success, explanation = await omni.usd.get_context().open_stage_async(stage_path)
-    carb.log_info(f"*** omni.kit.tests.basic_validation: Initial stage load success: {success}")
+    logger.info(f"*** omni.kit.tests.basic_validation: Initial stage load success: {success}")
     if not success:
         raise RuntimeError(explanation)
 
@@ -132,20 +268,20 @@ async def load_stage(stage_path: str, syncloads: bool, num_assets_loaded: int = 
 
     if required_assets_loaded == 0:
         load_time = time.time() - start
-        carb.log_info("*** omni.kit.tests.basic_validation: Not waiting for ASSETS LOADED at all, stage load complete.")
+        logger.info("*** omni.kit.tests.basic_validation: Not waiting for ASSETS LOADED at all, stage load complete.")
         return load_time
 
-    carb.log_info(f"*** omni.kit.tests.basic_validation: Waiting for {required_assets_loaded} ASSETS LOADED event(s)")
+    logger.info(f"*** omni.kit.tests.basic_validation: Waiting for {required_assets_loaded} ASSETS LOADED event(s)")
     while True:
         event = await stage_event()
         # TODO: compare to actual enum value when Kit fixes its return types
         if event == int(omni.usd.StageEventType.ASSETS_LOADED):
             assets_loaded_count += 1
-            carb.log_info(f"*** omni.kit.tests.basic_validation: Received ASSETS_LOADED #{assets_loaded_count}")
+            logger.info(f"*** omni.kit.tests.basic_validation: Received ASSETS_LOADED #{assets_loaded_count}")
             # The user can specify how many assets_loaded to wait for in async mode
             if assets_loaded_count < required_assets_loaded:
                 continue
-            carb.log_info(
+            logger.info(
                 f"*** omni.kit.tests.basic_validation: Met threshold of {required_assets_loaded}, all assets loaded"
             )
             break
@@ -163,9 +299,20 @@ async def load_stage(stage_path: str, syncloads: bool, num_assets_loaded: int = 
     return load_time
 
 
-def getStageDefaultPrimPath(stage):
-    """
-    Helper function used for getting default prim path for any given stage.
+def getStageDefaultPrimPath(stage: Any):
+    """Get the default prim path for a stage.
+
+    Args:
+        stage: USD stage.
+
+    Returns:
+        Default prim path.
+
+    Example:
+
+    .. code-block:: python
+
+        path = getStageDefaultPrimPath(stage)
     """
     if stage.HasDefaultPrim():
         return stage.GetDefaultPrim().GetPath()
@@ -176,35 +323,62 @@ def getStageDefaultPrimPath(stage):
 
 
 class LogErrorChecker:
-    """Automatically subscribes to logging events and monitors if error were produced during the test."""
+    """Monitor log events and count errors during a test."""
 
     def __init__(self):
         # Setup this test case to fail if any error is produced
         self._error_count = 0
 
         def on_log_event(e):
-            if e.payload["level"] >= carb.logging.LEVEL_ERROR:
+            if e["level"] >= carb.logging.LEVEL_ERROR:
                 self._error_count = self._error_count + 1
 
         self._log_stream = omni.kit.app.get_app().get_log_event_stream()
-        self._log_sub = self._log_stream.create_subscription_to_pop(on_log_event, name="test log event")
+        self._log_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.kit.app.GLOBAL_EVENT_LOG,
+            on_event=on_log_event,
+            observer_name="isaacsim.benchmark.services.utils.on_log_event",
+        )
 
     def shutdown(self):
+        """Unsubscribe from log events.
+
+        Example:
+
+        .. code-block:: python
+
+            checker.shutdown()
+        """
         self._log_stream = None
         self._log_sub = None
 
-    def get_error_count(self):
+    def get_error_count(self) -> int:
+        """Get the current error count.
+
+        Returns:
+            Number of logged errors.
+
+        Example:
+
+        .. code-block:: python
+
+            count = checker.get_error_count()
+        """
         self._log_stream.pump()
         return self._error_count
 
 
 def get_calling_test_id() -> str:
-    """
-    starting with the current stack frame, see if we are being called by
-    a unit test. If so, try and find the fully qualified name of the test
+    """Return the fully qualified name of a calling test, if any.
 
-    NOTE: This relies on conventions and a bit of hackery. Don't rely on
-    it 100%
+    Returns:
+        Fully qualified test name, or an empty string if not found.
+
+    Example:
+
+    .. code-block:: python
+
+        test_id = get_calling_test_id()
     """
 
     def get_class_from_frame(fr):
@@ -234,17 +408,35 @@ def get_calling_test_id() -> str:
     return ""
 
 
-def ensure_dir(file_path: Union[str, Path]) -> None:
-    """Creates directory if it doesn't exist."""
+def ensure_dir(file_path: str | Path):
+    """Create a directory if it does not exist.
+
+    Args:
+        file_path: Directory path.
+
+    Example:
+
+    .. code-block:: python
+
+        ensure_dir("/tmp/metrics")
+    """
     if not os.path.exists(file_path):
-        carb.log_info(f"Creating dir {file_path}")
+        logger.info(f"Creating dir {file_path}")
         os.makedirs(file_path)
 
 
-def get_kit_version_branch() -> Tuple[str, str, str]:
-    """Get Kit branch in the format of version_branch"""
-    # Example:
-    # 103.1+release.1979.086b7ede.tc -> 103.1_release
+def get_kit_version_branch() -> tuple[str, str, str]:
+    """Get Kit version, branch, and combined version_branch string.
+
+    Returns:
+        A tuple containing (version, branch, version_branch).
+
+    Example:
+
+    .. code-block:: python
+
+        version, branch, version_branch = get_kit_version_branch()
+    """
     app = omni.kit.app.get_app()
     build_version = app.get_build_version()
     version = build_version.split("+")[0]
@@ -257,15 +449,30 @@ def get_kit_version_branch() -> Tuple[str, str, str]:
 # early stop if a frame time threshold (frametime_threshold) is reached
 # or if the time ratio (time_ratio_treshold) between the current and the previous frame is reached
 # e.g. current frame needed X times less time than the previous one
-async def wait_until_stage_is_fully_loaded_async(max_frames=10, frametime_threshold=0.1, time_ratio_treshold=5):
-    prev_frametime = 0
+async def wait_until_stage_is_fully_loaded_async(
+    max_frames: int = 10, frametime_threshold: float = 0.1, time_ratio_treshold: float = 5
+):
+    """Wait for stage to fully load by observing frame times.
+
+    Args:
+        max_frames: Maximum frames to wait.
+        frametime_threshold: Frametime threshold to consider fully loaded.
+        time_ratio_treshold: Ratio threshold between frames.
+
+    Example:
+
+    .. code-block:: python
+
+        await wait_until_stage_is_fully_loaded_async()
+    """
+    prev_frametime = 0.0
     for i in range(max_frames):
         start_time = time.time()
         await omni.kit.app.get_app().next_update_async()
         elapsed_time = time.time() - start_time
-        carb.log_info(f"Frame {i} frametime: {elapsed_time}")
+        logger.info(f"Frame {i} frametime: {elapsed_time}")
         if elapsed_time < frametime_threshold or elapsed_time * time_ratio_treshold < prev_frametime:
-            carb.log_info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
+            logger.info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
             break
         prev_frametime = elapsed_time
 
@@ -274,14 +481,29 @@ async def wait_until_stage_is_fully_loaded_async(max_frames=10, frametime_thresh
 # early stop if a frame time threshold (frametime_threshold) is reached
 # or if the time ratio (time_ratio_treshold) between the current and the previous frame is reached
 # e.g. current frame needed X times less time than the previous one
-def wait_until_stage_is_fully_loaded(max_frames=10, frametime_threshold=0.1, time_ratio_treshold=5):
-    prev_frametime = 0
+def wait_until_stage_is_fully_loaded(
+    max_frames: int = 10, frametime_threshold: float = 0.1, time_ratio_treshold: float = 5
+):
+    """Wait for stage to fully load by observing frame times.
+
+    Args:
+        max_frames: Maximum frames to wait.
+        frametime_threshold: Frametime threshold to consider fully loaded.
+        time_ratio_treshold: Ratio threshold between frames.
+
+    Example:
+
+    .. code-block:: python
+
+        wait_until_stage_is_fully_loaded()
+    """
+    prev_frametime = 0.0
     for i in range(max_frames):
         start_time = time.time()
         omni.kit.app.get_app().update()
         elapsed_time = time.time() - start_time
-        carb.log_info(f"Frame {i} frametime: {elapsed_time}")
+        logger.info(f"Frame {i} frametime: {elapsed_time}")
         if elapsed_time < frametime_threshold or elapsed_time * time_ratio_treshold < prev_frametime:
-            carb.log_info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
+            logger.info(f"Stage fully loaded at frame {i}, last frametime: {elapsed_time}")
             break
         prev_frametime = elapsed_time

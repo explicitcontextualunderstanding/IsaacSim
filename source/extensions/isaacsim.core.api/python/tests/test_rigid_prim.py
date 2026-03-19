@@ -53,9 +53,7 @@ class TestSingleRigidPrimPose(CoreTestCase):
         rigid_prim = SingleRigidPrim("/test", "test", position=np.array(position), orientation=orientation)
         rigid_prim.set_local_scale(scale)
         real_position, real_orientation = rigid_prim.get_local_pose()
-        # TODO: this is buggy for some reason, world scale is equal to 1.0 in this case for some reason
-        # real_scale = rigid_prim.get_world_scale()
-        real_scale = rigid_prim.get_local_scale()
+        real_scale = rigid_prim.get_world_scale()
         for i in range(3):
             self.assertAlmostEqual(real_position[i], position[i])
             self.assertAlmostEqual(real_orientation[i], orientation[i])

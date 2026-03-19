@@ -29,6 +29,14 @@ class FrankaExperimental(Articulation):
     This class inherits from Articulation and provides high-level control commands for the Franka robot,
     including inverse kinematics for end-effector positioning and gripper control.
     It can either use an existing robot path or create a new one from USD assets.
+
+    Args:
+        robot_path: USD path where the robot should be created or exists.
+        create_robot: Whether to create a new robot from USD assets.
+        end_effector_link: The end effector rigid body link. If None, creates from robot_path.
+
+    Raises:
+        ValueError: If create_robot is False but no robot exists at robot_path.
     """
 
     def __init__(
@@ -157,10 +165,10 @@ class FrankaExperimental(Articulation):
         """Get current robot state including DOF positions and end effector pose.
 
         Returns:
-            A tuple containing:
-                - current_dof_positions: Current joint positions [N, 9]
-                - current_end_effector_position: Current end effector position [N, 3]
-                - current_end_effector_orientation: Current end effector orientation [N, 4] as quaternion
+            A tuple containing (current_dof_positions, current_end_effector_position, current_end_effector_orientation)
+            where current_dof_positions are current joint positions [N, 9], current_end_effector_position is current
+            end effector position [N, 3], and current_end_effector_orientation is current end effector orientation [N, 4]
+            as quaternion.
         """
         current_dof_positions = self.get_dof_positions().numpy()
         current_end_effector_position, current_end_effector_orientation = self.end_effector_link.get_world_poses()
@@ -174,7 +182,7 @@ class FrankaExperimental(Articulation):
         position: np.ndarray,
         orientation: np.ndarray,
         ik_method: str = "damped-least-squares",
-    ) -> None:
+    ):
         """Set the end effector to a specific pose (position and orientation).
 
         This method uses inverse kinematics to move the end effector to the target pose.
@@ -227,15 +235,15 @@ class FrankaExperimental(Articulation):
         dof_position_targets = current_dof_positions[:, :7] + delta_dof_positions
         self.set_dof_position_targets(dof_position_targets, dof_indices=list(range(7)))
 
-    def open_gripper(self) -> None:
+    def open_gripper(self):
         """Open the gripper to the default open position."""
         self.set_dof_position_targets(self.gripper_open_position, dof_indices=[7, 8])
 
-    def close_gripper(self) -> None:
+    def close_gripper(self):
         """Close the gripper to the default closed position."""
         self.set_dof_position_targets(self.gripper_closed_position, dof_indices=[7, 8])
 
-    def set_gripper_position(self, position: np.ndarray) -> None:
+    def set_gripper_position(self, position: np.ndarray):
         """Set gripper to a specific position.
 
         Args:
@@ -253,7 +261,7 @@ class FrankaExperimental(Articulation):
         """
         return np.array([[0.0, 1.0, 0.0, 0.0]])
 
-    def reset_to_default_pose(self) -> None:
+    def reset_to_default_pose(self):
         """Reset the robot to its default pose with open gripper."""
         default_positions = np.array([[0.012, -0.568, 0.0, -2.811, 0.0, 3.037, 0.741, 0.04, 0.04]])
         self.set_dof_positions(default_positions)

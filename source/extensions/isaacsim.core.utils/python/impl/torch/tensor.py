@@ -12,7 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import torch
+from isaacsim.core.deprecation_manager import import_module
+
+torch = import_module("torch")
 
 
 def as_type(data, dtype):

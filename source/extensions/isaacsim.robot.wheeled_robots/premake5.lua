@@ -16,8 +16,6 @@
 local ext = get_current_extension_info()
 local ogn = get_ogn_project_information(ext, "isaacsim/robot/wheeled_robots")
 
--- ext.group = "omnigraph"
-
 project_ext(ext)
 -- C++ Carbonite plugin
 project_ext_plugin(ext, "isaacsim.robot.wheeled_robots.plugin")
@@ -40,7 +38,7 @@ includedirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include",
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include/boost",
     "%{root}/_build/target-deps/usd_ext_physics/%{cfg.buildcfg}/include",
-    "%{root}/_build/target-deps/python/include/python3.11",
+    "%{root}/_build/target-deps/python/include/python3.12",
 
     "%{root}/_build/target-deps/omni_physics/%{config}/include",
     "%{root}/source/extensions/isaacsim.robot.wheeled_robots/include",
@@ -55,7 +53,7 @@ links {
     --    "usdGeom", "usdUtils", "omni.usd",
 }
 
-extra_usd_libs = {}
+extra_usd_libs = { "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)

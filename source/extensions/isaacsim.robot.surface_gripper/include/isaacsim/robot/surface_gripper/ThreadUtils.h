@@ -19,6 +19,12 @@
 #include <carb/tasking/ITasking.h>
 #include <carb/tasking/TaskingUtils.h>
 
+#include <future>
+#include <memory>
+#include <thread>
+#include <type_traits>
+#include <vector>
+
 namespace isaacsim
 {
 namespace robot
@@ -32,11 +38,48 @@ inline void parallelForIndex(size_t count, Func func)
     auto tasking = carb::getCachedInterface<carb::tasking::ITasking>();
 
     carb::tasking::TaskGroup threads;
-
-    for (size_t i = 0; i < count; i += 1)
+    if (count == 0)
     {
-        tasking->addTask(carb::tasking::Priority::eHigh, threads, [i, count, &func]() { func(i); });
+        return;
     }
+
+    // reduce spawned carb tasks from O(n) to O(min(n, cores)) and chunk to reduce overhead
+
+    // Creates chunks based on available hardware threads
+    const unsigned int numThreads = std::thread::hardware_concurrency();
+    const size_t maxWorkers = numThreads == 0 ? 1u : static_cast<size_t>(numThreads);
+
+    // TODO: evaluate tasking overhead to determine best strategy for smaller counts
+    if (count <= numThreads / 2)
+    {
+        for (size_t i = 0; i < count; i++)
+        {
+            func(i);
+        }
+        return;
+    }
+
+    const size_t numTasks = count < maxWorkers ? count : maxWorkers;
+    const size_t chunkSize = (count + numTasks - 1) / numTasks;
+
+    for (size_t t = 0; t < numTasks; t++)
+    {
+        const size_t start = t * chunkSize;
+        if (start >= count)
+        {
+            break;
+        }
+        const size_t end = ((t + 1) * chunkSize) < count ? ((t + 1) * chunkSize) : count;
+        tasking->addTask(carb::tasking::Priority::eHigh, threads,
+                         [start, end, &func]()
+                         {
+                             for (size_t i = start; i < end; i++)
+                             {
+                                 func(i);
+                             }
+                         });
+    }
+
     threads.wait();
 }
 

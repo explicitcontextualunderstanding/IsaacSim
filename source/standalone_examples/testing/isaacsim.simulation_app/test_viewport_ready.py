@@ -24,7 +24,9 @@ from isaacsim import SimulationApp
 kit = SimulationApp({"headless": False})
 
 
+import carb.eventdispatcher
 import omni
+import omni.usd
 
 # Track if callback was called
 callback_called = False
@@ -33,20 +35,17 @@ callback_called = False
 def data_acquisition_callback(event):
     """Callback function triggered on rendering events."""
     global callback_called
-    print(f"Received render event: {event.type}")
+    print(f"Received render event: {event.event_name}")
     callback_called = True
 
 
 # Subscribe to NEW_FRAME rendering events
-data_callback = (
-    omni.usd.get_context()
-    .get_rendering_event_stream()
-    .create_subscription_to_pop_by_type(
-        int(omni.usd.StageRenderingEventType.NEW_FRAME),
-        data_acquisition_callback,
-        name="test_viewport_ready.acquisition_callback",
-        order=0,
-    )
+usd_context = omni.usd.get_context()
+data_callback = carb.eventdispatcher.get_eventdispatcher().observe_event(
+    event_name=usd_context.stage_rendering_event_name(omni.usd.StageRenderingEventType.NEW_FRAME, True),
+    on_event=data_acquisition_callback,
+    observer_name="test_viewport_ready.acquisition_callback",
+    order=0,
 )
 
 try:
@@ -55,7 +54,7 @@ try:
 
     # Check if callback was called on first frame
     if not callback_called:
-        print("ERROR: Rendering callback was not called on the first frame")
+        print("[error] Rendering callback was not called on the first frame")
 
         # Wait for viewport to be ready before exiting to prevent app hang
         max_wait_frames = 100
@@ -72,4 +71,5 @@ try:
 
 finally:
     # Cleanup
+    data_callback = None
     kit.close()

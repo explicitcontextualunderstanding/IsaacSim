@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI components that provide specialized buttons for loading and resetting simulation scenes in Isaac Sim."""
+
+
 import asyncio
 from typing import Callable, List
 
@@ -23,36 +27,34 @@ from isaacsim.gui.components.element_wrappers.ui_widget_wrappers import *
 
 
 class LoadButton(UIWidgetWrapper):
-    """
-    Create a special type of UI button that connects to the isaacsim.core.api.World to enable convenient "Load" functionality.
+    """Create a special type of UI button that connects to the isaacsim.core.api.World to enable convenient "Load" functionality.
     The World acts as a scene manager that simplifies user interaction with the simulator.
     This provides the user with certain guarantees at the time that their callback functions are
     called.
 
     The setup_scene_fn() is called with the guarantee that a World has been created.  In this function,
-    the user is meant to add the asssets they want to the USD stage.  These assets then must also be added to
-    the World. World is a singleton class.  And example setup_scene_fn implementation would include:
+    the user is meant to add the assets they want to the USD stage.  These assets then must also be added to
+    the World. World is a singleton class.  An example setup_scene_fn implementation would include:
 
         - world = World.instance() # Get the unique instance of the World
         - world.scene.add(usd_object) # Add the user-loaded usd object to the scene
 
-    The setup_post_load() function is called with the gurantees that the World has been created, the
+    The setup_post_load() function is called with the guarantees that the World has been created, the
     setup_scene_fn() has already been called, all objects that the user added to the World have been properly
     initialized, and the timeline is paused at timestep 0.
 
     Args:
-        label (str): Short descriptive text to the left of the LoadButton
-        text (str): Text on the LoadButton
-        tooltip (str, optional): Text to appear when the mouse hovers over the LoadButton. Defaults to "".
-        setup_scene_fn (Callable, optional): A function that will be called when the LoadButton is clicked.
+        label: Short descriptive text to the left of the LoadButton.
+        text: Text on the LoadButton.
+        tooltip: Text to appear when the mouse hovers over the LoadButton.
+        setup_scene_fn: A function that will be called when the LoadButton is clicked.
             The user should use this function to add their assets to the USD stage and to add their assets
             to the World. This function should take 0 arguments.  The return value will not be used.
-            Defaults to None.
-        setup_post_load_fn (Callable, optional): A function that will be called when the LoadButton is clicked.
-            The function is called with the gurantees that the World has been created, the
+        setup_post_load_fn: A function that will be called when the LoadButton is clicked.
+            The function is called with the guarantees that the World has been created, the
             setup_scene_fn() has already been called, all objects that the user added to the World have been properly
             initialized, and the timeline is paused at timestep 0.  This function should take 0 arguments.
-            The return value will not be used.  Defaults to None.
+            The return value will not be used.
     """
 
     def __init__(
@@ -230,26 +232,25 @@ class LoadButton(UIWidgetWrapper):
 
 
 class ResetButton(UIWidgetWrapper):
-    """
-    Create a special type of UI button that connects to the isaacsim.core.api.World to perform a reset.
+    """Create a special type of UI button that connects to the isaacsim.core.api.World to perform a reset.
     If no World instance exists when this button will be clicked, this button will not create one.
     In this case, the button logs a warning and calls user callback functions with no guarantees
     on the Simulator State.
 
     Args:
-        label (str): Short descriptive text to the left of the ResetButton.
-        text (str): Text on the ResetButton
-        tooltip (str, optional): Text to appear when the mouse hovers over the ResetButton. Defaults to "".
-        pre_reset_fn (Callable, optional): A function that will be called before resetting the World.
-            This function should take 0 arguments.  The return value will not be used. Defaults to None.
-        post_reset_fn (Callable, optional): A function that will be called after the World is reset.
+        label: Short descriptive text to the left of the ResetButton.
+        text: Text on the ResetButton.
+        tooltip: Text to appear when the mouse hovers over the ResetButton.
+        pre_reset_fn: A function that will be called before resetting the World.
+            This function should take 0 arguments. The return value will not be used.
+        post_reset_fn: A function that will be called after the World is reset.
             When this function is called, the timeline will be paused at timestep 0, and all
             USD assets added to the World will be properly initialized and placed at their default positions.
-            This function should take no arguments. The return value will not be used. Defaults to None.
+            This function should take no arguments. The return value will not be used.
     """
 
     def __init__(
-        self, label: str, text: str, tooltip="", pre_reset_fn: Callable = None, post_reset_fn: Callable = None
+        self, label: str, text: str, tooltip: str = "", pre_reset_fn: Callable = None, post_reset_fn: Callable = None
     ):
         self._pre_reset_fn = pre_reset_fn
         self._post_reset_fn = post_reset_fn
@@ -259,17 +260,19 @@ class ResetButton(UIWidgetWrapper):
 
     @property
     def label(self) -> ui.Label:
-        """
+        """UI Label element that contains the descriptive text.
+
         Returns:
-            omni.ui.Label: UI Label element that contains the descriptive text
+            UI Label element that contains the descriptive text.
         """
         return self._label
 
     @property
     def button(self) -> ui.Button:
-        """
+        """UI Button element.
+
         Returns:
-            omni.ui.Button: UI Button element
+            UI Button element.
         """
         return self._button
 
@@ -277,7 +280,7 @@ class ResetButton(UIWidgetWrapper):
         """Set the pre_reset_fn for when the ResetButton is clicked.
 
         Args:
-            pre_reset_fn (Callable): A function that will be called before resetting the World.
+            pre_reset_fn: A function that will be called before resetting the World.
                 This function should take 0 arguments.  The return value will not be used.
         """
         self._pre_reset_fn = pre_reset_fn
@@ -286,7 +289,7 @@ class ResetButton(UIWidgetWrapper):
         """Set the post_reset_fn for when the ResetButton is clicked.
 
         Args:
-            post_reset_fn (Callable): A function that will be called after the World is reset.
+            post_reset_fn: A function that will be called after the World is reset.
                 When this function is called, the timeline will be paused at timestep 0, and all
                 USD assets added to the World will be properly initialized and placed at their default locations.
                 This function should take no arguments. The return value will not be used.
@@ -319,6 +322,16 @@ class ResetButton(UIWidgetWrapper):
         asyncio.ensure_future(_on_click_async())
 
     def _create_ui_widget(self, label: str, text: str, tooltip: str):
+        """Creates the UI widget frame containing the label and button.
+
+        Args:
+            label: Short descriptive text to the left of the ResetButton.
+            text: Text on the ResetButton.
+            tooltip: Text to appear when the mouse hovers over the ResetButton.
+
+        Returns:
+            The containing frame with the UI elements.
+        """
         containing_frame = Frame().frame
         with containing_frame:
             with ui.HStack():

@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive example demonstrating multiple robots performing stacking tasks in a factory environment."""
+
+
 from isaacsim.examples.interactive.robo_factory.robo_factory import RoboFactory
 from isaacsim.examples.interactive.robo_factory.robo_factory_extension import RoboFactoryExtension
+
+__all__ = ["RoboFactory"]

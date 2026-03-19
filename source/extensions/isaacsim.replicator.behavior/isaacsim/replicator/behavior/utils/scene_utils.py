@@ -17,6 +17,7 @@ import carb
 import carb.settings
 import omni.kit.app
 import omni.kit.commands
+import omni.physics.core
 import omni.physx
 import omni.usd
 from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
@@ -570,13 +571,11 @@ async def apply_forces_and_simulate_async(
     render: bool = True,
 ) -> None:
     """Apply forces to assets at the specified positions, and simulate for the given number of steps."""
-    # Physx APIs to apply the forces and to advance the simulation
-    physx_api = omni.physx.get_physx_simulation_interface()
     physx_sim_interface = omni.physx.get_physx_simulation_interface()
 
     # Apply the forces
     for body_id, force, position in zip(body_ids, forces, positions):
-        physx_api.apply_force_at_pos(stage_id, body_id, carb.Float3(*force), carb.Float3(*position))
+        physx_sim_interface.apply_force_at_pos(stage_id, body_id, carb.Float3(*force), carb.Float3(*position))
 
     # Run the simulation for the specified number of steps
     for _ in range(sim_steps):
@@ -598,6 +597,6 @@ def reset_simulation_and_enable_reset_on_stop():
             "Expected 'omni.physx.bindings._physx.SETTING_RESET_ON_STOP' to be False, skipping reset_simulation"
         )
         return
-    physx_interface = omni.physx.get_physx_interface()
-    physx_interface.reset_simulation()
+    physics_stage_update_interface = omni.physics.core.get_physics_stage_update_interface()
+    physics_stage_update_interface.reset_simulation()
     carb.settings.get_settings().set(omni.physx.bindings._physx.SETTING_RESET_ON_STOP, True)

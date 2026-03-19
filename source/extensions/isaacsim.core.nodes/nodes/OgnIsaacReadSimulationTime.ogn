@@ -11,7 +11,7 @@
                 "type": "bool",
                 "description": "If True the simulation time will reset when stop is pressed, False means time increases monotonically",
                 "uiName": "Reset On Stop",
-                "default": false
+                "default": true
             },
             "referenceTimeNumerator": {
                 "type": "int64",

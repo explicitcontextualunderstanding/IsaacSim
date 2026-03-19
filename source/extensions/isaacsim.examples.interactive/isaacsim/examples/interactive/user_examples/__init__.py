@@ -14,3 +14,8 @@
 # limitations under the License.
 
 # NOTE: Import here your extension examples to be propagated to ISAAC SIM Extensions startup
+
+"""Interactive user examples for Isaac Sim."""
+
+
+__all__ = []

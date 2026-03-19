@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for the motion policy functionality in the isaacsim.robot_motion.motion_generation extension."""
+
+
 import asyncio
 import json
 import os
@@ -46,8 +49,31 @@ from pxr import Gf, Sdf, UsdLux
 # Having a test class derived from omni.kit.test.AsyncTestCase declared on the root of module will
 # make it auto-discoverable by omni.kit.test
 class TestMotionPolicy(omni.kit.test.AsyncTestCase):
+    """Test class for motion generation functionality in the isaacsim.robot_motion.motion_generation extension.
+
+    This class provides comprehensive test coverage for robot motion policies, including RmpFlow motion generation,
+    obstacle avoidance, and articulation control. Tests are performed on various robot models such as Franka Panda,
+    Universal Robots (UR3, UR5, UR10, etc.), Denso Cobotta, and other supported robot platforms.
+
+    The test suite validates:
+    - Configuration space and task space target reaching
+    - Obstacle detection and avoidance capabilities
+    - Motion policy initialization and lifecycle management
+    - Visualization features for collision spheres and end effectors
+    - State update handling and robot convergence behavior
+    - Multi-robot platform compatibility
+
+    Each test method sets up a specific robot configuration, creates the necessary motion policies, and verifies
+    that the robot can successfully navigate to target positions while avoiding obstacles.
+    """
+
     # Before running each test
     async def setUp(self):
+        """Set up the test environment before each test.
+
+        Initializes physics settings, timeline interface, extension paths, policy configuration directory,
+        and creates a new USD stage for testing motion policies.
+        """
         self._physics_fps = 60
         self._physics_dt = 1 / self._physics_fps  # duration of physics frame in seconds
 
@@ -62,13 +88,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         with open(os.path.join(self._polciy_config_dir, "policy_map.json")) as policy_map:
             self._policy_map = json.load(policy_map)
 
-        carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", True)
-        carb.settings.get_settings().set_int("/app/runLoops/main/rateLimitFrequency", self._physics_fps)
-        carb.settings.get_settings().set_int("/persistent/simulation/minFrameRate", self._physics_fps)
-        omni.timeline.get_timeline_interface().set_target_framerate(self._physics_fps)
-
         await create_new_stage_async()
-        omni.usd.get_context().get_stage().SetTimeCodesPerSecond(self._physics_fps)
 
         await update_stage_async()
 
@@ -76,6 +96,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
 
     # After running each test
     async def tearDown(self):
+        """Clean up the test environment after each test.
+
+        Stops the timeline, waits for assets to finish loading, clears the articulation policy,
+        and resets the World instance.
+        """
         self._timeline.stop()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             print("tearDown, assets still loading, waiting to finish...")
@@ -87,12 +112,25 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def _create_light(self):
+        """Create a sphere light in the scene for visualization.
+
+        Adds a sphere light at position [6.5, 0, 12] with radius 2 and intensity 100000
+        to provide illumination for the test scene.
+        """
         sphereLight = UsdLux.SphereLight.Define(get_current_stage(), Sdf.Path("/World/SphereLight"))
         sphereLight.CreateRadiusAttr(2)
         sphereLight.CreateIntensityAttr(100000)
         SingleXFormPrim(sphereLight.GetPath().pathString).set_world_pose([6.5, 0, 12])
 
     async def _prepare_stage(self, robot):
+        """Prepare the simulation stage with the specified robot.
+
+        Initializes the world simulation context, creates lighting, starts the timeline,
+        and configures the robot with disabled gravity and increased solver iterations.
+
+        Args:
+            robot: The robot to initialize and configure for testing.
+        """
         # Set settings to ensure deterministic behavior
         # Initialize the robot
         # Play the timeline
@@ -116,6 +154,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await update_stage_async()
 
     async def test_rmpflow_cspace_target(self):
+        """Test RMPflow motion policy with configuration space targets on a Franka Panda robot.
+
+        Verifies that the robot can reach default and custom cspace targets, and that
+        end effector targets take precedence over cspace targets when both are set.
+        """
         asset_root_path = await get_assets_root_path_async()
 
         usd_path = asset_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
@@ -194,6 +237,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         )
 
     async def test_rmpflow_cobotta_900(self):
+        """Test RMPflow motion policy on a Cobotta Pro 900 robot.
+
+        Loads the Denso Cobotta Pro 900 robot and verifies that the RMPflow motion policy
+        can successfully navigate to target positions while avoiding obstacles.
+        """
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Denso/CobottaPro900/cobotta_pro_900.usd"
         robot_name = "Cobotta_Pro_900"
@@ -202,6 +250,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_cobotta_1300(self):
+        """Test RMPflow motion policy on a Cobotta Pro 1300 robot.
+
+        Loads the Denso Cobotta Pro 1300 robot and verifies that the RMPflow motion policy
+        can successfully navigate to target positions while avoiding obstacles.
+        """
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Denso/CobottaPro1300/cobotta_pro_1300.usd"
         robot_name = "Cobotta_Pro_1300"
@@ -210,6 +263,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_ur3(self):
+        """Test RMPflow motion policy on a UR3 robot.
+
+        Loads the Universal Robots UR3 robot and verifies that the RMPflow motion policy
+        can successfully navigate to target positions while avoiding obstacles.
+        """
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur3/ur3.usd"
         robot_name = "UR3"
@@ -220,6 +278,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         )
 
     async def test_rmpflow_ur3e(self):
+        """Test RMPflow motion policy on a UR3e robot.
+
+        Loads the Universal Robots UR3e robot and verifies that the RMPflow motion policy
+        can successfully navigate to target positions while avoiding obstacles.
+        """
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur3e/ur3e.usd"
         robot_name = "UR3e"
@@ -230,6 +293,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         )
 
     async def test_rmpflow_ur5(self):
+        """Test RMPflow motion policy on a UR5 robot.
+
+        Loads the Universal Robots UR5 robot and verifies that the RMPflow motion policy
+        can successfully navigate to target positions while avoiding obstacles.
+        """
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur5/ur5.usd"
         robot_name = "UR5"
@@ -238,6 +306,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_ur5e(self):
+        """Tests RMPflow motion policy with the Universal Robots UR5e robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur5e/ur5e.usd"
         robot_name = "UR5e"
@@ -246,6 +315,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_ur10(self):
+        """Tests RMPflow motion policy with the Universal Robots UR10 robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
         robot_name = "UR10"
@@ -254,6 +324,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_ur10e(self):
+        """Tests RMPflow motion policy with the Universal Robots UR10e robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur10e/ur10e.usd"
         robot_name = "UR10e"
@@ -262,6 +333,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_ur16e(self):
+        """Tests RMPflow motion policy with the Universal Robots UR16e robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur16e/ur16e.usd"
         robot_name = "UR16e"
@@ -270,6 +342,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_rizon4(self):
+        """Tests RMPflow motion policy with the Flexiv Rizon4 robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Flexiv/Rizon4/flexiv_rizon4.usd"
         robot_name = "Rizon4"
@@ -281,6 +354,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
     async def test_rmpflow_rs007l(self):
+        """Tests RMPflow motion policy with the Kawasaki RS007L robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Kawasaki/RS007L/rs007l_onrobot_rg2.usd"
         robot_name = "RS007L"
@@ -289,6 +363,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_rs007n(self):
+        """Tests RMPflow motion policy with the Kawasaki RS007N robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Kawasaki/RS007N/rs007n_onrobot_rg2.usd"
         robot_name = "RS007N"
@@ -297,6 +372,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name)
 
     async def test_rmpflow_rs013n(self):
+        """Tests RMPflow motion policy with the Kawasaki RS013N robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Kawasaki/RS013N/rs013n_onrobot_rg2.usd"
         robot_name = "RS013N"
@@ -308,6 +384,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
     async def test_rmpflow_rs025n(self):
+        """Tests RMPflow motion policy with the Kawasaki RS025N robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Kawasaki/RS025N/rs025n_onrobot_rg2.usd"
         robot_name = "RS025N"
@@ -319,6 +396,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
     async def test_rmpflow_rs080n(self):
+        """Tests RMPflow motion policy with the Kawasaki RS080N robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Kawasaki/RS080N/rs080n_onrobot_rg2.usd"
         robot_name = "RS080N"
@@ -329,18 +407,8 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
 
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
-    async def test_rmpflow_festo_cobot(self):
-        assets_root_path = await get_assets_root_path_async()
-        usd_path = assets_root_path + "/Isaac/Robots/Festo/FestoCobot/festo_cobot.usd"
-        robot_name = "FestoCobot"
-        robot_prim_path = "/bettina"
-
-        obstacle_position = np.array([0.8, 0.3, 0.8])
-        target_position = np.array([0.78, 0.1, 0.55])
-
-        await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
-
     async def test_rmpflow_tm12(self):
+        """Test RMPflow motion policy with Techman TM12 robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Techman/TM12/tm12.usd"
         robot_name = "Techman_TM12"
@@ -352,6 +420,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
     async def test_rmpflow_kr210(self):
+        """Test RMPflow motion policy with Kuka KR210 robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Kuka/KR210_L150/kr210_l150.usd"
         robot_name = "Kuka_KR210"
@@ -363,6 +432,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
     async def test_rmpflow_crx10ial(self):
+        """Test RMPflow motion policy with Fanuc CRX10IAL robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/Fanuc/CRX10IAL/crx10ial.usd"
         robot_name = "Fanuc_CRX10IAL"
@@ -374,6 +444,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self._simple_robot_rmpflow_test(usd_path, robot_prim_path, robot_name, target_position, obstacle_position)
 
     async def test_rmpflow_fr3(self):
+        """Test RMPflow motion policy with Franka FR3 robot."""
         assets_root_path = await get_assets_root_path_async()
         usd_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaFR3/fr3.usd"
         robot_name = "FR3"
@@ -392,8 +463,16 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         target_pos=np.array([0.6, 0.3, 0.5]),
         obstacle_pos=np.array([0.3, 0.1, 0.5]),
     ):
+        """Helper method to test RMPflow motion policy on a robot.
+
+        Args:
+            usd_path: Path to the robot USD file.
+            prim_path: Prim path for the robot in the stage.
+            robot_name: Name of the robot configuration.
+            target_pos: Target position for the end effector.
+            obstacle_pos: Position of the obstacle.
+        """
         (result, error) = await open_stage_async(usd_path)
-        omni.usd.get_context().get_stage().SetTimeCodesPerSecond(self._physics_fps)
 
         rmp_config = interface_config_loader.load_supported_motion_policy_config(robot_name, "RMPflow")
         self._motion_policy = RmpFlow(**rmp_config)
@@ -410,6 +489,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self.verify_robot_convergence(target_pos, timeout, obs_pos=obstacle_pos)
 
     async def test_rmpflow_visualization_franka(self):
+        """Test RMPflow visualization features with Franka Panda robot."""
         asset_root_path = await get_assets_root_path_async()
         usd_path = asset_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         robot_prim_path = "/panda"
@@ -494,6 +574,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         self.assertTrue(not is_prim_path_valid("/lula/collision_sphere0"))
 
     async def test_rmpflow_obstacle_adders(self):
+        """Test obstacle management functions in RMPflow with various obstacle types."""
         asset_root_path = await get_assets_root_path_async()
         usd_path = asset_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         robot_prim_path = "/panda"
@@ -547,6 +628,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         self.assertFalse(is_prim_path_valid("/lula/ground_plane"))
 
     async def test_articulation_motion_policy_init_order(self):
+        """Test initialization order of ArticulationMotionPolicy with robot."""
         asset_root_path = await get_assets_root_path_async()
         usd_path = asset_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         robot_prim_path = "/panda"
@@ -573,6 +655,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_rmpflow_on_franka(self):
+        """Test RMPflow motion policy with Franka Panda robot including state updates."""
         asset_root_path = await get_assets_root_path_async()
         usd_path = asset_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         robot_prim_path = "/panda"
@@ -645,6 +728,7 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_rmpflow_on_franka_ignore_state(self):
+        """Test RMPflow motion policy with Franka Panda robot while ignoring state updates."""
         # Perform an internal rollout of robot state, ignoring simulated robot state updates
 
         asset_root_path = await get_assets_root_path_async()
@@ -700,6 +784,12 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_rmpflow_static_obstacles_franka(self):
+        """Test RmpFlow motion policy on the Franka robot with static obstacles.
+
+        Performs robot motion testing using RmpFlow with internal robot state rollout.
+        Tests convergence to target positions in various robot base poses with
+        static obstacle avoidance.
+        """
         # Perform an internal rollout of robot state, ignoring simulated robot state updates
 
         asset_root_path = await get_assets_root_path_async()
@@ -747,6 +837,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         await self.verify_robot_convergence(target_pos, timeout, obs_pos=obstacle_pos, static=True)
 
     async def test_rmpflow_on_ur10(self):
+        """Test RmpFlow motion policy on the UR10 robot.
+
+        Verifies motion policy outputs against ground truth values and tests robot
+        convergence to target positions from various base poses and orientations.
+        """
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
         robot_prim_path = "/ur10"
@@ -802,6 +897,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_rmpflow_on_ur10_ignore_state(self):
+        """Test RmpFlow motion policy on the UR10 robot with state updates ignored.
+
+        Performs internal rollout of robot state while ignoring simulated robot state updates.
+        Tests robot convergence to target positions from various base poses and orientations.
+        """
         # Perform an internal rollout of robot state, ignoring simulated robot state updates
         usd_path = await get_assets_root_path_async()
         usd_path += "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
@@ -855,6 +955,17 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def reached_end_effector_target(self, target_trans, target_orient, trans_thresh=0.02, rot_thresh=0.1):
+        """Check if the end effector has reached the target pose.
+
+        Args:
+            target_trans: Target translation position.
+            target_orient: Target orientation quaternion.
+            trans_thresh: Translation distance threshold.
+            rot_thresh: Rotation distance threshold.
+
+        Returns:
+            True if the end effector is within the specified thresholds of the target pose.
+        """
         ee_trans, ee_rot = self._motion_policy.get_end_effector_pose(
             self._articulation_policy.get_active_joints_subset().get_joint_positions()
         )  # TODO this only works for RMPflow, and will be updated in upcoming MR before there are non-RMPflow tests
@@ -878,6 +989,17 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
             return trans_dist < trans_thresh and rot_dist < rot_thresh
 
     async def add_block(self, path, offset, size=np.array([0.01, 0.01, 0.01]), collidable=True):
+        """Add a block cuboid to the scene.
+
+        Args:
+            path: Prim path for the block.
+            offset: Position offset for the block.
+            size: Size array for the block dimensions.
+            collidable: Whether the block should be collidable.
+
+        Returns:
+            The created cuboid object.
+        """
         if collidable:
             cuboid = objects.cuboid.FixedCuboid(path, scale=size, size=1.0, position=offset)
             await update_stage_async()
@@ -887,6 +1009,13 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         return cuboid
 
     async def assertAlmostEqual(self, a, b, msg=""):
+        """Assert that two arrays are almost equal within a tolerance.
+
+        Args:
+            a: First array to compare.
+            b: Second array to compare.
+            msg: Message to display on assertion failure.
+        """
         # overriding method because it doesn't support iterables
         a = np.array(a)
         b = np.array(b)
@@ -894,6 +1023,16 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         pass
 
     async def simulate_until_target_reached(self, timeout, target_trans, target_orient=None):
+        """Simulate robot motion until the target is reached or timeout occurs.
+
+        Args:
+            timeout: Maximum simulation time in seconds.
+            target_trans: Target translation position.
+            target_orient: Target orientation quaternion.
+
+        Returns:
+            A tuple of (success, time_taken) where success indicates if the target was reached.
+        """
         for frame in range(int(1 / self._physics_dt * timeout)):
             self._motion_policy.update_world()
             self._articulation_policy.move()
@@ -903,7 +1042,8 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         return False, timeout
 
     async def verify_policy_outputs(self, robot, ground_truths, dbg=False):
-        """
+        """Verify motion policy outputs against ground truth values.
+
         The ground truths are obtained by running this method in dbg mode
         when certain that motion_generation is working as intended.
 
@@ -911,6 +1051,11 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
 
         In dbg mode, the returned velocity target values will be printed
         and no assertions will be checked.
+
+        Args:
+            robot: The robot instance to test.
+            ground_truths: Dictionary containing ground truth values for comparison.
+            dbg: Enable debug mode to print outputs without assertions.
         """
 
         # outputs of mg in different scenarios
@@ -1033,6 +1178,15 @@ class TestMotionPolicy(omni.kit.test.AsyncTestCase):
         return
 
     async def verify_robot_convergence(self, target_pos, timeout, target_orient=None, obs_pos=None, static=False):
+        """Assert that the robot can reach the target within a given timeout.
+
+        Args:
+            target_pos: Target position for the robot end effector.
+            timeout: Maximum time allowed for convergence in seconds.
+            target_orient: Target orientation quaternion.
+            obs_pos: Position for obstacle placement.
+            static: Whether obstacles should be treated as static.
+        """
         # Assert that the robot can reach the target within a given timeout
 
         target = await self.add_block("/scene/target", target_pos, size=0.05 * np.ones(3), collidable=False)

@@ -1,4 +1,23 @@
 # Changelog
+## [1.2.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [1.1.3] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [1.1.2] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [1.1.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.1.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
 
 ## [1.0.12] - 2025-07-16
 ### Fixed
@@ -14,7 +33,7 @@
 
 ## [1.0.9] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [1.0.8] - 2025-04-21
 ### Changed

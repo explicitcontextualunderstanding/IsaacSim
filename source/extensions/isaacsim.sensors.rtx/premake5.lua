@@ -37,6 +37,7 @@ includedirs {
     "%{root}/source/extensions/isaacsim.core.nodes/include",
     "%{root}/source/extensions/isaacsim.sensors.rtx/include",
     target_deps .. "/generic_model_output/%{platform}/%{config}/include",
+    target_deps .. "/sensor-checker/%{platform}/%{config}/include",
     target_deps .. "/omni_client_library/include",
     target_deps .. "/python/include",
     target_deps .. "/rapidjson/include",
@@ -50,7 +51,7 @@ links {
     "omni.usd",
 }
 
-extra_usd_libs = { "usdGeom" }
+extra_usd_libs = { "usdGeom", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -59,7 +60,7 @@ add_usd(extra_usd_libs)
 filter { "system:linux" }
 includedirs {
     target_deps .. "/usd/%{cfg.buildcfg}/include/boost",
-    target_deps .. "/python/include/python3.11",
+    target_deps .. "/python/include/python3.12",
 }
 filter { "system:windows" }
 libdirs {
@@ -104,6 +105,10 @@ repo_build.prebuild_copy {
     { "python/__init__.py", ogn.python_target_path },
     {
         "%{root}/_build/target-deps/generic_model_output/%{platform}/%{config}/omni/sensors",
+        ogn.python_target_path,
+    },
+    {
+        "%{root}/_build/target-deps/sensor-checker/%{platform}/%{config}/omni/sensors",
         ogn.python_target_path,
     },
 }

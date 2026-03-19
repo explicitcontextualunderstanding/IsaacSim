@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension module for Isaac Sim content browser implementation with enhanced file browsing capabilities."""
+
+
 import asyncio
 import weakref
 
@@ -30,13 +33,21 @@ class Extension(omni.ext.IExt):
     """The Extension class"""
 
     def on_startup(self, ext_id):
-        """Method called when the extension is loaded/enabled"""
+        """Method called when the extension is loaded/enabled.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         carb.log_info(f"on_startup {ext_id}")
         self._content_browser_ref = weakref.ref(get_content_window(), lambda ref: self.destroy())
 
         self._add_isim_content()
 
     def _add_isim_content(self):
+        """Adds Isaac Sim content to the content browser.
+
+        Registers the Isaac collection, expands collections, and populates asset information.
+        """
         content_browser = self._content_browser_ref()
         if not content_browser:
             return
@@ -47,6 +58,10 @@ class Extension(omni.ext.IExt):
         self._populate_asset_info()
 
     def _populate_asset_info(self):
+        """Populates asset information in the content browser.
+
+        Adds an extended file info detail frame to display additional asset information.
+        """
         content_browser = self._content_browser_ref()
         if not content_browser:
             return
@@ -55,6 +70,10 @@ class Extension(omni.ext.IExt):
         content_browser.api.add_detail_frame_from_controller("File Info", assetFileInfo)
 
     def _expand_collections(self):
+        """Expands the Isaac Sim collection in the content browser.
+
+        Asynchronously expands the Isaac collection while collapsing other collections after the UI is ready.
+        """
         # Only expand Isaac Sim collection after the UI is ready
 
         async def expand_collections_async():
@@ -76,7 +95,7 @@ class Extension(omni.ext.IExt):
         asyncio.ensure_future(expand_collections_async())
 
     def on_shutdown(self):
-        """Method called when the extension is disabled"""
+        """Method called when the extension is disabled."""
         carb.log_info(f"on_shutdown")
         content_browser = self._content_browser_ref()
         if content_browser:

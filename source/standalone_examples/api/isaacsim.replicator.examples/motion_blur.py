@@ -17,15 +17,15 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": False})
 
+import argparse
 import os
 
 import carb.settings
-import omni.kit.app
 import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
 from isaacsim.storage.native import get_assets_root_path
-from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics
+from pxr import PhysxSchema, UsdPhysics
 
 # Paths to the animated and physics-ready assets
 PHYSICS_ASSET_URL = "/Isaac/Props/YCB/Axis_Aligned_Physics/003_cracker_box.usd"
@@ -38,125 +38,162 @@ ASSET_X_MIRRORED_LOCATIONS = [(0.5, 0, 0.3), (0.3, 0, 0.3), (0.1, 0, 0.3)]
 # Used to calculate how many frames to animate the assets to maintain the same velocity as the physics assets
 ANIMATION_DURATION = 10
 
+# Number of frames to capture for each scenario
+NUM_FRAMES = 3
 
-# Create a new stage with animated and physics-enabled assets with synchronized motion
+
+def parse_delta_time(value):
+    """Convert string to float or None. Accepts 'None', -1, 0, or numeric values."""
+    if value.lower() == "none":
+        return None
+    float_value = float(value)
+    return None if float_value in (-1, 0) else float_value
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--delta_times",
+    nargs="*",
+    type=parse_delta_time,
+    default=[None, 1 / 30, 1 / 60, 1 / 240],
+    help="List of delta times (seconds per frame) to use for motion blur captures. Use 'None' for default stage time.",
+)
+parser.add_argument(
+    "--samples_per_pixel",
+    nargs="*",
+    type=int,
+    default=[32, 128],
+    help="List of samples per pixel (spp) values for path tracing",
+)
+parser.add_argument(
+    "--motion_blur_subsamples",
+    nargs="*",
+    type=int,
+    default=[4, 16],
+    help="List of motion blur subsample values for path tracing",
+)
+args, _ = parser.parse_known_args()
+delta_times = args.delta_times
+samples_per_pixel = args.samples_per_pixel
+motion_blur_subsamples = args.motion_blur_subsamples
+
+
 def setup_stage():
-    # Create new stage
+    """Create a new USD stage with animated and physics-enabled assets with synchronized motion."""
     omni.usd.get_context().new_stage()
+    settings = carb.settings.get_settings()
+    # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+    settings.set("rtx/post/dlss/execMode", 2)
+
+    # Capture data only on request
+    rep.orchestrator.set_capture_on_play(False)
+
     stage = omni.usd.get_context().get_stage()
     timeline = omni.timeline.get_timeline_interface()
     timeline.set_end_time(ANIMATION_DURATION)
 
     # Create lights
-    dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
-    dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(100.0)
-    distant_light = stage.DefinePrim("/World/DistantLight", "DistantLight")
-    if not distant_light.GetAttribute("xformOp:rotateXYZ"):
-        UsdGeom.Xformable(distant_light).AddRotateXYZOp()
-    distant_light.GetAttribute("xformOp:rotateXYZ").Set((-75, 0, 0))
-    distant_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(2500)
+    rep.functional.create.xform(name="World")
+    rep.functional.create.dome_light(intensity=100, parent="/World", name="DomeLight")
+    rep.functional.create.distant_light(intensity=2500, rotation=(315, 0, 0), parent="/World", name="DistantLight")
 
     # Setup the physics assets with gravity disabled and the requested velocity
     assets_root_path = get_assets_root_path()
     physics_asset_url = assets_root_path + PHYSICS_ASSET_URL
-    for loc, vel in zip(ASSET_X_MIRRORED_LOCATIONS, ASSET_VELOCITIES):
-        prim = stage.DefinePrim(f"/World/physics_asset_{int(abs(vel))}", "Xform")
-        prim.GetReferences().AddReference(physics_asset_url)
-        if not prim.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(prim).AddTranslateOp()
-        prim.GetAttribute("xformOp:translate").Set(loc)
-        prim.GetAttribute("physxRigidBody:disableGravity").Set(True)
-        prim.GetAttribute("physxRigidBody:angularDamping").Set(0.0)
-        prim.GetAttribute("physxRigidBody:linearDamping").Set(0.0)
-        prim.GetAttribute("physics:velocity").Set((0, 0, -vel))
+    for location, velocity in zip(ASSET_X_MIRRORED_LOCATIONS, ASSET_VELOCITIES):
+        prim = rep.functional.create.reference(
+            usd_path=physics_asset_url, parent="/World", name=f"physics_asset_{int(abs(velocity))}", position=location
+        )
+        physics_rigid_body_api = UsdPhysics.RigidBodyAPI(prim)
+        physics_rigid_body_api.GetVelocityAttr().Set((0, 0, -velocity))
+        physx_rigid_body_api = PhysxSchema.PhysxRigidBodyAPI(prim)
+        physx_rigid_body_api.GetDisableGravityAttr().Set(True)
+        physx_rigid_body_api.GetAngularDampingAttr().Set(0.0)
+        physx_rigid_body_api.GetLinearDampingAttr().Set(0.0)
 
-    # Setup animated assets maintaining the same velocity as the physics asssets
+    # Setup animated assets maintaining the same velocity as the physics assets
     anim_asset_url = assets_root_path + ANIM_ASSET_URL
-    for loc, vel in zip(ASSET_X_MIRRORED_LOCATIONS, ASSET_VELOCITIES):
-        start_loc = (-loc[0], loc[1], loc[2])
-        prim = stage.DefinePrim(f"/World/anim_asset_{int(abs(vel))}", "Xform")
-        prim.GetReferences().AddReference(anim_asset_url)
-        if not prim.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(prim).AddTranslateOp()
-        anim_distance = vel * ANIMATION_DURATION
-        end_loc = (start_loc[0], start_loc[1], start_loc[2] - anim_distance)
-        end_keyframe = timeline.get_time_codes_per_seconds() * ANIMATION_DURATION
+    for location, velocity in zip(ASSET_X_MIRRORED_LOCATIONS, ASSET_VELOCITIES):
+        start_location = (-location[0], location[1], location[2])
+        prim = rep.functional.create.reference(
+            usd_path=anim_asset_url, parent="/World", name=f"anim_asset_{int(abs(velocity))}", position=start_location
+        )
+        animation_distance = velocity * ANIMATION_DURATION
+        end_location = (start_location[0], start_location[1], start_location[2] - animation_distance)
+        end_keyframe_time = timeline.get_time_codes_per_seconds() * ANIMATION_DURATION
         # Timesampled keyframe (animated) translation
-        prim.GetAttribute("xformOp:translate").Set(start_loc, time=0)
-        prim.GetAttribute("xformOp:translate").Set(end_loc, time=end_keyframe)
+        prim.GetAttribute("xformOp:translate").Set(start_location, time=0)
+        prim.GetAttribute("xformOp:translate").Set(end_location, time=end_keyframe_time)
 
 
-# Capture motion blur frames with the given delta time step and render mode
-def run_motion_blur_example(num_frames=3, custom_delta_time=None, use_path_tracing=True, pt_subsamples=8, pt_spp=64):
-    # Create a new stage with the assets
+def run_motion_blur_example(
+    num_frames, delta_time=None, use_path_tracing=True, motion_blur_subsamples=8, samples_per_pixel=64
+):
+    """Capture motion blur frames with the given delta time step and render mode."""
     setup_stage()
     stage = omni.usd.get_context().get_stage()
+    settings = carb.settings.get_settings()
 
-    # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
-    carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
-
-    # Set replicator settings (capture only on request and enable motion blur)
-    carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
-    carb.settings.get_settings().set("/omni/replicator/captureMotionBlur", True)
+    # Enable motion blur capture
+    settings.set("/omni/replicator/captureMotionBlur", True)
 
     # Set motion blur settings based on the render mode
     if use_path_tracing:
-        print(f"[MotionBlur] Setting PathTracing render mode motion blur settings")
-        carb.settings.get_settings().set("/rtx/rendermode", "PathTracing")
+        print("[MotionBlur] Setting PathTracing render mode motion blur settings")
+        settings.set("/rtx/rendermode", "PathTracing")
         # (int): Total number of samples for each rendered pixel, per frame.
-        carb.settings.get_settings().set("/rtx/pathtracing/spp", pt_spp)
+        settings.set("/rtx/pathtracing/spp", samples_per_pixel)
         # (int): Maximum number of samples to accumulate per pixel. When this count is reached the rendering stops until a scene or setting change is detected, restarting the rendering process. Set to 0 to remove this limit.
-        carb.settings.get_settings().set("/rtx/pathtracing/totalSpp", pt_spp)
-        carb.settings.get_settings().set("/rtx/pathtracing/optixDenoiser/enabled", 0)
+        settings.set("/rtx/pathtracing/totalSpp", samples_per_pixel)
+        settings.set("/rtx/pathtracing/optixDenoiser/enabled", 0)
         # Number of sub samples to render if in PathTracing render mode and motion blur is enabled.
-        carb.settings.get_settings().set("/omni/replicator/pathTracedMotionBlurSubSamples", pt_subsamples)
+        settings.set("/omni/replicator/pathTracedMotionBlurSubSamples", motion_blur_subsamples)
     else:
-        print(f"[MotionBlur] Setting RaytracedLighting render mode motion blur settings")
-        carb.settings.get_settings().set("/rtx/rendermode", "RaytracedLighting")
+        print("[MotionBlur] Setting RealTimePathTracing render mode motion blur settings")
+        settings.set("/rtx/rendermode", "RealTimePathTracing")
         # 0: Disabled, 1: TAA, 2: FXAA, 3: DLSS, 4:RTXAA
-        carb.settings.get_settings().set("/rtx/post/aa/op", 2)
+        settings.set("/rtx/post/aa/op", 2)
         # (float): The fraction of the largest screen dimension to use as the maximum motion blur diameter.
-        carb.settings.get_settings().set("/rtx/post/motionblur/maxBlurDiameterFraction", 0.02)
+        settings.set("/rtx/post/motionblur/maxBlurDiameterFraction", 0.02)
         # (float): Exposure time fraction in frames (1.0 = one frame duration) to sample.
-        carb.settings.get_settings().set("/rtx/post/motionblur/exposureFraction", 1.0)
+        settings.set("/rtx/post/motionblur/exposureFraction", 1.0)
         # (int): Number of samples to use in the filter. A higher number improves quality at the cost of performance.
-        carb.settings.get_settings().set("/rtx/post/motionblur/numSamples", 8)
+        settings.set("/rtx/post/motionblur/numSamples", 8)
 
-    # Setup camera and writer
-    camera = rep.create.camera(position=(0, 1.5, 0), look_at=(0, 0, 0), name="MotionBlurCam")
-    render_product = rep.create.render_product(camera, (1280, 720))
-    basic_writer = rep.WriterRegistry.get("BasicWriter")
-    delta_time_str = "None" if custom_delta_time is None else f"{custom_delta_time:.4f}"
-    render_mode_str = f"pt_subsamples_{pt_subsamples}_spp_{pt_spp}" if use_path_tracing else "rt"
-    output_directory = os.path.join(os.getcwd(), f"_out_motion_blur_dt_{delta_time_str}_{render_mode_str}")
+    # Setup backend
+    mode_str = f"pt_subsamples_{motion_blur_subsamples}_spp_{samples_per_pixel}" if use_path_tracing else "rt"
+    delta_time_str = "None" if delta_time is None else f"{delta_time:.4f}"
+    output_directory = os.path.join(os.getcwd(), f"_out_motion_blur_func_dt_{delta_time_str}_{mode_str}")
     print(f"[MotionBlur] Output directory: {output_directory}")
-    basic_writer.initialize(output_dir=output_directory, rgb=True)
-    basic_writer.attach(render_product)
+    backend = rep.backends.get("DiskBackend")
+    backend.initialize(output_dir=output_directory)
+
+    # Setup writer and render product
+    camera = rep.functional.create.camera(
+        position=(0, 1.5, 0), look_at=(0, 0, 0), parent="/World", name="MotionBlurCam"
+    )
+    render_product = rep.create.render_product(camera, (1280, 720))
+    writer = rep.WriterRegistry.get("BasicWriter")
+    writer.initialize(backend=backend, rgb=True)
+    writer.attach(render_product)
 
     # Run a few updates to make sure all materials are fully loaded for capture
-    for _ in range(50):
+    for _ in range(5):
         simulation_app.update()
 
-    # Use the physics scene to modify the physics FPS (if needed) to guarantee motion samples at any custom delta time
-    physx_scene = None
-    for prim in stage.Traverse():
-        if prim.IsA(UsdPhysics.Scene):
-            physx_scene = PhysxSchema.PhysxSceneAPI.Apply(prim)
-            break
-    if physx_scene is None:
-        print(f"[MotionBlur] Creating a new PhysicsScene")
-        physics_scene = UsdPhysics.Scene.Define(stage, "/PhysicsScene")
-        physx_scene = PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/PhysicsScene"))
+    # Create or get the physics scene
+    rep.functional.physics.create_physics_scene(path="/PhysicsScene")
+    physx_scene = PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/PhysicsScene"))
 
-    # Check the target physics depending on the custom delta time and the render mode
-    target_physics_fps = stage.GetTimeCodesPerSecond() if custom_delta_time is None else 1 / custom_delta_time
+    # Check the target physics depending on the delta time and the render mode
+    target_physics_fps = stage.GetTimeCodesPerSecond() if delta_time is None else 1 / delta_time
     if use_path_tracing:
-        target_physics_fps *= pt_subsamples
+        target_physics_fps *= motion_blur_subsamples
 
-    # Check if the physics FPS needs to be increased to match the custom delta time
-    orig_physics_fps = physx_scene.GetTimeStepsPerSecondAttr().Get()
-    if target_physics_fps > orig_physics_fps:
-        print(f"[MotionBlur] Changing physics FPS from {orig_physics_fps} to {target_physics_fps}")
+    # Check if the physics FPS needs to be increased to match the delta time
+    original_physics_fps = physx_scene.GetTimeStepsPerSecondAttr().Get()
+    if target_physics_fps > original_physics_fps:
+        print(f"[MotionBlur] Changing physics FPS from {original_physics_fps} to {target_physics_fps}")
         physx_scene.GetTimeStepsPerSecondAttr().Set(target_physics_fps)
 
     # Start the timeline for physics updates in the step function
@@ -166,40 +203,50 @@ def run_motion_blur_example(num_frames=3, custom_delta_time=None, use_path_traci
     # Capture frames
     for i in range(num_frames):
         print(f"[MotionBlur] \tCapturing frame {i}")
-        rep.orchestrator.step(delta_time=custom_delta_time)
+        rep.orchestrator.step(delta_time=delta_time)
 
     # Restore the original physics FPS
-    if target_physics_fps > orig_physics_fps:
-        print(f"[MotionBlur] Restoring physics FPS from {target_physics_fps} to {orig_physics_fps}")
-        physx_scene.GetTimeStepsPerSecondAttr().Set(orig_physics_fps)
+    if target_physics_fps > original_physics_fps:
+        print(f"[MotionBlur] Restoring physics FPS from {target_physics_fps} to {original_physics_fps}")
+        physx_scene.GetTimeStepsPerSecondAttr().Set(original_physics_fps)
 
     # Switch back to the raytracing render mode
     if use_path_tracing:
-        print(f"[MotionBlur] Restoring render mode to RaytracedLighting")
-        carb.settings.get_settings().set("/rtx/rendermode", "RaytracedLighting")
+        print("[MotionBlur] Restoring render mode to RealTimePathTracing")
+        settings.set("/rtx/rendermode", "RealTimePathTracing")
 
     # Wait until the data is fully written
     rep.orchestrator.wait_until_complete()
 
+    # Cleanup
+    writer.detach()
+    render_product.destroy()
 
-def run_motion_blur_examples():
-    motion_blur_step_duration = [None, 1 / 30, 1 / 60, 1 / 240]
-    for custom_delta_time in motion_blur_step_duration:
+
+def run_motion_blur_examples(num_frames, delta_times, samples_per_pixel, motion_blur_subsamples):
+    print(
+        f"[MotionBlur] Running with delta_times={delta_times}, samples_per_pixel={samples_per_pixel}, motion_blur_subsamples={motion_blur_subsamples}"
+    )
+    for delta_time in delta_times:
         # RayTracing examples
-        run_motion_blur_example(custom_delta_time=custom_delta_time, use_path_tracing=False)
+        run_motion_blur_example(num_frames=num_frames, delta_time=delta_time, use_path_tracing=False)
         # PathTracing examples
-        spps = [32, 128]
-        motion_blur_sub_samples = [4, 16]
-        for motion_blur_sub_sample in motion_blur_sub_samples:
-            for spp in spps:
+        for motion_blur_subsample in motion_blur_subsamples:
+            for samples_per_pixel_value in samples_per_pixel:
                 run_motion_blur_example(
-                    custom_delta_time=custom_delta_time,
+                    num_frames=num_frames,
+                    delta_time=delta_time,
                     use_path_tracing=True,
-                    pt_subsamples=motion_blur_sub_sample,
-                    pt_spp=spp,
+                    motion_blur_subsamples=motion_blur_subsample,
+                    samples_per_pixel=samples_per_pixel_value,
                 )
 
 
-run_motion_blur_examples()
+run_motion_blur_examples(
+    num_frames=NUM_FRAMES,
+    delta_times=delta_times,
+    samples_per_pixel=samples_per_pixel,
+    motion_blur_subsamples=motion_blur_subsamples,
+)
 
 simulation_app.close()

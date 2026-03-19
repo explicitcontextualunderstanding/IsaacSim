@@ -1,5 +1,27 @@
 # Changelog
 
+## [5.3.0] - 2026-03-04
+### Changed
+- Added python_api.md
+
+## [5.2.0] - 2026-01-26
+### Changed
+- Update to llvmlite==0.46.0, nest_asyncio==1.6.0, matplotlib==3.10.8, contourpy==1.3.3, fonttools==4.61.1, pyparsing==3.3.2, cycler==0.12.1, kiwisolver==1.4.9, packaging==26.0, osqp==1.0.5, pyperclip==1.8.0, pyperclip==1.11.0
+
+## [5.1.0] - 2025-12-09
+### Changed
+- Update to kiwisolver-1.4.5
+
+## [5.0.0] - 2025-11-14
+### Changed
+- Removed numba and gunicorn from dependencies
+
+## [4.0.0] - 2025-10-31
+### Changed
+- Remove omni.pip.cloud from dependencies, users should explicitly enable if needed
+- Remove unused tornado and pint packages
+- Remove markupsafe from dependencies, its in omni.kit.pip_archive
+
 ## [3.0.0] - 2025-08-25
 ### Changed
 - Removed unused python packages: numpy-quaternion, selenium, construct, nvsmi, plotly
@@ -45,8 +67,8 @@
 
 ## [2.5.0] - 2025-01-16
 ### Changed
-- updated matplotlib==3.10.0,
-- added contourpy==1.3.1, fonttools==4.55.3, python-dateutil==2.9.0.post0, six==1.17.0
+- Updated matplotlib==3.10.0,
+- Added contourpy==1.3.1, fonttools==4.55.3, python-dateutil==2.9.0.post0, six==1.17.0
 
 ## [2.4.0] - 2025-01-15
 ### Changed
@@ -78,24 +100,24 @@
 
 ## [2.2.0] - 2023-05-15
 ### Removed
-- boto3, s3transfer to omni.pip.compute
+- Removed boto3, s3transfer from omni.pip.compute
 
 ## [2.1.0] - 2023-05-08
 ### Removed
-- scipy, pyyaml to omni.pip.compute
-- botocore, urllib3, charset-normalizer as they are already in omni.kit.pip_archive
+- Removed scipy, pyyaml from omni.pip.compute
+- Removed botocore, urllib3, charset-normalizer as they are already in omni.kit.pip_archive
 
 ## [2.0.1] - 2022-12-13
 ### Changed
-- make extension os specific
+- Make extension os specific
 
 ## [2.0.0] - 2022-12-13
 ### Removed
-- certifi install at runtime
+- Removed certifi install at runtime
 
 ## [1.2.0] - 2022-07-20
 ### Added
-- boto3, s3transfer
+- Added boto3, s3transfer
 
 ## [1.1.0] - 2022-07-11
 ### Changed
@@ -107,7 +129,7 @@
 
 ## [0.3.0] - 2022-04-16
 ### Added
-- osqp, qdldl
+- Added osqp, qdldl
 
 ## [0.2.0] - 2022-01-13
 ### Added

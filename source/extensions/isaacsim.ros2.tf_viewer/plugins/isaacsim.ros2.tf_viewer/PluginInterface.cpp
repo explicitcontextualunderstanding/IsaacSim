@@ -17,8 +17,8 @@
 
 #include <carb/PluginUtils.h>
 
-#include <isaacsim/ros2/bridge/Ros2Distro.h>
-#include <isaacsim/ros2/bridge/Ros2Node.h>
+#include <isaacsim/ros2/core/Ros2Distro.h>
+#include <isaacsim/ros2/core/Ros2Node.h>
 #include <isaacsim/ros2/tf_viewer/ITransformListener.h>
 #include <isaacsim/ros2/tf_viewer/Tf2Factory.h>
 
@@ -44,9 +44,9 @@ namespace tf_viewer
  * @details
  * This class provides functionality to listen for ROS 2 transform messages
  * and maintains a buffer of the transformation data. It inherits from
- * isaacsim::ros2::bridge::Ros2Node to interact with the ROS 2 system.
+ * isaacsim::ros2::core::Ros2Node to interact with the ROS 2 system.
  */
-class TransformListener : public ITransformListener, isaacsim::ros2::bridge::Ros2Node
+class TransformListener : public ITransformListener, isaacsim::ros2::core::Ros2Node
 {
 public:
     /**
@@ -59,7 +59,7 @@ public:
      */
     bool initialize(const std::string& rosDistro)
     {
-        if (!isaacsim::ros2::bridge::isRos2DistroSupported(rosDistro))
+        if (!isaacsim::ros2::core::isRos2DistroSupported(rosDistro))
         {
             CARB_LOG_ERROR("Unsupported ROS_DISTRO: %s", rosDistro.c_str());
             return false;
@@ -139,7 +139,7 @@ public:
 
         if (!m_subscriberTf)
         {
-            isaacsim::ros2::bridge::Ros2QoSProfile qos;
+            isaacsim::ros2::core::Ros2QoSProfile qos;
             qos.depth = 100;
             m_messageTf = m_factory->createTfTreeMessage();
             m_subscriberTf =
@@ -148,7 +148,7 @@ public:
         }
         if (!m_subscriberTfStatic)
         {
-            isaacsim::ros2::bridge::Ros2QoSProfile qos;
+            isaacsim::ros2::core::Ros2QoSProfile qos;
             qos.depth = 100;
             m_messageTfStatic = m_factory->createTfTreeMessage();
             m_subscriberTfStatic = m_factory->createSubscriber(
@@ -263,16 +263,16 @@ private:
     Tf2Factory* m_tf2Factory = nullptr;
 
     /** @brief Subscriber for the /tf topic. */
-    std::shared_ptr<isaacsim::ros2::bridge::Ros2Subscriber> m_subscriberTf = nullptr;
+    std::shared_ptr<isaacsim::ros2::core::Ros2Subscriber> m_subscriberTf = nullptr;
 
     /** @brief Subscriber for the /tf_static topic. */
-    std::shared_ptr<isaacsim::ros2::bridge::Ros2Subscriber> m_subscriberTfStatic = nullptr;
+    std::shared_ptr<isaacsim::ros2::core::Ros2Subscriber> m_subscriberTfStatic = nullptr;
 
     /** @brief Message buffer for /tf messages. */
-    std::shared_ptr<isaacsim::ros2::bridge::Ros2TfTreeMessage> m_messageTf = nullptr;
+    std::shared_ptr<isaacsim::ros2::core::Ros2TfTreeMessage> m_messageTf = nullptr;
 
     /** @brief Message buffer for /tf_static messages. */
-    std::shared_ptr<isaacsim::ros2::bridge::Ros2TfTreeMessage> m_messageTfStatic = nullptr;
+    std::shared_ptr<isaacsim::ros2::core::Ros2TfTreeMessage> m_messageTfStatic = nullptr;
 
     /** @brief Buffer for storing transform data. */
     std::shared_ptr<Ros2BufferCore> m_buffer = nullptr;

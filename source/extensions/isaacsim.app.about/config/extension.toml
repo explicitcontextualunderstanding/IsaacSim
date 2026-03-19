@@ -1,11 +1,11 @@
 [package]
-version = "2.0.11"
+version = "2.2.0"
 category = "Internal"
 title = "Isaac Sim About Window"
-description="Show application/build information."
+description = "Displays an About dialog window showing the application name, version, Kit SDK version, client library version, and a list of all loaded plugins."
 keywords = ["isaac", "about"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -18,3 +18,6 @@ writeTarget.kit = true
 
 [[python.module]]
 name = "isaacsim.app.about"
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

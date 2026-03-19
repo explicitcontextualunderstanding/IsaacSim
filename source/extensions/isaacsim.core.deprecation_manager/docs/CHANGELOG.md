@@ -1,4 +1,21 @@
 # Changelog
+
+## [0.3.3] - 2026-02-07
+### Changed
+- Remove deprecated asset browser settings
+
+## [0.3.2] - 2025-11-07
+### Changed
+- Removed code to enable the `omni.isaac.ml_archive` extension when importing PyTorch via `import_module`
+
+## [0.3.1] - 2025-11-05
+### Changed
+- Enable the `omni.isaac.ml_archive` extension when importing PyTorch via `import_module`
+
+## [0.3.0] - 2025-10-20
+### Added
+- Expose function to import a deprecated/removed module safely
+
 ## [0.2.7] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

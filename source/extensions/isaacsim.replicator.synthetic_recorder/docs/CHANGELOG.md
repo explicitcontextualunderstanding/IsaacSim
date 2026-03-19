@@ -1,12 +1,46 @@
 # Changelog
+## [2.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [2.3.4] - 2026-02-26
+### Changed
+- Windows tests are now split into groups and added `--vulkan` flag to "startup" test args to avoid GPU crashes
+- Re-enabled `colorize_depth` argument in tests
+
+## [2.3.3] - 2026-02-21
+### Changed
+- Updated UI to use width and height for checkboxes to fix click issues
+
+## [2.3.2] - 2025-12-17
+### Fixed
+- Fixed output directory not being updated when read from the UI field
+
+## [2.3.1] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.3.0] - 2025-10-28
+### Changed
+- Separated recorder and UI configuration
+- Refactored to use explicit `backend_type` and `backend_params` for custom backend support
+- Added file validation to tests and reorganized them by specific test cases for clarity and speed
+- Renamed test files (`test_recorder_outputs.py`, `test_recorder_timeline.py`)
+- Added `colorize_depth` parameter for depth visualization
+
+## [2.2.18] - 2025-10-14
+### Changed
+- Decreased number of captured frames for tests
+- Increased test timeout to 900 seconds
+
 ## [2.2.17] - 2025-09-26
 ### Changed
 - Restored capture on play flag to its original value after recording
 
 ## [2.2.16] - 2025-09-15
 ### Changed
-- enabled tests blocked by ISIM-2602
-- use isaacsim.test.utils in tests
+- Enabled tests blocked by ISIM-2602
+- Use isaacsim.test.utils in tests
 
 ## [2.2.15] - 2025-07-07
 ### Fixed
@@ -26,8 +60,8 @@
 
 ## [2.2.11] - 2025-05-28
 ### Changed
-- added new semantics API check
-- warning messages are now prefixed with [SDR][Warn] to make it clear that they are recorder related
+- Added new semantics API check
+- Warning messages are now prefixed with [SDR][Warn] to make it clear that they are recorder related
 
 ## [2.2.10] - 2025-05-19
 ### Changed
@@ -82,7 +116,7 @@
 
 ## [2.1.0] - 2024-10-28
 ### Fixed
-- moved from deprecated editor_menu.add_item to omni.kit.menu.utils
+- Moved from deprecated editor_menu.add_item to omni.kit.menu.utils
 
 ### Changed
 - Removed unused "omni.pip.cloud" dependency
@@ -109,33 +143,33 @@
 
 ## [1.7.3] - 2024-05-22
 ### Added
-- async delayed ui frame build
+- Async delayed ui frame build
 
 ## [1.7.2] - 2024-05-21
 ### Fixed
-- writing to s3 by using only folder name instead of full path (ISIM-1133)
-- disabled capture on play to fix timeline control issues
-- removed step_async WAR (ISIM-943)
+- Writing to s3 by using only folder name instead of full path (ISIM-1133)
+- Disabled capture on play to fix timeline control issues
+- Removed step_async WAR (ISIM-943)
 
 ## [1.7.1] - 2024-04-23
 ### Fixed
-- using step_async when num_frames=1 (ISIM-943 WAR)
+- Using step_async when num_frames=1 (ISIM-943 WAR)
 
 ## [1.7.0] - 2023-12-05
 ### Changed
-- removed overwrite/increment/timestamp options from recorder, it is now handled by the backend which is not exposed
+- Removed overwrite/increment/timestamp options from recorder, it is now handled by the backend which is not exposed
 
 ### Fixed
-- fixed bug if a non valid json file is provided to the custom writer
+- Fixed bug if a non valid json file is provided to the custom writer
 
 ## [1.6.0] - 2023-08-10
 ### Added
-- custom names for render products
-- render products are destroyed after each recording (OM-87164)
-- select all and toggle all buttons for writer annotator parameters
+- Custom names for render products
+- Render products are destroyed after each recording (OM-87164)
+- Select all and toggle all buttons for writer annotator parameters
 
 ### Changed
-- increased render product max resolution to 16kx8k
+- Increased render product max resolution to 16kx8k
 
 ## [1.5.2] - 2023-08-03
 ### Fixed
@@ -151,7 +185,7 @@
 
 ## [1.4.2] - 2023-02-22
 ### Fixed
-- added wait_until_complete for S3 bucket writing one frame less (OM-82465)
+- Added wait_until_complete for S3 bucket writing one frame less (OM-82465)
 - S3 accepting None values for s3_region and s3_endpoint
 
 ## [1.4.1] - 2023-02-14
@@ -196,15 +230,15 @@
 - Support for loading custom writers
 
 ### Changed
-- renamed extension.py to synthetic_recorder_extension.py
-- renamed extension class from Extension to SyntheticRecorderExtension
+- Renamed extension.py to synthetic_recorder_extension.py
+- Renamed extension class from Extension to SyntheticRecorderExtension
 
 ### Fixed
 - Annotators blocking other annotators of writing data if their requirements are not met
 
 ## [1.0.0] - 2022-11-14
 ### Added
-- version using Replicator OV API
+- Version using Replicator OV API
 
 ## [0.1.2] - 2022-09-07
 ### Fixed

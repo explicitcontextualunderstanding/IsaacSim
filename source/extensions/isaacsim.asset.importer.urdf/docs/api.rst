@@ -1,66 +1,47 @@
 URDF Import Extension [isaacsim.asset.importer.urdf]
 ####################################################
 
-
-
-URDF Import Commands
-====================
-The following commands can be used to simplify the import process.
-Below is a sample demonstrating how to import the Carter URDF included with this extension
+URDF Importer API
+=================
+The URDF importer provides a Python API for configuring and converting URDF files into USD assets.
+Below is a sample demonstrating how to import the Carter URDF included with this extension.
 
 .. code-block:: python
     :linenos:
 
-    import omni.kit.commands
-    from pxr import UsdLux, Sdf, Gf, UsdPhysics, PhysicsSchemaTools
+    import os
 
-    # setting up import configuration:
-    status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-    import_config.merge_fixed_joints = False
-    import_config.convex_decomp = False
-    import_config.import_inertia_tensor = True
-    import_config.fix_base = False
-    import_config.collision_from_visuals = False
+    import omni.usd
+    from isaacsim.asset.importer.urdf import URDFImporter, URDFImporterConfig
 
-    # Get path to extension data:
+    # Get path to extension data.
     ext_manager = omni.kit.app.get_app().get_extension_manager()
     ext_id = ext_manager.get_enabled_extension_id("isaacsim.asset.importer.urdf")
     extension_path = ext_manager.get_extension_path(ext_id)
-    # import URDF
-    omni.kit.commands.execute(
-        "URDFParseAndImportFile",
-        urdf_path=extension_path + "/data/urdf/robots/carter/urdf/carter.urdf",
-        import_config=import_config,
+
+    urdf_path = os.path.join(extension_path, "data", "urdf", "robots", "carter", "urdf", "carter.urdf")
+    output_dir = os.path.dirname(urdf_path)
+
+    # Configure and import.
+    import_config = URDFImporterConfig(
+        urdf_path=urdf_path,
+        usd_path=output_dir,
+        collision_from_visuals=False,
+        merge_mesh=False
     )
-    # get stage handle
-    stage = omni.usd.get_context().get_stage()
 
-    # enable physics
-    scene = UsdPhysics.Scene.Define(stage, Sdf.Path("/physicsScene"))
-    # set gravity
-    scene.CreateGravityDirectionAttr().Set(Gf.Vec3f(0.0, 0.0, -1.0))
-    scene.CreateGravityMagnitudeAttr().Set(9.81)
+    importer = URDFImporter(import_config)
+    output_path = importer.import_urdf()
 
-    # add ground plane
-    PhysicsSchemaTools.addGroundPlane(stage, "/World/groundPlane", "Z", 1500, Gf.Vec3f(0, 0, -50), Gf.Vec3f(0.5))
+    # Open the resulting USD stage.
+    omni.usd.get_context().open_stage(output_path)
 
-    # add lighting
-    distantLight = UsdLux.DistantLight.Define(stage, Sdf.Path("/DistantLight"))
-    distantLight.CreateIntensityAttr(500)
-
-.. automodule:: isaacsim.asset.importer.urdf.impl.commands
-    :members:
-    :undoc-members:
-    :exclude-members: do, undo
-
-.. automodule:: isaacsim.asset.importer.urdf._urdf
-
-.. autoclass:: isaacsim.asset.importer.urdf._urdf.Urdf
+.. autoclass:: isaacsim.asset.importer.urdf.URDFImporter
     :members:
     :undoc-members:
     :no-show-inheritance:
 
-.. autoclass:: isaacsim.asset.importer.urdf._urdf.ImportConfig
+.. autoclass:: isaacsim.asset.importer.urdf.URDFImporterConfig
     :members:
     :undoc-members:
     :no-show-inheritance:

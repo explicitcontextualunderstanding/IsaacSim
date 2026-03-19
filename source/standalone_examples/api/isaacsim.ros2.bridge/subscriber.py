@@ -15,7 +15,7 @@
 
 from isaacsim import SimulationApp
 
-simulation_app = SimulationApp({"renderer": "RaytracedLighting", "headless": False})
+simulation_app = SimulationApp({"renderer": "RealTimePathTracing", "headless": False})
 
 import omni
 from isaacsim.core.api import World

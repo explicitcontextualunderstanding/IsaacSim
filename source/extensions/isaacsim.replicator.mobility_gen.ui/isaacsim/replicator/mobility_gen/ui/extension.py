@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Extension for generating mobility data using teleoperated robots in Omniverse."""
+
+
 import asyncio
 import datetime
 import glob
@@ -28,6 +31,7 @@ import isaacsim.replicator.mobility_gen.examples
 import numpy as np
 import omni.ext
 import omni.kit
+import omni.kit.usdz_export as usdz_export
 import omni.ui as ui
 from isaacsim.core.utils.stage import open_stage, save_stage
 from isaacsim.core.utils.viewports import set_active_viewport_camera
@@ -60,8 +64,35 @@ SCENARIOS_DIR = os.path.join(DATA_DIR, "scenarios")
 
 
 class MobilityGenExtension(omni.ext.IExt):
+    """Extension for generating mobility data using teleoperated robots in Omniverse.
+
+    This extension provides a user interface for configuring and running mobility generation scenarios.
+    Users can select robot types, scenario types, and occupancy maps to create teleoperated data collection
+    sessions. The extension handles stage loading, robot spawning, camera setup, and data recording for
+    machine learning training datasets.
+
+    The extension creates two windows:
+    - MobilityGen: Main control panel for scenario configuration and recording management
+    - MobilityGen - Occupancy Map: Visualization window showing the occupancy map with robot position
+
+    Key features include:
+    - Support for multiple robot types and scenario configurations
+    - Real-time occupancy map visualization with robot tracking
+    - Keyboard and gamepad input support for teleoperation
+    - Automatic data recording with timestamped output files
+    - Stage caching and management for consistent scenario replay
+    - Physics-based simulation with configurable time steps
+    """
 
     def on_startup(self, ext_id):
+        """Initialize the MobilityGen extension.
+
+        Sets up keyboard and gamepad drivers, UI windows for occupancy map visualization and teleop controls,
+        and initializes recording state.
+
+        Args:
+            ext_id: Extension identifier.
+        """
 
         self.keyboard = KeyboardDriver.connect()
         self.gamepad = GamepadDriver.connect()
@@ -145,11 +176,20 @@ class MobilityGenExtension(omni.ext.IExt):
         )
 
     def build_occ_map_frame(self):
+        """Build the occupancy map visualization frame.
+
+        Creates an image widget to display the occupancy map visualization if a scenario is active.
+        """
         if self.scenario is not None:
             with ui.VStack():
                 image_widget = ui.ImageWithProvider(self._occupancy_map_image_provider)
 
     def draw_visualization_image(self):
+        """Update the occupancy map visualization image.
+
+        Retrieves the current visualization image from the scenario and updates the image provider for display
+        in the UI.
+        """
         if self.scenario is not None:
             image = self.scenario.get_visualization_image().copy().convert("RGBA")
             data = list(image.tobytes())
@@ -157,10 +197,19 @@ class MobilityGenExtension(omni.ext.IExt):
             self._occ_map_frame.rebuild()
 
     def update_recording_count(self):
+        """Update the recording count display.
+
+        Counts the number of existing recordings in the recordings directory and updates the UI label.
+        """
         num_recordings = len(glob.glob(os.path.join(RECORDINGS_DIR, "*")))
         self.recording_count_label.text = f"Number of recordings: {num_recordings}"
 
-    def create_config(self):
+    def create_config(self) -> Config:
+        """Create a configuration object from current UI settings.
+
+        Returns:
+            A Config object with the selected scenario type, robot type, and scene USD path.
+        """
         config = Config(
             scenario_type=list(SCENARIOS.names())[
                 self.scenario_combo_box.model.get_item_value_model().get_value_as_int()
@@ -171,10 +220,19 @@ class MobilityGenExtension(omni.ext.IExt):
         return config
 
     def scenario_type(self):
+        """Get the currently selected scenario type.
+
+        Returns:
+            The scenario type class corresponding to the current combo box selection.
+        """
         index = self.scenario_combo_box.model.get_item_value_model().get_value_as_int()
         return SCENARIOS.get_index(index)
 
     def on_shutdown(self):
+        """Clean up resources when the extension shuts down.
+
+        Disconnects input drivers and removes physics callbacks from the world.
+        """
         self.keyboard.disconnect()
         self.gamepad.disconnect()
         world = get_world()
@@ -182,6 +240,11 @@ class MobilityGenExtension(omni.ext.IExt):
             world.remove_physics_callback("scenario_physics")
 
     def start_new_recording(self):
+        """Start a new recording session.
+
+        Creates a timestamped recording directory, initializes the writer with config and occupancy map data,
+        and resets recording state.
+        """
         recording_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
         recording_path = os.path.join(RECORDINGS_DIR, recording_name)
         writer = MobilityGenWriter(recording_path)
@@ -196,25 +259,42 @@ class MobilityGenExtension(omni.ext.IExt):
         self.update_recording_count()
 
     def clear_recording(self):
+        """Clear the current recording session.
+
+        Resets the writer and clears recording display labels.
+        """
         self.writer = None
         self.recording_name_label.text = "Current recording name: "
         self.recording_step_label.text = "Current recording duration: "
 
     def clear_scenario(self):
+        """Clear the current scenario.
+
+        Resets the scenario instance and cached stage path.
+        """
         self.scenario = None
         self.cached_stage_path = None
 
     def enable_recording(self):
+        """Enable data recording for the current scenario.
+
+        Starts a new recording session if a scenario is active and recording is not already enabled.
+        """
         if not self.recording_enabled:
             if self.scenario is not None:
                 self.start_new_recording()
             self.recording_enabled = True
 
     def disable_recording(self):
+        """Disable data recording and clear the current recording session."""
         self.recording_enabled = False
         self.clear_recording()
 
     def reset(self):
+        """Reset the scenario to its initial state.
+
+        Clears the current recording writer, resets the scenario, and starts a new recording if recording is enabled.
+        """
         self.writer = None
         self.scenario.reset()
         if self.recording_enabled:
@@ -222,6 +302,11 @@ class MobilityGenExtension(omni.ext.IExt):
         self.draw_visualization_image()
 
     def on_physics(self, step_size: int):
+        """Physics step callback that advances the scenario and handles recording.
+
+        Args:
+            step_size: The physics step size in simulation time units.
+        """
 
         if self.scenario is not None:
 
@@ -238,7 +323,12 @@ class MobilityGenExtension(omni.ext.IExt):
                 if self.step % 15 == 0:
                     self.recording_step_label.text = f"Current recording duration: {self.recording_time:.2f}s"
 
-    def _check_occupancy_map_yaml_path(self):
+    def _check_occupancy_map_yaml_path(self) -> bool:
+        """Validate the occupancy map YAML file path from the UI field.
+
+        Returns:
+            True if the path exists and has a valid YAML extension, False otherwise.
+        """
         occupancy_map_yaml_path = os.path.expanduser(self.omap_field_string_model.as_string)
 
         if not os.path.exists(occupancy_map_yaml_path):
@@ -257,6 +347,10 @@ class MobilityGenExtension(omni.ext.IExt):
         return True
 
     def build_scenario(self):
+        """Build and initialize a new mobility generation scenario based on UI parameters.
+
+        Asynchronously creates a scenario using the selected robot type, scenario type, stage file, and occupancy map.
+        """
 
         async def _build_scenario_async():
 
@@ -284,8 +378,13 @@ class MobilityGenExtension(omni.ext.IExt):
 
             # Open stage and save local copy
             open_stage(scene_usd_str)
-            self.cached_stage_path = os.path.join(tempfile.mkdtemp(), "stage.usd")
-            save_stage(self.cached_stage_path, save_and_reload_in_place=False)
+            # Check if stage is a USDZ file
+            if scene_usd_str.endswith(".usdz"):
+                self.cached_stage_path = os.path.join(tempfile.mkdtemp(), "stage.usdz")
+                await usdz_export.usdz_export(scene_usd_str, self.cached_stage_path)
+            else:
+                self.cached_stage_path = os.path.join(tempfile.mkdtemp(), "stage.usd")
+                save_stage(self.cached_stage_path, save_and_reload_in_place=False)
 
             # Initialize world
             world = new_world(physics_dt=robot_type.physics_dt)

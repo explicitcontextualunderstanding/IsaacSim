@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Page for adding and configuring robots in the Isaac Sim robot setup wizard."""
+
+
 import os
 from functools import partial
 from typing import List
@@ -39,6 +43,23 @@ from ..utils.utils import get_stage_default_prim_path
 
 
 class AddRobot:
+    """A wizard interface for adding and configuring robots in Isaac Sim.
+
+    Provides a multi-step UI workflow for users to select, configure, and prepare robots for simulation. Supports
+    multiple robot acquisition methods including configuring existing robots on stage, converting URDF/MJCF files,
+    and using external importers. The wizard guides users through robot type selection, naming, parent transform
+    selection, and preparation for the next workflow steps.
+
+    The interface includes drag-and-drop functionality for robot files, asset picking for parent transforms, and
+    validation of user inputs. It integrates with the robot registry system to maintain robot configuration state
+    across workflow steps.
+
+    Args:
+        visible: Whether the wizard interface is initially visible.
+        *args: Additional positional arguments.
+        **kwargs: Additional keyword arguments including window_title for customizing the wizard window title.
+    """
+
     def __init__(self, visible, *args, **kwargs):
         self.visible = visible
         self.window_title = kwargs.pop("window_title", "Robot Wizard")
@@ -54,6 +75,7 @@ class AddRobot:
         self._reset_params()
 
     def destroy(self):
+        """Destroys the AddRobot instance and cleans up all associated UI elements and resources."""
         if self._select_parent_xform_window:
             self._select_parent_xform_window.destroy()
         self._select_parent_xform_window = None
@@ -65,14 +87,13 @@ class AddRobot:
         self.frame.destroy()
 
     def _reset_params(self):
+        """Resets the robot configuration parameters to their default values."""
         self._robot_type = "Custom"
         self._robot_name = ""
         self._robot_parent_prim_path = ""
 
     def _build_frame(self):
-        """
-        build the frame for the add robot page
-        """
+        """Build the frame for the add robot page."""
         with ui.ScrollingFrame():
             with ui.VStack(spacing=10):
                 with ui.CollapsableFrame("Add Robot", height=0, build_header_fn=custom_header):
@@ -156,6 +177,11 @@ class AddRobot:
                 self._robot_type_model.add_item_changed_fn(_update_robot_type)
 
     def _on_robot_name_changed(self, m):
+        """Handles changes to the robot name input field.
+
+        Args:
+            m: The model containing the updated robot name value.
+        """
         robot_name_value = m.get_value_as_string()
         if Sdf.Path.IsValidIdentifier(robot_name_value):
             self._robot_name = robot_name_value
@@ -163,9 +189,11 @@ class AddRobot:
         else:
             self._invalid_robot_name_label.visible = True
 
-    def set_visible(self, visible):
-        """
-        when this Add Robot page is visible or hidden
+    def set_visible(self, visible: bool):
+        """When this Add Robot page is visible or hidden.
+
+        Args:
+            visible: Whether the page should be visible.
         """
         if self.frame:
             if visible:
@@ -174,6 +202,14 @@ class AddRobot:
             self.frame.visible = visible
 
     def __next_step(self, verify_fn=None):
+        """Creates the next step button for the robot configuration wizard.
+
+        Args:
+            verify_fn: Optional verification function to call when proceeding to the next step.
+
+        Returns:
+            The ButtonWithIcon widget for the next step.
+        """
         with ui.VStack():
             ui.Spacer(height=16)
             separator("Next: Prepare Files")
@@ -189,6 +225,7 @@ class AddRobot:
         return button
 
     def _preprocess_params(self):
+        """Preprocesses parameters from the registered robot for display in the UI."""
         self._robot = RobotRegistry().get()
         if not self._robot:
             return
@@ -198,6 +235,7 @@ class AddRobot:
         self._robot_parent_prim_path = self._robot.parent_prim_path
 
     def _update_widgets(self):
+        """Updates UI widgets with current robot parameter values."""
         if self._robot_name_widget:
             self._robot_name_widget.model.set_value(self._robot_name)
         if self._robot_type_model:
@@ -205,9 +243,11 @@ class AddRobot:
         if self._parent_xform_widget:
             self._parent_xform_widget.model.set_value(self._robot_parent_prim_path)
 
-    def _add_robot(self):
-        """
-        before moving on, initialize (or overwrite)the robot with the given params
+    def _add_robot(self) -> bool:
+        """Before moving on, initialize (or overwrite)the robot with the given params.
+
+        Returns:
+            True if the robot was successfully added.
         """
 
         # get parameters from UI: robot name, type, and output folder, also parent prim path
@@ -240,7 +280,12 @@ class AddRobot:
 
         return True
 
-    def select(self, selected_paths):
+    def select(self, selected_paths: list):
+        """Handles selection of parent transform paths from the asset picker.
+
+        Args:
+            selected_paths: List of selected prim paths from the asset picker.
+        """
         self._select_parent_xform_window.visible = False
         self._selected_paths = selected_paths
         if self._selected_paths:
@@ -591,6 +636,19 @@ class AddRobot:
             self.external_drag_drops = {}
 
     def _on_ext_drag_drop(self, e, payload: List[str], drop_area, title, path_widget, button):
+        """Handles external drag and drop operations for robot file imports.
+
+        Validates and processes dropped files based on the drop area title and file type compatibility.
+        Updates the path widget and enables the associated button when a valid file is dropped.
+
+        Args:
+            e: The drag and drop event.
+            payload: List of file paths being dropped.
+            drop_area: The UI drop area widget.
+            title: Title identifying the drop area type (e.g., "Sim-Ready", "Robot Mesh").
+            path_widget: The UI string field widget to update with the file path.
+            button: The UI button widget to enable when a valid file is dropped.
+        """
         # if drop_area is not hovered, we dont want to do anything
         if not drop_area.checked:
             return

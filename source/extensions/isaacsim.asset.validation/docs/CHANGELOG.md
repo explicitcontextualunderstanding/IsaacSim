@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1] - 2026-02-28
+### Changed
+- Updated physics_rules to use new omni.physics.core API (`IPhysicsSimulation.initialize`/`close` replaces removed `attach_stage`/`detach_stage`)
+
+## [1.2.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.1.0] - 2025-09-19
 ### Added
 - Add diagonal inertia triangle inequality check

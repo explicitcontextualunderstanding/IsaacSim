@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Provides writer functionality for mobility generation data output including sensor states, configurations, and USD stages."""
+
+
 import os
 import shutil
 
@@ -25,11 +28,31 @@ from .occupancy_map import OccupancyMap
 
 
 class MobilityGenWriter:
+    """Writer class for mobility generation data output.
+
+    This class handles the structured output of mobility generation simulation data including sensor states,
+    configurations, occupancy maps, and USD stages. It organizes data into a hierarchical directory structure
+    with separate folders for different data types such as RGB images, segmentation masks, depth data, surface
+    normals, and common state information.
+
+    The writer creates timestamped files for state data and provides methods to save configuration files,
+    occupancy maps in ROS format, and copy USD stage files. It supports various image formats and numpy
+    arrays for different sensor modalities.
+
+    Args:
+        path: Output directory path where all mobility generation data will be written.
+    """
 
     def __init__(self, path: str):
         self.path = path
 
     def write_state_dict_common(self, state_dict: dict, step: int):
+        """Writes the common state dictionary data to a NumPy file.
+
+        Args:
+            state_dict: The common state data to write.
+            step: The step number used for file naming.
+        """
         dict_folder = os.path.join(self.path, "state", "common")
         if not os.path.exists(dict_folder):
             os.makedirs(dict_folder)
@@ -37,6 +60,12 @@ class MobilityGenWriter:
         np.save(state_dict_path, state_dict)
 
     def write_state_dict_rgb(self, state_rgb: dict, step: int):
+        """Writes RGB state data as JPEG images.
+
+        Args:
+            state_rgb: Dictionary mapping names to RGB image arrays.
+            step: The step number used for file naming.
+        """
         for name, value in state_rgb.items():
             if value is not None:
                 image_folder = os.path.join(self.path, "state", "rgb", name)
@@ -47,6 +76,12 @@ class MobilityGenWriter:
                 image.save(image_path)
 
     def write_state_dict_segmentation(self, state_segmentation: dict, step: int):
+        """Writes segmentation state data as PNG images.
+
+        Args:
+            state_segmentation: Dictionary mapping names to segmentation image arrays.
+            step: The step number used for file naming.
+        """
         for name, value in state_segmentation.items():
             if value is not None:
                 image_folder = os.path.join(self.path, "state", "segmentation", name)
@@ -57,6 +92,12 @@ class MobilityGenWriter:
                 image.save(image_path)
 
     def write_state_dict_depth(self, state_np: dict, step: int):
+        """Writes depth state data as 16-bit inverse depth PNG images.
+
+        Args:
+            state_np: Dictionary mapping names to depth arrays.
+            step: The step number used for file naming.
+        """
         for name, value in state_np.items():
             if value is not None:
                 output_folder = os.path.join(self.path, "state", "depth", name)
@@ -73,6 +114,12 @@ class MobilityGenWriter:
                 image.save(output_path)
 
     def write_state_dict_normals(self, state_np: dict, step: int):
+        """Writes normals state data as NumPy files.
+
+        Args:
+            state_np: Dictionary mapping names to normal arrays.
+            step: The step number used for file naming.
+        """
         for name, value in state_np.items():
             if value is not None:
                 output_folder = os.path.join(self.path, "state", "normals", name)
@@ -82,24 +129,50 @@ class MobilityGenWriter:
                 np.save(output_path, value)
 
     def copy_stage(self, input_path: str):
+        """Copies a USD or USDZ stage file to the output directory.
+
+        Args:
+            input_path: Path to the source stage file.
+        """
         if not os.path.exists(self.path):
             os.makedirs(self.path)
-        shutil.copyfile(input_path, os.path.join(self.path, "stage.usd"))
+        if input_path.endswith(".usdz"):
+            shutil.copyfile(input_path, os.path.join(self.path, "stage.usdz"))
+        else:
+            shutil.copyfile(input_path, os.path.join(self.path, "stage.usd"))
 
     def write_config(self, config: Config):
+        """Writes the configuration to a JSON file.
+
+        Args:
+            config: The configuration object to write.
+        """
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         with open(os.path.join(self.path, "config.json"), "w") as f:
             f.write(config.to_json())
 
     def write_occupancy_map(self, occupancy_map: OccupancyMap):
+        """Writes the occupancy map in ROS format.
+
+        Args:
+            occupancy_map: The occupancy map object to write.
+        """
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         occupancy_map.save_ros(os.path.join(self.path, "occupancy_map"))
 
     def copy_init(self, other_path: str):
+        """Copies initialization files from another path including stage, config, and occupancy map.
+
+        Args:
+            other_path: Path to the source directory containing initialization files.
+        """
         if not os.path.exists(self.path):
             os.makedirs(self.path)
-        shutil.copyfile(os.path.join(other_path, "stage.usd"), os.path.join(self.path, "stage.usd"))
+        if os.path.exists(os.path.join(other_path, "stage.usdz")):
+            shutil.copyfile(os.path.join(other_path, "stage.usdz"), os.path.join(self.path, "stage.usdz"))
+        else:
+            shutil.copyfile(os.path.join(other_path, "stage.usd"), os.path.join(self.path, "stage.usd"))
         shutil.copyfile(os.path.join(other_path, "config.json"), os.path.join(self.path, "config.json"))
         shutil.copytree(os.path.join(other_path, "occupancy_map"), os.path.join(self.path, "occupancy_map"))

@@ -1,5 +1,97 @@
 # Changelog
 
+## [1.12.0] - 2026-03-12
+### Changed
+- Remove Newton pip prebundle dependency
+
+## [1.11.2] - 2026-03-02
+### Changed
+- Newton tests enabled; PhysX-specific tests skip when active engine is not PhysX.
+
+## [1.11.1] - 2026-02-25
+### Fixed
+- Rebuild with new physics package
+
+## [1.11.0] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+### Added
+- Add Newton physics engine support with `switch_physics_engine()` method
+- Add `NewtonMjcScene` and `NewtonXpbdScene` classes for Newton solver-specific scene configuration
+- Add `PhysicsScene` base class for common physics scene operations
+
+## [1.10.1] - 2026-02-05
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.10.0] - 2026-02-03
+### Added
+- When `/rtx/hydra/supportMultiTickRate` is enabled, simulation time is propagated to the run loop
+
+## [1.9.2] - 2026-01-22
+### Changed
+- Replaced omni.physx start_simulation with omni.physics start_simulation
+- Replaced omni.physx simulation event stream with omni.physics simulation event stream
+
+## [1.9.1] - 2026-01-16
+### Added
+- Add `cleanupInvalidPhysicsScenes()` method to C++ `ISimulationManager` interface to remove tracked physics scenes with invalid prims
+- Add `isValid()` method to C++ `PhysicsScene` class to check if the underlying prim is still valid
+- Add Python binding for `cleanup_invalid_physics_scenes()` method
+
+### Fixed
+- Fix `RuntimeError: Accessed invalid expired 'PhysicsScene' prim` error when physics scene prims become invalid without triggering USD notices (e.g., layer removal operations, session sublayer changes)
+- Add stage and root layer validation in `_on_play()` to prevent physics initialization on expired/invalid stages
+- Add error handling in `_create_physics_scene()` to gracefully handle physics scene creation failures
+
+## [1.9.0] - 2026-01-14
+### Added
+- Add supporting APIs for changing physics engines through the omniphysics interfaces
+
+## [1.8.0] - 2026-01-09
+### Added
+- Add `PhysicsScene` and `PhysxScene` Python class wrappers for high-level physics scene manipulation
+- Add `PhysicsScene` C++ class and header for USD Physics Scene prim operations
+- Add `get_physics_scene_paths()` function to get all physics scene paths in a stage
+
+## [1.7.3] - 2026-01-08
+### Changed
+- Change log level of no adjacent samples found for interpolation warning to INFO
+
+## [1.7.2] - 2025-12-07
+### Changed
+- Run clang tidy
+
+## [1.7.1] - 2025-12-02
+### Changed
+- Raise a RuntimeError if the physics dt is being set while simulation is running/playing
+
+## [1.7.0] - 2025-11-26
+### Added
+- Add the `SimulationEvent` enum
+- Allow to perform a fabric update when stepping physics
+
+### Changed
+- Mark as deprecated the `IsaacEvents` enum and the backend-related methods
+
+## [1.6.2] - 2025-11-25
+### Changed
+- Make set_physics_dt a classmethod
+- Add unit tests for SimulationManager
+
+## [1.6.1] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [1.6.0] - 2025-10-27
+### Changed
+- Replace the use of deprecated core utils functions by the core experimental implementations
+
+## [1.5.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.4.4] - 2025-10-09
 ### Fixed
 - Change log level of invalid rational time error to WARN
@@ -118,7 +210,7 @@
 
 ## [0.4.2] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [0.4.1] - 2025-04-30
 ### Changed

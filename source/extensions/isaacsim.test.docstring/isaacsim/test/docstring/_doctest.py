@@ -13,24 +13,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module providing custom doctest functionality with extended output checking capabilities."""
+
+
 import doctest
 import inspect
 
 NO_CHECK = doctest.register_optionflag("NO_CHECK")
-"""When specified, run the example and ignore its output, regardless of whether it has any
+"""Custom doctest directive to run an example but ignore its output.
+
+When specified, the example code is executed but no output comparison is performed,
+regardless of whether the example produces output or not. This is useful for examples
+that have non-deterministic output (e.g., memory addresses, timestamps, random values)
+or when you only want to verify that code runs without errors.
+
+The following directives are available for use in docstring examples:
+
+**Custom Directives (this extension):**
+
+* ``# doctest: +NO_CHECK``: Run the example but skip output verification.
+
+**Standard Python doctest Directives:**
+
+* ``# doctest: +SKIP``: Skip this example entirely (don't run it).
+* ``# doctest: +ELLIPSIS``: Allow ``...`` in expected output to match any substring.
+* ``# doctest: +NORMALIZE_WHITESPACE``: Ignore whitespace differences when comparing output.
+* ``# doctest: +IGNORE_EXCEPTION_DETAIL``: Ignore exception message details, only check type.
+
+**Default Flags:**
+
+The ``assertDocTest`` and ``assertDocTests`` methods use these flags by default:
+``doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST``
 
 Example:
 
 .. code-block:: python
 
+    # Run but don't check output (useful for non-deterministic results)
     >>> print(list(range(20)))  # doctest: +NO_CHECK
+
+    # Skip this example entirely
+    >>> some_dangerous_operation()  # doctest: +SKIP
+
+    # Use ellipsis to match variable parts of output
+    >>> print({"key": "value", "id": 12345})
+    {...'key': 'value'...}
+
+    # Combine multiple directives
+    >>> print(complex_output())  # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    ...output pattern...
 """
 
 
 class _Checker(doctest.OutputChecker):
-    """Custom doctest's output checker to support the NO_CHECK option"""
+    """Custom doctest's output checker to support the NO_CHECK option."""
 
     def check_output(self, want, got, optionflags):
+        """Check if the actual output matches the expected output.
+
+        Extends the default doctest output checking by supporting the NO_CHECK flag.
+        When NO_CHECK is set in optionflags, the method returns True regardless of
+        whether the actual output matches the expected output.
+
+        Args:
+            want: The expected output string.
+            got: The actual output string.
+            optionflags: Bitwise OR of option flags controlling comparison behavior.
+
+        Returns:
+            True if the outputs match or NO_CHECK flag is set, False otherwise.
+        """
         result = super().check_output(want, got, optionflags)
         if not result:
             if optionflags & NO_CHECK:
@@ -39,12 +91,35 @@ class _Checker(doctest.OutputChecker):
 
 
 class DocTest:
-    def __init__(self, *args, **kwargs) -> None:
+    """A doctest runner for validating docstring examples in Python modules and classes.
+
+    This class provides functionality to run doctest examples found in docstrings of classes, modules,
+    functions, and methods. It supports custom doctest directives including a NO_CHECK flag for running
+    examples without output verification, which is useful for non-deterministic output.
+
+    The class automatically discovers and tests all public members of a given object, with support for
+    both regular Python modules and pybind11 binary extension modules. It maintains a global namespace
+    for example execution and uses a custom output checker to handle the NO_CHECK directive.
+
+    Args:
+        *args: Variable length argument list passed to the doctest runner.
+        **kwargs: Arbitrary keyword arguments for configuring the doctest runner.
+    """
+
+    def __init__(self, *args, **kwargs):
         self._globs = {"__name__": "__main__"}
         self._checker = _Checker()
 
     def _get_names(self, obj, privates: bool = False) -> list[str]:
-        """Get class/module names without including special methods"""
+        """Get class/module names without including special methods
+
+        Args:
+            obj: The class or module object to get names from.
+            privates: Whether to include private names (starting with underscore).
+
+        Returns:
+            List of qualified names in the format 'obj_name.member_name'.
+        """
         names = []
         is_pybind11_mod = self._is_pybind11_module(obj)
 
@@ -86,12 +161,12 @@ class DocTest:
 
         Args:
             expr: module function or class definition, property or method to check docstrings examples for
-            order (list[tuple[object, int]]): list of pair (name, index) to modify the examples execution order
-            exclude (list[object]): list of class/module names to exclude for testing
-            _globals (dict): current namespace
+            order: list of pair (name, index) to modify the examples execution order
+            exclude: list of class/module names to exclude for testing
+            _globals: current namespace
 
         Returns:
-            list[object]: list of class/module members
+            list of class/module members
         """
         _globals.update({expr.__name__: expr})
         members = [eval(name, _globals) for name in self._get_names(expr)]
@@ -113,10 +188,10 @@ class DocTest:
 
         Args:
             expr: module function or class definition, property or method to check docstrings examples for
-            flags (int): doctest's option flags
+            flags: doctest's option flags
 
         Returns:
-            bool: whether the test passes or fails
+            whether the test passes or fails
         """
         # implement doctest.run_docstring_examples with execution checking
         testFinder = doctest.DocTestFinder(verbose=False, recurse=False)
@@ -128,8 +203,15 @@ class DocTest:
                 return False
         return True
 
-    def _is_pybind11_module(self, obj):
-        """Check if this is a pybind11 module"""
+    def _is_pybind11_module(self, obj) -> bool:
+        """Check if this is a pybind11 module
+
+        Args:
+            obj: The object to check.
+
+        Returns:
+            True if the object is a pybind11 module.
+        """
         if not inspect.ismodule(obj):
             return False
 
@@ -143,8 +225,15 @@ class DocTest:
 
         return False
 
-    def _is_function_like(self, obj):
-        """Check if object is function-like (including pybind11 functions)"""
+    def _is_function_like(self, obj) -> bool:
+        """Check if object is function-like (including pybind11 functions)
+
+        Args:
+            obj: The object to check.
+
+        Returns:
+            True if the object is function-like.
+        """
         return (
             inspect.isfunction(obj)
             or inspect.isdatadescriptor(obj)

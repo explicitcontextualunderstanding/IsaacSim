@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Style definitions for the browser interface components."""
+
+
 import omni.ui as ui
 from omni.ui import color as cl
 

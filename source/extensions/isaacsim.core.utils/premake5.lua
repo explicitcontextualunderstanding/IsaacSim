@@ -33,7 +33,6 @@ include_physx()
 includedirs {
     "%{root}/source/extensions/isaacsim.core.includes/include",
     "%{root}/source/extensions/isaacsim.core.simulation_manager/include",
-    "%{root}/source/deprecated/omni.isaac.dynamic_control/include",
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include",
     "%{kit_sdk_bin_dir}/dev/fabric/include/",
     "%{root}/_build/target-deps/omni_client_library/include",
@@ -48,14 +47,16 @@ libdirs {
 }
 links { "omni.usd" }
 
-extra_usd_libs = { "usdUtils", "usdGeom", "usdPhysics", "pcp" }
+extra_usd_libs = { "usdUtils", "usdGeom", "usdPhysics", "pcp", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
 -- End OpenUSD
 
-filter { "system:linux", "platforms:x86_64" }
+filter { "system:linux", "platforms:x86_64", "configurations:release" }
 links { "tbb" }
+filter { "system:linux", "platforms:x86_64", "configurations:debug" }
+links { "tbb_debug" }
 filter {}
 
 filter { "system:windows", "platforms:x86_64" }

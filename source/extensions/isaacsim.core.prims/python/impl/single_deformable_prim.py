@@ -17,7 +17,7 @@ from typing import Optional, Sequence, Union
 
 import carb
 import numpy as np
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.stage import get_current_stage
 from isaacsim.core.utils.types import DynamicState
 from omni.physx.scripts import deformableUtils, physicsUtils
@@ -26,6 +26,8 @@ from pxr import Gf, PhysxSchema, Sdf, UsdGeom, UsdPhysics, UsdShade
 from .deformable_prim import DeformablePrim
 from .single_prim_wrapper import _SinglePrimWrapper
 from .single_xform_prim import SingleXFormPrim
+
+torch = import_module("torch")
 
 
 class SingleDeformablePrim(_SinglePrimWrapper):

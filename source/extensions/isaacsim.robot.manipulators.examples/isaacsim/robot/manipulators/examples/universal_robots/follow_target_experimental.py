@@ -29,13 +29,9 @@ class UR10FollowTarget:
     This class provides a complete follow target implementation for UR10 robot
     without inheriting from any base classes. It manages the robot, target cube, and
     provides the necessary interface for the simulation.
-
-    Args:
-        name (str, optional): Task name. Defaults to "ur10_follow_target".
-        target_position (Optional[np.ndarray], optional): Target position [x, y, z]. Defaults to None.
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize the UR follow target task."""
 
         # Initialize robot and target references
@@ -45,7 +41,7 @@ class UR10FollowTarget:
     def setup_scene(
         self,
         target_position: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         """Set up the scene with robot, target cube, and environment.
 
         Args:
@@ -54,12 +50,9 @@ class UR10FollowTarget:
 
         # Set default target position if none provided
         if target_position is None:
-            self.target_position = np.array([0.5, 0.0, 0.3])
+            self.target_position = [0.5, 0.0, 0.3]
         else:
-            self.target_position = np.array(target_position)
-
-        # Create a new USD stage with default sunlight lighting
-        stage_utils.create_new_stage(template="sunlight")
+            self.target_position = target_position if isinstance(target_position, list) else list(target_position)
 
         # Add ground plane environment for physics simulation
         ground_plane = stage_utils.add_reference_to_stage(
@@ -78,9 +71,9 @@ class UR10FollowTarget:
         cube_shape = Cube(
             paths="/World/TargetCube",
             positions=self.target_position,
-            orientations=np.array([1, 0, 0, 0]),
+            orientations=[1, 0, 0, 0],
             sizes=[1.0],
-            scales=np.array([0.05, 0.05, 0.05]),  # 5cm cube
+            scales=[0.05, 0.05, 0.05],  # 5cm cube
             reset_xform_op_properties=True,
         )
 
@@ -97,7 +90,7 @@ class UR10FollowTarget:
         if self.target_cube is not None:
             position, _ = self.target_cube.get_world_poses()
             return position.numpy().flatten()
-        return self.target_position
+        return np.array(self.target_position)
 
     def get_robot_end_effector_position(self) -> np.ndarray:
         """Get the current robot end effector position.
@@ -124,7 +117,7 @@ class UR10FollowTarget:
         distance = np.linalg.norm(target_pos - ee_pos)
         return distance < threshold
 
-    def move_to_target(self, ik_method: str = "damped-least-squares") -> None:
+    def move_to_target(self, ik_method: str = "damped-least-squares"):
         """Move the robot end effector towards the target position.
 
         Args:
@@ -134,10 +127,10 @@ class UR10FollowTarget:
             target_pos = self.get_target_position()
             # Use the enhanced UR10Controller's set_end_effector_pose method
             self.robot.set_end_effector_pose(
-                position=target_pos, orientation=np.array([[0.0, 1.0, 0.0, 0.0]]), ik_method=ik_method
+                position=target_pos, orientation=[[0.0, 1.0, 0.0, 0.0]], ik_method=ik_method
             )
 
-    def reset_robot(self) -> None:
+    def reset_robot(self):
         """Reset the robot to its default pose."""
         if self.robot is not None:
             self.robot.reset_to_default_pose()

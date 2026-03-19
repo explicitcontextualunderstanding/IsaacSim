@@ -97,21 +97,33 @@ std::vector<Point> getChildren(Point& point,
 
         // Filter out of bounds
         if (candidate.row < 0)
+        {
             continue;
+        }
         if (candidate.row >= rowCount)
+        {
             continue;
+        }
         if (candidate.column < 0)
+        {
             continue;
+        }
         if (candidate.column >= columnCount)
+        {
             continue;
+        }
 
         // Filter non-freespaceMap
         if (!freespaceMap(candidate.row, candidate.column))
+        {
             continue;
+        }
 
         // Filter visitedMap
         if (visitedMap(candidate.row, candidate.column))
+        {
             continue;
+        }
 
         children.push_back(candidate);
     }
@@ -169,14 +181,14 @@ void generatePaths(py::array_t<int64_t> startPoint,
 
             // Mark distance to start
 
-            double child_distanace_to_start =
+            double childDistanaceToStart =
                 (distanceToStartMapUnchecked(node.point.row, node.point.column) + getDistance(node.point, child));
 
-            distanceToStartMapUnchecked(child.row, child.column) = child_distanace_to_start;
+            distanceToStartMapUnchecked(child.row, child.column) = childDistanaceToStart;
 
             visitedMapUnchecked(child.row, child.column) = true;
 
-            queue.push({ child_distanace_to_start, child });
+            queue.push({ childDistanaceToStart, child });
         }
     }
 }
@@ -194,7 +206,7 @@ std::vector<std::pair<int64_t, int64_t>> unrollPath(py::array_t<int64_t> endPoin
     std::vector<std::pair<int64_t, int64_t>> path;
     std::pair<int64_t, int64_t> point = { endPointUnchecked(0), endPointUnchecked(1) };
 
-    while (1)
+    while (true)
     {
         path.push_back(point);
 

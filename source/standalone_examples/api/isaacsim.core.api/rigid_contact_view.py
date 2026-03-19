@@ -20,10 +20,12 @@ simulation_app = SimulationApp({"headless": False})
 import argparse
 
 import numpy as np
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import GeometryPrim, RigidPrim
+
+torch = import_module("torch")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test", default=False, action="store_true", help="Run in test mode")

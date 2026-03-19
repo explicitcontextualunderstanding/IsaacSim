@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive bin filling demonstration extension that showcases robotic manipulation using a UR10 robot with realistic gripper physics in Isaac Sim."""
+
+
 import asyncio
 import os
 
@@ -25,7 +28,29 @@ from isaacsim.gui.components.ui_utils import btn_builder
 
 
 class BinFillingExtension(omni.ext.IExt):
+    """Extension for the Bin Filling interactive example.
+
+    This extension provides an interactive demonstration of bin filling using a UR10 robot in Isaac Sim.
+    It showcases a realistic surface gripper that can break under heavy bin loads, providing insights into
+    manipulation challenges in industrial automation scenarios.
+
+    The extension registers itself with the examples browser and creates a user interface that allows users
+    to control the bin filling simulation. Users can start the bin filling process and observe how the robot
+    handles different scenarios, including gripper failure conditions.
+
+    The example is designed to teach manipulation concepts and demonstrate realistic physical interactions
+    between robotic systems and objects in a bin filling context.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the Bin Filling extension when it starts up.
+
+        Registers the bin filling example with the browser instance, setting up the UI components
+        and documentation links for the manipulation tutorial.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self.example_name = "Bin Filling"
         self.category = "Manipulation"
 
@@ -50,15 +75,41 @@ class BinFillingExtension(omni.ext.IExt):
         return
 
     def on_shutdown(self):
+        """Cleans up the Bin Filling extension when it shuts down.
+
+        Deregisters the bin filling example from the browser instance to ensure proper cleanup.
+        """
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
         return
 
 
 class BinFillingUI(BaseSampleUITemplate):
+    """User interface for the bin filling example in Isaac Sim.
+
+    Provides an interactive UI for controlling a UR10 robot performing bin filling tasks. The interface includes
+    task controls with a "Start Bin Filling" button that triggers an asynchronous bin filling operation. The UI
+    extends the base sample template to provide a consistent interface experience with additional frames for
+    task-specific controls.
+
+    The interface automatically manages button states, disabling the start button during active operations and
+    re-enabling it after reset or load operations. It integrates with the BinFilling sample class to execute
+    the actual bin filling logic.
+
+    Args:
+        *args: Variable length argument list passed to the parent BaseSampleUITemplate class.
+        **kwargs: Additional keyword arguments passed to the parent class. Typically includes UI configuration
+            parameters such as ext_id, file_path, title, doc_link, overview, and sample instance.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def build_extra_frames(self):
+        """Builds the extra UI frames for the bin filling task control panel.
+
+        Creates a collapsible frame containing task control UI elements with scrollbars
+        for managing bin filling operations.
+        """
         extra_stacks = self.get_extra_frames_handle()
         self.task_ui_elements = {}
 
@@ -76,23 +127,45 @@ class BinFillingUI(BaseSampleUITemplate):
                 self.build_task_controls_ui()
 
     def _on_fill_bin_button_event(self):
+        """Handles the fill bin button click event.
+
+        Triggers the asynchronous bin filling operation and disables the start button
+        to prevent multiple simultaneous operations.
+        """
         asyncio.ensure_future(self.sample.on_fill_bin_event_async())
         self.task_ui_elements["Start Bin Filling"].enabled = False
         return
 
     def post_reset_button_event(self):
+        """Handles post-reset operations for the UI.
+
+        Re-enables the "Start Bin Filling" button after a reset operation.
+        """
         self.task_ui_elements["Start Bin Filling"].enabled = True
         return
 
     def post_load_button_event(self):
+        """Handles post-load operations for the UI.
+
+        Re-enables the "Start Bin Filling" button after a load operation.
+        """
         self.task_ui_elements["Start Bin Filling"].enabled = True
         return
 
     def post_clear_button_event(self):
+        """Handles post-clear operations for the UI.
+
+        Disables the "Start Bin Filling" button after a clear operation.
+        """
         self.task_ui_elements["Start Bin Filling"].enabled = False
         return
 
     def build_task_controls_ui(self):
+        """Builds the task control UI elements.
+
+        Creates the "Start Bin Filling" button with appropriate tooltip and click handler.
+        The button is initially disabled until the scene is properly loaded.
+        """
         with ui.VStack(spacing=5):
 
             dict = {

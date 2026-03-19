@@ -174,7 +174,8 @@ def compose_fabric_transformation_matrix_from_warp_arrays(
         scale[1] = array_scales[index, 1]
         scale[2] = array_scales[index, 2]
     # set transform matrix
-    fabric_matrices[fabric_index] = wp.mat44d(wp.transpose(wp.matrix(position, rotation, scale)))
+    # fabric_matrices[fabric_index] = wp.mat44d(wp.transpose(wp.matrix(position, rotation, scale)))
+    fabric_matrices[fabric_index] = wp.mat44d(wp.transpose(wp.transform_compose(position, rotation, scale)))
 
 
 @wp.func

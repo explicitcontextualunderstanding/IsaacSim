@@ -1,11 +1,56 @@
 # Changelog
+## [1.4.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [1.3.7] - 2026-02-26
+### Changed
+- Migrated behavior scripting dependency from omni.kit.scripting to omni.behavior.scripting.core
+
+## [1.3.6] - 2026-02-21
+### Changed
+- Updated SDG physics based volume filling behavior script to use the omni.physx api
+
+## [1.3.5] - 2026-02-03
+### Changed
+- Update sdg pipeline golden images with new randomization determinism by pausing the timeline before capturing frames
+
+## [1.3.4] - 2026-01-22
+### Changed
+- Increased test tolerances for golden image comparison until randomizations are deterministic
+
+## [1.3.3] - 2026-01-22
+### Changed
+- Disable behavior test output until tests are run
+
+## [1.3.2] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [1.3.1] - 2025-12-16
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [1.3.0] - 2025-12-03
+### Changed
+- Added explicit seed to randomizers to make them deterministic
+- Updated sdg pipeline golden images
+
+## [1.2.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.2.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.1.16] - 2025-09-16
 ### Fixed
 - Added kit update after timeline.stop to fix flaky test due to stage loading status
 
 ## [1.1.15] - 2025-09-15
 ### Changed
-- switched to isaacsim.test.utils for golden image comparison in tests
+- Switched to isaacsim.test.utils for golden image comparison in tests
 
 ## [1.1.14] - 2025-07-17
 ### Changed
@@ -76,7 +121,7 @@
 
 ## [1.0.14] - 2025-04-17
 ### Changed
-- changed add_update_semantics to add_labels
+- Changed add_update_semantics to add_labels
 
 ## [1.0.13] - 2025-04-09
 ### Changed

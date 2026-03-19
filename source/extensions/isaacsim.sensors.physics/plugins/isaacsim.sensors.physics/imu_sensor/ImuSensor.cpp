@@ -76,7 +76,7 @@ ImuSensor::~ImuSensor()
     m_rigidBodyDataBuffer = nullptr;
 }
 
-void ImuSensor::initialize(std::vector<float>* rigidBodyDataBuffer, size_t& dataBufferIndex)
+void ImuSensor::initialize(float* rigidBodyDataBuffer, size_t& dataBufferIndex)
 {
     m_dataBufferIndex = dataBufferIndex;
     m_rigidBodyDataBuffer = rigidBodyDataBuffer;
@@ -185,14 +185,14 @@ void ImuSensor::onPhysicsStep()
         return;
     }
     // vW linear velocity in world frame
-    omni::math::linalg::vec3d vW = omni::math::linalg::vec3d((*m_rigidBodyDataBuffer)[m_dataBufferIndex],
-                                                             (*m_rigidBodyDataBuffer)[m_dataBufferIndex + 1],
-                                                             (*m_rigidBodyDataBuffer)[m_dataBufferIndex + 2]);
+    omni::math::linalg::vec3d vW = omni::math::linalg::vec3d(m_rigidBodyDataBuffer[m_dataBufferIndex],
+                                                             m_rigidBodyDataBuffer[m_dataBufferIndex + 1],
+                                                             m_rigidBodyDataBuffer[m_dataBufferIndex + 2]);
 
     // wW angular velocity in world frame
-    omni::math::linalg::vec3d wW = omni::math::linalg::vec3d((*m_rigidBodyDataBuffer)[m_dataBufferIndex + 3],
-                                                             (*m_rigidBodyDataBuffer)[m_dataBufferIndex + 4],
-                                                             (*m_rigidBodyDataBuffer)[m_dataBufferIndex + 5]);
+    omni::math::linalg::vec3d wW = omni::math::linalg::vec3d(m_rigidBodyDataBuffer[m_dataBufferIndex + 3],
+                                                             m_rigidBodyDataBuffer[m_dataBufferIndex + 4],
+                                                             m_rigidBodyDataBuffer[m_dataBufferIndex + 5]);
 
 
     // Get transformation matrix from body to world

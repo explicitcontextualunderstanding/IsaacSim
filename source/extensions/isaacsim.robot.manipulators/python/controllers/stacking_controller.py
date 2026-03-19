@@ -12,7 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Module providing a stacking controller for manipulating objects in a specified order using a pick and place controller."""
+
+
 import typing
+from typing import List, Optional
 
 import numpy as np
 from isaacsim.core.api.controllers.base_controller import BaseController
@@ -21,13 +26,13 @@ from isaacsim.robot.manipulators.controllers.pick_place_controller import PickPl
 
 
 class StackingController(BaseController):
-    """[summary]
+    """Controller for stacking objects in a specified order.
 
     Args:
-        name (str): [description]
-        pick_place_controller (PickPlaceController): [description]
-        picking_order_cube_names (typing.List[str]): [description]
-        robot_observation_name (str): [description]
+        name: Name identifier for the controller.
+        pick_place_controller: The underlying pick and place controller.
+        picking_order_cube_names: Ordered list of cube names to pick and stack.
+        robot_observation_name: Name key for robot observations in the observation dict.
     """
 
     def __init__(
@@ -36,7 +41,7 @@ class StackingController(BaseController):
         pick_place_controller: PickPlaceController,
         picking_order_cube_names: typing.List[str],
         robot_observation_name: str,
-    ) -> None:
+    ):
         BaseController.__init__(self, name=name)
         self._pick_place_controller = pick_place_controller
         self._picking_order_cube_names = picking_order_cube_names
@@ -50,6 +55,16 @@ class StackingController(BaseController):
         end_effector_orientation: typing.Optional[np.ndarray] = None,
         end_effector_offset: typing.Optional[np.ndarray] = None,
     ) -> ArticulationAction:
+        """Executes the stacking sequence by picking and placing cubes in the specified order.
+
+        Args:
+            observations: Dictionary containing robot and cube observations including positions and joint states.
+            end_effector_orientation: Optional orientation for the end effector during manipulation.
+            end_effector_offset: Optional position offset for the end effector during manipulation.
+
+        Returns:
+            Articulation action containing joint positions for the robot.
+        """
         if self._current_cube >= len(self._picking_order_cube_names):
             target_joint_positions = [None] * observations[self._robot_observation_name]["joint_positions"].shape[0]
             return ArticulationAction(joint_positions=target_joint_positions)
@@ -65,11 +80,11 @@ class StackingController(BaseController):
             self._pick_place_controller.reset()
         return actions
 
-    def reset(self, picking_order_cube_names: typing.Optional[typing.List[str]] = None) -> None:
-        """[summary]
+    def reset(self, picking_order_cube_names: typing.Optional[typing.List[str]] = None):
+        """Reset the controller state and optionally update the picking order.
 
         Args:
-            picking_order_cube_names (typing.Optional[typing.List[str]], optional): [description]. Defaults to None.
+            picking_order_cube_names: New list of cube names to pick in order.
         """
         self._current_cube = 0
         self._pick_place_controller.reset()
@@ -78,10 +93,10 @@ class StackingController(BaseController):
         return
 
     def is_done(self) -> bool:
-        """[summary]
+        """Check if all cubes have been stacked.
 
         Returns:
-            bool: [description]
+            True if all cubes have been stacked, False otherwise.
         """
         if self._current_cube >= len(self._picking_order_cube_names):
             return True

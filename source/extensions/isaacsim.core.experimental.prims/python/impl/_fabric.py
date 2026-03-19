@@ -16,9 +16,7 @@ import usdrt
 import warp as wp
 
 
-def update_fabric_selection(
-    *, stage: usdrt.Usd.Stage, data: dict, device: wp.context.Device, attr: str, count: int
-) -> bool:
+def update_fabric_selection(*, stage: usdrt.Usd.Stage, data: dict, device: wp.Device, attr: str, count: int) -> bool:
     # update selection
     selection = data["selection"]
     if selection is None or device.alias.startswith("cuda"):
@@ -177,4 +175,4 @@ def wk_compose_fabric_transformation_matrix_from_warp_arrays(
         scale[1] = array_scales[index, 1]
         scale[2] = array_scales[index, 2]
     # set transform matrix
-    fabric_matrices[fabric_index] = wp.mat44d(wp.transpose(wp.matrix(position, rotation, scale)))
+    fabric_matrices[fabric_index] = wp.mat44d(wp.transpose(wp.transform_compose(position, rotation, scale)))

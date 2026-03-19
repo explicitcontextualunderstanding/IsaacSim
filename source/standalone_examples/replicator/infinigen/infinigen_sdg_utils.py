@@ -15,13 +15,14 @@
 
 import math
 import os
-import random
 import re
 from itertools import chain
 
+import numpy as np
+import omni.client
 import omni.kit.app
 import omni.kit.commands
-import omni.physx
+import omni.physics.core
 import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
@@ -29,32 +30,6 @@ from isaacsim.core.utils.semantics import add_labels, remove_labels
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path
 from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
-
-
-def set_transform_attributes(
-    prim: Usd.Prim,
-    location: Gf.Vec3d | None = None,
-    orientation: Gf.Quatf | None = None,
-    rotation: Gf.Vec3f | None = None,
-    scale: Gf.Vec3f | None = None,
-) -> None:
-    """Set transformation attributes (location, orientation, rotation, scale) on a prim."""
-    if location is not None:
-        if not prim.HasAttribute("xformOp:translate"):
-            UsdGeom.Xformable(prim).AddTranslateOp()
-        prim.GetAttribute("xformOp:translate").Set(location)
-    if orientation is not None:
-        if not prim.HasAttribute("xformOp:orient"):
-            UsdGeom.Xformable(prim).AddOrientOp()
-        prim.GetAttribute("xformOp:orient").Set(orientation)
-    if rotation is not None:
-        if not prim.HasAttribute("xformOp:rotateXYZ"):
-            UsdGeom.Xformable(prim).AddRotateXYZOp()
-        prim.GetAttribute("xformOp:rotateXYZ").Set(rotation)
-    if scale is not None:
-        if not prim.HasAttribute("xformOp:scale"):
-            UsdGeom.Xformable(prim).AddScaleOp()
-        prim.GetAttribute("xformOp:scale").Set(scale)
 
 
 def add_colliders(root_prim: Usd.Prim, approximation_type: str = "convexHull") -> None:
@@ -75,39 +50,17 @@ def add_colliders(root_prim: Usd.Prim, approximation_type: str = "convexHull") -
             mesh_collision_api.CreateApproximationAttr().Set(approximation_type)
 
 
-def has_colliders(root_prim: Usd.Prim) -> bool:
-    """Check if any descendant prims under the root prim have collision attributes."""
-    for desc_prim in Usd.PrimRange(root_prim):
-        if desc_prim.HasAPI(UsdPhysics.CollisionAPI):
-            return True
-    return False
-
-
-def add_rigid_body_dynamics(prim: Usd.Prim, disable_gravity: bool = False) -> None:
-    """Add rigid body dynamics properties to a prim if it has colliders, with optional gravity setting."""
-    if has_colliders(prim):
-        if not prim.HasAPI(UsdPhysics.RigidBodyAPI):
-            rigid_body_api = UsdPhysics.RigidBodyAPI.Apply(prim)
-        else:
-            rigid_body_api = UsdPhysics.RigidBodyAPI(prim)
-        rigid_body_api.CreateRigidBodyEnabledAttr(True)
-
-        # Apply PhysX rigid body dynamics
-        if not prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI):
-            physx_rigid_body_api = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
-        else:
-            physx_rigid_body_api = PhysxSchema.PhysxRigidBodyAPI(prim)
-        physx_rigid_body_api.GetDisableGravityAttr().Set(disable_gravity)
-    else:
-        print(
-            f"[SDG-Infinigen] Prim '{prim.GetPath()}' has no colliders. Skipping adding rigid body dynamics properties."
-        )
-
-
-def add_colliders_and_rigid_body_dynamics(prim: Usd.Prim, disable_gravity: bool = False) -> None:
-    """Add colliders and rigid body dynamics properties to a prim, with optional gravity setting."""
-    add_colliders(prim)
-    add_rigid_body_dynamics(prim, disable_gravity)
+def add_rigid_body(prim: Usd.Prim, disable_gravity: bool = False, ensure_mass: bool = False) -> None:
+    """Apply rigid body physics, optionally ensuring a valid mass property exists (defaults to 1.0 kg)."""
+    rep.functional.physics.apply_rigid_body(prim, disableGravity=disable_gravity)
+    if not ensure_mass:
+        return
+    if not prim.HasAPI(UsdPhysics.MassAPI):
+        UsdPhysics.MassAPI.Apply(prim)
+    mass_api = UsdPhysics.MassAPI(prim)
+    mass_attr = mass_api.GetMassAttr()
+    if not mass_attr or mass_attr.Get() is None or mass_attr.Get() <= 0:
+        mass_api.CreateMassAttr(1.0)
 
 
 def get_random_pose_on_sphere(
@@ -115,17 +68,21 @@ def get_random_pose_on_sphere(
     radius_range: tuple[float, float],
     polar_angle_range: tuple[float, float],
     camera_forward_axis: tuple[float, float, float] = (0, 0, -1),
+    rng: np.random.Generator = None,
 ) -> tuple[Gf.Vec3d, Gf.Quatf]:
     """Generate a random pose on a sphere looking at the origin, with specified radius and polar angle ranges."""
+    if rng is None:
+        rng = np.random.default_rng()
+
     # https://docs.isaacsim.omniverse.nvidia.com/latest/reference_material/reference_conventions.html
     # Convert degrees to radians for polar angles (theta)
     polar_angle_min_rad = math.radians(polar_angle_range[0])
     polar_angle_max_rad = math.radians(polar_angle_range[1])
 
     # Generate random spherical coordinates
-    radius = random.uniform(radius_range[0], radius_range[1])
-    polar_angle = random.uniform(polar_angle_min_rad, polar_angle_max_rad)
-    azimuthal_angle = random.uniform(0, 2 * math.pi)
+    radius = rng.uniform(radius_range[0], radius_range[1])
+    polar_angle = rng.uniform(polar_angle_min_rad, polar_angle_max_rad)
+    azimuthal_angle = rng.uniform(0, 2 * math.pi)
 
     # Convert spherical coordinates to Cartesian coordinates
     x = radius * math.sin(polar_angle) * math.cos(azimuthal_angle)
@@ -152,25 +109,26 @@ def randomize_camera_poses(
     distance_range: tuple[float, float],
     polar_angle_range: tuple[float, float] = (0, 180),
     look_at_offset: tuple[float, float] = (-0.1, 0.1),
+    rng: np.random.Generator = None,
 ) -> None:
     """Randomize the poses of cameras to look at random targets with adjustable distance and offset."""
     for cam in cameras:
         # Get a random target asset to look at
-        target_asset = random.choice(targets)
+        target_asset = targets[rng.integers(len(targets))]
 
         # Add a look_at offset so the target is not always in the center of the camera view
         target_loc = target_asset.GetAttribute("xformOp:translate").Get()
         target_loc = (
-            target_loc[0] + random.uniform(look_at_offset[0], look_at_offset[1]),
-            target_loc[1] + random.uniform(look_at_offset[0], look_at_offset[1]),
-            target_loc[2] + random.uniform(look_at_offset[0], look_at_offset[1]),
+            target_loc[0] + rng.uniform(look_at_offset[0], look_at_offset[1]),
+            target_loc[1] + rng.uniform(look_at_offset[0], look_at_offset[1]),
+            target_loc[2] + rng.uniform(look_at_offset[0], look_at_offset[1]),
         )
 
         # Generate random camera pose
-        loc, quat = get_random_pose_on_sphere(target_loc, distance_range, polar_angle_range)
+        loc, quat = get_random_pose_on_sphere(target_loc, distance_range, polar_angle_range, rng=rng)
 
         # Set the camera's transform attributes to the generated location and orientation
-        set_transform_attributes(cam, location=loc, orientation=quat)
+        rep.functional.modify.pose(cam, position_value=loc, rotation_value=quat)
 
 
 def get_usd_paths_from_folder(
@@ -181,17 +139,13 @@ def get_usd_paths_from_folder(
         usd_paths = []
     skip_keywords = skip_keywords or []
 
-    # Make sure the omni.client extension is enabled
-    import omni.kit.app
-
     ext_manager = omni.kit.app.get_app().get_extension_manager()
     if not ext_manager.is_extension_enabled("omni.client"):
         ext_manager.set_extension_enabled_immediate("omni.client", True)
-    import omni.client
 
     result, entries = omni.client.list(folder_path)
     if result != omni.client.Result.OK:
-        print(f"[SDG-Infinigen] Could not list assets in path: {folder_path}")
+        print(f"[SDG] Error: Could not list assets in path: {folder_path}")
         return usd_paths
 
     for entry in entries:
@@ -212,6 +166,21 @@ def get_usd_paths(
     files: list[str] = None, folders: list[str] = None, skip_folder_keywords: list[str] = None
 ) -> list[str]:
     """Retrieve USD paths from specified files and folders, optionally filtering out specific folder keywords."""
+
+    def resolve_path(path: str, assets_root: str, is_folder: bool = False) -> str:
+        """Resolve path to full URL: remote URLs and existing local paths used as-is, otherwise prefixed with assets_root."""
+        # Remote URLs - use as-is
+        if path.startswith(("omniverse://", "http://", "https://", "file://")):
+            return path
+        # Windows absolute path (e.g., C:\path or C:/path) - use as-is
+        if len(path) > 2 and path[1] == ":" and path[2] in ("/", "\\"):
+            return path
+        # Local absolute path that exists - use as-is
+        if path.startswith("/") and (os.path.isfile(path) or (is_folder and os.path.isdir(path))):
+            return path
+        # Nucleus relative path - prepend assets root
+        return assets_root + path
+
     files = files or []
     folders = folders or []
     skip_folder_keywords = skip_folder_keywords or []
@@ -220,20 +189,11 @@ def get_usd_paths(
     env_paths = []
 
     for file_path in files:
-        file_path = (
-            file_path
-            if file_path.startswith(("omniverse://", "http://", "https://", "file://"))
-            else assets_root_path + file_path
-        )
-        env_paths.append(file_path)
+        env_paths.append(resolve_path(file_path, assets_root_path, is_folder=False))
 
     for folder_path in folders:
-        folder_path = (
-            folder_path
-            if folder_path.startswith(("omniverse://", "http://", "https://", "file://"))
-            else assets_root_path + folder_path
-        )
-        env_paths.extend(get_usd_paths_from_folder(folder_path, recursive=True, skip_keywords=skip_folder_keywords))
+        resolved_folder = resolve_path(folder_path, assets_root_path, is_folder=True)
+        env_paths.extend(get_usd_paths_from_folder(resolved_folder, recursive=True, skip_keywords=skip_folder_keywords))
 
     return env_paths
 
@@ -313,59 +273,77 @@ def setup_env(root_path: str | None = None, approximation_type: str = "none", hi
     if table_prim is not None:
         add_colliders(table_prim, approximation_type="boundingCube")
     else:
-        print("[SDG-Infinigen] Could not find dining table prim in the environment.")
+        print("[SDG] Warning: Could not find dining table prim in the environment")
 
 
 def create_shape_distractors(
-    num_distractors: int, shape_types: list[str], root_path: str, gravity_disabled_chance: float
+    num_distractors: int,
+    shape_types: list[str],
+    root_path: str,
+    gravity_disabled_chance: float,
+    rng: np.random.Generator = None,
 ) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Create shape distractors with optional gravity settings, returning lists of floating and falling shapes."""
+    if rng is None:
+        rng = np.random.default_rng()
     stage = omni.usd.get_context().get_stage()
     floating_shapes = []
     falling_shapes = []
     for _ in range(num_distractors):
-        rand_shape = random.choice(shape_types)
-        disable_gravity = random.random() < gravity_disabled_chance
+        rand_shape = shape_types[rng.integers(len(shape_types))]
+        disable_gravity = rng.random() < gravity_disabled_chance
         name_prefix = "floating_" if disable_gravity else "falling_"
         prim_path = omni.usd.get_stage_next_free_path(stage, f"{root_path}/{name_prefix}{rand_shape}", False)
         prim = stage.DefinePrim(prim_path, rand_shape.capitalize())
-        add_colliders_and_rigid_body_dynamics(prim, disable_gravity=disable_gravity)
+        add_colliders(prim)
+        add_rigid_body(prim, disable_gravity=disable_gravity, ensure_mass=True)
         (floating_shapes if disable_gravity else falling_shapes).append(prim)
     return floating_shapes, falling_shapes
 
 
-def load_shape_distractors(shape_distractors_config: dict) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
+def load_shape_distractors(
+    shape_distractors_config: dict, rng: np.random.Generator = None
+) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Load shape distractors based on configuration, returning lists of floating and falling shapes."""
     num_shapes = shape_distractors_config.get("num", 0)
     shape_types = shape_distractors_config.get("shape_types", ["capsule", "cone", "cylinder", "sphere", "cube"])
     shape_gravity_disabled_chance = shape_distractors_config.get("gravity_disabled_chance", 0.0)
-    return create_shape_distractors(num_shapes, shape_types, "/Distractors", shape_gravity_disabled_chance)
+    return create_shape_distractors(num_shapes, shape_types, "/Distractors", shape_gravity_disabled_chance, rng)
 
 
 def create_mesh_distractors(
-    num_distractors: int, mesh_urls: list[str], root_path: str, gravity_disabled_chance: float
+    num_distractors: int,
+    mesh_urls: list[str],
+    root_path: str,
+    gravity_disabled_chance: float,
+    rng: np.random.Generator = None,
 ) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Create mesh distractors from specified URLs with optional gravity settings."""
+    if rng is None:
+        rng = np.random.default_rng()
     stage = omni.usd.get_context().get_stage()
     floating_meshes = []
     falling_meshes = []
     for _ in range(num_distractors):
-        rand_mesh_url = random.choice(mesh_urls)
-        disable_gravity = random.random() < gravity_disabled_chance
+        rand_mesh_url = mesh_urls[rng.integers(len(mesh_urls))]
+        disable_gravity = rng.random() < gravity_disabled_chance
         name_prefix = "floating_" if disable_gravity else "falling_"
         prim_name = os.path.basename(rand_mesh_url).split(".")[0]
         prim_path = omni.usd.get_stage_next_free_path(stage, f"{root_path}/{name_prefix}{prim_name}", False)
         try:
             prim = add_reference_to_stage(usd_path=rand_mesh_url, prim_path=prim_path)
         except Exception as e:
-            print(f"[SDG-Infinigen] Failed to load mesh distractor reference {rand_mesh_url} with exception: {e}")
+            print(f"[SDG] Error: Failed to load mesh distractor '{rand_mesh_url}': {e}")
             continue
-        add_colliders_and_rigid_body_dynamics(prim, disable_gravity=disable_gravity)
+        add_colliders(prim)
+        add_rigid_body(prim, disable_gravity=disable_gravity, ensure_mass=True)
         (floating_meshes if disable_gravity else falling_meshes).append(prim)
     return floating_meshes, falling_meshes
 
 
-def load_mesh_distractors(mesh_distractors_config: dict) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
+def load_mesh_distractors(
+    mesh_distractors_config: dict, rng: np.random.Generator = None
+) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Load mesh distractors based on configuration, returning lists of floating and falling meshes."""
     num_meshes = mesh_distractors_config.get("num", 0)
     mesh_gravity_disabled_chance = mesh_distractors_config.get("gravity_disabled_chance", 0.0)
@@ -375,7 +353,7 @@ def load_mesh_distractors(mesh_distractors_config: dict) -> tuple[list[Usd.Prim]
         files=mesh_files, folders=mesh_folders, skip_folder_keywords=["material", "texture", ".thumbs"]
     )
     floating_meshes, falling_meshes = create_mesh_distractors(
-        num_meshes, mesh_urls, "/Distractors", mesh_gravity_disabled_chance
+        num_meshes, mesh_urls, "/Distractors", mesh_gravity_disabled_chance, rng
     )
     for prim in chain(floating_meshes, falling_meshes):
         remove_labels(prim, include_descendants=True)
@@ -389,14 +367,17 @@ def create_auto_labeled_assets(
     regex_replace_pattern: str,
     regex_replace_repl: str,
     gravity_disabled_chance: float,
+    rng: np.random.Generator = None,
 ) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Create assets with automatic labels, applying optional gravity settings."""
+    if rng is None:
+        rng = np.random.default_rng()
     stage = omni.usd.get_context().get_stage()
     floating_assets = []
     falling_assets = []
     for _ in range(num_assets):
-        asset_url = random.choice(asset_urls)
-        disable_gravity = random.random() < gravity_disabled_chance
+        asset_url = asset_urls[rng.integers(len(asset_urls))]
+        disable_gravity = rng.random() < gravity_disabled_chance
         name_prefix = "floating_" if disable_gravity else "falling_"
         basename = os.path.basename(asset_url)
         name_without_ext = os.path.splitext(basename)[0]
@@ -405,16 +386,19 @@ def create_auto_labeled_assets(
         try:
             prim = add_reference_to_stage(usd_path=asset_url, prim_path=prim_path)
         except Exception as e:
-            print(f"[SDG-Infinigen] Failed to load mesh distractor reference {asset_url} with exception: {e}")
+            print(f"[SDG] Error: Failed to load asset '{asset_url}': {e}")
             continue
-        add_colliders_and_rigid_body_dynamics(prim, disable_gravity=disable_gravity)
+        add_colliders(prim)
+        add_rigid_body(prim, disable_gravity=disable_gravity, ensure_mass=True)
         remove_labels(prim, include_descendants=True)
         add_labels(prim, labels=[label], instance_name="class")
         (floating_assets if disable_gravity else falling_assets).append(prim)
     return floating_assets, falling_assets
 
 
-def load_auto_labeled_assets(auto_label_config: dict) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
+def load_auto_labeled_assets(
+    auto_label_config: dict, rng: np.random.Generator = None
+) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Load auto-labeled assets based on configuration, returning lists of floating and falling assets."""
     num_assets = auto_label_config.get("num", 0)
     gravity_disabled_chance = auto_label_config.get("gravity_disabled_chance", 0.0)
@@ -432,13 +416,21 @@ def load_auto_labeled_assets(auto_label_config: dict) -> tuple[list[Usd.Prim], l
         regex_replace_pattern,
         regex_replace_repl,
         gravity_disabled_chance,
+        rng,
     )
 
 
 def create_labeled_assets(
-    num_assets: int, asset_url: str, label: str, root_path: str, gravity_disabled_chance: float
+    num_assets: int,
+    asset_url: str,
+    label: str,
+    root_path: str,
+    gravity_disabled_chance: float,
+    rng: np.random.Generator = None,
 ) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Create labeled assets with optional gravity settings, returning lists of floating and falling assets."""
+    if rng is None:
+        rng = np.random.default_rng()
     stage = omni.usd.get_context().get_stage()
     assets_root_path = get_assets_root_path()
     asset_url = (
@@ -449,19 +441,22 @@ def create_labeled_assets(
     floating_assets = []
     falling_assets = []
     for _ in range(num_assets):
-        disable_gravity = random.random() < gravity_disabled_chance
+        disable_gravity = rng.random() < gravity_disabled_chance
         name_prefix = "floating_" if disable_gravity else "falling_"
         prim_path = omni.usd.get_stage_next_free_path(stage, f"{root_path}/{name_prefix}{label}", False)
 
         prim = add_reference_to_stage(usd_path=asset_url, prim_path=prim_path)
-        add_colliders_and_rigid_body_dynamics(prim, disable_gravity=disable_gravity)
+        add_colliders(prim)
+        add_rigid_body(prim, disable_gravity=disable_gravity, ensure_mass=True)
         remove_labels(prim, include_descendants=True)
         add_labels(prim, labels=[label], instance_name="class")
         (floating_assets if disable_gravity else falling_assets).append(prim)
     return floating_assets, falling_assets
 
 
-def load_manual_labeled_assets(manual_labeled_assets_config: list[dict]) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
+def load_manual_labeled_assets(
+    manual_labeled_assets_config: list[dict], rng: np.random.Generator = None
+) -> tuple[list[Usd.Prim], list[Usd.Prim]]:
     """Load manually labeled assets based on configuration, returning lists of floating and falling assets."""
     labeled_floating_assets = []
     labeled_falling_assets = []
@@ -476,6 +471,7 @@ def load_manual_labeled_assets(manual_labeled_assets_config: list[dict]) -> tupl
             asset_label,
             "/Assets",
             gravity_disabled_chance,
+            rng,
         )
         labeled_floating_assets.extend(floating_assets)
         labeled_falling_assets.extend(falling_assets)
@@ -500,14 +496,14 @@ def get_matching_prim_location(match_string, root_path=None):
         match_strings=[match_string], root_path=root_path, prim_type="Xform", first_match_only=True
     )
     if prim is None:
-        print(f"[SDG-Infinigen] Could not find matching prim, returning (0, 0, 0)")
+        print("[SDG] Warning: Could not find matching prim, returning (0, 0, 0)")
         return (0, 0, 0)
     if prim.HasAttribute("xformOp:translate"):
         return prim.GetAttribute("xformOp:translate").Get()
     elif prim.HasAttribute("xformOp:transform"):
         return prim.GetAttribute("xformOp:transform").Get().ExtractTranslation()
     else:
-        print(f"[SDG-Infinigen] Could not find location attribute for '{prim.GetPath()}', returning (0, 0, 0)")
+        print(f"[SDG] Warning: Could not find location attribute for '{prim.GetPath()}', returning (0, 0, 0)")
         return (0, 0, 0)
 
 
@@ -530,21 +526,99 @@ def randomize_poses(
     location_range: tuple[float, float, float, float, float, float],
     rotation_range: tuple[float, float],
     scale_range: tuple[float, float],
+    rng: np.random.Generator = None,
 ) -> None:
     """Randomize the location, rotation, and scale of a list of prims within specified ranges."""
+    if rng is None:
+        rng = np.random.default_rng()
     for prim in prims:
         rand_loc = (
-            random.uniform(location_range[0], location_range[3]),
-            random.uniform(location_range[1], location_range[4]),
-            random.uniform(location_range[2], location_range[5]),
+            rng.uniform(location_range[0], location_range[3]),
+            rng.uniform(location_range[1], location_range[4]),
+            rng.uniform(location_range[2], location_range[5]),
         )
         rand_rot = (
-            random.uniform(rotation_range[0], rotation_range[1]),
-            random.uniform(rotation_range[0], rotation_range[1]),
-            random.uniform(rotation_range[0], rotation_range[1]),
+            rng.uniform(rotation_range[0], rotation_range[1]),
+            rng.uniform(rotation_range[0], rotation_range[1]),
+            rng.uniform(rotation_range[0], rotation_range[1]),
         )
-        rand_scale = random.uniform(scale_range[0], scale_range[1])
-        set_transform_attributes(prim, location=rand_loc, rotation=rand_rot, scale=(rand_scale, rand_scale, rand_scale))
+        rand_scale = rng.uniform(scale_range[0], scale_range[1])
+        rep.functional.modify.pose(prim, position_value=rand_loc, rotation_value=rand_rot, scale_value=rand_scale)
+
+
+def get_or_create_physx_scene(prim_path: str = "/PhysicsScene") -> PhysxSchema.PhysxSceneAPI:
+    """Get the existing PhysX scene or create a new one at the given prim path.
+
+    Searches the current stage for an existing UsdPhysics.Scene prim. If found, applies
+    and returns the PhysxSceneAPI on it. If not found, creates a new physics scene at the
+    given prim path and returns the PhysxSceneAPI.
+
+    Args:
+        prim_path: The prim path to create a new physics scene at if none exists.
+
+    Returns:
+        The PhysxSceneAPI applied to the physics scene prim.
+    """
+    stage = omni.usd.get_context().get_stage()
+    for prim in stage.Traverse():
+        if prim.IsA(UsdPhysics.Scene):
+            return PhysxSchema.PhysxSceneAPI.Apply(prim)
+
+    UsdPhysics.Scene.Define(stage, prim_path)
+    return PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath(prim_path))
+
+
+# Default GPU collision stack size for the infinigen SDG pipeline (300 MB).
+# The PhysX default (64 MB) is insufficient for scenes with many colliders (e.g. 30+ shape
+# distractors, 10+ mesh distractors, labeled assets, and environment collision meshes).
+# The error message from PhysX recommends at least ~272 MB for a typical infinigen scene,
+# so 300 MB provides a comfortable margin.
+INFINIGEN_DEFAULT_GPU_COLLISION_STACK_SIZE = 314572800
+
+
+def configure_physics_scene(physics_config: dict | None = None) -> None:
+    """Configure the PhysX scene GPU memory settings for the infinigen SDG pipeline.
+
+    This must be called before running any physics simulation. It sets the GPU collision
+    stack size and other GPU memory parameters on the PhysX scene to prevent buffer overflow
+    errors when simulating complex scenes with many colliders.
+
+    Args:
+        physics_config: Optional dictionary with physics configuration overrides.
+            Supported keys (all optional):
+            - gpu_collision_stack_size (int): GPU collision stack size in bytes.
+              Defaults to INFINIGEN_DEFAULT_GPU_COLLISION_STACK_SIZE (300 MB).
+            - gpu_found_lost_pairs_capacity (int): GPU found/lost pairs capacity.
+            - gpu_found_lost_aggregate_pairs_capacity (int): GPU found/lost aggregate pairs capacity.
+            - gpu_total_aggregate_pairs_capacity (int): GPU total aggregate pairs capacity.
+            - gpu_max_rigid_contact_count (int): Maximum rigid body contact count on GPU.
+            - gpu_max_rigid_patch_count (int): Maximum rigid body contact patches on GPU.
+            - gpu_heap_capacity (int): GPU heap capacity in bytes.
+            - gpu_temp_buffer_capacity (int): GPU temporary buffer capacity in bytes.
+    """
+    physics_config = physics_config or {}
+    physx_scene = get_or_create_physx_scene()
+
+    gpu_collision_stack_size = physics_config.get(
+        "gpu_collision_stack_size", INFINIGEN_DEFAULT_GPU_COLLISION_STACK_SIZE
+    )
+    physx_scene.GetGpuCollisionStackSizeAttr().Set(gpu_collision_stack_size)
+
+    # Apply other GPU memory settings if provided
+    gpu_settings_map = {
+        "gpu_found_lost_pairs_capacity": physx_scene.GetGpuFoundLostPairsCapacityAttr,
+        "gpu_found_lost_aggregate_pairs_capacity": physx_scene.GetGpuFoundLostAggregatePairsCapacityAttr,
+        "gpu_total_aggregate_pairs_capacity": physx_scene.GetGpuTotalAggregatePairsCapacityAttr,
+        "gpu_max_rigid_contact_count": physx_scene.GetGpuMaxRigidContactCountAttr,
+        "gpu_max_rigid_patch_count": physx_scene.GetGpuMaxRigidPatchCountAttr,
+        "gpu_heap_capacity": physx_scene.GetGpuHeapCapacityAttr,
+        "gpu_temp_buffer_capacity": physx_scene.GetGpuTempBufferCapacityAttr,
+    }
+    for key, attr_getter in gpu_settings_map.items():
+        if key in physics_config:
+            attr_getter().Set(physics_config[key])
+
+    print(f"[SDG] Configured PhysX scene GPU collision stack size: {gpu_collision_stack_size} bytes")
 
 
 def run_simulation(num_frames: int, render: bool = True) -> None:
@@ -561,27 +635,16 @@ def run_simulation(num_frames: int, render: bool = True) -> None:
         timeline.pause()
     else:
         # Run the physics simulation steps without advancing the app
-        stage = omni.usd.get_context().get_stage()
-        physx_scene = None
-
-        # Search for or create a physics scene
-        for prim in stage.Traverse():
-            if prim.IsA(UsdPhysics.Scene):
-                physx_scene = PhysxSchema.PhysxSceneAPI.Apply(prim)
-                break
-
-        if physx_scene is None:
-            physics_scene = UsdPhysics.Scene.Define(stage, "/PhysicsScene")
-            physx_scene = PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/PhysicsScene"))
+        physx_scene = get_or_create_physx_scene()
 
         # Get simulation parameters
         physx_dt = 1 / physx_scene.GetTimeStepsPerSecondAttr().Get()
-        physx_sim_interface = omni.physx.get_physx_simulation_interface()
+        physics_sim_interface = omni.physics.core.get_physics_simulation_interface()
 
         # Run physics simulation for each frame
         for _ in range(num_frames):
-            physx_sim_interface.simulate(physx_dt, 0)
-            physx_sim_interface.fetch_results()
+            physics_sim_interface.simulate(physx_dt, 0)
+            physics_sim_interface.fetch_results()
 
 
 def register_dome_light_randomizer() -> None:
@@ -616,30 +679,33 @@ def randomize_lights(
     location_range: tuple[float, float, float, float, float, float] | None = None,
     color_range: tuple[float, float, float, float, float, float] | None = None,
     intensity_range: tuple[float, float] | None = None,
+    rng: np.random.Generator = None,
 ) -> None:
     """Randomize location, color, and intensity of specified lights within given ranges."""
+    if rng is None:
+        rng = np.random.default_rng()
     for light in lights:
         # Randomize the location of the light
         if location_range is not None:
             rand_loc = (
-                random.uniform(location_range[0], location_range[3]),
-                random.uniform(location_range[1], location_range[4]),
-                random.uniform(location_range[2], location_range[5]),
+                rng.uniform(location_range[0], location_range[3]),
+                rng.uniform(location_range[1], location_range[4]),
+                rng.uniform(location_range[2], location_range[5]),
             )
-            set_transform_attributes(light, location=rand_loc)
+            rep.functional.modify.pose(light, position_value=rand_loc)
 
         # Randomize the color of the light
         if color_range is not None:
             rand_color = (
-                random.uniform(color_range[0], color_range[3]),
-                random.uniform(color_range[1], color_range[4]),
-                random.uniform(color_range[2], color_range[5]),
+                rng.uniform(color_range[0], color_range[3]),
+                rng.uniform(color_range[1], color_range[4]),
+                rng.uniform(color_range[2], color_range[5]),
             )
             light.GetAttribute("inputs:color").Set(rand_color)
 
         # Randomize the intensity of the light
         if intensity_range is not None:
-            rand_intensity = random.uniform(intensity_range[0], intensity_range[1])
+            rand_intensity = rng.uniform(intensity_range[0], intensity_range[1])
             light.GetAttribute("inputs:intensity").Set(rand_intensity)
 
 
@@ -647,13 +713,13 @@ def setup_writer(config: dict) -> None:
     """Setup a writer based on configuration settings, initializing with specified arguments."""
     writer_type = config.get("type", None)
     if writer_type is None:
-        print("[Infinigen-SDG] No writer type specified. No writer will be used.")
+        print("[SDG] Warning: No writer type specified, skipping writer setup")
         return None
 
     try:
         writer = rep.writers.get(writer_type)
     except Exception as e:
-        print(f"[Infinigen-SDG] Writer type '{writer_type}' not found. No writer will be used. Error: {e}")
+        print(f"[SDG] Error: Writer type '{writer_type}' not found: {e}")
         return None
 
     writer_kwargs = config.get("kwargs", {})

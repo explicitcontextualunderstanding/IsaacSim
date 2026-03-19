@@ -14,7 +14,9 @@
 # limitations under the License.
 
 from .articulation import Articulation
+from .buffer_dtype import BufferDtype
 from .deformable_prim import DeformablePrim
+from .extension import Extension
 from .geom_prim import GeomPrim
 from .prim import Prim
 from .rigid_prim import RigidPrim

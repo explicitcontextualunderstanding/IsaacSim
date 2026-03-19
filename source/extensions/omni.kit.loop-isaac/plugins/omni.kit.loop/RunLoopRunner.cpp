@@ -26,6 +26,7 @@
 #include <carb/settings/SettingsUtils.h>
 #include <carb/tasking/TaskingUtils.h>
 #include <carb/thread/Mutex.h>
+#include <carb/thread/SetName.h>
 
 #include <omni/ext/IExt.h>
 #include <omni/extras/DictHelpers.h>
@@ -328,15 +329,31 @@ public:
 
         if (usingEventAdapter)
         {
-            static const RStringKey kDt("dt");
-            static const RStringKey kSWHFrameNumber("SWHFrameNumber");
+            static constexpr size_t kMaxParameters = 3; // 'dt', 'kSWHFrameNumber' +  'SWHExternalSimulationTime'
 
-            carb::eventdispatcher::NamedVariant params[2] = { { kDt, carb::variant::Variant(dt) } };
+            static const RStringKey kDt("dt");
+            carb::eventdispatcher::NamedVariant params[kMaxParameters] = { { kDt, carb::variant::Variant(dt) } };
             size_t numParams = 1;
 
             if (mainThread)
             {
+                static const RStringKey kSWHFrameNumber("SWHFrameNumber");
+                CARB_CHECK(numParams < kMaxParameters);
                 params[numParams++] = { kSWHFrameNumber, carb::variant::Variant(m_runloopIterationCount) };
+
+                // In multi-tick rendering mode, the app is expected to set an explicit simulation time
+                // which is picked up by both SWH and the renderer to schedule sensors to be renderered
+                auto settings = getCachedInterface<settings::ISettings>();
+                if (settings && settings->getAsBool("/rtx/hydra/supportMultiTickRate"))
+                {
+                    if (m_nextSimulationTime >= 0.0)
+                    {
+                        static const RStringKey kSWHExternalSimulationTimeParam("SWHExternalSimulationTime");
+                        params[numParams++] = { kSWHExternalSimulationTimeParam,
+                                                carb::variant::Variant(m_nextSimulationTime) };
+                    }
+                }
+
                 std::sort(params, params + numParams, carb::eventdispatcher::detail::NamedVariantLess{});
             }
 
@@ -532,7 +549,10 @@ public:
     {
         return m_deltaTime;
     }
-
+    void setNextSimulationTime(double simulationTime)
+    {
+        m_nextSimulationTime = simulationTime;
+    }
 
 private:
     void _initialize()
@@ -598,6 +618,9 @@ private:
     int64_t m_runloopIterationCount;
 
     PrecisionSleep m_windowsSleep;
+
+    // < 0.0 means we won't use this value and fallback to the runloop frame frame based time
+    double m_nextSimulationTime = -1.0;
 };
 
 // Use a transparent compare struct so we can compare against char* without having to construct a std::string
@@ -656,11 +679,11 @@ public:
     {
         std::unique_lock lock(m_mutex);
 
-        if (!m_usingEventAdapter)
+        if (!m_usingEventAdapter.has_value())
         {
             m_usingEventAdapter = carb::cpp::string_view("RunLoop.update") != loop->update->getName();
         }
-        if (!m_usingMessageBusEventAdapter)
+        if (!m_usingMessageBusEventAdapter.has_value())
         {
             m_usingMessageBusEventAdapter = carb::cpp::string_view("RunLoop.messageBus") != loop->messageBus->getName();
         }
@@ -805,82 +828,74 @@ private:
 
     bool m_started = false;
 
-
     carb::cpp::optional<bool> m_usingEventAdapter, m_usingMessageBusEventAdapter;
     RunLoopThread* m_mainThread = nullptr;
     carb::thread::mutex m_mutex;
 };
 
-static void SetManualStepSize(const double dt, const std::string& name = "")
+template <typename Lambda>
+static void callForRunLoop(const std::string& name, Lambda&& func, bool stopOnFirstMatch = false)
 {
     for (auto& l : m_runLoops)
     {
-        if (name.compare("") != 0)
+        if (name.length())
         {
             if (l.first.compare(name) == 0)
             {
-                l.second.setManualStepSize(dt);
+                func(l.second);
+                if (stopOnFirstMatch)
+                {
+                    break;
+                }
             }
         }
         else
         {
-            l.second.setManualStepSize(dt);
+            func(l.second);
+            if (stopOnFirstMatch)
+            {
+                break;
+            }
         }
     }
+}
+
+static void SetManualStepSize(const double dt, const std::string& name = "")
+{
+    callForRunLoop(name, [dt](RunLoopThread& runloop) { runloop.setManualStepSize(dt); });
 }
 static void SetManualMode(const bool enabled, const std::string& name = "")
 {
-    for (auto& l : m_runLoops)
+    if (m_runLoops.size() == 0)
     {
-        if (name.compare("") != 0)
+        auto settings = getCachedInterface<settings::ISettings>();
+        if (settings)
         {
-            if (l.first.compare(name) == 0)
-            {
-                l.second.setManualMode(enabled);
-            }
+            settings->setBool("/app/runLoops/main/manualModeEnabled", enabled);
         }
-        else
-        {
-            l.second.setManualMode(enabled);
-        }
+        return;
     }
+    callForRunLoop(name, [enabled](RunLoopThread& runloop) { runloop.setManualMode(enabled); });
 }
 static double GetManualStepSize(const std::string& name = "")
 {
-    for (auto& l : m_runLoops)
-    {
-        if (name.compare("") != 0)
-        {
-            if (l.first.compare(name) == 0)
-            {
-                return l.second.getManualStepSize();
-            }
-        }
-        else
-        {
-            return l.second.getManualStepSize();
-        }
-    }
-    return 0;
+    double manualStepSize = 0.0;
+    callForRunLoop(
+        name, [&manualStepSize](RunLoopThread& runloop) { manualStepSize = runloop.getManualStepSize(); }, true);
+    return manualStepSize;
 }
 
 static bool GetManualMode(const std::string& name = "")
 {
-    for (auto& l : m_runLoops)
-    {
-        if (name.compare("") != 0)
-        {
-            if (l.first.compare(name) == 0)
-            {
-                return l.second.getManualMode();
-            }
-        }
-        else
-        {
-            return l.second.getManualMode();
-        }
-    }
-    return false;
+    bool manualMode = false;
+    callForRunLoop(
+        name, [&manualMode](RunLoopThread& runloop) { manualMode = runloop.getManualMode(); }, true);
+    return manualMode;
+}
+
+static void SetNextSimulationTime(const double simulationTime, const std::string& name)
+{
+    callForRunLoop(name, [simulationTime](RunLoopThread& runloop) { runloop.setNextSimulationTime(simulationTime); });
 }
 
 
@@ -921,6 +936,7 @@ void fillInterface(omni::kit::IRunLoopRunnerImpl& iface)
     iface.setManualStepSize = SetManualStepSize;
     iface.getManualMode = GetManualMode;
     iface.getManualStepSize = GetManualStepSize;
+    iface.setNextSimulationTime = SetNextSimulationTime;
 }
 
 void fillInterface(omni::kit::IExtensionPluginImpl& iface)

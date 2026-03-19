@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Defines geometric data types for 2D and 3D spatial representations used in mobility generation."""
+
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -21,16 +24,40 @@ import numpy as np
 
 @dataclass
 class Point2d:
+    """Point2d(x: float, y: float)
+
+    Args:
+        x: The x-coordinate of the point.
+        y: The y-coordinate of the point.
+    """
+
     x: float
     y: float
 
 
 @dataclass
 class Pose2d(Point2d):
+    """A 2D pose representation with position and orientation.
+
+    Inherits from Point2d and adds rotation angle.
+
+    Args:
+        x: X coordinate position.
+        y: Y coordinate position.
+        theta: Rotation angle in radians.
+    """
+
     theta: float
 
 
 @dataclass
 class Pose3d:
+    """Pose3d(position: numpy.ndarray, orientation: numpy.ndarray)
+
+    Args:
+        position: The 3D position as a numpy array.
+        orientation: The 3D orientation as a numpy array.
+    """
+
     position: np.ndarray
     orientation: np.ndarray

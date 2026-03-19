@@ -14,4 +14,7 @@
 # limitations under the License.
 
 
+"""Collection of test modules for Isaac Sim testing framework."""
+
+
 scan_for_test_modules = True

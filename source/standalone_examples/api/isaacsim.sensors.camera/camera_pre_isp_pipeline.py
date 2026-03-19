@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import os
 
@@ -12,15 +27,14 @@ from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": True})
 
-import isaacsim.core.utils.numpy.rotations as rot_utils
 import numpy as np
 import omni.graph.core as og
-from isaacsim.core.api.objects import VisualCuboid
+from isaacsim.core.experimental.materials import OmniPbrMaterial
+from isaacsim.core.experimental.objects import Cube, DomeLight
+from isaacsim.core.experimental.utils.transform import euler_angles_to_quaternion
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.stage import get_current_stage
 from isaacsim.sensors.camera import Camera
 from omni.syntheticdata import SyntheticData, SyntheticDataStage
-from pxr import UsdLux
 
 # Enable omni.sensors.nv.camera extension
 enable_extension("omni.sensors.nv.camera")
@@ -30,16 +44,18 @@ output_dir = args.output_dir
 os.makedirs(output_dir, exist_ok=True)
 
 # Set up environment (light and cubes)
-dome_light_path = "/World/DomeLight"
-dome_light = UsdLux.DomeLight.Define(get_current_stage(), dome_light_path)
-dome_light.CreateIntensityAttr(1000)
+dome_light = DomeLight("/World/DomeLight")
+dome_light.set_intensities(1000)
 
-cube_left = VisualCuboid(
-    prim_path="/World/Cube_left", position=np.array([-1.5, 0.0, 0.5]), color=np.array([1.0, 0.0, 0.0])
-)
-cube_right = VisualCuboid(
-    prim_path="/World/Cube_right", position=np.array([1.5, 0.0, 0.5]), color=np.array([0.0, 1.0, 0.0])
-)
+cube_left = Cube("/World/Cube_left", sizes=1.0, positions=np.array([-1.5, 0.0, 0.5]))
+cube_left_material = OmniPbrMaterial("/World/Materials/cube_left")
+cube_left_material.set_input_values("diffuse_color_constant", [1.0, 0.0, 0.0])
+cube_left.apply_visual_materials(cube_left_material)
+
+cube_right = Cube("/World/Cube_right", sizes=1.0, positions=np.array([1.5, 0.0, 0.5]))
+cube_right_material = OmniPbrMaterial("/World/Materials/cube_right")
+cube_right_material.set_input_values("diffuse_color_constant", [0.0, 1.0, 0.0])
+cube_right.apply_visual_materials(cube_right_material)
 
 # Create camera and attach render product
 width, height = 640, 480
@@ -49,7 +65,7 @@ camera = Camera(
     prim_path="/World/Camera",
     position=camera_position,
     resolution=(width, height),
-    orientation=rot_utils.euler_angles_to_quats(camera_rotation_as_euler, degrees=True),
+    orientation=euler_angles_to_quaternion(camera_rotation_as_euler, degrees=True, extrinsic=False).numpy(),
 )
 camera.set_focal_length(1.5)
 camera.initialize()

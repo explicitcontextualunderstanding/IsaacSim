@@ -17,13 +17,13 @@ import typing
 
 # python
 import numpy as np
-import omni.physx
+
+# omniverse
+import omni.physics.core
 
 # isaacsim
 from isaacsim.core.utils.stage import get_current_stage
-
-# omniverse
-from pxr import Gf, UsdGeom
+from pxr import Gf, PhysicsSchemaTools, UsdGeom
 
 
 def ray_cast(
@@ -54,9 +54,9 @@ def ray_cast(
     origin = (trans[0], trans[1], trans[2])
     ray_dir = (direction[0], direction[1], direction[2])
 
-    hit = omni.physx.get_physx_scene_query_interface().raycast_closest(origin, ray_dir, max_dist)
-    if hit["hit"]:
-        usdGeom = UsdGeom.Mesh.Get(get_current_stage(), hit["rigidBody"])
-        distance = hit["distance"]
+    ret, hit = omni.physics.core.get_physics_scene_query_interface().raycast_closest(origin, ray_dir, max_dist, True)
+    if ret:
+        usdGeom = UsdGeom.Mesh.Get(get_current_stage(), PhysicsSchemaTools.intToSdfPath(hit.rigid_body))
+        distance = hit.distance
         return usdGeom.GetPath().pathString, distance
     return None, 10000.0

@@ -27,15 +27,6 @@
 
 CARB_BINDINGS("isaacsim.robot.surface_gripper.python")
 
-namespace isaacsim
-{
-namespace robot
-{
-namespace surface_gripper
-{
-} // namespace surface_gripper
-} // namespace robot
-} // namespace isaacsim
 
 namespace
 {
@@ -98,17 +89,54 @@ PYBIND11_MODULE(_surface_gripper, m)
             "set_gripper_action",
             [](const SurfaceGripperInterface* iface, const char* primPath, const float action) -> bool
             { return iface ? iface->setGripperAction(primPath, action) : false; },
-            py::arg("prim_path"), py::arg("action"), "Sets the action of a surface gripper at the specified USD path.")
+            py::arg("prim_path"), py::arg("action"),
+            R"doc(
+                Sets the action of a surface gripper.
+                
+                Values less than -0.3 will open the gripper, values greater than 0.3
+                will close the gripper, and values in between have no effect.
+                
+                Args:
+                    prim_path (str): USD path to the gripper.
+                    action (float): Action value, typically in range [-1.0, 1.0].
+                    
+                Returns:
+                    bool: True if successful, False otherwise.
+            )doc")
         .def(
             "open_gripper",
             [](const SurfaceGripperInterface* iface, const char* primPath) -> bool
             { return iface ? iface->openGripper(primPath) : false; },
-            py::arg("prim_path"), "Opens a surface gripper at the specified USD path.")
+            py::arg("prim_path"),
+            R"doc(
+                Opens/releases a surface gripper.
+                
+                Commands the specified gripper to release any held objects and return
+                to the open state.
+                
+                Args:
+                    prim_path (str): USD path to the gripper.
+                    
+                Returns:
+                    bool: True if successful, False otherwise.
+            )doc")
         .def(
             "close_gripper",
             [](const SurfaceGripperInterface* iface, const char* primPath) -> bool
             { return iface ? iface->closeGripper(primPath) : false; },
-            py::arg("prim_path"), "Closes a surface gripper at the specified USD path.")
+            py::arg("prim_path"),
+            R"doc(
+                Closes/activates a surface gripper.
+                
+                Commands the specified gripper to attempt to grip objects in contact
+                with its surface.
+                
+                Args:
+                    prim_path (str): USD path to the gripper.
+                    
+                Returns:
+                    bool: True if successful, False otherwise.
+            )doc")
         .def(
             "get_gripper_status",
             [](const SurfaceGripperInterface* iface, const char* primPath) -> GripperStatus
@@ -117,12 +145,33 @@ PYBIND11_MODULE(_surface_gripper, m)
                     return GripperStatus::Open;
                 return static_cast<GripperStatus>(iface->getGripperStatus(primPath));
             },
-            py::arg("prim_path"), "Gets the status of a surface gripper at the specified USD path.")
+            py::arg("prim_path"),
+            R"doc(
+                Gets the status of a surface gripper.
+                
+                Args:
+                    prim_path (str): USD path to the gripper.
+                    
+                Returns:
+                    GripperStatus: Current status (Open, Closed, or Closing).
+            )doc")
         .def(
             "set_write_to_usd",
             [](const SurfaceGripperInterface* iface, bool writeToUsd) -> bool
             { return iface ? iface->setWriteToUsd(writeToUsd) : false; },
-            py::arg("write_to_usd"), "Sets whether to write to USD.")
+            py::arg("write_to_usd"),
+            R"doc(
+                Sets whether to write gripper state to USD.
+                
+                Controls whether gripper state changes are persisted to the USD stage
+                or maintained only in memory for improved performance.
+                
+                Args:
+                    write_to_usd (bool): True to write state to USD, False to keep in memory only.
+                    
+                Returns:
+                    bool: True if successful, False otherwise.
+            )doc")
         // .def(
         //     "get_all_grippers",
         //     [](const SurfaceGripperInterface* iface) -> std::vector<std::string>
@@ -134,7 +183,19 @@ PYBIND11_MODULE(_surface_gripper, m)
             "get_gripped_objects",
             [](const SurfaceGripperInterface* iface, const char* primPath) -> std::vector<std::string>
             { return iface ? iface->getGrippedObjects(primPath) : std::vector<std::string>(); },
-            py::arg("prim_path"), "Gets a list of objects currently gripped by the specified gripper.")
+            py::arg("prim_path"),
+            R"doc(
+                Gets a list of objects currently gripped.
+                
+                Returns the USD paths of all objects that are currently held by the
+                specified gripper.
+                
+                Args:
+                    prim_path (str): USD path to the gripper.
+                    
+                Returns:
+                    list[str]: List of USD paths for all gripped objects, empty if none.
+            )doc")
         .def(
             "get_gripper_status_batch",
             [](const SurfaceGripperInterface* iface, const std::vector<std::string>& primPaths) -> std::vector<int>
@@ -151,7 +212,18 @@ PYBIND11_MODULE(_surface_gripper, m)
                 }
                 return iface->getGripperStatusBatch(cpaths.data(), cpaths.size());
             },
-            py::arg("prim_paths"), "Gets statuses for multiple surface grippers.")
+            py::arg("prim_paths"),
+            R"doc(
+                Gets statuses for multiple surface grippers in parallel.
+                
+                Batch operation that queries the status of multiple grippers efficiently.
+                
+                Args:
+                    prim_paths (list[str]): List of USD paths for grippers to query.
+                    
+                Returns:
+                    list[int]: List of status codes corresponding to each gripper path.
+            )doc")
         .def(
             "open_gripper_batch",
             [](const SurfaceGripperInterface* iface, const std::vector<std::string>& primPaths) -> std::vector<bool>
@@ -168,7 +240,18 @@ PYBIND11_MODULE(_surface_gripper, m)
                 }
                 return iface->openGripperBatch(cpaths.data(), cpaths.size());
             },
-            py::arg("prim_paths"), "Opens multiple surface grippers.")
+            py::arg("prim_paths"),
+            R"doc(
+                Opens multiple surface grippers in parallel.
+                
+                Batch operation that opens multiple grippers efficiently.
+                
+                Args:
+                    prim_paths (list[str]): List of USD paths for grippers to open.
+                    
+                Returns:
+                    list[bool]: List of success flags corresponding to each gripper path.
+            )doc")
         .def(
             "close_gripper_batch",
             [](const SurfaceGripperInterface* iface, const std::vector<std::string>& primPaths) -> std::vector<bool>
@@ -185,7 +268,18 @@ PYBIND11_MODULE(_surface_gripper, m)
                 }
                 return iface->closeGripperBatch(cpaths.data(), cpaths.size());
             },
-            py::arg("prim_paths"), "Closes multiple surface grippers.")
+            py::arg("prim_paths"),
+            R"doc(
+                Closes multiple surface grippers in parallel.
+                
+                Batch operation that closes multiple grippers efficiently.
+                
+                Args:
+                    prim_paths (list[str]): List of USD paths for grippers to close.
+                    
+                Returns:
+                    list[bool]: List of success flags corresponding to each gripper path.
+            )doc")
         .def(
             "set_gripper_action_batch",
             [](const SurfaceGripperInterface* iface, const std::vector<std::string>& primPaths,
@@ -203,7 +297,22 @@ PYBIND11_MODULE(_surface_gripper, m)
                 }
                 return iface->setGripperActionBatch(cpaths.data(), actions.data(), actions.size());
             },
-            py::arg("prim_paths"), py::arg("actions"), "Sets actions for multiple surface grippers.")
+            py::arg("prim_paths"), py::arg("actions"),
+            R"doc(
+                Sets actions for multiple surface grippers in parallel.
+                
+                Batch operation that sets gripper actions for multiple grippers efficiently.
+                
+                Args:
+                    prim_paths (list[str]): List of USD paths for grippers to control.
+                    actions (list[float]): List of action values corresponding to each gripper.
+                    
+                Returns:
+                    list[bool]: List of success flags corresponding to each gripper path.
+                    
+                Note:
+                    The prim_paths and actions lists must have the same length.
+            )doc")
         .def(
             "get_gripped_objects_batch",
             [](const SurfaceGripperInterface* iface,
@@ -221,6 +330,19 @@ PYBIND11_MODULE(_surface_gripper, m)
                 }
                 return iface->getGrippedObjectsBatch(cpaths.data(), cpaths.size());
             },
-            py::arg("prim_paths"), "Gets gripped objects for multiple surface grippers.");
+            py::arg("prim_paths"),
+            R"doc(
+                Gets gripped objects for multiple surface grippers in parallel.
+                
+                Batch operation that retrieves the list of gripped objects for
+                multiple grippers efficiently.
+                
+                Args:
+                    prim_paths (list[str]): List of USD paths for grippers to query.
+                    
+                Returns:
+                    list[list[str]]: List of lists containing USD paths of gripped objects
+                                     for each gripper.
+            )doc");
 }
 }

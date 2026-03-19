@@ -72,6 +72,8 @@ public:
     ~SurfaceGripperManager()
     {
         m_components.clear();
+        m_componentKeys.clear();
+        m_componentIndexByKey.clear();
     }
 
     /**
@@ -158,10 +160,40 @@ public:
 
     virtual void initialize(const pxr::UsdStageWeakPtr stage);
 
+    /** @brief Remove components for a prim path and its descendants. */
+    virtual void onComponentRemove(const pxr::SdfPath& primPath) override;
+
+    /** @brief Remove all components. */
+    virtual void deleteAllComponents() override;
+
+    /**
+     * @brief Executes queued PhysX actions for all managed grippers.
+     */
+    void executePhysxActions();
+
+    /**
+     * @brief Executes queued USD actions for all managed grippers.
+     */
+    void executeUsdActions();
+
 private:
     omni::physx::IPhysx* m_physXInterface = nullptr; ///< Pointer to the PhysX interface
     pxr::SdfLayerRefPtr m_gripperLayer; ///< The gripper layer for this gripper
     bool m_writeToUsd = false; ///< Whether to write to USD or keep state in memory only
+
+    /**
+     * @brief Vector storage for gripper components.
+     * @details
+     * This shadows the base container to allow index-based parallel iteration while
+     * maintaining a separate key-to-index map for keyed lookups.
+     */
+    std::vector<std::unique_ptr<SurfaceGripperComponent>> m_components;
+
+    /** @brief Parallel vector of keys for each component index. */
+    std::vector<std::string> m_componentKeys;
+
+    /** @brief Map from prim path key to index in m_components. */
+    std::unordered_map<std::string, size_t> m_componentIndexByKey;
 };
 
 } // namespace surface_gripper

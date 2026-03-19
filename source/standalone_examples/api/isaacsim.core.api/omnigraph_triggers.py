@@ -16,7 +16,7 @@
 
 from isaacsim import SimulationApp
 
-simulation_app = SimulationApp({"renderer": "RaytracedLighting", "headless": True})
+simulation_app = SimulationApp({"renderer": "RealTimePathTracing", "headless": True})
 
 import omni.graph.core as og
 from isaacsim.core.api import SimulationContext

@@ -17,7 +17,7 @@ from typing import List, Optional, Sequence, Union
 
 import carb
 import numpy as np
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.stage import get_current_stage
 from isaacsim.core.utils.types import DynamicState
 from omni.physx.scripts import particleUtils, physicsUtils
@@ -26,6 +26,8 @@ from pxr import Gf, PhysxSchema, Sdf, UsdGeom, UsdPhysics, UsdShade
 from .cloth_prim import ClothPrim
 from .single_particle_system import SingleParticleSystem
 from .single_prim_wrapper import _SinglePrimWrapper
+
+torch = import_module("torch")
 
 
 class SingleClothPrim(_SinglePrimWrapper):
@@ -52,6 +54,7 @@ class SingleClothPrim(_SinglePrimWrapper):
         spring_damping: Optional[float] = None,
     ) -> None:
         """Creates a cloth at prim_path given a particle_system and the cloth parameters.
+
         Args:
             prim_path (str): the absolute path that the prim is supposed to be registered in.
             particle_system (SingleParticleSystem): the particle system that this cloth is using.
@@ -61,26 +64,25 @@ class SingleClothPrim(_SinglePrimWrapper):
             orientation (Sequence[float], optional): the initial orientation of the cloth, assuming cloth is flat.
             scale (Sequence[float], optional): the scale of the cloth.
             visible (bool, optional): True if the cloth is supposed to be visible, False otherwise.
-            ==================================== particle physic cloth coefficients ====================================
             particle_mass (float, optional): the mass of one single particle.
             pressure (float, optional): if > 0, a particle cloth has an additional pressure constraint that provides
-                                        inflatable (i.e. balloon-like) dynamics. The pressure times the rest volume
-                                        defines the volume the inflatable tries to match. Pressure only works well for
-                                        closed or approximately closed meshes, range: [0, inf), units: dimensionless
+                inflatable (i.e. balloon-like) dynamics. The pressure times the rest volume defines the volume the
+                inflatable tries to match. Pressure only works well for closed or approximately closed meshes,
+                range: [0, inf), units: dimensionless
             particle_group (int, optional): group Id of the particles, range: [0, 2^20)
             self_collision (bool, optional): enable self collision of the particles or of the particle object.
             self_collision_filter (bool, optional): whether the simulation should filter particle-particle collisions
-                                                    based on the rest position distances.
-            stretch_stiffness (Sequence[float], optional): represents a stiffness for linear springs placed between particles to
-                                                 counteract stretching, range: [0, inf), units: force / distance =
-                                                 mass / second / second
-            bend_stiffness (Sequence[float], optional): represents a stiffness for linear springs placed in a way to counteract
-                                              bending, range: [0, inf), units: force / distance = mass / second / second
-            shear_stiffness (Sequence[float], optional): represents a stiffness for linear springs placed in a way to counteract
-                                               shear, range: [0, inf), units: force / distance = mass / second / second
+                based on the rest position distances.
+            stretch_stiffness (Sequence[float], optional): represents a stiffness for linear springs placed between
+                particles to counteract stretching, range: [0, inf), units: force / distance = mass / second / second
+            bend_stiffness (Sequence[float], optional): represents a stiffness for linear springs placed in a way to
+                counteract bending, range: [0, inf), units: force / distance = mass / second / second
+            shear_stiffness (Sequence[float], optional): represents a stiffness for linear springs placed in a way to
+                counteract shear, range: [0, inf), units: force / distance = mass / second / second
             spring_damping (Sequence[float], optional): damping on cloth spring constraints. Applies to all constraints
-                                              parameterized by stiffness attributes, range: [0, inf),
-                                              units: force * second / distance = mass / second
+                parameterized by stiffness attributes, range: [0, inf),
+                units: force * second / distance = mass / second
+
         Note:
             Particles / objects in different groups in the same system collide with each other. Within the same group in
             the same system, the collision behavior is controlled by the self_collision parameter.

@@ -1,7 +1,7 @@
 [package]
 description = "Full Isaac Sim Action and Event Data Generation App"
 title = "Isaac Sim Action and Event Data Generation"
-version = "0.1.5"
+version = "0.4.0"
 keywords = ["experience", "app", "usd", "action and event data generation"]
 template_name = "action_and_event_data_generation_full"
 
@@ -9,27 +9,29 @@ template_name = "action_and_event_data_generation_full"
 "isaacsim.exp.action_and_event_data_generation.base" = {}
 
 # Additional dependencies
-"isaacsim.action_and_event_data_generation.setup" = { version = "0.0.9", exact = true, order = 1000 }
+"isaacsim.action_and_event_data_generation.setup" = { version = "0.6.0", exact = true, order = 1000 }
 
+"omni.kit.renderer.capture" = {}
+"omni.kit.renderer.core" = {}
 "omni.kit.uiapp" = {}
 
 # Kit Viewport Window
 "omni.kit.viewport.actions" = {}
 "omni.kit.viewport.bundle" = {}
-"omni.kit.viewport.rtx" = {}
-"omni.kit.viewport_widgets_manager" = {}
-"omni.kit.viewport.window" = {}
-"omni.kit.viewport.menubar.settings" = {}
-"omni.kit.viewport.menubar.display" = {}
-"omni.kit.viewport.menubar.render" = {}
 "omni.kit.viewport.menubar.camera" = {}
+"omni.kit.viewport.menubar.display" = {}
 "omni.kit.viewport.menubar.lighting" = {}
+"omni.kit.viewport.menubar.render" = {}
+"omni.kit.viewport.menubar.settings" = {}
+"omni.kit.viewport.rtx" = {}
+"omni.kit.viewport.window" = {}
+"omni.kit.viewport_widgets_manager" = {}
 
 # Viewport Manipulator
-"omni.kit.manipulator.prim" = {}
-"omni.kit.manipulator.viewport" = {}
 "omni.kit.manipulator.camera" = {}
+"omni.kit.manipulator.prim" = {}
 "omni.kit.manipulator.selection" = {}
+"omni.kit.manipulator.viewport" = {}
 
 # Kit Browser
 "omni.kit.browser.asset" = {}
@@ -39,6 +41,7 @@ template_name = "action_and_event_data_generation_full"
 "omni.kit.property.bundle" = {}
 "omni.kit.property.collection" = {}
 "omni.kit.property.layer" = {}
+"omni.kit.property.physics" = {}
 
 # Kit Window Tools
 "omni.kit.preferences.animation" = {} # Allow Animation Preference window
@@ -54,25 +57,23 @@ template_name = "action_and_event_data_generation_full"
 "omni.kit.window.script_editor" = {}
 "omni.kit.window.stats" = { order = 1000 }
 "omni.kit.window.title" = {}
-"omni.kit.window.usd_paths" = {}
 "omni.kit.window.toolbar" = {}
+"omni.kit.window.usd_paths" = {}
 
 # Kit Stage Tools
+"omni.kit.manipulator.transform" = {}
 "omni.kit.stage.copypaste" = {}
 "omni.kit.stage.mdl_converter" = {}
 "omni.kit.stage_column.payload" = {}
 "omni.kit.stage_column.variant" = {}
 "omni.kit.stage_templates" = {}
 "omni.kit.stagerecorder.bundle" = {}
-"omni.kit.manipulator.transform" = {}
 
 # Kit Tools
+"omni.kit.tool.asset_exporter" = {}
 "omni.kit.tool.collect" = {} # Allow collecting USDs
 "omni.kit.tool.remove_unused.controller" = {}
 "omni.kit.tool.remove_unused.core" = {}
-"omni.kit.usd.collect" = {}  # Allow collecting USDs
-"omni.kit.usda_edit" = {} # Allow to edit USD as USDA
-"omni.kit.tool.asset_exporter" = {}
 
 # Kit Widgets
 "omni.kit.widget.cache_indicator" = {}
@@ -92,34 +93,44 @@ template_name = "action_and_event_data_generation_full"
 
 # Action and Event Data Generation Extensions
 #############################################
-"isaacsim.replicator.agent.ui" = { version = "0.7.11", exact = true }
-
+"isaacsim.replicator.agent.ui" = { version = "1.0.20", exact = true }
+"isaacsim.replicator.object.ui" = { version = "0.11.3", exact = true }
+"isaacsim.replicator.incident.ui" = { version = "0.6.3", exact = true }
+"omni.ai.langchain.agent.chat_iro" = { version = "2.2.8", exact = true }
 # Animation Extensions
 #############################################
-"omni.anim.navigation.bundle" = {}
+"omni.anim.curve.bundle" = {} # For "Set Key" option in right-click menu
+"omni.anim.curve_editor" = {}
 "omni.anim.graph.bundle" = {}
 "omni.anim.retarget.bundle" = {}
-"omni.anim.curve_editor" = {}
-"omni.anim.curve.bundle" = {} # For "Set Key" option in right-click menu
 "omni.anim.window.timeline" = {}
 
 # Other useful Extensions
 #############################################
-"omni.kit.quicklayout" = {}
-"isaacsim.util.debug_draw" = {}
-"omni.graph.window.action" = {}
-"omni.graph.visualization.nodes" = {}
-"omni.hydra.engine.stats" = {}
-"omni.physx.graph" = {}
-"omni.scene.optimizer.bundle" = { version = "107.3.12", exact = true }
 "isaacsim.asset.gen.conveyor" = {}
+"isaacsim.util.debug_draw" = {}
+"omni.graph.visualization.nodes" = {}
+"omni.graph.window.action" = {}
+"omni.hydra.engine.stats" = {}
+"omni.kit.quicklayout" = {}
+"omni.kit.search.files" = {}
+"omni.kit.selection" = {}
+"omni.kit.usd.collect" = {}  # Allow collecting USDs
+"omni.kit.usda_edit" = {} # Allow to edit USD as USDA
+"omni.kit.variant.editor" = {}
+"omni.kit.variant.presenter" = {}
+"omni.physx.bundle" = {}
+"omni.scene.optimizer.bundle" = {}
+"omni.simready.explorer" = {}
 
 
 [settings.app]
 name = "Action and Event Data Generation"
-version = "0.1.5"
-file.ignoreUnsavedOnExit = false
+version = "0.4.0"
+file.ignoreUnsavedStage = false
+enableDeveloperWarnings = false        # Disable developer warnings to reduce log noise
 window.title = "Action and Event Data Generation"
+vulkan = true
 runLoops.main.rateLimitEnabled = true  # Enable rate limiting, simulation runs at specified rendering rate (default 60 hz)
 runLoops.main.manualModeEnabled = true # Enable manual mode, dt is fixed at requested rate
 gatherRenderResults = true # True to prevent artifacts in multiple viewport configurations, can be set to false for better performance in some cases
@@ -146,3 +157,8 @@ registryCacheFull = "${app}/../extscache"
 
 [settings.exts."omni.kit.window.content_browser"]
 enable_checkpoints = true
+
+[settings.exts."omni.kit.registry.nucleus".registries]
+++ = [
+    { name = "isaacsim/prod/6.0", url = "https://ovextensionsprod.blob.core.windows.net/exts/isaacsim/prod/6.0/shared" },
+]

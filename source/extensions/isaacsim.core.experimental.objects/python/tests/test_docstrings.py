@@ -16,6 +16,7 @@
 import isaacsim.core.experimental.utils.stage as stage_utils
 import isaacsim.test.docstring
 from isaacsim.core.experimental.objects import (
+    Camera,
     Capsule,
     Cone,
     Cube,
@@ -49,6 +50,11 @@ class TestExtensionDocstrings(isaacsim.test.docstring.AsyncDocTestCase):
     async def tearDown(self):
         """Method called immediately after the test method has been called"""
         super().tearDown()
+
+    # --------------------------------------------------------------------
+
+    async def test_camera_docstrings(self):
+        await self.assertDocTests(Camera)
 
     # --------------------------------------------------------------------
 

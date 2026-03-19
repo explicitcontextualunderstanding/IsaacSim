@@ -1,4 +1,56 @@
 # Changelog
+## [1.1.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [1.0.1] - 2026-02-09
+### Fixed
+- Fix crash issue when IPhysxSimulation interface is not available
+
+## [1.0.0] - 2026-02-01
+### Changed
+- Deprecated this extension in favor of isaacsim.sensors.experimental.physics extension
+- Moved omnigraph nodes from this extension to isaacsim.sensors.nodes extension. The nodes use the new api from isaacsim.sensors.experimental.physics extension.
+
+## [0.7.0] - 2026-01-28
+### Added
+- Refactor IMU and contact sensor tests to use experimental core APIs
+
+## [0.6.3] - 2025-12-07
+### Changed
+- Fix clang tidy issues in cpp code
+
+## [0.6.2] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [0.6.1] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [0.6.0] - 2025-11-25
+### Added
+- Add dedicated GPU codepath for IMU to use separate stream and pinned memory buffer
+
+## [0.5.4] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [0.5.3] - 2025-10-31
+### Changed
+- Update deprecated python unittest methods
+
+## [0.5.2] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [0.5.1] - 2025-10-22
+### Changed
+- Remove deprecated time related APIs from CoreNodes interface
+
+## [0.5.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
 
 ## [0.4.3] - 2025-10-02
 ### Fixed
@@ -58,7 +110,7 @@
 
 ## [0.3.17] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [0.3.16] - 2025-05-02
 ### Changed
@@ -128,7 +180,7 @@
 
 ## [0.3.0] - 2024-10-31
 ### Changed
-- moved examples from menu to browser
+- Moved examples from menu to browser
 
 ## [0.2.0] - 2024-10-30
 ### Changed

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Callback functions for GUI component interactions including clipboard operations, file browser, IDE integration, and documentation links."""
+
+
 import os
 import subprocess
 import sys
@@ -20,9 +23,11 @@ import sys
 import carb
 
 
-def on_copy_to_clipboard(to_copy: str) -> None:
-    """
-    Copy text to system clipboard
+def on_copy_to_clipboard(to_copy: str):
+    """Copy text to system clipboard.
+
+    Args:
+        to_copy: Text content to copy to the system clipboard.
     """
     try:
         import pyperclip
@@ -36,8 +41,13 @@ def on_copy_to_clipboard(to_copy: str) -> None:
         return
 
 
-def on_open_IDE_clicked(ext_path: str, file_path: str) -> None:
-    """Opens the current directory and file in VSCode"""
+def on_open_IDE_clicked(ext_path: str, file_path: str):
+    """Opens the current directory and file in VSCode.
+
+    Args:
+        ext_path: Path to the extension directory.
+        file_path: Path to the specific file to open.
+    """
     if sys.platform == "win32":
         try:
             subprocess.Popen(["code", os.path.abspath(ext_path), os.path.abspath(file_path)], shell=True)
@@ -47,17 +57,19 @@ def on_open_IDE_clicked(ext_path: str, file_path: str) -> None:
             )
     else:
         try:
-            cmd_string = "code " + ext_path + " " + file_path
-            subprocess.run([cmd_string], shell=True, check=True)
-            # os.system("code " + ext_path + " " + file_path)
+            subprocess.run(["code", ext_path, file_path], check=True)
         except Exception:
             carb.log_warn(
                 "Could not open in VSCode. See Troubleshooting help here: https://code.visualstudio.com/docs/editor/command-line#_common-questions"
             )
 
 
-def on_open_folder_clicked(file_path: str) -> None:
-    """Opens the current directory in a File Browser"""
+def on_open_folder_clicked(file_path: str):
+    """Opens the current directory in a file browser.
+
+    Args:
+        file_path: Path to the file whose directory should be opened.
+    """
     if sys.platform == "win32":
         try:
             subprocess.Popen(["start", os.path.abspath(os.path.dirname(file_path))], shell=True)
@@ -70,8 +82,12 @@ def on_open_folder_clicked(file_path: str) -> None:
             carb.log_warn("could not open file browser")
 
 
-def on_docs_link_clicked(doc_link: str) -> None:
-    """Opens an extension's documentation in a Web Browser"""
+def on_docs_link_clicked(doc_link: str):
+    """Opens an extension's documentation in a web browser.
+
+    Args:
+        doc_link: URL of the documentation to open.
+    """
     import webbrowser
 
     try:

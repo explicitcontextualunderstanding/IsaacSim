@@ -16,12 +16,16 @@
 from typing import List, Optional, Union
 
 import carb
+import carb.eventdispatcher
 import numpy as np
 import omni.kit.app
-import torch
+import omni.timeline
+from isaacsim.core.deprecation_manager import import_module
 from pxr import PhysxSchema, UsdShade
 
 from .xform_prim import XFormPrim
+
+torch = import_module("torch")
 
 
 class DeformablePrim(XFormPrim):
@@ -51,6 +55,7 @@ class DeformablePrim(XFormPrim):
         as well as its attributes/ properties. This object wraps all matching deformable bodies found at the regex provided at the prim_paths_expr.
 
         Note: - if the underlying UsdGeom.Mesh.Get does not already have appropriate USD deformable body apis applied to it before init, this class will apply it.
+
         Args:
             prim_paths_expr (str): Prim paths regex to encapsulate all prims that match it.
             name (str): Shortname to be used as a key by Scene class.
@@ -107,12 +112,21 @@ class DeformablePrim(XFormPrim):
             self.set_solver_position_iteration_counts(solver_position_iteration_counts)
 
         timeline = omni.timeline.get_timeline_interface()
-        self._invalidate_physics_handle_event = timeline.get_timeline_event_stream().create_subscription_to_pop(
-            self._invalidate_physics_handle_callback
+        self._invalidate_physics_handle_event = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=self._invalidate_physics_handle_callback,
+            observer_name="isaacsim.core.prims.DeformablePrim.initialize._invalidate_physics_handle_callback",
         )
         carb.log_warn(
             "Please note that support for deformable prims in the current form is now deprecated. Some features including stress/strain APIs may be removed in the future."
         )
+
+    def __del__(self):
+        XFormPrim.__del__(self)
+        if hasattr(self, "_physics_view"):
+            del self._physics_view
+        self._invalidate_physics_handle_event = None
+        return
 
     """
     Properties.
@@ -191,8 +205,7 @@ class DeformablePrim(XFormPrim):
         return
 
     def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
+        self._physics_view = None
         return
 
     def _apply_deformable_body_api(self, index):

@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Handles synthetic data recording with state management and asynchronous recording operations."""
+
+
 import os
 from enum import Enum
 
-import carb.events
 import carb.settings
 import omni.kit.app
 import omni.replicator.core as rep
@@ -45,48 +47,39 @@ SEMANTICS_ANNOTATORS = (
 
 # Possible states of the recorder
 class RecorderState(Enum):
+    """Enumeration representing the possible states of the synthetic data recorder.
+
+    This enum defines the three operational states that a SyntheticRecorder instance can be in
+    during its lifecycle. The states control the recording process flow and determine what
+    operations are available at any given time.
+    """
+
     STOPPED = 0
+    """Recorder is not active and not capturing data."""
     RUNNING = 1
+    """Recorder is actively capturing and processing frames."""
     PAUSED = 2
+    """Recorder is temporarily suspended but can be resumed."""
 
 
 class SyntheticRecorder:
     """Synthetic Data Recorder class handling the recording process."""
 
     def __init__(self):
-        # Public -- modified by the UI
+        # Recording configuration
         self.num_frames = 0
         self.rt_subframes = 0
         self.control_timeline = False
         self.verbose = False
+
+        # Writer and render products configuration
         self.writer_name = "BasicWriter"
-        self.rp_data = []
-        self.custom_writer_params = {}
-        self.basic_writer_params = {
-            "rgb": True,
-            "bounding_box_2d_tight": False,
-            "bounding_box_2d_loose": False,
-            "semantic_segmentation": False,
-            "colorize_semantic_segmentation": False,
-            "instance_id_segmentation": False,
-            "colorize_instance_id_segmentation": False,
-            "instance_segmentation": False,
-            "colorize_instance_segmentation": False,
-            "distance_to_camera": False,
-            "distance_to_image_plane": False,
-            "bounding_box_3d": False,
-            "occlusion": False,
-            "normals": False,
-            "motion_vectors": False,
-            "camera_params": False,
-            "pointcloud": False,
-            "pointcloud_include_unlabelled": False,
-            "skeleton_data": False,
-        }
-        self.out_dir = "_out_sdrec"
-        self.out_working_dir = os.getcwd()
-        self.use_s3 = False
-        self.s3_params = {"s3_bucket": "", "s3_region": "", "s3_endpoint": ""}
+        self.writer_params = {}  # Parameters to pass to writer.initialize()
+        self.rp_data = []  # Render product data: [(camera_path, width, height, name), ...]
+
+        # Backend configuration
+        self.backend_type = None  # Options: None, "DiskBackend", "S3Backend", etc.
+        self.backend_params = {}  # Backend-specific parameters
 
         # Internal
         self._state = RecorderState.STOPPED
@@ -96,12 +89,20 @@ class SyntheticRecorder:
         self._render_products = []
         self._original_capture_on_play = None
 
-    def get_state(self):
-        """Get the current state of the recorder."""
+    def get_state(self) -> RecorderState:
+        """Current state of the recorder.
+
+        Returns:
+            The current recorder state (STOPPED, RUNNING, or PAUSED).
+        """
         return self._state
 
     def subscribe_state_changed(self, callback):
-        """Subscribe to the recorder state changes."""
+        """Subscribe to the recorder state changes.
+
+        Args:
+            callback: Function to call when the recorder state changes.
+        """
         self._state_subscribers.append(callback)
 
     def _notify_state_subscribers(self):
@@ -109,13 +110,21 @@ class SyntheticRecorder:
         for callback in self._state_subscribers:
             callback()
 
-    def _set_state(self, state):
-        """Set the state of the recorder and notify any subscribers about the change."""
+    def _set_state(self, state: RecorderState):
+        """Set the state of the recorder and notify any subscribers about the change.
+
+        Args:
+            state: The new recorder state to set.
+        """
         self._state = state
         self._notify_state_subscribers()
 
-    def init_recorder(self):
-        """Initialize the recorder (create a new one) and attach the writer to the render products (newly created)."""
+    def init_recorder(self) -> bool:
+        """Initialize the recorder (create a new one) and attach the writer to the render products (newly created).
+
+        Returns:
+            True if initialization was successful, False otherwise.
+        """
         if self._writer is None:
             try:
                 self._writer = rep.WriterRegistry.get(self.writer_name)
@@ -129,19 +138,26 @@ class SyntheticRecorder:
             rep.orchestrator.set_capture_on_play(False)
             print("[SDR][Warn] Disabling replicator capture on play flag during recording.")
 
-        writer_params = {}
-        if self.writer_name == "BasicWriter":
-            if self.use_s3:
-                if not self.s3_params.get("s3_bucket", None):
-                    print("[SDR][Warn] Could not initialize writer, s3_bucket parameter is missing.")
-                    return False
-                for key, value in self.s3_params.items():
-                    if value == "":
-                        self.s3_params[key] = None
-                writer_params = {**self.basic_writer_params, **self.s3_params}
-            else:
-                writer_params = {**self.basic_writer_params}
+        # Create and initialize the backend
+        if not self.backend_type:
+            print("[SDR][Warn] Backend not configured. Set backend_type before recording.")
+            return False
 
+        try:
+            backend = rep.backends.get(self.backend_type)
+            backend.initialize(**self.backend_params)
+            if self.verbose:
+                print(f"[SDR][Backend] Using {self.backend_type} with params: {self.backend_params}")
+        except Exception as e:
+            print(f"[SDR][Warn] Could not initialize {self.backend_type}: {e}")
+            return False
+
+        # Add backend to writer_params
+        writer_params = {"backend": backend}
+        writer_params.update(self.writer_params)
+
+        # For BasicWriter: perform stage validation and disable incompatible annotators
+        if self.writer_name == "BasicWriter":
             # If the stage is not semantically labeled, disable any semantics related annotators
             stage_is_labeled = self._check_if_stage_is_semantically_labeled()
             if not stage_is_labeled:
@@ -154,16 +170,9 @@ class SyntheticRecorder:
             if writer_params.get("skeleton_data", False) and not self._check_if_stage_has_skeleton_prims():
                 print(f"[SDR][Warn] Stage does not have any skeleton prims, disabling skeleton annotator.")
                 writer_params["skeleton_data"] = False
-        else:
-            # If a custom writer is used instead of the BasicWriter, load the given custom parameters
-            writer_params = {**self.custom_writer_params}
 
-        if self.use_s3:
-            output_dir = self.out_dir
-        else:
-            output_dir = os.path.join(self.out_working_dir, self.out_dir)
         try:
-            self._writer.initialize(output_dir=output_dir, **writer_params)
+            self._writer.initialize(**writer_params)
         except Exception as e:
             print(f"[SDR][Warn] Could not initialize writer {self.writer_name}: {e}")
             return False
@@ -272,8 +281,15 @@ class SyntheticRecorder:
         else:
             print(f"[SDR][Warn] Recorder is in an unexpected state ({self._state.name}), try again.")
 
-    def _check_if_valid_camera(self, path):
-        """Check if the camera path is valid for the render product."""
+    def _check_if_valid_camera(self, path) -> bool:
+        """Check if the camera path is valid for the render product.
+
+        Args:
+            path: The USD path to the camera prim.
+
+        Returns:
+            True if the camera path is valid, False otherwise.
+        """
         context = omni.usd.get_context()
         stage = context.get_stage()
         prim = stage.GetPrimAtPath(path)
@@ -288,8 +304,16 @@ class SyntheticRecorder:
             print(f"[SDR][Warn] {prim.GetPath()} is not a valid 'Camera' type.")
             return False
 
-    def _check_if_valid_resolution(self, width, height):
-        """Check if the resolution is valid for the render product."""
+    def _check_if_valid_resolution(self, width: int, height: int) -> bool:
+        """Check if the resolution is valid for the render product.
+
+        Args:
+            width: Width of the resolution in pixels.
+            height: Height of the resolution in pixels.
+
+        Returns:
+            True if the resolution is valid (both width and height > 0), False otherwise.
+        """
         if width > 0 and height > 0:
             if width > MAX_RESOLUTION_WARN and height > MAX_RESOLUTION_WARN:
                 print(f"[SDR][Warn] Using a large resolution {width}x{height} might lead to out of memory issues.")
@@ -299,7 +323,14 @@ class SyntheticRecorder:
         return False
 
     def _check_if_valid_rp_entry(self, entry):
-        """Check if the render product entry is valid."""
+        """Check if the render product entry is valid.
+
+        Args:
+            entry: Render product entry tuple containing (camera_path, width, height, custom_name).
+
+        Returns:
+            True if the entry is valid, False otherwise.
+        """
         return (
             len(entry) == 4  # (camera path, width, height, custom name="")
             and self._check_if_valid_camera(entry[0])
@@ -307,7 +338,11 @@ class SyntheticRecorder:
         )
 
     def _check_if_stage_is_semantically_labeled(self):
-        """Check if the stage has any semantically labeled prims."""
+        """Check if the stage has any semantically labeled prims.
+
+        Returns:
+            True if the stage has semantically labeled prims, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
         for prim in stage.Traverse():
             # Check the new semantics API
@@ -319,7 +354,11 @@ class SyntheticRecorder:
         return False
 
     def _check_if_stage_has_skeleton_prims(self):
-        """Check if the stage has any skeleton prims."""
+        """Check if the stage has any skeleton prims.
+
+        Returns:
+            True if the stage has skeleton prims, False otherwise.
+        """
         stage = omni.usd.get_context().get_stage()
         for prim in stage.Traverse():
             if prim.IsA(UsdSkel.Skeleton):
@@ -327,7 +366,11 @@ class SyntheticRecorder:
         return False
 
     def _disable_semantics_annotators(self, writer_params):
-        """Disable semantics related annotators if the stage does not have semantically labeled prims."""
+        """Disable semantics related annotators if the stage does not have semantically labeled prims.
+
+        Args:
+            writer_params: Dictionary of writer parameters to modify by disabling semantics annotators.
+        """
         # Store the annotators that were disabled due to the stage not having semantically labeled prims
         disabled_annotators = []
         # Iterate over the semantics related annotators and disable them if they are enabled
@@ -340,7 +383,11 @@ class SyntheticRecorder:
             print(f"[SDR][Warn] Disabled the following semantics related annotators: {disabled_annotators}.")
 
     async def _run_recording_loop_async(self, num_frames):
-        """Run the recording loop for the specified number of frames."""
+        """Run the recording loop for the specified number of frames.
+
+        Args:
+            num_frames: Number of frames to record.
+        """
         timeline = omni.timeline.get_timeline_interface()
         while self._current_frame < num_frames:
             # Stop the recording loop if the state has been changed from RUNNING to PAUSED or STOPPED
@@ -373,5 +420,16 @@ class SyntheticRecorder:
             timeline.commit()
         await rep.orchestrator.wait_until_complete_async()
         if self.verbose:
-            print(f"[SDR][Recorder] Finished;\tData written to: {os.path.join(self.out_working_dir, self.out_dir)}.")
+            # Print completion message based on backend type
+            if self.backend_type == "DiskBackend":
+                output_dir = self.backend_params.get("output_dir", "unknown")
+                print(f"[SDR][Recorder] Finished;\tData written to: {output_dir}.")
+            elif self.backend_type == "S3Backend":
+                bucket = self.backend_params.get("bucket", "unknown")
+                key_prefix = self.backend_params.get("key_prefix", "")
+                print(f"[SDR][Recorder] Finished;\tData written to S3 bucket: {bucket}/{key_prefix}.")
+            elif self.backend_type:
+                print(f"[SDR][Recorder] Finished;\tData written using {self.backend_type}.")
+            else:
+                print(f"[SDR][Recorder] Finished;\tData written.")
         self.clear_recorder()

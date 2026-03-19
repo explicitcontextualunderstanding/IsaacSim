@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import carb
 import omni.ext
 from isaacsim.ros2.urdf import RobotDescription
 
 
 class Extension(omni.ext.IExt):
     def on_startup(self, ext_id):
-        print("startup")
-
         self.urdf = RobotDescription()
 
     def on_shutdown(self):

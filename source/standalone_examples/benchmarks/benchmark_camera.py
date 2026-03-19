@@ -51,13 +51,15 @@ simulation_app = SimulationApp(
 import carb
 import omni
 import omni.replicator.core as rep
+from isaacsim.core.experimental.utils.stage import is_stage_loading
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.stage import is_stage_loading
 
 enable_extension("isaacsim.benchmark.services")
-from isaacsim.benchmark.services import BaseIsaacBenchmark
+from isaacsim.benchmark.services import DEFAULT_RECORDERS, BaseIsaacBenchmark
 
 # Create the benchmark
+# Define recorders to use, use default set, other combinations, or custom data recorders
+recorders = DEFAULT_RECORDERS + ["gpu_frametime"] if gpu_frametime else DEFAULT_RECORDERS
 benchmark = BaseIsaacBenchmark(
     benchmark_name="benchmark_camera",
     workflow_metadata={
@@ -69,17 +71,13 @@ benchmark = BaseIsaacBenchmark(
         ]
     },
     backend_type=args.backend_type,
-    gpu_frametime=gpu_frametime,
+    recorders=recorders,
 )
 benchmark.set_phase("loading", start_recording_frametime=False, start_recording_runtime=True)
 
 scene_path = "/Isaac/Environments/Simple_Warehouse/full_warehouse.usd"
 benchmark.fully_load_stage(benchmark.assets_root_path + scene_path)
 
-# make sure scene is loaded in all viewports
-while is_stage_loading():
-    print("asset still loading, waiting to finish")
-    omni.kit.app.get_app().update()
 omni.kit.app.get_app().update()
 
 timeline = omni.timeline.get_timeline_interface()

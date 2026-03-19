@@ -13,28 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Defines a Replicator writer that converts RGB data to PyTorch tensor batches and sends them to a listener."""
+
+
 import carb
-import torch
 import warp as wp
+from isaacsim.core.deprecation_manager import import_module
 from omni.replicator.core import AnnotatorRegistry, BackendDispatch, Writer
 
 from . import PytorchListener
+
+torch = import_module("torch")
 
 __version__ = "0.0.1"
 
 
 class PytorchWriter(Writer):
     """A custom writer that uses omni.replicator API to retrieve RGB data via render products
-        and formats them as tensor batches. The writer takes a PytorchListener which is able
-        to retrieve pytorch tensors for the user directly after each writer call.
+            and formats them as tensor batches. The writer takes a PytorchListener which is able
+            to retrieve pytorch tensors for the user directly after each writer call.
 
     Args:
-        listener (PytorchListener): A PytorchListener that is sent pytorch batch tensors at each write() call.
-        output_dir (str): directory in which rgb data will be saved in PNG format by the backend dispatch.
-                          If not specified, the writer will not write rgb data as png and only ping the
-                          listener with batched tensors.
-        device (str): device in which the pytorch tensor data will reside. Can be "cpu", "cuda", or any
-                      other format that pytorch supports for devices. Default is "cuda".
+        listener: A PytorchListener that is sent pytorch batch tensors at each write() call.
+        output_dir: Directory in which rgb data will be saved in PNG format by the backend dispatch.
+            If not specified, the writer will not write rgb data as png and only ping the
+            listener with batched tensors.
+        tiled_sensor: Whether to use tiled sensor mode.
+        device: Device in which the pytorch tensor data will reside. Can be "cpu", "cuda", or any
+            other format that pytorch supports for devices.
     """
 
     def __init__(
@@ -59,12 +65,12 @@ class PytorchWriter(Writer):
         self.device = device
         self.version = __version__
 
-    def write(self, data: dict) -> None:
+    def write(self, data: dict):
         """Sends data captured by the attached render products to the PytorchListener and will write data to
         the output directory if specified during initialization.
 
         Args:
-            data (dict): Data to be pinged to the listener and written to the output directory if specified.
+            data: Data to be pinged to the listener and written to the output directory if specified.
         """
         # breakpoint()
         for annotator in data.keys():
@@ -79,13 +85,19 @@ class PytorchWriter(Writer):
         self._frame_id += 1
 
     @carb.profiler.profile
-    def _write_rgb(self, data: dict, rp_info: dict) -> None:
+    def _write_rgb(self, data: dict, rp_info: dict):
+        """Writes RGB data to the output directory as PNG files.
+
+        Args:
+            data: Dictionary containing annotator data with RGB information.
+            rp_info: Render product information containing resolution and other metadata.
+        """
         for annotator in data.keys():
             if annotator.startswith("LdrColor"):
                 render_product_name = annotator.split("-")[-1]
                 file_path = f"rgb_{self._frame_id}_{render_product_name}.png"
                 img_data = data[annotator]
-                if isinstance(img_data, wp.types.array):
+                if isinstance(img_data, wp.array):
                     img_data = img_data.numpy()
                 self._backend.write_image(file_path, img_data)
             elif annotator.startswith("RtxSensor"):
@@ -96,6 +108,18 @@ class PytorchWriter(Writer):
 
     @carb.profiler.profile
     def _convert_to_pytorch(self, data: dict, rp_info: dict) -> torch.Tensor:
+        """Converts annotator data to a PyTorch tensor batch.
+
+        Args:
+            data: Dictionary containing annotator data to convert.
+            rp_info: Render product information containing resolution and other metadata.
+
+        Returns:
+            Concatenated PyTorch tensor containing all converted data.
+
+        Raises:
+            Exception: If data is None.
+        """
         if data is None:
             raise Exception("Data is Null")
         # breakpoint()

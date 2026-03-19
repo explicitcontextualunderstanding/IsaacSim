@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate synthetic data from an AMR navigating to random locations"""
+"""Generate synthetic data from an AMR navigating to random locations."""
 
 from isaacsim import SimulationApp
 
@@ -25,6 +25,7 @@ import os
 import random
 from itertools import cycle
 
+import carb.eventdispatcher
 import carb.settings
 import omni.client
 import omni.kit.app
@@ -32,19 +33,34 @@ import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
 import omni.usd.commands
-from isaacsim.core.utils.stage import add_reference_to_stage, create_new_stage
+from isaacsim.core.utils.stage import create_new_stage
 from isaacsim.storage.native import get_assets_root_path
-from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdLux, UsdPhysics
+from pxr import Gf, UsdGeom
+
+ENV_URLS = [
+    "/Isaac/Environments/Grid/default_environment.usd",
+    "/Isaac/Environments/Simple_Warehouse/warehouse.usd",
+    "/Isaac/Environments/Grid/gridroom_black.usd",
+]
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--num_frames", type=int, default=9, help="The number of frames to capture")
+parser.add_argument("--env_interval", type=int, default=3, help="Interval at which to change the environments")
+parser.add_argument("--use_temp_rp", action="store_true", help="Create and destroy render products for each SDG frame")
+args, unknown = parser.parse_known_args()
 
 
 class NavSDGDemo:
+    """Demonstration of synthetic data generation using an AMR navigating towards a target."""
+
     CARTER_URL = "/Isaac/Samples/Replicator/OmniGraph/nova_carter_nav_only.usd"
     DOLLY_URL = "/Isaac/Props/Dolly/dolly.usd"
     PROPS_URL = "/Isaac/Props/YCB/Axis_Aligned_Physics"
-    LEFT_CAMERA_PATH = "/NavWorld/CarterNav/chassis_link/sensors/front_hawk/left/camera_left"
-    RIGHT_CAMERA_PATH = "/NavWorld/CarterNav/chassis_link/sensors/front_hawk/right/camera_right"
+    LEFT_CAMERA_REL_PATH = "sensors/front_hawk/left/camera_left"
+    RIGHT_CAMERA_REL_PATH = "sensors/front_hawk/right/camera_right"
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the navigation SDG demo with default values."""
         self._carter_chassis = None
         self._carter_nav_target = None
         self._dolly = None
@@ -67,15 +83,17 @@ class NavSDGDemo:
 
     def start(
         self,
-        num_frames=10,
-        out_dir=None,
-        env_urls=[],
-        env_interval=3,
-        use_temp_rp=False,
-        seed=None,
-    ):
-        print(f"[NavSDGDemo] Starting")
+        num_frames: int = 10,
+        out_dir: str | None = None,
+        env_urls: list[str] = [],
+        env_interval: int = 3,
+        use_temp_rp: bool = False,
+        seed: int | None = None,
+    ) -> None:
+        """Start the SDG demo with the given configuration."""
+        print(f"[SDG] Starting")
         if seed is not None:
+            rep.set_global_seed(seed)
             random.seed(seed)
         self._num_frames = num_frames
         self._out_dir = out_dir if out_dir is not None else os.path.join(os.getcwd(), "_out_nav_sdg_demo")
@@ -91,17 +109,20 @@ class NavSDGDemo:
         self._setup_sdg()
         self._timeline = omni.timeline.get_timeline_interface()
         self._timeline.play()
-        self._timeline_sub = self._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-            int(omni.timeline.TimelineEventType.CURRENT_TIME_TICKED), self._on_timeline_event
+        self._timeline_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_CURRENT_TIME_TICKED,
+            on_event=self._on_timeline_event,
+            observer_name="amr_navigation.NavSDGDemo._on_timeline_event",
         )
-        self._stage_event_sub = (
-            omni.usd.get_context()
-            .get_stage_event_stream()
-            .create_subscription_to_pop_by_type(int(omni.usd.StageEventType.CLOSING), self._on_stage_closing_event)
+        self._stage_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.usd.get_context().stage_event_name(omni.usd.StageEventType.CLOSING),
+            on_event=self._on_stage_closing_event,
+            observer_name="amr_navigation.NavSDGDemo._on_stage_closing_event",
         )
         self._in_running_state = True
 
-    def clear(self):
+    def clear(self) -> None:
+        """Reset all state variables and unsubscribe from events."""
         self._cycled_env_urls = None
         self._carter_chassis = None
         self._carter_nav_target = None
@@ -109,73 +130,79 @@ class NavSDGDemo:
         self._dolly_light = None
         self._timeline = None
         self._frame_counter = 0
-        if self._stage_event_sub:
-            self._stage_event_sub.unsubscribe()
         self._stage_event_sub = None
-        if self._timeline_sub:
-            self._timeline_sub.unsubscribe()
         self._timeline_sub = None
         self._clear_sdg_render_products()
         self._stage = None
         self._in_running_state = False
 
-    def is_running(self):
+    def is_running(self) -> bool:
+        """Return whether the SDG demo is currently running."""
         return self._in_running_state
 
-    def _is_running_in_script_editor(self):
+    def _is_running_in_script_editor(self) -> bool:
+        """Return whether the script is running in the Isaac Sim script editor."""
         return builtins.ISAAC_LAUNCHED_FROM_TERMINAL is True
 
-    def _on_stage_closing_event(self, e: carb.events.IEvent):
+    def _on_stage_closing_event(self, e: carb.eventdispatcher.Event):
+        """Handle stage closing event by clearing state."""
         self.clear()
 
-    def _load_env(self):
-        # Fresh stage with custom physics scene for Nova Carter's navigation
+    def _load_env(self) -> None:
+        """Create a new stage and load environment, robot, dolly, light, and props."""
         create_new_stage()
         self._stage = omni.usd.get_context().get_stage()
-        self._add_physics_scene()
+        rep.functional.physics.create_physics_scene(
+            "/PhysicsScene", enableCCD=True, broadphaseType="MBP", enableGPUDynamics=False
+        )
 
         # Environment
         assets_root_path = get_assets_root_path()
-        add_reference_to_stage(usd_path=assets_root_path + next(self._cycled_env_urls), prim_path="/Environment")
+        rep.functional.create.reference(usd_path=assets_root_path + next(self._cycled_env_urls), name="Environment")
 
         # Nova Carter
-        add_reference_to_stage(usd_path=assets_root_path + self.CARTER_URL, prim_path="/NavWorld/CarterNav")
-        self._carter_nav_target = self._stage.GetPrimAtPath("/NavWorld/CarterNav/targetXform")
-        self._carter_chassis = self._stage.GetPrimAtPath("/NavWorld/CarterNav/chassis_link")
+        rep.functional.create.scope(name="NavWorld")
+        carter = rep.functional.create.reference(
+            position=(0, 0, 0),
+            rotation=(0, 0, 0),
+            usd_path=assets_root_path + self.CARTER_URL,
+            parent="/NavWorld",
+            name="CarterNav",
+        )
+
+        # Iterate children until targetXform (for navigation target) and chassis_link (for current location) are found
+        for child in carter.GetChildren():
+            if child.GetName() == "targetXform":
+                self._carter_nav_target = child
+                break
+        for child in carter.GetChildren():
+            if child.GetName() == "chassis_link":
+                self._carter_chassis = child
+                break
 
         # Dolly
-        add_reference_to_stage(usd_path=assets_root_path + self.DOLLY_URL, prim_path="/NavWorld/Dolly")
-        self._dolly = self._stage.GetPrimAtPath("/NavWorld/Dolly")
-        if not self._dolly.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(self._dolly).AddTranslateOp()
-        if not self._dolly.GetAttribute("xformOp:rotateXYZ"):
-            UsdGeom.Xformable(self._dolly).AddRotateXYZOp()
-        # Add colliders to the mesh and primitive types of the dolly descendent prims
-        for desc_prim in Usd.PrimRange(self._dolly):
-            # Enable collisions if the prim is of type mesh or gprim (primitive)
-            if desc_prim.IsA(UsdGeom.Mesh) or desc_prim.IsA(UsdGeom.Gprim):
-                if not desc_prim.HasAPI(UsdPhysics.CollisionAPI):
-                    collision_api = UsdPhysics.CollisionAPI.Apply(desc_prim)
-                else:
-                    collision_api = UsdPhysics.CollisionAPI(desc_prim)
-                collision_api.CreateCollisionEnabledAttr(True)
-            # If the prim is a mesh add a collider aproximation type
-            if desc_prim.IsA(UsdGeom.Mesh):
-                if not desc_prim.HasAPI(UsdPhysics.MeshCollisionAPI):
-                    mesh_collision_api = UsdPhysics.MeshCollisionAPI.Apply(desc_prim)
-                else:
-                    mesh_collision_api = UsdPhysics.MeshCollisionAPI(desc_prim)
-                # The prim is static, setting the collider type to "none" (defaulting to "TriangleMesh", e.g. no approx)
-                mesh_collision_api.CreateApproximationAttr().Set("none")
+        self._dolly = rep.functional.create.reference(
+            position=(0, 0, 0),
+            rotation=(0, 0, 0),
+            usd_path=assets_root_path + self.DOLLY_URL,
+            parent="/NavWorld",
+            name="Dolly",
+        )
+
+        # # Add colliders to the dolly and its geometry primitives
+        for desc_prim in self._dolly.GetChildren():
+            if desc_prim.IsA(UsdGeom.Gprim):
+                rep.functional.physics.apply_rigid_body(desc_prim)
 
         # Light
-        light = UsdLux.SphereLight.Define(self._stage, f"/NavWorld/DollyLight")
-        light.CreateRadiusAttr(0.5)
-        light.CreateIntensityAttr(35000)
-        light.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
-        self._dolly_light = light.GetPrim()
-        if not self._dolly_light.GetAttribute("xformOp:translate"):
-            UsdGeom.Xformable(self._dolly_light).AddTranslateOp()
+        self._dolly_light = rep.functional.create.sphere_light(
+            position=(0, 0, 0),
+            intensity=250000,
+            radius=0.3,
+            color=(1.0, 1.0, 1.0),
+            parent="/NavWorld",
+            name="DollyLight",
+        )
 
         # Props
         props_urls = []
@@ -198,15 +225,8 @@ class NavSDGDemo:
             prim.GetReferences().AddReference(prop_url)
             self._props.append(prim)
 
-    def _add_physics_scene(self):
-        # Physics setup specific for the navigation graph
-        physics_scene = UsdPhysics.Scene.Define(self._stage, "/physicsScene")
-        physx_scene = PhysxSchema.PhysxSceneAPI.Apply(self._stage.GetPrimAtPath("/physicsScene"))
-        physx_scene.GetEnableCCDAttr().Set(True)
-        physx_scene.GetEnableGPUDynamicsAttr().Set(False)
-        physx_scene.GetBroadphaseTypeAttr().Set("MBP")
-
-    def _randomize_dolly_pose(self):
+    def _randomize_dolly_pose(self) -> None:
+        """Set random dolly position ensuring minimum distance from Carter."""
         min_dist_from_carter = 4
         carter_loc = self._carter_chassis.GetAttribute("xformOp:translate").Get()
         for _ in range(100):
@@ -218,49 +238,57 @@ class NavSDGDemo:
                 break
         self._dolly.GetAttribute("xformOp:rotateXYZ").Set((0, 0, random.uniform(-180, 180)))
 
-    def _randomize_dolly_light(self):
+    def _randomize_dolly_light(self) -> None:
+        """Position light above dolly with random color."""
         dolly_loc = self._dolly.GetAttribute("xformOp:translate").Get()
-        self._dolly_light.GetAttribute("xformOp:translate").Set(dolly_loc + (0, 0, 2.5))
+        self._dolly_light.GetAttribute("xformOp:translate").Set(dolly_loc + (0, 0, 3))
         self._dolly_light.GetAttribute("inputs:color").Set(
             (random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1))
         )
 
-    def _randomize_prop_poses(self):
+    def _randomize_prop_poses(self) -> None:
+        """Stack props above the dolly with random horizontal offsets."""
         spawn_loc = self._dolly.GetAttribute("xformOp:translate").Get()
         spawn_loc[2] = spawn_loc[2] + 0.5
         for prop in self._props:
             prop.GetAttribute("xformOp:translate").Set(spawn_loc + (random.uniform(-1, 1), random.uniform(-1, 1), 0))
             spawn_loc[2] = spawn_loc[2] + 0.2
 
-    def _setup_sdg(self):
-        # Disable capture on play and async rendering
-        carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
-        carb.settings.get_settings().set("/omni/replicator/asyncRendering", False)
-        carb.settings.get_settings().set("/app/asyncRendering", False)
+    def _setup_sdg(self) -> None:
+        """Configure SDG settings, camera parameters, writer, and render products."""
+        rep.orchestrator.set_capture_on_play(False)
 
         # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
         carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
         # Set camera sensors fStop to 0.0 to get well lit sharp images
-        left_camera_prim = self._stage.GetPrimAtPath(self.LEFT_CAMERA_PATH)
+        left_camera_path = self._carter_chassis.GetPath().AppendPath(self.LEFT_CAMERA_REL_PATH)
+        left_camera_prim = self._stage.GetPrimAtPath(left_camera_path)
         left_camera_prim.GetAttribute("fStop").Set(0.0)
-        right_camera_prim = self._stage.GetPrimAtPath(self.RIGHT_CAMERA_PATH)
+        right_camera_path = self._carter_chassis.GetPath().AppendPath(self.RIGHT_CAMERA_REL_PATH)
+        right_camera_prim = self._stage.GetPrimAtPath(right_camera_path)
         right_camera_prim.GetAttribute("fStop").Set(0.0)
 
-        self._writer = rep.WriterRegistry.get("BasicWriter")
-        self._writer.initialize(output_dir=self._out_dir, rgb=True)
+        backend = rep.backends.get("DiskBackend")
+        backend.initialize(output_dir=self._out_dir)
+        print(f"[SDG] Writing data to: {self._out_dir}")
+        self._writer = rep.writers.get("BasicWriter")
+        self._writer.initialize(backend=backend, rgb=True)
         self._setup_sdg_render_products()
 
-    def _setup_sdg_render_products(self):
-        print(f"[NavSDGDemo] Creating SDG render products")
+    def _setup_sdg_render_products(self) -> None:
+        """Create and attach render products for left and right cameras."""
+        print(f"[SDG] Creating SDG render products")
+        left_camera_path = self._carter_chassis.GetPath().AppendPath(self.LEFT_CAMERA_REL_PATH)
         rp_left = rep.create.render_product(
-            self.LEFT_CAMERA_PATH,
+            str(left_camera_path),
             (1024, 1024),
             name="left_sensor",
             force_new=True,
         )
+        right_camera_path = self._carter_chassis.GetPath().AppendPath(self.RIGHT_CAMERA_REL_PATH)
         rp_right = rep.create.render_product(
-            self.RIGHT_CAMERA_PATH,
+            str(right_camera_path),
             (1024, 1024),
             name="right_sensor",
             force_new=True,
@@ -270,10 +298,10 @@ class NavSDGDemo:
         if self._use_temp_rp:
             self._disable_render_products()
         self._writer.attach(self._render_products)
-        rep.orchestrator.preview()
 
-    def _clear_sdg_render_products(self):
-        print(f"[NavSDGDemo] Clearing SDG render products")
+    def _clear_sdg_render_products(self) -> None:
+        """Detach writer and destroy all render products."""
+        print(f"[SDG] Clearing SDG render products")
         if self._writer:
             self._writer.detach()
         for rp in self._render_products:
@@ -282,43 +310,51 @@ class NavSDGDemo:
         if self._stage.GetPrimAtPath("/Replicator"):
             omni.kit.commands.execute("DeletePrimsCommand", paths=["/Replicator"])
 
-    def _enable_render_products(self):
-        print(f"[NavSDGDemo] Enabling render products for SDG..")
+    def _enable_render_products(self) -> None:
+        """Enable texture updates on all render products."""
+        print(f"[SDG] Enabling render products for SDG..")
         for rp in self._render_products:
             rp.hydra_texture.set_updates_enabled(True)
 
-    def _disable_render_products(self):
-        print(f"[NavSDGDemo] Disabling render products (enabled only during SDG)..")
+    def _disable_render_products(self) -> None:
+        """Disable texture updates on all render products."""
+        print(f"[SDG] Disabling render products (enabled only during SDG)..")
         for rp in self._render_products:
             rp.hydra_texture.set_updates_enabled(False)
 
-    def _run_sdg(self):
+    def _run_sdg(self) -> None:
+        """Execute one SDG capture step synchronously."""
         if self._use_temp_rp:
             self._enable_render_products()
         rep.orchestrator.step(rt_subframes=16)
         if self._use_temp_rp:
             self._disable_render_products()
 
-    async def _run_sdg_async(self):
+    async def _run_sdg_async(self) -> None:
+        """Execute one SDG capture step asynchronously."""
         if self._use_temp_rp:
             self._enable_render_products()
         await rep.orchestrator.step_async(rt_subframes=16)
         if self._use_temp_rp:
             self._disable_render_products()
 
-    def _load_next_env(self):
+    def _load_next_env(self) -> None:
+        """Replace current environment with the next one from the cycle."""
         if self._stage.GetPrimAtPath("/Environment"):
             omni.kit.commands.execute("DeletePrimsCommand", paths=["/Environment"])
         assets_root_path = get_assets_root_path()
-        add_reference_to_stage(usd_path=assets_root_path + next(self._cycled_env_urls), prim_path="/Environment")
+        rep.functional.create.scope(name="Environment")
+        rep.functional.create.reference(usd_path=assets_root_path + next(self._cycled_env_urls), name="Environment")
 
-    def _on_sdg_done(self, task):
+    def _on_sdg_done(self, task) -> None:
+        """Callback invoked when async SDG step completes."""
         self._setup_next_frame()
 
-    def _setup_next_frame(self):
+    def _setup_next_frame(self) -> None:
+        """Prepare scene for next frame or finish if all frames captured."""
         self._frame_counter += 1
         if self._frame_counter >= self._num_frames:
-            print(f"[NavSDGDemo] Finished")
+            print(f"[SDG] Finished")
             # Make sure the data has been written to disk before clearing the state
             if self._is_running_in_script_editor():
                 import asyncio
@@ -338,18 +374,20 @@ class NavSDGDemo:
         # Set a new random distance from which to take capture the next frame
         self._trigger_distance = random.uniform(1.75, 2.5)
         self._timeline.play()
-        self._timeline_sub = self._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-            int(omni.timeline.TimelineEventType.CURRENT_TIME_TICKED), self._on_timeline_event
+        self._timeline_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_CURRENT_TIME_TICKED,
+            on_event=self._on_timeline_event,
+            observer_name="amr_navigation.NavSDGDemo._on_timeline_event",
         )
 
-    def _on_timeline_event(self, e: carb.events.IEvent):
+    def _on_timeline_event(self, e: carb.eventdispatcher.Event):
+        """Check distance to dolly and trigger SDG capture when close enough."""
         carter_loc = self._carter_chassis.GetAttribute("xformOp:translate").Get()
         dolly_loc = self._dolly.GetAttribute("xformOp:translate").Get()
         dist = (Gf.Vec2f(dolly_loc[0], dolly_loc[1]) - Gf.Vec2f(carter_loc[0], carter_loc[1])).GetLength()
         if dist < self._trigger_distance:
-            print(f"[NavSDGDemo] Starting SDG for frame no. {self._frame_counter}")
+            print(f"[SDG] Starting SDG for frame no. {self._frame_counter}")
             self._timeline.pause()
-            self._timeline_sub.unsubscribe()
             if self._is_running_in_script_editor():
                 import asyncio
 
@@ -359,18 +397,6 @@ class NavSDGDemo:
                 self._run_sdg()
                 self._setup_next_frame()
 
-
-ENV_URLS = [
-    "/Isaac/Environments/Grid/default_environment.usd",
-    "/Isaac/Environments/Simple_Warehouse/warehouse.usd",
-    "/Isaac/Environments/Grid/gridroom_black.usd",
-]
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--use_temp_rp", action="store_true", help="Create and destroy render products for each SDG frame")
-parser.add_argument("--num_frames", type=int, default=9, help="The number of frames to capture")
-parser.add_argument("--env_interval", type=int, default=3, help="Interval at which to change the environments")
-args, unknown = parser.parse_known_args()
 
 out_dir = os.path.join(os.getcwd(), "_out_nav_sdg_demo", "")
 nav_demo = NavSDGDemo()

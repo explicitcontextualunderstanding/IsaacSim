@@ -22,6 +22,7 @@ import gc
 from typing import Callable, Optional
 
 import carb
+import carb.eventdispatcher
 
 # isaac-core
 import isaacsim.core.utils.numpy as np_utils
@@ -223,6 +224,7 @@ class SimulationContext:
             SimulationContext._instance._stage_open_callback = None
             SimulationContext._instance._physics_timer_callback = None
             SimulationContext._instance._event_timer_callback = None
+            SimulationContext._instance._on_post_physics_ready_callback = None
             SimulationContext._instance = None
             SimulationContext._sim_context_initialized = False
             SimulationManager.set_backend("numpy")
@@ -1001,7 +1003,7 @@ class SimulationContext:
 
         Args:
             callback_name (str): should be unique.
-            callback_fn (Callable[[float], None]): [description]
+            callback_fn (Callable[[float], None]): Function to call before each physics step, receives step size as argument.
 
         Example:
 
@@ -1016,7 +1018,9 @@ class SimulationContext:
             carb.log_error(f"Physics callback `{callback_name}` already exists")
             return
         self._physics_callback_functions[callback_name] = (
-            self._physics_context._physx_interface.subscribe_physics_step_events(callback_fn)
+            self._physics_context._physics_sim_interface.subscribe_physics_on_step_events(
+                pre_step=False, order=0, on_update=lambda step_dt, context: callback_fn(step_dt)
+            )
         )
         self._physics_functions[callback_name] = callback_fn
         return
@@ -1082,8 +1086,8 @@ class SimulationContext:
         ``callback_fn`` should take an argument of type ``omni.usd.StageEvent`` (e.g., ``event``)
 
         Args:
-            callback_name (str): [description]
-            callback_fn (Callable[[omni.usd.StageEvent], None]): [description]
+            callback_name (str): Unique name for the callback.
+            callback_fn (Callable[[omni.usd.StageEvent], None]): Function to call on stage events, receives stage event as argument.
 
         Example:
 
@@ -1161,8 +1165,8 @@ class SimulationContext:
         ``callback_fn`` should take an argument of type ``omni.timeline.TimelineEvent`` (e.g., ``event``)
 
         Args:
-            callback_name (str): [description]
-            callback_fn (Callable[[omni.timeline.TimelineEvent], None]): [description]
+            callback_name (str): Unique name for the callback.
+            callback_fn (Callable[[omni.timeline.TimelineEvent], None]): Function to call on timeline events, receives timeline event as argument.
 
         Example:
 
@@ -1240,8 +1244,8 @@ class SimulationContext:
         ``callback_fn`` should take an argument of type (e.g., ``event``)
 
         Args:
-            callback_name (str): [description]
-            callback_fn (Callable): [description]
+            callback_name (str): Unique name for the callback.
+            callback_fn (Callable): Function to call after each render, receives event as argument.
 
         Example:
 
@@ -1395,11 +1399,13 @@ class SimulationContext:
         return self.stage
 
     def _setup_default_callback_fns(self):
-        self._physics_timer_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
-            self._physics_timer_callback_fn
+        self._physics_timer_callback = self._physics_context._physics_sim_interface.subscribe_physics_on_step_events(
+            pre_step=False, order=0, on_update=self._physics_timer_callback_fn
         )
-        self._event_timer_callback = self._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-            int(omni.timeline.TimelineEventType.STOP), self._timeline_timer_callback_fn
+        self._event_timer_callback = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=self._timeline_timer_callback_fn,
+            observer_name="isaacsim.core.api.simulation_context.SimulationContext._timeline_timer_callback",
         )
         self._physics_callback_functions = dict()
         self._physics_functions = dict()
@@ -1416,13 +1422,13 @@ class SimulationContext:
     Default Callbacks.
     """
 
-    def _physics_timer_callback_fn(self, step_size: int):
+    def _physics_timer_callback_fn(self, step_size: int, context):
         self._current_time += step_size
         self._number_of_steps += 1
         return
 
     def _timeline_timer_callback_fn(self, event):
-        # because we use create_subscription_to_pop_by_type for omni.timeline.TimelineEventType.STOP, there is no need to check the type here
+        """Timeline stop event callback - reset simulation state."""
         self._current_time = 0
         self._number_of_steps = 0
         for callback_name in list(self._physics_callback_functions.keys()):
@@ -1450,5 +1456,7 @@ class SimulationContext:
     def _on_post_physics_ready(self, event):
         for callback_name, callback_function in self._physics_functions.items():
             self._physics_callback_functions[callback_name] = (
-                self._physics_context._physx_interface.subscribe_physics_step_events(callback_function)
+                self._physics_context._physics_sim_interface.subscribe_physics_on_step_events(
+                    pre_step=False, order=0, on_update=lambda step_dt, context: callback_function(step_dt)
+                )
             )

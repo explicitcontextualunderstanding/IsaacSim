@@ -17,13 +17,13 @@ from isaacsim.core.prims import SingleArticulation
 
 
 class RMPFlowController(mg.MotionPolicyController):
-    """[summary]
+    """RMPflow motion controller for the UR10 robot.
 
     Args:
-        name (str): [description]
-        robot_articulation (SingleArticulation): [description]
-        physics_dt (float, optional): [description]. Defaults to 1.0/60.0.
-        attach_gripper (bool, optional): [description]. Defaults to False.
+        name: Name identifier for the controller.
+        robot_articulation: The robot articulation to control.
+        physics_dt: Physics timestep.
+        attach_gripper: Whether gripper is attached.
     """
 
     def __init__(
@@ -32,7 +32,7 @@ class RMPFlowController(mg.MotionPolicyController):
         robot_articulation: SingleArticulation,
         physics_dt: float = 1.0 / 60.0,
         attach_gripper: bool = False,
-    ) -> None:
+    ):
 
         if attach_gripper:
             self.rmp_flow_config = mg.interface_config_loader.load_supported_motion_policy_config(
@@ -55,6 +55,10 @@ class RMPFlowController(mg.MotionPolicyController):
         return
 
     def reset(self):
+        """Resets the RMPflow controller to its default state.
+
+        Resets the motion policy controller and restores the robot base pose to the default position and orientation.
+        """
         mg.MotionPolicyController.reset(self)
         self._motion_policy.set_robot_base_pose(
             robot_position=self._default_position, robot_orientation=self._default_orientation

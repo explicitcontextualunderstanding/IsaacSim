@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utilities for USD stage operations in the mobility generation module."""
+
+
 import os
 import tempfile  # type: ignore
 from typing import Tuple  # type: ignore
@@ -31,19 +34,16 @@ def stage_add_camera(
 ) -> UsdGeom.Camera:
     """Adds a camera to a USD stage.
 
-
     Args:
-        stage (Usd.Stage): The USD stage to modify.
-        path (str): The path to add the USD prim.
-        focal_length (float): The focal length of the camera (default 35).
-        horizontal_aperature (float): The horizontal aperature of the camera
-            (default 20.955).
-        vertical_aperature (float): The vertical aperature of the camera
-            (default 20.955).
-        clipping_range (Tuple[float, float]): The clipping range of the camera.
+        stage: The USD stage to modify.
+        path: The path to add the USD prim.
+        focal_length: The focal length of the camera.
+        horizontal_aperature: The horizontal aperature of the camera.
+        vertical_aperature: The vertical aperature of the camera.
+        clipping_range: The clipping range of the camera.
 
-    returns:
-        UsdGeom.Camera:  The created USD camera.
+    Returns:
+        The created USD camera.
     """
 
     camera = UsdGeom.Camera.Define(stage, path)

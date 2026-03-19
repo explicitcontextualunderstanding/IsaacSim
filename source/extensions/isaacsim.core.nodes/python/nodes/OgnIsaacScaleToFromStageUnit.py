@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
-from isaacsim.core.utils.stage import get_stage_units
 
 
 class OgnIsaacScaleToFromStageUnit:
@@ -36,10 +36,10 @@ class OgnIsaacScaleToFromStageUnit:
             return False
 
         if conversion in db.tokens.toStage:
-            db.outputs.result.value = value / get_stage_units()
+            db.outputs.result.value = value / stage_utils.get_stage_units()[0]
 
         elif conversion in db.tokens.toMeters:
-            db.outputs.result.value = value * get_stage_units()
+            db.outputs.result.value = value * stage_utils.get_stage_units()[0]
 
         return True
 

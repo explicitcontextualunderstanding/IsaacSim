@@ -21,13 +21,15 @@ import sys
 
 import carb
 import numpy as np
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.materials.particle_material import ParticleMaterial
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import ClothPrim, SingleClothPrim, SingleParticleSystem
 from isaacsim.storage.native import get_assets_root_path
 from omni.physx.scripts import deformableUtils, physicsUtils
 from pxr import Gf, UsdGeom
+
+torch = import_module("torch")
 
 # The example shows how to create and manipulate environments with particle cloth through the ClothPrim
 parser = argparse.ArgumentParser()

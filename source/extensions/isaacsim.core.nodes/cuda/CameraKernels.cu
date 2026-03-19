@@ -99,7 +99,6 @@ extern "C" void uint32ToUint16(uint16_t *dest, const uint32_t *src, const int wi
 }
 
 
-// TODO : Refactor with the UINT16 version
 __global__ void uint32ToUint8Kernel(uint8_t *dest, const uint32_t *src, int width, int height, int srcStride)
 {
 

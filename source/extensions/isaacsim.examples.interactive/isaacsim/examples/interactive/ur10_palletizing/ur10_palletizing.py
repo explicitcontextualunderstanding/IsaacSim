@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Interactive example demonstrating robotic bin stacking using a UR10 robot with autonomous bin handling on a conveyor system."""
+
+
 import random
 
 import isaacsim.cortex.framework.math_util as math_util
@@ -31,6 +35,19 @@ from isaacsim.examples.interactive.cortex.cortex_base import CortexBase
 
 
 class Ur10Assets:
+    """Container for asset file paths used in the UR10 bin stacking demonstration.
+
+    This class provides centralized access to USD file paths for all assets required in the UR10 bin stacking
+    scenario, including the robot workspace, bins, environment backgrounds, and interactive objects. All paths
+    are resolved relative to the Isaac Sim assets root directory.
+
+    The class initializes paths for:
+    - UR10 robot table setup with suction gripper
+    - Small KLT bins for stacking operations
+    - Warehouse environment background
+    - Rubik's cube props for manipulation tasks
+    """
+
     def __init__(self):
         self.assets_root_path = get_assets_root_path()
 
@@ -42,7 +59,16 @@ class Ur10Assets:
         self.rubiks_cube_usd = self.assets_root_path + "/Isaac/Props/Rubiks_Cube/rubiks_cube.usd"
 
 
-def random_bin_spawn_transform():
+def random_bin_spawn_transform() -> tuple[np.ndarray, np.ndarray]:
+    """Generate a random spawn transform for a bin on the conveyor.
+
+    Creates a randomized position and orientation for spawning bins. The position has random x-coordinate
+    within the conveyor width, with a 50% chance of flipping the bin upside down for varied orientations.
+
+    Returns:
+        A tuple containing (position, quaternion) where position is the spawn coordinates and quaternion
+        represents the orientation values.
+    """
     x = random.uniform(-0.15, 0.15)
     y = 1.5
     z = -0.15
@@ -63,7 +89,24 @@ def random_bin_spawn_transform():
 
 
 class BinStackingTask(BaseTask):
-    def __init__(self, env_path, assets) -> None:
+    """A robotic task for bin stacking automation using a UR10 robot.
+
+    This task manages the dynamic spawning and manipulation of bins on a conveyor system. It continuously
+    spawns bins with random orientations and positions, monitors their movement through the conveyor system,
+    and coordinates with the robot's behavior system for stacking operations. The task handles bin lifecycle
+    management including creation, tracking, and cleanup of bin objects in the simulation environment.
+
+    The task integrates with Isaac Sim's Cortex framework to provide autonomous bin handling capabilities.
+    Bins are spawned with random orientations (including potential upside-down configurations) and initial
+    velocities to simulate realistic conveyor belt behavior. The system tracks bins as they move through
+    different zones and triggers new bin spawning when previous bins have been processed.
+
+    Args:
+        env_path: Path to the environment in the USD stage where bins will be spawned.
+        assets: Asset manager containing USD file paths for bin models and other required assets.
+    """
+
+    def __init__(self, env_path, assets):
         super().__init__("bin_stacking")
         self.assets = assets
 
@@ -72,13 +115,25 @@ class BinStackingTask(BaseTask):
         self.stashed_bins = []
         self.on_conveyor = None
 
-    def _spawn_bin(self, rigid_bin):
+    def _spawn_bin(self, rigid_bin: CortexRigidPrim):
+        """Spawns a bin at a random position and orientation on the conveyor.
+
+        Sets the bin's world pose with random position and orientation, applies initial velocity,
+        and makes it visible in the scene.
+
+        Args:
+            rigid_bin: The rigid bin prim to spawn on the conveyor.
+        """
         x, q = random_bin_spawn_transform()
         rigid_bin.set_world_pose(position=x, orientation=q)
         rigid_bin.set_linear_velocity(np.array([0, -0.30, 0]))
         rigid_bin.set_visibility(True)
 
-    def post_reset(self) -> None:
+    def post_reset(self):
+        """Resets the task state after a reset event.
+
+        Removes all existing bins from the scene, clears the bins list, and resets the conveyor state.
+        """
         if len(self.bins) > 0:
             for rigid_bin in self.bins:
                 self.scene.remove_object(rigid_bin.name)
@@ -86,8 +141,13 @@ class BinStackingTask(BaseTask):
 
         self.on_conveyor = None
 
-    def pre_step(self, time_step_index, simulation_time) -> None:
-        """Spawn a new randomly oriented bin if the previous bin has been placed."""
+    def pre_step(self, time_step_index: int, simulation_time: float):
+        """Spawn a new randomly oriented bin if the previous bin has been placed.
+
+        Args:
+            time_step_index: The current simulation time step index.
+            simulation_time: The current simulation time in seconds.
+        """
         spawn_new = False
         if self.on_conveyor is None:
             spawn_new = True
@@ -107,6 +167,10 @@ class BinStackingTask(BaseTask):
             self.bins.append(self.on_conveyor)
 
     def world_cleanup(self):
+        """Cleans up all task-related objects and resets internal state.
+
+        Clears the bins list, stashed bins list, and resets the conveyor reference.
+        """
         self.bins = []
         self.stashed_bins = []
         self.on_conveyor = None
@@ -114,12 +178,49 @@ class BinStackingTask(BaseTask):
 
 
 class BinStacking(CortexBase):
+    """Interactive example demonstrating robotic bin stacking using a UR10 robot.
+
+    This class sets up a complete bin stacking simulation where a UR10 robot autonomously picks up bins
+    from a conveyor belt and stacks them. The simulation includes:
+
+    - A UR10 robot with suction gripper capabilities
+    - Dynamic bin spawning on a moving conveyor belt with random orientations
+    - Intelligent behavior system for bin detection, pickup, and stacking
+    - Collision avoidance with registered obstacles
+    - Real-time decision monitoring and diagnostics
+
+    The robot uses Cortex behavior trees to autonomously:
+
+    1. Detect bins arriving on the conveyor belt
+    2. Plan collision-free paths to approach bins
+    3. Handle bins in various orientations (including upside-down)
+    4. Pick up bins using suction gripper
+    5. Navigate to stacking location while avoiding obstacles
+    6. Stack bins in an organized manner
+
+    The simulation continuously spawns new bins with random positions and orientations, creating an
+    ongoing stacking task. Each bin may be oriented normally or flipped upside-down, requiring the
+    robot to adapt its approach strategy.
+
+    Obstacles are registered around the workspace including navigation barriers, flip station spheres,
+    and dome constraints to ensure safe robot operation.
+
+    Args:
+        monitor_fn: Optional callback function for receiving behavior diagnostics and decision stack
+            updates during simulation execution.
+    """
+
     def __init__(self, monitor_fn=None):
         super().__init__()
         self._monitor_fn = monitor_fn
         self.robot = None
 
     def setup_scene(self):
+        """Sets up the bin stacking scene with the UR10 robot, obstacles, and environment.
+
+        Creates the robot workspace including the UR10 table, background environment, and collision obstacles
+        for navigation and manipulation planning.
+        """
         world = self.get_world()
         env_path = "/World/Ur10Table"
         ur10_assets = Ur10Assets()
@@ -182,6 +283,11 @@ class BinStacking(CortexBase):
         self.robot.register_obstacle(obs)
 
     async def setup_post_load(self):
+        """Configures the bin stacking task and decision network after scene loading.
+
+        Initializes the BinStackingTask, sets up the scene components, and creates the behavior decision
+        network for autonomous bin manipulation operations.
+        """
         world = self.get_world()
         env_path = "/World/Ur10Table"
         ur10_assets = Ur10Assets()
@@ -199,6 +305,14 @@ class BinStacking(CortexBase):
         return
 
     def _on_monitor_update(self, diagnostics):
+        """Handles updates from the decision network monitoring system.
+
+        Formats the decision stack information and forwards diagnostics data to the registered monitor
+        function for display or logging purposes.
+
+        Args:
+            diagnostics: Diagnostic information from the decision network monitoring system.
+        """
         decision_stack = ""
         if self.decider_network._decider_state.stack:
             decision_stack = "\n".join(
@@ -212,11 +326,24 @@ class BinStacking(CortexBase):
             self._monitor_fn(diagnostics, decision_stack)
 
     def _on_physics_step(self, step_size):
+        """Executes a single physics simulation step.
+
+        Advances the world simulation by one step without rendering to maintain physics calculations
+        for the bin stacking scenario.
+
+        Args:
+            step_size: The time step size for the physics simulation.
+        """
         world = self.get_world()
         world.step(False, False)
         return
 
     async def on_event_async(self):
+        """Handles asynchronous event processing for the bin stacking scenario.
+
+        Resets the Cortex system, registers the physics step callback, and starts the simulation
+        playback for autonomous bin manipulation operations.
+        """
         world = self.get_world()
         await omni.kit.app.get_app().next_update_async()
         world.reset_cortex()
@@ -225,10 +352,18 @@ class BinStacking(CortexBase):
         return
 
     async def setup_pre_reset(self):
+        """Prepares the scene for reset by cleaning up physics callbacks.
+
+        Removes the physics step callback to ensure proper cleanup before the simulation reset.
+        """
         world = self.get_world()
         if world.physics_callback_exists("sim_step"):
             world.remove_physics_callback("sim_step")
         return
 
     def world_cleanup(self):
+        """Performs cleanup operations for the bin stacking world.
+
+        Clears any remaining world state and prepares for scene teardown or reinitialization.
+        """
         return

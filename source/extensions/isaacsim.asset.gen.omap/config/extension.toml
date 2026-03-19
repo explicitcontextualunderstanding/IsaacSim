@@ -1,5 +1,5 @@
 [package]
-version = "2.0.29"
+version = "2.2.1"
 category = "Simulation"
 title = "Isaac Sim Occupancy Map"
 description = "The Isaac Sim Occupancy Map extension provides tools to generate occupancy maps for a Scene"
@@ -14,6 +14,8 @@ writeTarget.kit = true
 "isaacsim.core.deprecation_manager" = {}
 "isaacsim.util.debug_draw" = {}
 "omni.kit.pip_archive" = {}
+"omni.physics.physx" = {}
+"omni.physics.stageupdate" = {}
 "omni.physx" = {}
 
 [[python.module]]
@@ -29,9 +31,8 @@ recursive = false
 [[test]]
 timeout = 900
 dependencies = [
-    "isaacsim.core.utils",
+    "isaacsim.core.experimental.utils",
     "isaacsim.storage.native",
-    "omni.hydra.usdrt_delegate",
     "isaacsim.test.docstring",
 ]
 args = [
@@ -42,7 +43,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -58,6 +59,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",

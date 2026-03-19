@@ -68,10 +68,6 @@ class TestArticulationDeterminism(CoreTestCase):
         (result, error) = await open_stage_async(
             self._assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         )
-        carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", True)
-        carb.settings.get_settings().set_int("/app/runLoops/main/rateLimitFrequency", int(60))
-        carb.settings.get_settings().set_int("/persistent/simulation/minFrameRate", int(60))
-        omni.usd.get_context().get_stage().SetTimeCodesPerSecond(60)
         robot_prim_path = "/panda"
         my_world = World(device="cpu")  # Create a new default world to reset any physics settings.
         await my_world.initialize_simulation_context_async()

@@ -1,4 +1,25 @@
 # Changelog
+
+## [2.2.1] - 2025-11-19
+### Changed
+- Update to use new debug draw plugin interface
+
+## [2.2.0] - 2025-11-08
+### Changed
+- Improve docstrings and cleanup codebase
+
+## [2.1.1] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [2.1.0] - 2025-10-29
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [2.0.30] - 2025-10-23
+### Changed
+- Add omni.physics.stageupdate to extension.toml
+
 ## [2.0.29] - 2025-09-26
 ### Changed
 - Update license headers
@@ -38,7 +59,7 @@
 
 ## [2.0.20] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.0.19] - 2025-04-09
 ### Changed
@@ -95,7 +116,7 @@
 
 ## [2.0.6] - 2024-11-06
 ### Changed
-- nucleus import update
+- Nucleus import update
 
 ## [2.0.5] - 2024-11-04
 ### Changed
@@ -184,7 +205,7 @@
 
 ## [0.2.4] - 2022-05-24
 ### Fixed
-- block world default to meters
+- Block world default to meters
 
 ## [0.2.3] - 2022-05-16
 ### Fixed

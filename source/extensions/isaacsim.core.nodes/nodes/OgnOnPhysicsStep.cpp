@@ -19,11 +19,12 @@
 
 #include <carb/Defines.h>
 #include <carb/Types.h>
-#include <carb/events/EventsUtils.h>
+#include <carb/eventdispatcher/IEventDispatcher.h>
 #include <carb/logging/Logger.h>
 
 #include <isaacsim/core/includes/BaseResetNode.h>
 #include <isaacsim/core/nodes/ICoreNodes.h>
+#include <omni/timeline/TimelineTypes.h>
 #include <omni/usd/UsdContextIncludes.h>
 //
 #include <omni/physx/IPhysx.h>
@@ -60,9 +61,7 @@ std::map<GraphHandle, PhysicsStepData> g_graphsWithPhysxStepNode;
 class OgnOnPhysicsStep
 {
 public:
-    OgnOnPhysicsStep()
-    {
-    }
+    OgnOnPhysicsStep() = default;
 
     static void start(const NodeObj& nodeObj, GraphInstanceID instanceId)
     {
@@ -98,12 +97,11 @@ public:
         auto& state = OgnOnPhysicsStepDatabase::sPerInstanceState<OgnOnPhysicsStep>(nodeObj, instanceId);
         if (!state.m_timelineEventSub)
         {
-            state.m_timeline = carb::getCachedInterface<omni::timeline::ITimeline>();
-            state.m_timelineEventSub = carb::events::createSubscriptionToPopByType(
-                state.m_timeline->getTimeline()->getTimelineEventStream(),
-                static_cast<carb::events::EventType>(omni::timeline::TimelineEventType::ePlay),
-                [nodeObj, instanceId](const carb::events::IEvent* e) { start(nodeObj, instanceId); }, 0,
-                "IsaacSimOGNPhysicStepsTimelineEventHandler");
+            auto ed = carb::getCachedInterface<carb::eventdispatcher::IEventDispatcher>();
+            state.m_timelineEventSub = ed->observeEvent(
+                carb::RStringKey("IsaacSimOGNPhysicStepsTimelineEventHandler"), carb::eventdispatcher::kDefaultOrder,
+                omni::timeline::kGlobalEventPlay,
+                [nodeObj, instanceId](const carb::eventdispatcher::Event&) { start(nodeObj, instanceId); });
         }
         if (pipelineStage != kGraphPipelineStage_OnDemand)
         {
@@ -166,7 +164,7 @@ public:
     {
         unsubscribe(nodeObj);
         auto& state = OgnOnPhysicsStepDatabase::sPerInstanceState<OgnOnPhysicsStep>(nodeObj, instanceId);
-        state.m_timelineEventSub->unsubscribe();
+        state.m_timelineEventSub.reset();
     }
 
 
@@ -228,8 +226,7 @@ private:
     bool m_isSet = false;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_startTime;
     HandleIdPair m_graphHandlePair;
-    carb::events::ISubscriptionPtr m_timelineEventSub = nullptr;
-    omni::timeline::ITimeline* m_timeline = nullptr;
+    carb::eventdispatcher::ObserverGuard m_timelineEventSub;
 };
 
 REGISTER_OGN_NODE()

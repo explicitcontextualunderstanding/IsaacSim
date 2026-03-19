@@ -15,10 +15,10 @@
 
 import omni.kit.test
 import omni.usd
-from isaacsim.core.utils.stage import create_new_stage_async, is_stage_loading, update_stage_async
+from isaacsim.core.experimental.utils.stage import create_new_stage_async, is_stage_loading
 from isaacsim.sensors.camera import SingleViewDepthSensor, SingleViewDepthSensorAsset
 from isaacsim.storage.native import get_assets_root_path
-from pxr import Usd, UsdGeom
+from pxr import UsdGeom
 
 
 class TestSingleViewDepthSensorAsset(omni.kit.test.AsyncTestCase):
@@ -27,11 +27,10 @@ class TestSingleViewDepthSensorAsset(omni.kit.test.AsyncTestCase):
     async def setUp(self):
         """Set up test environment by creating a new stage."""
         await create_new_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         while is_stage_loading():
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
         self.assets_root_path = get_assets_root_path()
-        return
 
     async def test_valid_asset_path_initialization_and_depth_sensor_access(self):
         """Test valid asset path initialization and depth sensor access."""

@@ -25,15 +25,15 @@ from isaacsim.core.utils.string import find_unique_string_name
 
 
 class Stacking(ABC, BaseTask):
-    """[summary]
+    """Abstract task for stacking multiple cubes with a robot.
 
     Args:
-        name (str): [description]
-        cube_initial_positions (np.ndarray): [description]
-        cube_initial_orientations (Optional[np.ndarray], optional): [description]. Defaults to None.
-        stack_target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_size (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
+        name: Task name identifier.
+        cube_initial_positions: Initial positions for all cubes.
+        cube_initial_orientations: Initial orientations for cubes. Defaults to None.
+        stack_target_position: Position to stack cubes at. Defaults to None.
+        cube_size: Size of each cube. Defaults to None.
+        offset: Offset for all task objects. Defaults to None.
     """
 
     def __init__(
@@ -63,10 +63,10 @@ class Stacking(ABC, BaseTask):
         return
 
     def set_up_scene(self, scene: Scene) -> None:
-        """[summary]
+        """Set up the scene with cubes and robot.
 
         Args:
-            scene (Scene): [description]
+            scene: The scene to populate.
         """
         super().set_up_scene(scene)
         scene.add_default_ground_plane()
@@ -100,10 +100,10 @@ class Stacking(ABC, BaseTask):
 
     @abstractmethod
     def set_robot(self) -> None:
-        """[summary]
+        """Create and return the robot for this task.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
         """
         raise NotImplementedError
 
@@ -114,13 +114,13 @@ class Stacking(ABC, BaseTask):
         cube_orientation: Optional[str] = None,
         stack_target_position: Optional[str] = None,
     ) -> None:
-        """[summary]
+        """Set task parameters.
 
         Args:
-            cube_name (Optional[str], optional): [description]. Defaults to None.
-            cube_position (Optional[str], optional): [description]. Defaults to None.
-            cube_orientation (Optional[str], optional): [description]. Defaults to None.
-            stack_target_position (Optional[str], optional): [description]. Defaults to None.
+            cube_name: Name of cube to modify. Defaults to None.
+            cube_position: New position for cube. Defaults to None.
+            cube_orientation: New orientation for cube. Defaults to None.
+            stack_target_position: New stack target position. Defaults to None.
         """
         if stack_target_position is not None:
             self._stack_target_position = stack_target_position
@@ -129,10 +129,10 @@ class Stacking(ABC, BaseTask):
         return
 
     def get_params(self) -> dict:
-        """[summary]
+        """Get task parameters.
 
         Returns:
-            dict: [description]
+            Dictionary of task parameters.
         """
         params_representation = dict()
         params_representation["stack_target_position"] = {"value": self._stack_target_position, "modifiable": True}
@@ -140,10 +140,10 @@ class Stacking(ABC, BaseTask):
         return params_representation
 
     def get_observations(self) -> dict:
-        """[summary]
+        """Get current task observations.
 
         Returns:
-            dict: [description]
+            Dictionary with cube and robot observations.
         """
         joints_state = self._robot.get_joints_state()
         end_effector_position, _ = self._robot.end_effector.get_local_pose()
@@ -169,16 +169,16 @@ class Stacking(ABC, BaseTask):
         return observations
 
     def pre_step(self, time_step_index: int, simulation_time: float) -> None:
-        """[summary]
+        """Called before each physics step.
 
         Args:
-            time_step_index (int): [description]
-            simulation_time (float): [description]
+            time_step_index: Current simulation step index.
+            simulation_time: Current simulation time.
         """
         return
 
     def post_reset(self) -> None:
-        """[summary]"""
+        """Called after world reset to open gripper."""
         from isaacsim.robot.manipulators.grippers.parallel_gripper import ParallelGripper
 
         if isinstance(self._robot.gripper, ParallelGripper):
@@ -186,10 +186,10 @@ class Stacking(ABC, BaseTask):
         return
 
     def get_cube_names(self) -> List[str]:
-        """[summary]
+        """Get the names of all cubes in the task.
 
         Returns:
-            List[str]: [description]
+            List of cube names.
         """
         cube_names = []
         for i in range(self._num_of_cubes):
@@ -197,23 +197,23 @@ class Stacking(ABC, BaseTask):
         return cube_names
 
     def calculate_metrics(self) -> dict:
-        """[summary]
+        """Calculate task metrics.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
-            dict: [description]
+            Dictionary of task metrics.
         """
         raise NotImplementedError
 
     def is_done(self) -> bool:
-        """[summary]
+        """Check if task is complete.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: Must be implemented by subclass.
 
         Returns:
-            bool: [description]
+            True if task is done, False otherwise.
         """
         raise NotImplementedError

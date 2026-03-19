@@ -1,5 +1,5 @@
 [package]
-version = "0.2.7"
+version = "0.3.3"
 category = "Utility"
 title = "Deprecation manager"
 description = "Manage deprecated OmniGraph nodes and app/extension settings"
@@ -19,7 +19,7 @@ writeTarget.kit = true
 name = "isaacsim.core.deprecation_manager"
 
 [settings]
-# list of deprecated settings and their replacements
+# List of deprecated settings and their replacements.
 exts."isaacsim.core.deprecation_manager".settings = [
     # omni.isaac.benchmark.services -> isaacsim.benchmark.services
     { deprecated = "/exts/omni.isaac.benchmark.services/metrics/metrics_output_folder", new = "/exts/isaacsim.benchmark.services/metrics/metrics_output_folder", update = true },
@@ -45,12 +45,8 @@ exts."isaacsim.core.deprecation_manager".settings = [
     { deprecated = "/exts/omni.isaac.ros2_bridge/publish_multithreading_disabled", new = "/exts/isaacsim.ros2.bridge/publish_multithreading_disabled", update = true },
     # omni.isaac.tf_viewer -> isaacsim.ros2.tf_viewer
     { deprecated = "/exts/omni.isaac.tf_viewer/cpp", new = "/exts/isaacsim.ros2.tf_viewer/cpp", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/folder", new = "/exts/isaacsim.asset.browser/folder", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/instanceable", new = "/exts/isaacsim.asset.browser/instanceable", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/data/timeout", new = "/exts/isaacsim.asset.browser/data/timeout", update = true },
-    { deprecated = "/exts/omni.isaac.asset_browser/visible_after_startup", new = "/exts/isaacsim.asset.browser/visible_after_startup", update = true },
 ]
-# List of deprecated OmniGraph nodes and their replacements
+# List of deprecated OmniGraph nodes and their replacements.
 exts."isaacsim.core.deprecation_manager".omnigraph = [
     { deprecated = "omni.isaac.isaac_sensor", new = "isaacsim.sensors.rtx" },
     { deprecated = "omni.isaac.conveyor", new = "isaacsim.asset.gen.conveyor" },

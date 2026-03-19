@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-
 import carb
+import numpy as np
 import omni.kit.window.property
 from isaacsim.replicator.behavior.global_variables import EXPOSED_ATTR_NS
 from isaacsim.replicator.behavior.utils.behavior_utils import (
@@ -29,7 +28,7 @@ from isaacsim.replicator.behavior.utils.scene_utils import (
     set_rotation_op_and_value,
     set_rotation_with_ops,
 )
-from omni.kit.scripting import BehaviorScript
+from omni.behavior.scripting.core import BehaviorScript
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 
@@ -67,10 +66,17 @@ class RotationRandomizer(BehaviorScript):
             "default_value": 0,
             "doc": "Interval for updating the behavior. Value 0 means every frame.",
         },
+        {
+            "attr_name": "seed",
+            "attr_type": Sdf.ValueTypeNames.Int,
+            "default_value": -1,
+            "doc": "Random seed for reproducible randomization. Use -1 for non-deterministic behavior.",
+        },
     ]
 
     def on_init(self):
         """Called when the script is assigned to a prim."""
+        self._rng = None
         self._min_rotation = Gf.Vec3d(0.0, 0.0, 0.0)
         self._max_rotation = Gf.Vec3d(360.0, 360.0, 360.0)
         self._update_counter = 0
@@ -121,6 +127,11 @@ class RotationRandomizer(BehaviorScript):
         self._max_rotation = self._get_exposed_variable("range:maxRotation")
         include_children = self._get_exposed_variable("includeChildren")
         self._interval = self._get_exposed_variable("interval")
+        seed = self._get_exposed_variable("seed")
+
+        # Initialize the random number generator (use seed if valid, otherwise non-deterministic)
+        if self._rng is None:
+            self._rng = np.random.default_rng(seed if seed >= 0 else None)
 
         # Get the prims to apply the behavior to
         if include_children:
@@ -146,6 +157,7 @@ class RotationRandomizer(BehaviorScript):
         self._initial_rotations.clear()
         self._interval = 0
         self._update_counter = 0
+        self._rng = None
 
     def _apply_behavior(self):
         # Randomize the rotation for each valid prim
@@ -155,9 +167,9 @@ class RotationRandomizer(BehaviorScript):
     def _randomize_rotation(self, prim):
         # Create a Gf.Rotation from random Euler angles within the bounds
         rotation = (
-            Gf.Rotation(Gf.Vec3d.XAxis(), random.uniform(self._min_rotation[0], self._max_rotation[0]))
-            * Gf.Rotation(Gf.Vec3d.YAxis(), random.uniform(self._min_rotation[1], self._max_rotation[1]))
-            * Gf.Rotation(Gf.Vec3d.ZAxis(), random.uniform(self._min_rotation[2], self._max_rotation[2]))
+            Gf.Rotation(Gf.Vec3d.XAxis(), self._rng.uniform(self._min_rotation[0], self._max_rotation[0]))
+            * Gf.Rotation(Gf.Vec3d.YAxis(), self._rng.uniform(self._min_rotation[1], self._max_rotation[1]))
+            * Gf.Rotation(Gf.Vec3d.ZAxis(), self._rng.uniform(self._min_rotation[2], self._max_rotation[2]))
         )
         # Set the rotation using and existing xformOp (orient, rotate, transform) or create a new default xformOp:orient
         set_rotation_with_ops(prim, rotation)
@@ -165,3 +177,11 @@ class RotationRandomizer(BehaviorScript):
     def _get_exposed_variable(self, attr_name):
         full_attr_name = f"{EXPOSED_ATTR_NS}:{self.BEHAVIOR_NS}:{attr_name}"
         return get_exposed_variable(self.prim, full_attr_name)
+
+    def set_rng(self, rng: np.random.Generator | None = None):
+        """Set the random number generator, overriding the USD seed attribute.
+
+        Args:
+            rng: Numpy random generator. If None, creates a new default generator.
+        """
+        self._rng = rng if rng is not None else np.random.default_rng()

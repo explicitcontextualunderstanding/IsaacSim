@@ -1,11 +1,11 @@
 [package]
-version = "2.1.23"
+version = "2.2.0"
 category = "Simulation"
 title = "Wheeled Robots UI"
 description = "This extension provides the UI elements for the wheeled_robots extension"
 keywords = ["isaac", "physics", "analyze", "tune", "ui"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -23,7 +23,23 @@ writeTarget.kit = true
 name = "isaacsim.robot.wheeled_robots.ui"
 
 [[test]]
-dependencies = []
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+stdoutFailPatterns.exclude = [    
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
+dependencies = [
+    "isaacsim.test.utils",
+    "omni.isaac.ml_archive",
+]
 args = [
     "--enable",
     "omni.kit.loop-isaac",
@@ -32,7 +48,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -48,6 +64,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -72,8 +89,9 @@ args = [
     "--/app/window/scaleToMonitor=false",
 ]
 
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
+stdoutFailPatterns.exclude = [    
+    '*The NumPy module was reloaded*',
 ]
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

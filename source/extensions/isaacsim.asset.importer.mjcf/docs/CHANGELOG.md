@@ -1,4 +1,36 @@
 # Changelog
+
+## [3.2.0] - 2026-03-04
+### Changed
+- Added scene import option for the MJCF importer
+- MJCF converter version bump to 0.1.0a8
+
+## [3.1.0] - 2026-02-25
+### Changed
+- Added mjc / newton to physx attribute conversion for multi-physics engine asset support
+
+## [3.0.2] - 2026-02-25
+### Changed
+- Changed dep from pip prebundle to isaacsim.pip.newton
+
+## [3.0.1] - 2026-02-25
+### Changed
+- Switched to lazy import for mjcf-usd-converter to fix docs build issue
+
+## [3.0.0] - 2026-01-01
+### Changed
+- USD exchange backend
+- New import format
+- New UI design and interface
+
+## [2.5.15] - 2025-12-07
+### Changed
+- Update description
+
+## [2.5.14] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
 ## [2.5.13] - 2025-09-26
 ### Changed
 - Update license headers
@@ -164,7 +196,7 @@
 - Change the import options
 
 ### Removed
-- standalone window import
+- Standalone window import
 
 ## [2.0.0] - 2024-09-20
 ### Changed

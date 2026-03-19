@@ -17,13 +17,13 @@
 import asyncio
 
 import carb
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.graph.core as og
 import omni.graph.core.tests as ogts
 import omni.kit.test
-from isaacsim.core.api.robots import Robot
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.stage import open_stage_async
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.storage.native import get_assets_root_path_async
 
 
@@ -31,15 +31,12 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
     async def setUp(self):
         """Set up  test environment, to be torn down when done"""
         await omni.usd.get_context().new_stage_async()
-        self._timeline = omni.timeline.get_timeline_interface()
         # add franka robot for test
         assets_root_path = await get_assets_root_path_async()
         if assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
-        (result, error) = await open_stage_async(
-            assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
-        )
+        await stage_utils.open_stage_async(assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd")
 
     # ----------------------------------------------------------------------
     async def tearDown(self):
@@ -79,13 +76,11 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         )
 
         # set a specific robot state
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(1)
-        robot.initialize()
-        robot.set_joint_positions([-1.0, 1.2], joint_indices=[1, 2])
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=60)
+        robot.set_dof_positions([-1.0, 1.2], dof_indices=[1, 2])
+        await app_utils.update_app_async(steps=2)
 
         # check where the joints are after evaluate
         await og.Controller.evaluate(test_graph)
@@ -103,9 +98,9 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         print(joint_forces)
         print(joint_torques)
 
-        robot_joint_positions = robot.get_joint_positions()
-        robot_joint_velocities = robot.get_joint_velocities()
-        robot_measured_joint_efforts = robot.get_measured_joint_efforts()
+        robot_joint_positions = robot.get_dof_positions().numpy()[0]
+        robot_joint_velocities = robot.get_dof_velocities().numpy()[0]
+        robot_measured_joint_efforts = robot.get_dof_projected_joint_forces().numpy()[0]
 
         self.assertEqual(len(joint_names), 2)
         self.assertEqual(len(joint_positions), 2)
@@ -149,13 +144,11 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         )
 
         # set a specific robot state
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(1)
-        robot.initialize()
-        robot.set_joint_positions([-1.0, 1.2], joint_indices=[1, 2])
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=60)
+        robot.set_dof_positions([-1.0, 1.2], dof_indices=[1, 2])
+        await app_utils.update_app_async(steps=2)
 
         # check where the joints are after evaluate
         await og.Controller.evaluate(test_graph)
@@ -173,9 +166,9 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         print(joint_forces)
         print(joint_torques)
 
-        robot_joint_positions = robot.get_joint_positions()
-        robot_joint_velocities = robot.get_joint_velocities()
-        robot_measured_joint_efforts = robot.get_measured_joint_efforts()
+        robot_joint_positions = robot.get_dof_positions().numpy()[0]
+        robot_joint_velocities = robot.get_dof_velocities().numpy()[0]
+        robot_measured_joint_efforts = robot.get_dof_projected_joint_forces().numpy()[0]
 
         self.assertEqual(len(joint_names), 2)
         self.assertEqual(len(joint_positions), 2)
@@ -207,13 +200,11 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         )
 
         # set a specific robot state
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(1)
-        robot.initialize()
-        robot.set_joint_positions([-1.0, 1.2], joint_indices=[1, 2])
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=60)
+        robot.set_dof_positions([-1.0, 1.2], dof_indices=[1, 2])
+        await app_utils.update_app_async(steps=2)
 
         # check where the joints are after evaluate
         await og.Controller.evaluate(test_graph)
@@ -231,9 +222,9 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         print(joint_forces)
         print(joint_torques)
 
-        robot_joint_positions = robot.get_joint_positions()
-        robot_joint_velocities = robot.get_joint_velocities()
-        robot_measured_joint_efforts = robot.get_measured_joint_efforts()
+        robot_joint_positions = robot.get_dof_positions().numpy()[0]
+        robot_joint_velocities = robot.get_dof_velocities().numpy()[0]
+        robot_measured_joint_efforts = robot.get_dof_projected_joint_forces().numpy()[0]
 
         self.assertEqual(len(joint_names), 9)
         self.assertEqual(len(joint_positions), 9)
@@ -271,13 +262,11 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         )
 
         # set a specific robot state
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(1)
-        robot.initialize()
-        robot.set_joint_positions([-1.0], joint_indices=[2])
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=60)
+        robot.set_dof_positions([-1.0], dof_indices=[2])
+        await app_utils.update_app_async(steps=2)
 
         # check where the joints are after evaluate
         await og.Controller.evaluate(test_graph)
@@ -295,9 +284,9 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         print(joint_forces)
         print(joint_torques)
 
-        robot_joint_positions = robot.get_joint_positions()
-        robot_joint_velocities = robot.get_joint_velocities()
-        robot_measured_joint_efforts = robot.get_measured_joint_efforts()
+        robot_joint_positions = robot.get_dof_positions().numpy()[0]
+        robot_joint_velocities = robot.get_dof_velocities().numpy()[0]
+        robot_measured_joint_efforts = robot.get_dof_projected_joint_forces().numpy()[0]
 
         self.assertEqual(len(joint_names), 1)
         self.assertEqual(len(joint_positions), 1)
@@ -335,13 +324,11 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         )
 
         # set a specific robot state
-        robot = Robot(prim_path="/panda", name="franka")
-        self._timeline.play()
-        await simulate_async(1)
-        robot.initialize()
-        robot.set_joint_positions([-1.0], joint_indices=[2])
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
+        robot = Articulation("/panda")
+        app_utils.play()
+        await app_utils.update_app_async(steps=60)
+        robot.set_dof_positions([-1.0], dof_indices=[2])
+        await app_utils.update_app_async(steps=2)
 
         # check where the joints are after evaluate
         await og.Controller.evaluate(test_graph)
@@ -359,9 +346,9 @@ class TestArticulationStateNode(ogts.OmniGraphTestCase):
         print(joint_forces)
         print(joint_torques)
 
-        robot_joint_positions = robot.get_joint_positions()
-        robot_joint_velocities = robot.get_joint_velocities()
-        robot_measured_joint_efforts = robot.get_measured_joint_efforts()
+        robot_joint_positions = robot.get_dof_positions().numpy()[0]
+        robot_joint_velocities = robot.get_dof_velocities().numpy()[0]
+        robot_measured_joint_efforts = robot.get_dof_projected_joint_forces().numpy()[0]
 
         self.assertEqual(len(joint_names), 1)
         self.assertEqual(len(joint_positions), 1)

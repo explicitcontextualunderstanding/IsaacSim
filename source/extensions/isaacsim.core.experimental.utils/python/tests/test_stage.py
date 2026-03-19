@@ -38,7 +38,7 @@ class TestStage(omni.kit.test.AsyncTestCase):
     async def tearDown(self):
         """Method called immediately after the test method has been called"""
         # ------------------
-        # Do custom tearDown
+        stage_utils.close_stage()
         # ------------------
         super().tearDown()
 
@@ -102,6 +102,10 @@ class TestStage(omni.kit.test.AsyncTestCase):
                 template is not None,
                 f"Invalid stage content for the given template: {template}",
             )
+
+    async def test_is_stage_loading(self):
+        await stage_utils.create_new_stage_async()
+        stage_utils.is_stage_loading()
 
     async def test_open_stage(self):
         assets_root_path = await get_assets_root_path_async(skip_check=True)
@@ -198,6 +202,60 @@ class TestStage(omni.kit.test.AsyncTestCase):
         self.assertRaises(ValueError, stage_utils.define_prim, f"/World/")
         # - prim already exists with a different type
         self.assertRaises(RuntimeError, stage_utils.define_prim, f"/Sphere", type_name="Cube")
+
+    async def test_delete_prim(self):
+        assets_root_path = await get_assets_root_path_async(skip_check=True)
+        # create and populate stage
+        await stage_utils.create_new_stage_async()
+        prim = stage_utils.define_prim("/World/A", "Xform")
+        stage_utils.add_reference_to_stage(
+            usd_path=assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
+            path="/World/panda",
+            variants=[("Gripper", "AlternateFinger"), ("Mesh", "Performance")],
+        )
+        # test cases
+        self.assertTrue(stage_utils.delete_prim(prim))
+        self.assertFalse(stage_utils.delete_prim("/World/panda/panda_hand"))  # ancestral prim (cannot be deleted)
+        self.assertTrue(stage_utils.delete_prim("/World/panda"))
+        # exceptions
+        self.assertRaisesRegex(ValueError, "not a valid prim", stage_utils.delete_prim, "/World/A")
+
+    async def test_move_prim(self):
+        stage = await stage_utils.create_new_stage_async()
+        prim_a = stage_utils.define_prim("/World/A", "Xform")
+        prim_b = stage_utils.define_prim("/World/B", "Xform")
+        # test cases
+        # - move A to (inside) B
+        result, path = stage_utils.move_prim(prim_a, prim_b)
+        self.assertTrue(result)
+        self.assertEqual(path, "/World/B/A")
+        self.assertEqual(stage.GetPrimAtPath("/World/B/A").IsValid(), True)
+        self.assertEqual(stage.GetPrimAtPath("/World/A").IsValid(), False)
+        # - move A next to B
+        result, path = stage_utils.move_prim("/World/B/A", "/World")
+        self.assertTrue(result)
+        self.assertEqual(path, "/World/A")
+        self.assertEqual(stage.GetPrimAtPath("/World/A").IsValid(), True)
+        self.assertEqual(stage.GetPrimAtPath("/World/B/A").IsValid(), False)
+        # - move A to root
+        result, path = stage_utils.move_prim("/World/A", "/")
+        self.assertTrue(result)
+        self.assertEqual(path, "/A")
+        self.assertEqual(stage.GetPrimAtPath("/A").IsValid(), True)
+        self.assertEqual(stage.GetPrimAtPath("/World/A").IsValid(), False)
+        # - move A to an unexisting path
+        result, path = stage_utils.move_prim("/A", "/World/C")
+        self.assertTrue(result)
+        self.assertEqual(path, "/World/C")
+        self.assertEqual(stage.GetPrimAtPath("/World/C").IsValid(), True)
+        self.assertEqual(stage.GetPrimAtPath("/A").IsValid(), False)
+        # exceptions
+        # - prim is not a valid prim
+        self.assertRaisesRegex(ValueError, "not a valid prim", stage_utils.move_prim, "/ABC", "/")
+        # - destination path is not a valid path string
+        self.assertRaisesRegex(ValueError, "not a valid path string", stage_utils.move_prim, "/World/B", "?")
+        # - destination path has unexisting parents
+        self.assertRaisesRegex(ValueError, "unexisting parent", stage_utils.move_prim, "/World/B", "/World/X/Y")
 
     async def test_stage_units(self):
         await stage_utils.create_new_stage_async()

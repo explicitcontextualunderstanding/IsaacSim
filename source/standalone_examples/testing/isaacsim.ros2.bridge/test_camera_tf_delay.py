@@ -13,10 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import logging
 import os
+import time
+from collections import deque
 
 import numpy as np
 from isaacsim import SimulationApp
+
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("tf_cam_sync_test")
 
 # CLI args
 parser = argparse.ArgumentParser()
@@ -49,16 +55,87 @@ rclpy.init()
 # ROS state
 tf_msg = None
 img_msg = None
+tf_recv_time = None
+img_recv_time = None
+tf_recv_count = 0
+img_recv_count = 0
+tf_queue = deque()
+img_queue = deque()
 
 
 def tf_callback(msg):
-    global tf_msg
+    global tf_msg, tf_recv_time, tf_recv_count
     tf_msg = msg
+    tf_recv_time = time.perf_counter()
+    tf_recv_count += 1
+    stamp = msg.transforms[0].header.stamp
+    tf_ns = stamp.sec * 1_000_000_000 + stamp.nanosec
+    tf_queue.append((tf_ns, msg, tf_recv_time))
+    log.debug(
+        f"  TF  callback #{tf_recv_count}: stamp={stamp.sec}.{stamp.nanosec:09d}, "
+        f"frame_id='{msg.transforms[0].header.frame_id}', "
+        f"child_frame_id='{msg.transforms[0].child_frame_id}'"
+    )
 
 
 def img_callback(msg):
-    global img_msg
+    global img_msg, img_recv_time, img_recv_count
     img_msg = msg
+    img_recv_time = time.perf_counter()
+    img_recv_count += 1
+    stamp = msg.header.stamp
+    img_ns = stamp.sec * 1_000_000_000 + stamp.nanosec
+    img_queue.append((img_ns, msg, img_recv_time))
+    log.debug(
+        f"  IMG callback #{img_recv_count}: stamp={stamp.sec}.{stamp.nanosec:09d}, "
+        f"encoding='{msg.encoding}', size={msg.width}x{msg.height}"
+    )
+
+
+def clear_message_state():
+    global tf_msg, img_msg, tf_recv_time, img_recv_time
+    tf_msg = None
+    img_msg = None
+    tf_recv_time = None
+    img_recv_time = None
+    tf_queue.clear()
+    img_queue.clear()
+
+
+def collect_latest_pair(max_wait_steps=20):
+    wait_count = 0
+    spin_start = time.perf_counter()
+
+    while wait_count < max_wait_steps:
+        if tf_queue and img_queue:
+            break
+
+        rclpy.spin_once(node, timeout_sec=0.05)
+        wait_count += 1
+
+    if tf_queue and img_queue:
+        dropped_tf = max(0, len(tf_queue) - 1)
+        dropped_img = max(0, len(img_queue) - 1)
+        tf_ns, tf_pair_msg, tf_pair_recv_time = tf_queue[-1]
+        img_ns, img_pair_msg, img_pair_recv_time = img_queue[-1]
+        tf_queue.clear()
+        img_queue.clear()
+        spin_elapsed = time.perf_counter() - spin_start
+        return (
+            tf_ns,
+            img_ns,
+            tf_pair_msg,
+            img_pair_msg,
+            tf_pair_recv_time,
+            img_pair_recv_time,
+            wait_count,
+            spin_elapsed,
+            dropped_tf,
+            dropped_img,
+        )
+
+    spin_elapsed = time.perf_counter() - spin_start
+    return (None, None, None, None, None, None, wait_count, spin_elapsed, 0, 0)
 
 
 # Create ROS2 node + subscribers
@@ -114,49 +191,219 @@ og.Controller.edit(
 )
 
 simulation_app.update()
+log.info("Action graph created, starting warmup...")
 
 # Warmup
-for _ in range(20):
+for i in range(20):
     world.step(render=True)
+    rclpy.spin_once(node, timeout_sec=0.0)
+    warmup_tf = tf_msg is not None
+    warmup_img = img_msg is not None
+    if i % 5 == 0 or warmup_tf or warmup_img:
+        log.debug(f"  warmup step {i}: tf_received={warmup_tf}, img_received={warmup_img}")
+
+log.info(f"Warmup complete. Total callbacks so far: tf={tf_recv_count}, img={img_recv_count}")
+
+# Flush the render pipeline: the camera publisher has ~1 frame of latency, so after
+# clearing warmup messages we need to step+spin once more to drain the stale render
+# frame. Without this, the first test step receives an image stamped from the previous
+# warmup frame while TF already carries the current frame's timestamp.
+clear_message_state()
+world.step(render=True)
+for _ in range(20):
+    rclpy.spin_once(node, timeout_sec=0.05)
+    if tf_queue and img_queue:
+        break
+log.info(f"Pipeline flush: tf_queue={'OK' if tf_queue else 'NONE'}, " f"img_queue={'OK' if img_queue else 'NONE'}")
+clear_message_state()
+
+# Settle phase: require several consecutive zero-delta synced pairs before measuring.
+# This removes startup transients from CI while keeping strict checks in measured steps.
+SETTLE_REQUIRED_CONSECUTIVE = 5
+SETTLE_MAX_STEPS = 200
+settle_consecutive_zero = 0
+settled = False
+
+log.info(
+    "Starting settle phase: require "
+    f"{SETTLE_REQUIRED_CONSECUTIVE} consecutive zero-delta pairs (max {SETTLE_MAX_STEPS} steps)"
+)
+for settle_step in range(SETTLE_MAX_STEPS):
+    world.step(render=True)
+    (
+        tf_ns,
+        img_ns,
+        tf_pair_msg,
+        img_pair_msg,
+        _,
+        _,
+        settle_wait_count,
+        settle_spin_elapsed,
+        settle_dropped_tf,
+        settle_dropped_img,
+    ) = collect_latest_pair(max_wait_steps=20)
+
+    if tf_pair_msg is None or img_pair_msg is None:
+        settle_consecutive_zero = 0
+        log.debug(
+            f"  settle step {settle_step}: no pair, "
+            f"spins={settle_wait_count}, spin_time={settle_spin_elapsed * 1000:.1f} ms, "
+            f"dropped_tf={settle_dropped_tf}, dropped_img={settle_dropped_img}"
+        )
+        continue
+
+    settle_delta_ns = abs(tf_ns - img_ns)
+    if settle_delta_ns == 0:
+        settle_consecutive_zero += 1
+    else:
+        settle_consecutive_zero = 0
+
+    tf_settle_stamp = tf_pair_msg.transforms[0].header.stamp
+    img_settle_stamp = img_pair_msg.header.stamp
+    log.debug(
+        f"  settle step {settle_step}: "
+        f"tf_stamp={tf_settle_stamp.sec}.{tf_settle_stamp.nanosec:09d}, "
+        f"img_stamp={img_settle_stamp.sec}.{img_settle_stamp.nanosec:09d}, "
+        f"delta={settle_delta_ns / 1e6:.3f} ms, "
+        f"consecutive_zero={settle_consecutive_zero}/{SETTLE_REQUIRED_CONSECUTIVE}, "
+        f"spins={settle_wait_count}, spin_time={settle_spin_elapsed * 1000:.1f} ms, "
+        f"dropped_tf={settle_dropped_tf}, dropped_img={settle_dropped_img}"
+    )
+
+    if settle_consecutive_zero >= SETTLE_REQUIRED_CONSECUTIVE:
+        settled = True
+        settle_steps_used = settle_step + 1
+        log.info(f"Settle phase complete at step {settle_step}")
+        break
+
+settle_steps_used = SETTLE_MAX_STEPS if not settled else settle_steps_used
+
+if not settled:
+    log.error(
+        "Settle phase failed: did not observe required consecutive zero-delta synced pairs "
+        f"within {SETTLE_MAX_STEPS} steps."
+    )
+
+clear_message_state()
 
 # Run sync test
+log.info(f"Starting sync test with {args.test_steps} steps...")
 deltas = []
+missed_steps = []
 for step in range(args.test_steps):
-    cube.set_world_pose(position=np.random.uniform(-1, 1, 3))
+    step_start = time.perf_counter()
+    new_pos = np.random.uniform(-1, 1, 3)
+    cube.set_world_pose(position=new_pos)
     world.step(render=True)
+    step_elapsed = time.perf_counter() - step_start
 
-    # Block to make sure both messages are received
-    MAX_WAIT_STEPS = 20
-    wait_count = 0
-    while (tf_msg is None or img_msg is None) and wait_count < MAX_WAIT_STEPS:
-        rclpy.spin_once(node, timeout_sec=0.05)
-        wait_count += 1
+    (
+        tf_ns,
+        img_ns,
+        tf_pair_msg,
+        img_pair_msg,
+        tf_pair_recv_time,
+        img_pair_recv_time,
+        wait_count,
+        spin_elapsed,
+        dropped_tf,
+        dropped_img,
+    ) = collect_latest_pair(max_wait_steps=20)
 
-    if tf_msg and img_msg:
-        tf_stamp = tf_msg.transforms[0].header.stamp
-        img_stamp = img_msg.header.stamp
-        tf_ns = tf_stamp.sec * 1e9 + tf_stamp.nanosec
-        img_ns = img_stamp.sec * 1e9 + img_stamp.nanosec
+    if tf_pair_msg and img_pair_msg:
+        tf_stamp = tf_pair_msg.transforms[0].header.stamp
+        img_stamp = img_pair_msg.header.stamp
         delta = abs(tf_ns - img_ns)
         deltas.append(delta)
-        tf_msg = None
-        img_msg = None
 
-    # Reset messages
-    tf_msg = None
-    img_msg = None
+        # Determine which message has the later timestamp
+        behind = "TF" if tf_ns < img_ns else ("IMG" if img_ns < tf_ns else "EQUAL")
+
+        log.info(
+            f"Step {step:3d}: "
+            f"tf_stamp={tf_stamp.sec}.{tf_stamp.nanosec:09d}  "
+            f"img_stamp={img_stamp.sec}.{img_stamp.nanosec:09d}  "
+            f"delta={delta / 1e6:8.3f} ms  "
+            f"behind={behind}  "
+            f"spins={wait_count}  "
+            f"step_time={step_elapsed * 1000:.1f} ms  "
+            f"spin_time={spin_elapsed * 1000:.1f} ms  "
+            f"tf_recv_wall={tf_pair_recv_time:.6f}  "
+            f"img_recv_wall={img_pair_recv_time:.6f}  "
+            f"wall_recv_delta={(abs(tf_pair_recv_time - img_pair_recv_time)) * 1000:.3f} ms  "
+            f"dropped_tf={dropped_tf}  "
+            f"dropped_img={dropped_img}"
+        )
+    else:
+        missed_steps.append(step)
+        log.warning(
+            f"Step {step:3d}: MISSED - tf_queue={'OK' if tf_queue else 'NONE'}, "
+            f"img_queue={'OK' if img_queue else 'NONE'}, "
+            f"spins={wait_count}, spin_time={spin_elapsed * 1000:.1f} ms, "
+            f"dropped_tf={dropped_tf}, dropped_img={dropped_img}"
+        )
 
 # Print results
+log.info("=" * 80)
+log.info("SUMMARY")
+log.info("=" * 80)
+log.info(f"Total TF  callbacks received: {tf_recv_count}")
+log.info(f"Total IMG callbacks received: {img_recv_count}")
+log.info(f"Total test steps:             {args.test_steps}")
+log.info(f"Steps with valid pair:        {len(deltas)}")
+log.info(f"Missed steps:                 {len(missed_steps)} {missed_steps if missed_steps else ''}")
+log.info(
+    f"Settle steps used:            {settle_steps_used}/{SETTLE_MAX_STEPS} ({'converged' if settled else 'did NOT converge'})"
+)
+
 if deltas:
     avg_delay = np.mean(deltas) / 1e6
     max_delay = np.max(deltas) / 1e6
+    min_delay = np.min(deltas) / 1e6
+    median_delay = np.median(deltas) / 1e6
+    std_delay = np.std(deltas) / 1e6
+
+    # Classify the deltas
+    zero_count = sum(1 for d in deltas if d == 0)
+    one_frame_count = sum(1 for d in deltas if abs(d / 1e6 - 16.667) < 1.0)
+    other_count = len(deltas) - zero_count - one_frame_count
+
+    THRESHOLD_MS = 0.0
+    passed = settled and max_delay <= THRESHOLD_MS
+
     print("\nTF / CAMERA TIMESTAMP SYNC TEST")
-    print(f"Steps:         {len(deltas)}")
-    print(f"Average delay: {avg_delay:.3f} ms")
-    print(f"Max delay:     {max_delay:.3f} ms")
-    print("Status:        ", "PASS ✅" if avg_delay < 0.5 else "FAIL ❌")
+    print(f"Steps:              {len(deltas)}")
+    print(f"Average delay:      {avg_delay:.3f} ms")
+    print(f"Median delay:       {median_delay:.3f} ms")
+    print(f"Std dev:            {std_delay:.3f} ms")
+    print(f"Min delay:          {min_delay:.3f} ms")
+    print(f"Max delay:          {max_delay:.3f} ms  (threshold: {THRESHOLD_MS} ms)")
+    print(f"Zero-delta steps:   {zero_count}/{len(deltas)}")
+    print(f"One-frame (~16ms):  {one_frame_count}/{len(deltas)}")
+    print(f"Other:              {other_count}/{len(deltas)}")
+    print("Status:        ", "PASS ✅" if passed else "[fatal] ❌")
+
+    if not passed:
+        if not settled:
+            log.error(
+                "FAIL: pre-test settle phase did not converge to consecutive zero-delta pairs. "
+                "This indicates persistent startup/ordering instability before measurement."
+            )
+        else:
+            log.error(
+                f"FAIL: max_delay={max_delay:.3f} ms >= {THRESHOLD_MS} ms threshold. "
+                f"At least one frame had TF and camera timestamps from different "
+                f"simulation frames. A delay of ~16.667 ms = exactly 1 frame at 60 FPS, "
+                f"suggesting a pipeline ordering issue where one publisher reads the "
+                f"sim time before the step and the other reads it after."
+            )
 else:
-    print("\n[ERROR] No messages received.")
+    print("\n[error] No messages received.")
+    log.error(
+        f"No message pairs received at all. "
+        f"TF callbacks={tf_recv_count}, IMG callbacks={img_recv_count}. "
+        f"Check that the action graph is wired correctly and ROS2 bridge is loaded."
+    )
 
 # Cleanup
 node.destroy_node()

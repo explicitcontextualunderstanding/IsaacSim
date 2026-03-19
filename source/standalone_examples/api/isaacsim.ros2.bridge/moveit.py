@@ -23,7 +23,7 @@ FRANKA_USD_PATH = "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
 BACKGROUND_STAGE_PATH = "/background"
 BACKGROUND_USD_PATH = "/Isaac/Environments/Simple_Room/simple_room.usd"
 
-CONFIG = {"renderer": "RaytracedLighting", "headless": False}
+CONFIG = {"renderer": "RealTimePathTracing", "headless": False}
 
 # Example ROS2 bridge sample demonstrating the manual loading of stages
 # and creation of ROS components

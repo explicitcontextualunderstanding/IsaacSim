@@ -1,4 +1,24 @@
 # Changelog
+
+## [2.2.1] - 2026-02-23
+### Changed
+- Add isaacsim.core.experimental.objects dependency, remove omni.physics.physx dependency for groundplane creation
+
+## [2.2.0] - 2025-11-05
+### Changed
+- Renamed Block World Generator to Heightmap Importer
+- Refactored to separate importer logic from extension UI
+- Standardized terminology from "block world" to "heightmap" throughout codebase
+- Updated all documentation, comments, and test names to use heightmap terminology
+
+## [2.1.0] - 2025-10-30
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [2.0.7] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.0.6] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0

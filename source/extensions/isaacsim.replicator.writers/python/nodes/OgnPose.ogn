@@ -2,7 +2,10 @@
     "Pose": {
         "version": 1,
         "scheduling": "compute-on-request",
-        "description": "This node outputs the poses of assets with semantic labels",
+        "description": [
+            "NOTE: DEPRECATED and will be removed in the next major release.",
+            "This node outputs the poses of assets with semantic labels"
+        ],
         "language": "Python",
         "metadata": {
             "uiName": "Pose"

@@ -22,10 +22,11 @@ import asyncio
 import time
 
 import carb
+import omni.kit.app
 import omni.kit.test
 import omni.timeline
+from isaacsim.core.experimental.utils.stage import create_new_stage_async, get_current_stage
 from isaacsim.core.simulation_manager import SimulationManager
-from isaacsim.core.utils.stage import create_new_stage_async, get_current_stage, update_stage_async
 
 
 class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
@@ -37,14 +38,16 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Set stage FPS to match carb setting for deterministic time sample testing
         settings = carb.settings.get_settings()
         sim_period_denom = settings.get("/app/settings/fabricDefaultSimPeriodDenominator") or 60
-        get_current_stage().SetTimeCodesPerSecond(sim_period_denom)
-        await update_stage_async()
+        get_current_stage(backend="usd").SetTimeCodesPerSecond(sim_period_denom)
+        # Set physics dt to 1/60 for consistent timestep across engines
+        SimulationManager.set_physics_dt(1.0 / 60.0)
+        await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
         """Clean up after test."""
         timeline = omni.timeline.get_timeline_interface()
         timeline.stop()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         super().tearDown()
 
     def _verify_samples_monotonic(self, samples, message="Samples should be monotonic"):
@@ -82,7 +85,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Start simulation and let it run
         timeline.play()
         for _ in range(10):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         # Should now have samples
         sample_count = SimulationManager._simulation_manager_interface.get_sample_count()
@@ -124,7 +127,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Run simulation for many steps (more than buffer capacity)
         buffer_capacity = SimulationManager._simulation_manager_interface.get_buffer_capacity()
         for step in range(buffer_capacity + 40):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
             # Capture current frame time every few steps
             if step % 5 == 0:
@@ -189,7 +192,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Start simulation
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_after_play = SimulationManager._simulation_manager_interface.get_all_samples()
         count_after_play = len(samples_after_play)
@@ -208,7 +211,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
 
         # Stop simulation
         timeline.stop()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Storage should be cleared on stop
         count_after_stop = SimulationManager._simulation_manager_interface.get_sample_count()
@@ -221,7 +224,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Start again
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_after_restart = SimulationManager._simulation_manager_interface.get_all_samples()
         count_after_restart = len(samples_after_restart)
@@ -235,7 +238,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Start and run
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_before_pause = SimulationManager._simulation_manager_interface.get_all_samples()
         count_before_pause = len(samples_before_pause)
@@ -243,7 +246,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
 
         # Pause
         timeline.pause()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Sample count shouldn't change during pause
         count_during_pause = SimulationManager._simulation_manager_interface.get_sample_count()
@@ -254,7 +257,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Resume and continue
         timeline.play()
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples_after_resume = SimulationManager._simulation_manager_interface.get_all_samples()
         SimulationManager._simulation_manager_interface.log_statistics()
@@ -269,7 +272,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
 
         # Run simulation to get some samples
         for _ in range(20):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples = SimulationManager._simulation_manager_interface.get_all_samples()
 
@@ -309,7 +312,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
 
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
         # Get sim period setting to determine number of frames for 1-second test
         settings = carb.settings.get_settings()
@@ -317,7 +320,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         num_frames = sim_period_denom  # Run for 1 second worth of frames
 
         for f in range(num_frames):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         # Should have range now
         time_range = SimulationManager._simulation_manager_interface.get_sample_range()
@@ -401,17 +404,17 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         timeline.play()
         print("Playing timeline")
         for _ in range(10):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
         print("Done playing timeline")
         # Should work with samples
         SimulationManager._simulation_manager_interface.log_statistics()
 
         # Should work after stop (when cleared)
         timeline.stop()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         print("Stopped")
         SimulationManager._simulation_manager_interface.log_statistics()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
 
     async def test_structured_data_access(self):
         """Test that the Entry and TimeData objects work correctly."""
@@ -419,7 +422,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         timeline.play()
 
         for _ in range(5):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples = SimulationManager._simulation_manager_interface.get_all_samples()
         self.assertGreater(len(samples), 0)
@@ -450,7 +453,7 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         # Run for exactly buffer capacity + some extra
         buffer_capacity = SimulationManager._simulation_manager_interface.get_buffer_capacity()
         for _ in range(buffer_capacity + 10):
-            await update_stage_async()
+            await omni.kit.app.get_app().next_update_async()
 
         samples = SimulationManager._simulation_manager_interface.get_all_samples()
         sample_count = len(samples)
@@ -471,6 +474,6 @@ class TestTimeSampleStorage(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(invalid_time, 0.0)
         timeline = omni.timeline.get_timeline_interface()
         timeline.play()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         invalid_time = SimulationManager._simulation_manager_interface.get_simulation_time_at_time((0, 0))
         self.assertAlmostEqual(invalid_time, 3 * 1 / 60)  # two initial steps done during play + 1 more step

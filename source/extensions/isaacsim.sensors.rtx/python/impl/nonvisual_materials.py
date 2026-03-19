@@ -22,8 +22,6 @@ Based on documentation from omni.sensors.nv.material extension:
 https://docs.isaacsim.omniverse.nvidia.com/4.5.0/sensors/omni_sensors_docs/materials_extension/materials_extension.html#current-materials
 """
 
-from typing import Union
-
 import carb
 from pxr import Sdf, Usd, UsdShade
 
@@ -132,7 +130,7 @@ ATTR_ATTRIBUTE = f"{ATTR_PREFIX}:attributes"
 
 
 def apply_nonvisual_material(
-    prim: Usd.Prim, base: Union[str, int], coating: Union[str, int] = "none", attribute: Union[str, int] = "none"
+    prim: Usd.Prim, base: str | int, coating: str | int = "none", attribute: str | int = "none"
 ) -> bool:
     """Apply nonvisual material attributes to a USD material prim.
 
@@ -261,11 +259,11 @@ def get_material_id(prim: Usd.Prim) -> int:
         prim: USD prim that must be a material prim with nonvisual material attributes.
 
     Returns:
-        Computed material ID as an integer. Returns 0 if attributes are not found.
+        Computed material ID as an integer. Returns 0 if attributes are not found
+        or if prim is invalid.
 
     Note:
         Error messages are logged via carb.log_error for debugging.
-        Returns 0 if attributes are not found or if prim is invalid.
 
     Example:
 

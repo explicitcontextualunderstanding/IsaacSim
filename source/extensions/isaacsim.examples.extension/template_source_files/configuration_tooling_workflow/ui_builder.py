@@ -16,6 +16,7 @@
 import numpy as np
 import omni.timeline
 import omni.ui as ui
+import omni.usd
 from isaacsim.core.prims import SingleArticulation
 from isaacsim.core.utils.prims import get_prim_object_type
 from isaacsim.core.utils.types import ArticulationAction
@@ -80,13 +81,21 @@ class UIBuilder:
         Args:
             event (omni.usd.StageEventType): Event Type
         """
-        if event.type == int(omni.usd.StageEventType.ASSETS_LOADED):  # Any asset added or removed
+        event_name = event.event_name
+        usd_context = omni.usd.get_context()
+        if event_name == usd_context.stage_event_name(
+            omni.usd.StageEventType.ASSETS_LOADED
+        ):  # Any asset added or removed
             self._selection_menu.repopulate()
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_START_PLAY):  # Timeline played
+        elif event_name == usd_context.stage_event_name(
+            omni.usd.StageEventType.SIMULATION_START_PLAY
+        ):  # Timeline played
             # Treat a playing timeline as a trigger for selecting an Articulation
             self._selection_menu.trigger_on_selection_fn_with_current_selection()
             self._stop_text.visible = False
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_STOP_PLAY):  # Timeline stopped
+        elif event_name == usd_context.stage_event_name(
+            omni.usd.StageEventType.SIMULATION_STOP_PLAY
+        ):  # Timeline stopped
             # Ignore pause events
             if self._timeline.is_stopped():
                 self._invalidate_articulation()

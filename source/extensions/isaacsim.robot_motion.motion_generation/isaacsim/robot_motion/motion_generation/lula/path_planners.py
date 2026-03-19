@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides RRT path planning capabilities for robot motion generation using the Lula motion planning library."""
+
+
 from typing import List, Union
 
 import carb
@@ -30,10 +33,10 @@ class RRT(LulaInterfaceHelper, PathPlanner):
     This class implements the PathPlanner interface, as well as exposing RRT-specific parameters.
 
     Args:
-        robot_description_path (str): path to a robot description yaml file
-        urdf_path (str): path to robot urdf
-        rrt_config_path (str): path to an rrt parameter yaml file
-        end_effector_frame_name (str): name of the robot end effector frame (must be present in the robot urdf)
+        robot_description_path: Path to a robot description yaml file.
+        urdf_path: Path to robot urdf.
+        rrt_config_path: Path to an rrt parameter yaml file.
+        end_effector_frame_name: Name of the robot end effector frame (must be present in the robot urdf).
     """
 
     def __init__(self, robot_description_path: str, urdf_path: str, rrt_config_path: str, end_effector_frame_name: str):
@@ -59,6 +62,15 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         self._taskspace_target_rotation = None
 
     def compute_path(self, active_joint_positions, watched_joint_positions) -> np.array:
+        """Compute a path from the current robot configuration to the target.
+
+        Args:
+            active_joint_positions: Current joint positions for active joints.
+            watched_joint_positions: Current joint positions for watched joints.
+
+        Returns:
+            Computed path as array of joint configurations, or None if no path found.
+        """
         __doc__ = PathPlanner.compute_path.__doc__
 
         active_joint_positions = active_joint_positions.astype(np.float64)
@@ -72,11 +84,22 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         return self._plan
 
     def set_robot_base_pose(self, robot_position: np.array, robot_orientation: np.array) -> None:
+        """Set the robot base pose.
+
+        Args:
+            robot_position: Position of the robot base.
+            robot_orientation: Orientation of the robot base.
+        """
         __doc__ = LulaInterfaceHelper.set_robot_base_pose.__doc__
 
         return LulaInterfaceHelper.set_robot_base_pose(self, robot_position, robot_orientation)
 
     def set_cspace_target(self, active_joint_targets: np.array) -> None:
+        """Set a configuration space target for path planning.
+
+        Args:
+            active_joint_targets: Target joint positions for active joints.
+        """
         __doc__ = PathPlanner.set_cspace_target.__doc__
 
         self._cspace_target = active_joint_targets
@@ -84,6 +107,12 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         self._taskspace_target_rotation = None
 
     def set_end_effector_target(self, target_translation, target_orientation=None) -> None:
+        """Set an end effector target for task space path planning.
+
+        Args:
+            target_translation: Target translation for the end effector.
+            target_orientation: Target orientation for the end effector.
+        """
         __doc__ = PathPlanner.set_end_effector_target.__doc__
 
         if target_translation is not None:
@@ -98,14 +127,33 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         self._cspace_target = None
 
     def get_active_joints(self) -> List:
+        """Active joints of the robot.
+
+        Returns:
+            List of active joint names.
+        """
         __doc__ = PathPlanner.get_active_joints.__doc__
 
         return LulaInterfaceHelper.get_active_joints(self)
 
     def get_watched_joints(self) -> List:
+        """Watched joints of the robot.
+
+        Returns:
+            List of watched joint names.
+        """
         return LulaInterfaceHelper.get_watched_joints(self)
 
     def add_obstacle(self, obstacle: objects, static: bool = False) -> bool:
+        """Add an obstacle to the planning world.
+
+        Args:
+            obstacle: The obstacle object to add.
+            static: Whether the obstacle is static.
+
+        Returns:
+            True if the obstacle was added successfully.
+        """
         __doc__ = PathPlanner.add_obstacle.__doc__
         return PathPlanner.add_obstacle(self, obstacle, static)
 
@@ -114,35 +162,100 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         cuboid: Union[objects.cuboid.DynamicCuboid, objects.cuboid.FixedCuboid, objects.cuboid.VisualCuboid],
         static: bool = False,
     ) -> bool:
+        """Add a cuboid obstacle to the planning world.
+
+        Args:
+            cuboid: The cuboid obstacle to add.
+            static: Whether the cuboid is static.
+
+        Returns:
+            True if the cuboid was added successfully.
+        """
         return LulaInterfaceHelper.add_cuboid(self, cuboid, static)
 
     def add_sphere(
         self, sphere: Union[objects.sphere.DynamicSphere, objects.sphere.VisualSphere], static: bool = False
     ) -> bool:
+        """Add a sphere obstacle to the planning world.
+
+        Args:
+            sphere: The sphere obstacle to add.
+            static: Whether the sphere is static.
+
+        Returns:
+            True if the sphere was added successfully.
+        """
         return LulaInterfaceHelper.add_sphere(self, sphere, static)
 
     def add_capsule(
         self, capsule: Union[objects.capsule.DynamicCapsule, objects.capsule.VisualCapsule], static: bool = False
     ) -> bool:
+        """Add a capsule obstacle to the planning world.
+
+        Args:
+            capsule: The capsule obstacle to add.
+            static: Whether the capsule is static.
+
+        Returns:
+            True if the capsule was added successfully.
+        """
         return LulaInterfaceHelper.add_capsule(self, capsule, static)
 
     def add_ground_plane(self, ground_plane: objects.ground_plane.GroundPlane) -> bool:
+        """Adds a ground plane obstacle to the RRT world for collision detection.
+
+        Args:
+            ground_plane: The ground plane obstacle to add to the world.
+
+        Returns:
+            True if the ground plane was added successfully.
+        """
         return LulaInterfaceHelper.add_ground_plane(self, ground_plane)
 
     def disable_obstacle(self, obstacle: objects) -> bool:
+        """Disables an obstacle in the RRT world without removing it completely.
+
+        Args:
+            obstacle: The obstacle to disable in the world.
+
+        Returns:
+            True if the obstacle was disabled successfully.
+        """
         return LulaInterfaceHelper.disable_obstacle(self, obstacle)
 
     def enable_obstacle(self, obstacle: objects) -> bool:
+        """Enables a previously disabled obstacle in the RRT world.
+
+        Args:
+            obstacle: The obstacle to enable in the world.
+
+        Returns:
+            True if the obstacle was enabled successfully.
+        """
         return LulaInterfaceHelper.enable_obstacle(self, obstacle)
 
     def remove_obstacle(self, obstacle: objects) -> bool:
+        """Removes an obstacle from the RRT world completely.
+
+        Args:
+            obstacle: The obstacle to remove from the world.
+
+        Returns:
+            True if the obstacle was removed successfully.
+        """
         return LulaInterfaceHelper.remove_obstacle(self, obstacle)
 
-    def update_world(self, updated_obstacles: List = None) -> None:
+    def update_world(self, updated_obstacles: List = None):
+        """Updates the RRT world view with changes to obstacles and refreshes collision detection.
+
+        Args:
+            updated_obstacles: List of obstacles that have been updated.
+        """
         LulaInterfaceHelper.update_world(self, updated_obstacles)
         self._rrt.update_world_view()
 
-    def reset(self) -> None:
+    def reset(self):
+        """Resets the RRT planner by recreating the motion planner instance and restoring default parameters."""
         LulaInterfaceHelper.reset(self)
 
         self._rrt = lula.create_motion_planner(
@@ -152,20 +265,20 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         self._rrt.set_param("task_space_frame_name", self.end_effector_frame_name)
         self._seed = 123456
 
-    def set_max_iterations(self, max_iter: int) -> None:
+    def set_max_iterations(self, max_iter: int):
         """Set the maximum number of iterations of RRT before a failure is returned
 
         Args:
-            max_iter (int): Maximum number of iterations of RRT before a failure is returned.
+            max_iter: Maximum number of iterations of RRT before a failure is returned.
                 The time it takes to return a failure scales quadratically with max_iter
         """
         self._rrt.set_param("max_iterations", max_iter)
 
-    def set_random_seed(self, random_seed: int) -> None:
+    def set_random_seed(self, random_seed: int):
         """Set the random seed that RRT uses to generate a solution
 
         Args:
-            random_seed (int): Used to initialize random sampling. random_seed must be positive.
+            random_seed: Used to initialize random sampling. random_seed must be positive.
         """
         self._seed = random_seed
 
@@ -363,11 +476,11 @@ class RRT(LulaInterfaceHelper, PathPlanner):
               system.
 
         Args:
-            param_name (str): Name of parameter
-            value (Union[np.ndarray[np.float64],float,int,str]): value of parameter
+            param_name: Name of parameter
+            value: value of parameter
 
         Returns:
-            bool: True if the parameter was set successfully
+            True if the parameter was set successfully
         """
         if param_name == "seed":
             self.set_random_seed(value)
@@ -379,6 +492,11 @@ class RRT(LulaInterfaceHelper, PathPlanner):
         return self._rrt.set_param(param_name, value)
 
     def _generate_plan_to_cspace_target(self, joint_positions):
+        """Generates a motion plan from the current joint positions to a configuration space target.
+
+        Args:
+            joint_positions: Current joint positions to plan from.
+        """
         if self._cspace_target is None:
             self._plan = None
             return
@@ -389,6 +507,15 @@ class RRT(LulaInterfaceHelper, PathPlanner):
             self._plan = None
 
     def _generate_plan_to_taskspace_target(self, joint_positions):
+        """Generates a motion plan to reach a task space target.
+
+        Uses the RRT algorithm to find a path from the current joint positions to the target end effector
+        pose or position in task space. The method handles both position-only and full pose targets depending
+        on whether orientation is specified.
+
+        Args:
+            joint_positions: Current joint positions to start planning from.
+        """
         if self._taskspace_target_position is None:
             self._plan = None
             return

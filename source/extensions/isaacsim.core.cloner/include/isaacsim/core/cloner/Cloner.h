@@ -45,8 +45,8 @@ namespace cloner
  * target locations within the same stage.
  *
  * @param[in] stageId The unique identifier of the USD stage where cloning will occur
- * @param[in] source_prim_path The path to the source prim that will be cloned, this prim should be a valid USD prim
- * @param[in] prim_paths Vector of target paths where clones will be created, these prims will be created in Fabric
+ * @param[in] sourcePrimPath The path to the source prim that will be cloned, this prim should be a valid USD prim
+ * @param[in] primPaths Vector of target paths where clones will be created, these prims will be created in Fabric
  * stage not in USD stage
  *
  * @return true if cloning was successful, false otherwise
@@ -54,8 +54,8 @@ namespace cloner
  * @warning The source prim must exist at the specified path
  */
 ISAACSIM_CORE_CLONER_DLL_EXPORT bool fabricClone(long int stageId,
-                                                 const std::string& source_prim_path,
-                                                 const std::vector<std::string>& prim_paths);
+                                                 const std::string& sourcePrimPath,
+                                                 const std::vector<std::string>& primPaths);
 
 }
 }

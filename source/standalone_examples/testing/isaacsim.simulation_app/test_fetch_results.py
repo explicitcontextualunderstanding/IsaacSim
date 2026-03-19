@@ -18,34 +18,35 @@ from isaacsim import SimulationApp
 kit = SimulationApp()
 
 import omni
-import omni.physx
-from pxr import PhysxSchema, UsdPhysics
+import omni.physics.core
+from pxr import PhysxSchema, UsdPhysics, UsdUtils
 
 kit.update()
 
 stage = omni.usd.get_context().get_stage()
+stage_id = UsdUtils.StageCache.Get().GetId(stage).ToLongInt()
 scene = UsdPhysics.Scene.Define(stage, "/physicsScene")
 physx_scene_api = PhysxSchema.PhysxSceneAPI.Apply(scene.GetPrim())
 
 kit.update()
 
 
-def test_callback(step):
+def test_callback(step, context):
     print("callback")
 
 
 print("Start test")
-physx_interface = omni.physx.get_physx_interface()
-physx_sim_interface = omni.physx.get_physx_simulation_interface()
+physics_sim_interface = omni.physics.core.get_physics_simulation_interface()
 # Commenting out the following line will prevent the deadlock
-physics_timer_callback = physx_interface.subscribe_physics_step_events(test_callback)
+physics_timer_callback = physics_sim_interface.subscribe_physics_on_step_events(
+    pre_step=False, order=0, on_update=test_callback
+)
 
 # In Isaac Sim we run the following to "warm up" physics without simulating forward in time
-physx_interface.start_simulation()
-physx_interface.force_load_physics_from_usd()
-physx_sim_interface.simulate(1.0 / 60.0, 0.0)
+physics_sim_interface.initialize(stage_id)
+physics_sim_interface.simulate(1.0 / 60.0, 0.0)
 print("Fetch results")
-physx_sim_interface.fetch_results()
+physics_sim_interface.fetch_results()
 
 print("Finish Test")
 kit.update()

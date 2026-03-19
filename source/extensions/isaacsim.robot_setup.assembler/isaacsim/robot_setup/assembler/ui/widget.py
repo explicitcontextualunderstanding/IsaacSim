@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI widget components for robot setup assembler interface."""
+
+
 from typing import Callable, List, Optional, Tuple, Union
 
 import omni.kit.actions.core
@@ -23,7 +27,28 @@ LABEL_WIDTH = 160
 
 
 class CheckBoxWithNoReset(CheckBox):
+    """A checkbox UI component that inherits from CheckBox but excludes the reset functionality.
+
+    This class creates a checkbox widget with a label positioned to the left, similar to the standard CheckBox
+    component, but without any reset mechanism. The checkbox maintains its state changes without providing
+    a way to reset to default values.
+
+    The UI layout consists of a horizontal stack with a fixed-width label on the left and the checkbox
+    control on the right. The label width is set to a standard 160 pixels for consistent alignment
+    with other form elements.
+    """
+
     def _create_ui_widget(self, label: str, default_value: bool, tooltip: str):
+        """Creates the UI widget components for the checkbox.
+
+        Args:
+            label: Label text displayed to the left of the checkbox.
+            default_value: Initial checked state of the checkbox.
+            tooltip: Tooltip text shown when hovering over the checkbox.
+
+        Returns:
+            The containing frame widget with the checkbox and label.
+        """
         containing_frame = Frame().frame
         with containing_frame:
             with ui.HStack():
@@ -37,11 +62,40 @@ class CheckBoxWithNoReset(CheckBox):
 
 
 class DropDownWithPicker(DropDown):
+    """A dropdown UI component with an integrated picker button for file or asset selection.
+
+    Extends the standard dropdown functionality by adding a clickable picker icon that triggers
+    a selection dialog or custom selection callback. The picker button appears to the left of
+    the dropdown menu and provides an intuitive way for users to browse and select items
+    rather than typing them manually.
+
+    The component creates a horizontal layout with a label, picker icon, and dropdown menu.
+    When the picker button is clicked, it executes the provided selection function to handle
+    the selection logic.
+
+    Args:
+        *args: Variable length argument list passed to the parent DropDown class.
+        **kwargs: Additional keyword arguments passed to the parent DropDown class.
+            Special keyword arguments include on_selection_fn for handling picker button clicks.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.selection_fn = kwargs.get("on_selection_fn", None)
 
     def _create_ui_widget(self, label, tooltip):
+        """Creates the UI widget for the dropdown with picker.
+
+        Creates a horizontal layout containing a label, a picker image button, and a combobox.
+        The picker image triggers the selection function when clicked.
+
+        Args:
+            label: The text label for the dropdown.
+            tooltip: The tooltip text to display for the label.
+
+        Returns:
+            The containing frame widget.
+        """
         items = []
         combobox_model = DynamicComboBoxModel(items)
         containing_frame = Frame().frame
@@ -64,6 +118,13 @@ class DropDownWithPicker(DropDown):
         return containing_frame
 
     def _on_pressed_fn(self, b):
+        """Handles mouse button press events on the picker image.
+
+        Executes the selection function if it exists and the left mouse button was pressed.
+
+        Args:
+            b: The mouse button that was pressed (0 for left button).
+        """
         if b != 0:
             return
         if self.selection_fn is not None:
@@ -72,6 +133,21 @@ class DropDownWithPicker(DropDown):
 
 
 class DropDownWithSelect(DropDown):
+    """A dropdown widget with an integrated selection button for interactive prim selection.
+
+    This class extends the DropDown component to include a selection button that allows users to
+    interactively select prims in the viewport. The widget combines a standard dropdown menu with a
+    selection icon, providing both manual dropdown selection and direct viewport selection capabilities.
+
+    The selection button triggers a callback function that can be used to implement custom selection
+    logic, such as opening selection dialogs or enabling viewport picking modes. The widget also supports
+    a populate function for dynamically updating the dropdown options based on the current selection.
+
+    Args:
+        *args: Variable length argument list passed to the parent DropDown class.
+        **kwargs: Additional keyword arguments passed to the parent DropDown class.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._articulation_path_to = None
@@ -80,6 +156,11 @@ class DropDownWithSelect(DropDown):
 
     @property
     def articulation_path_to(self):
+        """The path to the articulation prim.
+
+        Returns:
+            The articulation path currently set for this dropdown.
+        """
         return self._articulation_path_to
 
     @articulation_path_to.setter
@@ -87,6 +168,15 @@ class DropDownWithSelect(DropDown):
         self._articulation_path_to = path
 
     def _create_ui_widget(self, label, tooltip):
+        """Creates the UI widget components for the dropdown with select functionality.
+
+        Args:
+            label: The label text to display next to the dropdown.
+            tooltip: The tooltip text to show on hover.
+
+        Returns:
+            The containing frame widget for the dropdown with select button.
+        """
         items = []
         combobox_model = DynamicComboBoxModel(items)
         containing_frame = Frame().frame
@@ -109,6 +199,11 @@ class DropDownWithSelect(DropDown):
         return containing_frame
 
     def _on_pressed_fn(self, b):
+        """Handles mouse press events on the select button.
+
+        Args:
+            b: The mouse button that was pressed.
+        """
         if b != 0:
             return
         if self.selection_fn is not None:
@@ -116,7 +211,16 @@ class DropDownWithSelect(DropDown):
             self.selection_fn(b)
 
 
-def help_frame_header(collapsed, title):
+def help_frame_header(collapsed: bool, title: str):
+    """Creates a collapsible header UI with a triangle indicator, title label, and help icon.
+
+    Creates a horizontal stack containing a triangle that changes orientation based on collapsed state,
+    a title label, and a help documentation icon.
+
+    Args:
+        collapsed: Whether the header is in collapsed state, affecting triangle orientation.
+        title: Text to display as the header title.
+    """
     with ui.HStack(height=22):
         ui.Spacer(width=4)
         with ui.VStack(width=10):
@@ -135,7 +239,20 @@ def help_frame_header(collapsed, title):
 
 
 class ButtonWithIcon:
-    def __init__(self, text="", image_width=14, *args, **kwargs):
+    """A custom button component that combines an icon and text label.
+
+    This class creates a clickable button with an optional icon and text label using Omni UI components.
+    The button consists of a layered structure with an invisible button for interaction, a styled rectangle
+    for visual appearance, and a horizontal layout containing the icon and label.
+
+    Args:
+        text: The text to display on the button.
+        image_width: Width of the icon in pixels. Set to 0 to hide the icon.
+        *args: Additional positional arguments passed to ui.ZStack and child components.
+        **kwargs: Additional keyword arguments passed to ui.ZStack and child components.
+    """
+
+    def __init__(self, text: str = "", image_width: int = 14, *args, **kwargs):
         with ui.ZStack(*args, **kwargs):
             self.button = ui.InvisibleButton(*args, **kwargs)
             self.rect = ui.Rectangle(style_type_name_override="Button.Rect", *args, **kwargs)
@@ -147,7 +264,8 @@ class ButtonWithIcon:
                 ui.Spacer()
 
     @property
-    def enabled(self):
+    def enabled(self) -> bool:
+        """Whether the button is enabled and can be clicked."""
         return self.button.enabled
 
     @enabled.setter
@@ -157,5 +275,10 @@ class ButtonWithIcon:
         self.image.enabled = value
         self.label.enabled = value
 
-    def set_clicked_fn(self, fn):
+    def set_clicked_fn(self, fn: Callable[[], None]):
+        """Sets the callback function to be called when the button is clicked.
+
+        Args:
+            fn: Callback function to execute when the button is clicked.
+        """
         self.button.set_clicked_fn(fn)

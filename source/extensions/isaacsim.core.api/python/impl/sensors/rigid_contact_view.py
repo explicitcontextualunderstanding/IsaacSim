@@ -17,11 +17,13 @@ from typing import List, Optional, Tuple, Union
 import carb
 import numpy as np
 import omni.kit.app
-import torch
 import warp as wp
 from isaacsim.core.api.simulation_context.simulation_context import SimulationContext
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.prims import find_matching_prim_paths, get_prim_at_path
 from pxr import PhysxSchema, UsdPhysics
+
+torch = import_module("torch")
 
 
 class RigidContactView(object):
@@ -200,11 +202,6 @@ class RigidContactView(object):
             True
         """
         return self._physics_view is not None
-
-    def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
-        return
 
     def initialize(self, physics_sim_view: omni.physics.tensors.SimulationView = None) -> None:
         """Create a physics simulation view if not passed and set other properties using the PhysX tensor API

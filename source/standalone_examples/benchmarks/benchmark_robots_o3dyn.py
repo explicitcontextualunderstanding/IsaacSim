@@ -55,7 +55,7 @@ simulation_app = SimulationApp(
 )
 
 import carb
-import isaacsim.core.utils.stage as stage_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.kit.test
 from isaacsim.core.experimental.prims import Articulation
@@ -65,9 +65,11 @@ from isaacsim.core.utils.viewports import set_camera_view
 from omni.kit.viewport.utility import get_active_viewport
 
 enable_extension("isaacsim.benchmark.services")
-from isaacsim.benchmark.services import BaseIsaacBenchmark
+from isaacsim.benchmark.services import DEFAULT_RECORDERS, BaseIsaacBenchmark
 
 # Create benchmark
+# Define recorders to use, use default set, other combinations, or custom data recorders
+recorders = DEFAULT_RECORDERS + ["gpu_frametime"] if gpu_frametime else DEFAULT_RECORDERS
 benchmark = BaseIsaacBenchmark(
     benchmark_name="benchmark_o3dyn_robot",
     workflow_metadata={
@@ -78,7 +80,7 @@ benchmark = BaseIsaacBenchmark(
         ]
     },
     backend_type=args.backend_type,
-    gpu_frametime=gpu_frametime,
+    recorders=recorders,
 )
 benchmark.set_phase("loading", start_recording_frametime=False, start_recording_runtime=True)
 
@@ -98,12 +100,12 @@ set_camera_view(eye=[-6, -15.5, 6.5], target=[-6, 10.5, -1], camera_prim_path="/
 robot_positions = []
 for i in range(n_robots):
     prim_path = f"/Robots/Robot_{i}"
-    stage_utils.add_reference_to_stage(robot_path, prim_path=prim_path)
+    stage_utils.add_reference_to_stage(robot_path, path=prim_path)
     # Position robots in a grid pattern:
     robot_positions.append([-3 * (i % max_line) + 3, -3 * (i // max_line), 0.1])
 
 # Collect all robot prims into Articulation wrapper
-robot_prim_paths = "/Robots/Robot_*"
+robot_prim_paths = r"/Robots/Robot_.*"
 robots = Articulation(robot_prim_paths, positions=robot_positions)
 
 viewport = get_active_viewport()

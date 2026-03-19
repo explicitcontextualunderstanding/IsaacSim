@@ -45,7 +45,7 @@ from isaacsim.benchmark.services import BaseIsaacBenchmark
 
 
 # Create PhysX Lidar from params
-def add_physx_lidar(prim_path, translation=Gf.Vec3f(0, 0, 0), orientation=Gf.Vec4f(0, 0, 0, 0)):
+def add_physx_lidar(prim_path, translation=Gf.Vec3f(0, 0, 0), orientation=Gf.Vec4d(0, 0, 0, 0)):
     _, lidar = omni.kit.commands.execute(
         "RangeSensorCreateLidar",
         path=prim_path,
@@ -90,7 +90,7 @@ for i in range(n_sensor):
     lidar_path = f"/World/PhysxLidar_{i}"
     sensor_translation = Gf.Vec3f([-8, 13, 2.0])  # Positions set for full_warehouse.usd
     q = euler_angles_to_quat([90, 0, 90 + i * 360 / n_sensor], degrees=True)
-    sensor_orientation = Gf.Quatf(q[0], q[1], q[2], q[3])
+    sensor_orientation = Gf.Quatd(q[0], q[1], q[2], q[3])
     add_physx_lidar(prim_path=lidar_path, translation=sensor_translation, orientation=sensor_orientation)
 
     omni.kit.app.get_app().update()

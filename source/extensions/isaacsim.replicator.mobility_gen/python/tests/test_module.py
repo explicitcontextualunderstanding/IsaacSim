@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for validating the Module and Buffer functionality in the mobility generation framework."""
+
+
 import carb.tokens
 import numpy as np
 
@@ -26,16 +29,35 @@ from isaacsim.replicator.mobility_gen.impl.common import Buffer, Module
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestPathPlanner(omni.kit.test.AsyncTestCase):
+    """Test class for validating the Module and Buffer functionality in the mobility generation framework.
+
+    This class contains unit tests that verify the proper behavior of the Module base class and its
+    interaction with Buffer objects. It tests core functionality including named buffer discovery,
+    state dictionary generation, and tag-based buffer filtering.
+
+    The tests cover:
+    - Named buffer enumeration across nested module hierarchies
+    - State dictionary creation and value retrieval
+    - Tag-based buffer inclusion and exclusion filtering
+    """
+
     # Before running each test
     async def setUp(self):
+        """Set up test fixtures before each test method is run."""
         pass
 
     # After running each test
     async def tearDown(self):
+        """Clean up after each test method has run."""
         pass
 
     # test to make sure this runs
     async def test_module_named_buffers(self):
+        """Test that Module.named_buffers() returns the correct buffer names.
+
+        Verifies that named_buffers() includes both direct buffers and nested module buffers
+        with proper dot notation for nested paths.
+        """
 
         class ModuleA(Module):
             def __init__(self):
@@ -50,10 +72,15 @@ class TestPathPlanner(omni.kit.test.AsyncTestCase):
 
         module = ModuleB()
 
-        self.assert_("buffer_b" in module.named_buffers())
-        self.assert_("module_a.buffer_a" in module.named_buffers())
+        self.assertTrue("buffer_b" in module.named_buffers())
+        self.assertTrue("module_a.buffer_a" in module.named_buffers())
 
     async def test_module_state_dict(self):
+        """Test that Module.state_dict() returns the correct buffer values.
+
+        Verifies that state_dict() includes all buffer values with proper naming
+        for both direct and nested module buffers.
+        """
 
         class ModuleA(Module):
             def __init__(self):
@@ -70,12 +97,17 @@ class TestPathPlanner(omni.kit.test.AsyncTestCase):
 
         state_dict = module.state_dict()
 
-        self.assert_("buffer_b" in state_dict)
+        self.assertTrue("buffer_b" in state_dict)
         self.assertEqual(state_dict["buffer_b"], 1)
-        self.assert_("module_a.buffer_a" in state_dict)
+        self.assertTrue("module_a.buffer_a" in state_dict)
         self.assertEqual(state_dict["module_a.buffer_a"], 0)
 
     async def test_module_named_buffer_with_tags(self):
+        """Test that Module.named_buffers() correctly filters buffers by tags.
+
+        Verifies that include_tags and exclude_tags parameters properly filter
+        buffers based on their assigned tags.
+        """
 
         class ModuleA(Module):
             def __init__(self):
@@ -96,10 +128,10 @@ class TestPathPlanner(omni.kit.test.AsyncTestCase):
         bar_buffers = module.named_buffers(include_tags=["bar"])
         nonbar_buffers = module.named_buffers(exclude_tags=["bar"])
 
-        self.assert_("buffer_b" in foo_buffers)
-        self.assert_("buffer_b" not in bar_buffers)
-        self.assert_("buffer_b" in nonbar_buffers)
+        self.assertTrue("buffer_b" in foo_buffers)
+        self.assertTrue("buffer_b" not in bar_buffers)
+        self.assertTrue("buffer_b" in nonbar_buffers)
 
-        self.assert_("module_a.buffer_a" in foo_buffers)
-        self.assert_("module_a.buffer_a" in bar_buffers)
-        self.assert_("module_a.buffer_a" not in nonbar_buffers)
+        self.assertTrue("module_a.buffer_a" in foo_buffers)
+        self.assertTrue("module_a.buffer_a" in bar_buffers)
+        self.assertTrue("module_a.buffer_a" not in nonbar_buffers)

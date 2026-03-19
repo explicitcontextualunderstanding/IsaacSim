@@ -182,8 +182,8 @@ public:
 
             for (const usdrt::SdfPath& usdrtPath : componentPaths)
             {
-                const omni::fabric::PathC pathC(usdrtPath);
-                const pxr::SdfPath usdPath = omni::fabric::toSdfPath(pathC);
+                const omni::fabric::Path path(usdrtPath);
+                const pxr::SdfPath usdPath = omni::fabric::toSdfPath(path);
                 pxr::UsdPrim prim = m_stage->GetPrimAtPath(usdPath);
 
                 onComponentAdd(prim);

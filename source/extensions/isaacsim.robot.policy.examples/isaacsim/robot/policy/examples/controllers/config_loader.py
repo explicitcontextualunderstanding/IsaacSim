@@ -12,25 +12,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utilities for loading and parsing robot policy environment configuration files."""
+
+
 import fnmatch
 import io
 import sys
-from typing import Dict, List, Tuple
+from typing import Any
 
 import carb
 import omni
 import yaml
 
 
-def parse_env_config(env_config_path: str = "env.yaml") -> dict:
+def parse_env_config(env_config_path: str = "env.yaml") -> dict[str, Any]:
     """
-    Parses the environment configuration file.
+    Loads and parses an environment configuration YAML file with custom handling for Python tuples
+    and unknown tags. Uses a safe YAML loader that ignores unknown tags and properly constructs
+    Python tuples from YAML sequences.
 
     Args:
-        env_config_path (str, optional): The path to the environment configuration file. Defaults to "env.yaml".
+        env_config_path: Path to the environment configuration file
 
     Returns:
-        dict: The parsed environment configuration data.
+        Parsed configuration dictionary containing environment settings including robot,
+        scene, simulation, and physics parameters
     """
 
     class SafeLoaderIgnoreUnknown(yaml.SafeLoader):
@@ -51,17 +58,22 @@ def parse_env_config(env_config_path: str = "env.yaml") -> dict:
 
 
 def get_robot_joint_properties(
-    data: dict, joint_names: List[str]
-) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[float]]:
+    data: dict[str, Any], joint_names: list[str]
+) -> tuple[list[float], list[float], list[float], list[float], list[float], list[float]]:
     """
-    Gets the robot joint properties from the environment configuration data.
+    Extracts and processes robot joint properties from environment configuration.
+    Handles both scalar and per-joint property specifications, with pattern matching
+    for joint names. Provides default values for missing properties.
 
     Args:
-        data (dict): The environment configuration data.
-        joint_names (List[str]): The list of joint names in the expected order.
+        data: Environment configuration dictionary containing robot actuator and state data
+        joint_names: Ordered list of joint names to extract properties for
 
     Returns:
-        tuple: A tuple containing the effort limits, velocity limits, stiffness, damping, default positions, and default velocities.
+        A tuple containing ordered lists of joint properties (effort_limits, velocity_limits, stiffness, damping,
+        default_pos, default_vel) where effort_limits are maximum torque/force limits, velocity_limits are maximum
+        velocity limits, stiffness are position control stiffness gains, damping are velocity control damping gains,
+        default_pos are initial/default joint positions, and default_vel are initial/default joint velocities.
     """
     actuator_data = data.get("scene").get("robot").get("actuators")
     stiffness = {}
@@ -208,66 +220,78 @@ def get_robot_joint_properties(
     )
 
 
-def get_articulation_props(data: dict) -> dict:
+def get_articulation_props(data: dict[str, Any]) -> dict[str, Any]:
     """
-    Gets the articulation properties from the environment configuration data.
+    Retrieves articulation properties from the robot spawn configuration.
+    These properties define the physical characteristics and simulation
+    parameters for the robot's articulated joints and links.
 
     Args:
-        data (dict): The environment configuration data.
+        data: Environment configuration dictionary
 
     Returns:
-        dict: The articulation properties.
+        Articulation properties dictionary from scene.robot.spawn.articulation_props
     """
     return data.get("scene").get("robot").get("spawn").get("articulation_props")
 
 
-def get_physics_properties(data: dict) -> dict:
+def get_physics_properties(data: dict[str, Any]) -> tuple[int, float, int]:
     """
-    Gets the physics properties from the environment configuration data.
+    Extracts simulation timing parameters from the environment configuration.
+    These parameters control the simulation's temporal resolution and rendering.
 
     Args:
-        data (dict): The environment configuration data.
+        data: Environment configuration dictionary
 
     Returns:
-        tuple: A tuple containing the decimation, dt, and render interval.
+        A tuple containing (decimation, dt, render_interval) where decimation is the policy update decimation factor,
+        dt is the physics simulation timestep in seconds, and render_interval is the number of physics steps between
+        renders.
     """
     return data.get("decimation"), data.get("sim").get("dt"), data.get("sim").get("render_interval")
 
 
-def get_observations(data: dict) -> dict:
+def get_observations(data: dict[str, Any]) -> dict[str, Any]:
     """
-    Gets the observations from the environment configuration data.
+    Retrieves policy observation specifications from the configuration.
+    These define what state information is provided to the policy
+    for decision making.
 
     Args:
-        data (dict): The environment configuration data.
+        data: Environment configuration dictionary
 
     Returns:
-        dict: The observations.
+        Observation specification dictionary from observations.policy section
     """
     return data.get("observations").get("policy")
 
 
-def get_action(data: dict) -> dict:
+def get_action(data: dict[str, Any]) -> dict[str, Any]:
     """
-    Gets the actions from the environment configuration data.
+    Retrieves policy action specifications from the configuration.
+    These define the control interface and action space available
+    to the policy for controlling the robot.
 
     Args:
-        data (dict): The environment configuration data.
+        data: Environment configuration dictionary
 
     Returns:
-        dict: The actions.
+        Action specification dictionary defining control parameters and limits
     """
     return data.get("actions")
 
 
-def get_physx_settings(data: dict) -> dict:
+def get_physx_settings(data: dict[str, Any]) -> dict[str, Any]:
     """
-    Gets the PhysX settings from the environment configuration data.
+    Retrieves PhysX simulation engine configuration parameters.
+    These settings control physics simulation quality, stability,
+    and performance characteristics.
 
     Args:
-        data (dict): The environment configuration data.
+        data: Environment configuration dictionary
 
     Returns:
-        dict: The PhysX settings.
+        PhysX settings dictionary from sim.physx section, containing solver
+        settings, collision parameters, and other physics simulation properties
     """
     return data.get("sim").get("physx")

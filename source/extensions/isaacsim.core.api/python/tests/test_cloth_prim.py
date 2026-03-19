@@ -14,10 +14,10 @@
 # limitations under the License.
 
 import omni.kit.test
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.materials.particle_material import ParticleMaterial
 from isaacsim.core.api.tests.common import TestProperties
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import SingleClothPrim, SingleParticleSystem
 
 # NOTE:
@@ -31,6 +31,8 @@ from omni.physx.scripts import deformableUtils, physicsUtils
 from pxr import Gf, Usd, UsdGeom
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 
 class TestSingleClothPrim(CoreTestCase, TestProperties):

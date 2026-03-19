@@ -17,7 +17,6 @@
 
 #include "GenericModelOutput.h"
 #include "LidarConfigHelper.h"
-#include "LidarMetaData.h"
 #include "OgnIsaacComputeRTXLidarFlatScanDatabase.h"
 #include "isaacsim/core/includes/BaseResetNode.h"
 #include "isaacsim/core/includes/ScopedCudaDevice.h"
@@ -56,9 +55,21 @@ public:
     {
         m_firstFrame = true;
         m_isInitialized = false;
-        CUDA_CHECK(cudaFreeHost(m_intensityBuffer));
-        CUDA_CHECK(cudaFreeHost(m_distanceBuffer));
-        CUDA_CHECK(cudaFreeHost(m_azimuthBuffer));
+        if (m_intensityBuffer)
+        {
+            CUDA_CHECK(cudaFreeHost(m_intensityBuffer));
+            m_intensityBuffer = nullptr;
+        }
+        if (m_distanceBuffer)
+        {
+            CUDA_CHECK(cudaFreeHost(m_distanceBuffer));
+            m_distanceBuffer = nullptr;
+        }
+        if (m_azimuthBuffer)
+        {
+            CUDA_CHECK(cudaFreeHost(m_azimuthBuffer));
+            m_azimuthBuffer = nullptr;
+        }
     }
     bool initialize(OgnIsaacComputeRTXLidarFlatScanDatabase& db)
     {
@@ -72,6 +83,7 @@ public:
             CARB_LOG_ERROR("IsaacComputeRTXLidarFlatScan: renderProductPath input is empty. Skipping execution.");
             return false;
         }
+        size_t maxPoints = 0;
         pxr::UsdPrim lidarPrim = isaacsim::core::includes::getCameraPrimFromRenderProduct(renderProductPath);
         if (lidarPrim.IsA<pxr::UsdGeomCamera>())
         {
@@ -113,6 +125,9 @@ public:
             state.m_nearRangeM = configHelper.nearRangeM;
             state.m_farRangeM = configHelper.farRangeM;
             state.m_rotationRate = static_cast<float>(configHelper.scanRateBaseHz);
+            maxPoints = configHelper.numChannels * configHelper.maxReturns *
+                        static_cast<size_t>(std::ceil(static_cast<float>(configHelper.reportRateBaseHz) /
+                                                      static_cast<float>(configHelper.scanRateBaseHz)));
         }
         else
         {
@@ -168,7 +183,7 @@ public:
             {
                 // Set useful state variables
                 uint32_t reportRateBaseHzAsInt;
-                lidarPrim.GetAttribute(pxr::TfToken("omni:sensor:Core:reportRateBaseHz")).Get(&reportRateBaseHzAsInt);
+                lidarPrim.GetAttribute(pxr::TfToken("omni:sensor:Core:patternFiringRateHz")).Get(&reportRateBaseHzAsInt);
                 float reportRateBaseHz = static_cast<float>(reportRateBaseHzAsInt);
 
                 state.m_horizontalResolution = 360.0f * state.m_rotationRate / reportRateBaseHz;
@@ -176,10 +191,18 @@ public:
                 state.m_azimuthRangeEnd = 180.0f;
                 state.m_horizontalFov = 360.0;
             }
+
+            // Compute the max number of points in the scan
+            uint32_t maxReturns;
+            uint32_t numChannels;
+            uint32_t patternFiringRateHz;
+            lidarPrim.GetAttribute(pxr::TfToken("omni:sensor:Core:maxReturns")).Get(&maxReturns);
+            lidarPrim.GetAttribute(pxr::TfToken("omni:sensor:Core:numberOfChannels")).Get(&numChannels);
+            lidarPrim.GetAttribute(pxr::TfToken("omni:sensor:Core:patternFiringRateHz")).Get(&patternFiringRateHz);
+            maxPoints = numChannels * maxReturns *
+                        static_cast<size_t>(
+                            std::ceil(static_cast<float>(patternFiringRateHz) / static_cast<float>(rotationRateAsInt)));
         }
-        omni::sensors::lidar::LidarMetaData* metadataPtr =
-            reinterpret_cast<omni::sensors::lidar::LidarMetaData*>(db.inputs.metaDataPtr());
-        auto maxPoints = metadataPtr->maxPoints;
         CUDA_CHECK(cudaMallocHost(&state.m_intensityBuffer, maxPoints * sizeof(float)));
         CUDA_CHECK(cudaMallocHost(&state.m_distanceBuffer, maxPoints * sizeof(float)));
         CUDA_CHECK(cudaMallocHost(&state.m_azimuthBuffer, maxPoints * sizeof(float)));
@@ -192,12 +215,6 @@ public:
         auto& state = db.perInstanceState<OgnIsaacComputeRTXLidarFlatScan>();
         // Enable downstream execution by default
         db.outputs.exec() = kExecutionAttributeStateEnabled;
-
-        if (!db.inputs.metaDataPtr())
-        {
-            CARB_LOG_INFO("IsaacComputeRTXLidarFlatScan: metaDataPtr input is empty. Skipping execution.");
-            return false;
-        }
 
         if (state.m_firstFrame)
         {
@@ -242,21 +259,10 @@ public:
             return false;
         }
 
-        // Asynchronously copy input elements into the state buffers on host
-        isaacsim::core::includes::ScopedDevice scopedDevice(db.inputs.cudaDeviceIndex());
-        cudaStream_t cudaStream;
-        CUDA_CHECK(cudaStreamCreate(&cudaStream));
-        CUDA_CHECK(cudaMemcpyAsync(state.m_intensityBuffer, reinterpret_cast<void*>(db.inputs.intensityPtr()),
-                                   db.inputs.intensityBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
-        CUDA_CHECK(cudaMemcpyAsync(state.m_distanceBuffer, reinterpret_cast<void*>(db.inputs.distancePtr()),
-                                   db.inputs.distanceBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
-        CUDA_CHECK(cudaMemcpyAsync(state.m_azimuthBuffer, reinterpret_cast<void*>(db.inputs.azimuthPtr()),
-                                   db.inputs.azimuthBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
-
         // Number of elements in the input buffers
         size_t numInputElements = db.inputs.intensityBufferSize() / sizeof(float);
 
-        // Simultaneously reset output attributes on host
+        // Reset output attributes on host
         size_t numOutputElements = static_cast<size_t>(state.m_horizontalFov / state.m_horizontalResolution);
         db.outputs.numCols() = static_cast<int>(numOutputElements);
         db.outputs.intensitiesData().resize(numOutputElements);
@@ -267,15 +273,42 @@ public:
             db.outputs.intensitiesData()[i] = 0;
         }
 
-        // Synchronize the stream to ensure the input buffers on host are populated
-        CUDA_CHECK(cudaStreamSynchronize(cudaStream));
-        CUDA_CHECK(cudaStreamDestroy(cudaStream));
+        const float* intensityData;
+        const float* distanceData;
+        const float* azimuthData;
+
+        if (db.inputs.cudaDeviceIndex() == -1)
+        {
+            // Data is already on host — use input pointers directly (no D2H copy needed)
+            intensityData = reinterpret_cast<const float*>(db.inputs.intensityPtr());
+            distanceData = reinterpret_cast<const float*>(db.inputs.distancePtr());
+            azimuthData = reinterpret_cast<const float*>(db.inputs.azimuthPtr());
+        }
+        else
+        {
+            // Asynchronously copy input elements from device into the state buffers on host
+            isaacsim::core::includes::ScopedDevice scopedDevice(db.inputs.cudaDeviceIndex());
+            cudaStream_t cudaStream;
+            CUDA_CHECK(cudaStreamCreate(&cudaStream));
+            CUDA_CHECK(cudaMemcpyAsync(state.m_intensityBuffer, reinterpret_cast<void*>(db.inputs.intensityPtr()),
+                                       db.inputs.intensityBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
+            CUDA_CHECK(cudaMemcpyAsync(state.m_distanceBuffer, reinterpret_cast<void*>(db.inputs.distancePtr()),
+                                       db.inputs.distanceBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
+            CUDA_CHECK(cudaMemcpyAsync(state.m_azimuthBuffer, reinterpret_cast<void*>(db.inputs.azimuthPtr()),
+                                       db.inputs.azimuthBufferSize(), cudaMemcpyDeviceToHost, cudaStream));
+            CUDA_CHECK(cudaStreamSynchronize(cudaStream));
+            CUDA_CHECK(cudaStreamDestroy(cudaStream));
+
+            intensityData = state.m_intensityBuffer;
+            distanceData = state.m_distanceBuffer;
+            azimuthData = state.m_azimuthBuffer;
+        }
 
         for (size_t inIdx = 0; inIdx < numInputElements; inIdx++)
         {
-            float azimuth = state.m_azimuthBuffer[inIdx];
-            float distance = state.m_distanceBuffer[inIdx];
-            uint8_t intensity = static_cast<uint8_t>(state.m_intensityBuffer[inIdx] * 255.0f);
+            float azimuth = azimuthData[inIdx];
+            float distance = distanceData[inIdx];
+            uint8_t intensity = static_cast<uint8_t>(intensityData[inIdx] * 255.0f);
             // Compute index of buffer in which measurements will be placed, based on beam azimuth
             size_t outIdx = static_cast<size_t>((azimuth - state.m_azimuthRangeStart) / state.m_horizontalResolution);
             if (outIdx >= numOutputElements)
@@ -292,6 +325,13 @@ public:
 
         return true;
     }
+
+    // static void releaseInstance(NodeObj const& nodeObj, GraphInstanceID instanceId)
+    // {
+    //     auto& state = OgnIsaacComputeRTXLidarFlatScanDatabase::sPerInstanceState<OgnIsaacComputeRTXLidarFlatScan>(
+    //         nodeObj, instanceId);
+    //     state.reset();
+    // }
 };
 
 REGISTER_OGN_NODE()

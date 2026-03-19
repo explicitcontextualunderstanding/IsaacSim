@@ -1,5 +1,5 @@
 [package]
-version = "1.3.2"
+version = "1.3.3"
 category = "Simulation"
 title = "ROS 2 Simulation Control"
 description = "Extension that uses the ROS 2 Simulation Interfaces to control Isaac Sim"
@@ -22,14 +22,29 @@ name = "isaacsim.ros2.sim_control"
 name = "isaacsim.ros2.sim_control.tests" 
 
 [[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
 timeout = 900
 
 dependencies = [
     "isaacsim.robot.wheeled_robots",
+    "omni.isaac.ml_archive",
 ]
 
 stdoutFailPatterns.exclude = [
     "*[Error] [omni.usd] Failed to open : /invalid/path/to/nonexistent.usd*",
+    '*The NumPy module was reloaded*',
 ]
 
 args = [
@@ -40,7 +55,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -56,6 +71,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -76,11 +92,3 @@ args = [
     "--/rtx/newDenoiser/enabled=1",
     "--/rtx/reservedDescriptors=900000",
 ]
-
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
-]
-
-

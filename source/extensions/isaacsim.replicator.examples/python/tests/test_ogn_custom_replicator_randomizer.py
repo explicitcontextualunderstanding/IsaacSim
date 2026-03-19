@@ -13,18 +13,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for custom replicator randomizer implementations using mathematical distribution algorithms and OmniGraph nodes."""
+
+
 import omni.kit
 import omni.usd
 from isaacsim.core.utils.stage import create_new_stage_async
 
 
 class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
+    """Test class for demonstrating custom replicator randomization techniques.
+
+    This class provides comprehensive test cases for implementing and using custom randomizers
+    within Omniverse Replicator. It demonstrates two approaches: manual randomization using pure
+    Python code and automated randomization using Omniverse Graph (OmniGraph) nodes.
+
+    The test class showcases three distinct spatial distribution patterns:
+
+    * Point sampling on sphere surfaces for objects positioned at exact distances
+    * Point sampling within sphere volumes for objects distributed throughout 3D spaces
+    * Point sampling between concentric spheres for objects in annular regions
+
+    The first test method demonstrates manual randomization by implementing mathematical algorithms
+    for uniform spatial distribution. It creates 1,500 primitives (spheres, cubes, cylinders) and
+    applies randomized positions and rotations using custom Python functions that ensure proper
+    spatial uniformity.
+
+    The second test method demonstrates automated randomization through custom OmniGraph nodes.
+    It defines replicator wrapper functions that interface with specialized nodes:
+    ``isaacsim.replicator.examples.OgnSampleOnSphere``, ``isaacsim.replicator.examples.OgnSampleInSphere``,
+    and ``isaacsim.replicator.examples.OgnSampleBetweenSpheres``. These nodes provide the same
+    spatial distribution capabilities as the manual approach but integrate seamlessly with
+    Omniverse Replicator's orchestration system.
+
+    Both approaches handle proper mathematical considerations for uniform distribution, including
+    cube root scaling for volumetric sampling and cosine theta sampling for spherical coordinates.
+    The test validates that custom randomizers can be successfully integrated into Replicator
+    workflows while maintaining proper spatial distribution properties.
+    """
+
     async def setUp(self):
+        """Set up the test environment by creating a new stage."""
         await omni.kit.app.get_app().next_update_async()
         await create_new_stage_async()
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
+        """Clean up the test environment by closing the stage and waiting for assets to finish loading."""
         omni.usd.get_context().close_stage()
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
@@ -32,6 +67,12 @@ class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
             await omni.kit.app.get_app().next_update_async()
 
     async def test_custom_randomizer(self):
+        """Test custom randomizer implementations for distributing prims on sphere surfaces and volumes.
+
+        Creates 500 prims of each type (spheres, cubes, cylinders) and randomizes their positions using
+        custom mathematical distribution functions: on sphere surface, within sphere volume, and between
+        two concentric spheres.
+        """
         import math
         import random
         from itertools import chain
@@ -140,6 +181,11 @@ class TestOgnCustomReplicatorRandomizer(omni.kit.test.AsyncTestCase):
                 between_spheres_prim.GetAttribute("xformOp:translate").Set(rand_loc)
 
     async def test_custom_replicator_randomizer_graph(self):
+        """Test custom replicator randomizer graph using Omni Replicator framework.
+
+        Creates 50 prims of each type and applies randomization using custom replicator nodes for
+        sphere-based distribution patterns. Tests the integration with omni.replicator.core framework.
+        """
         import omni.replicator.core as rep
         from omni.replicator.core.scripts.utils import ReplicatorItem, ReplicatorWrapper, create_node, set_target_prims
 

@@ -19,12 +19,14 @@ import numpy as np
 #   omni.kit.test - std python's unittest module with additional wrapping to add support for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-import torch
 from isaacsim.core.api import World
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import ParticleSystem, SingleParticleSystem
 from isaacsim.core.utils.stage import create_new_stage_async, update_stage_async
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 
 class TestParticleSystemView(CoreTestCase):

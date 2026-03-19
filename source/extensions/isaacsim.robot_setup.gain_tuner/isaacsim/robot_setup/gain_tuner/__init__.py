@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""UI extension for robot joint gain tuning that provides an interactive interface for adjusting and testing robot control parameters."""
+
+
 from .extension import *
+
+__all__ = ["UIBuilder"]

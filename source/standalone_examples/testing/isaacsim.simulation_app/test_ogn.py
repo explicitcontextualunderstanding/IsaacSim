@@ -50,7 +50,7 @@ simulation_app.update()
 value = og.DataView.get(output_attr)
 print(value)
 if value != "Hello":
-    print("[FAIL] Output does not equal Hello")
+    print("[fatal] Output does not equal Hello")
     sys.exit(1)
 simulation_app.update()
 og.DataView.set(input_attr, "Goodbye")
@@ -58,7 +58,7 @@ simulation_app.update()
 value = og.DataView.get(output_attr)
 print(value)
 if value != "Goodbye":
-    print("[FAIL] Output does not equal Goodbye")
+    print("[fatal] Output does not equal Goodbye")
     sys.exit(1)
 
 simulation_app.update()

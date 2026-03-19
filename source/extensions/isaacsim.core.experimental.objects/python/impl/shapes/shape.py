@@ -17,11 +17,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+import isaacsim.core.experimental.utils.ops as ops_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import warp as wp
 from isaacsim.core.experimental.prims import XformPrim
-from pxr import Usd, UsdGeom
+from pxr import Gf, Usd, UsdGeom
 
 
 class Shape(XformPrim, ABC):
@@ -37,6 +38,8 @@ class Shape(XformPrim, ABC):
     Args:
         paths: Single path or list of paths to existing or non-existing (one of both) USD prims.
             Can include regular expressions for matching multiple prims.
+        colors: Display colors (shape ``(N, 3)``).
+            If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         resolve_paths: Whether to resolve the given paths (true) or use them as is (false).
         positions: Positions in the world frame (shape ``(N, 3)``).
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
@@ -57,6 +60,8 @@ class Shape(XformPrim, ABC):
         self,
         paths: str | list[str],
         *,
+        # Shape
+        colors: list | np.ndarray | wp.array | None = None,
         # Prim
         resolve_paths: bool = True,
         # XformPrim
@@ -64,7 +69,7 @@ class Shape(XformPrim, ABC):
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         scales: list | np.ndarray | wp.array | None = None,
-        reset_xform_op_properties: bool = False,
+        reset_xform_op_properties: bool = True,
     ) -> None:
         super().__init__(
             paths,
@@ -77,6 +82,11 @@ class Shape(XformPrim, ABC):
         )
         if not hasattr(self, "_geoms"):
             self._geoms = []
+        # set display colors
+        if colors is not None:
+            colors = ops_utils.broadcast_to(colors, shape=(len(self._geoms), 3), dtype=wp.float32, device="cpu").numpy()
+            for geom, color in zip(self._geoms, colors):
+                geom.GetDisplayColorAttr().Set([Gf.Vec3f(*color.tolist())])
 
     """
     Properties.

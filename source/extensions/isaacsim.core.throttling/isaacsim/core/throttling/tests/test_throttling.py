@@ -39,7 +39,6 @@ class TestIsaacThrottling(omni.kit.test.AsyncTestCase):
 
     # async rendering always off
     async def test_on_stop_play_toggles_off(self):
-        self._settings = carb.settings.get_settings()
         self._settings.set("/rtx/ecoMode/enabled", True)
         self._settings.set("/app/asyncRendering", False)
         self._settings.set("/app/asyncRenderingLowLatency", False)
@@ -70,7 +69,6 @@ class TestIsaacThrottling(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_on_stop_play_callback(self):
-        self._settings = carb.settings.get_settings()
         self._settings.set("/rtx/ecoMode/enabled", True)
         self._settings.set("/app/asyncRendering", False)
         self._settings.set("/app/asyncRenderingLowLatency", False)
@@ -98,7 +96,6 @@ class TestIsaacThrottling(omni.kit.test.AsyncTestCase):
 
     async def test_async_rendering_10_frame_delay(self):
         """Test that async rendering is re-enabled after 10 frames when timeline stops."""
-        self._settings = carb.settings.get_settings()
 
         # Enable async toggle
         self._settings.set("/exts/isaacsim.core.throttling/enable_async", True)

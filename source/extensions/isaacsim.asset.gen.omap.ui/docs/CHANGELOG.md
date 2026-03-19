@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.5.0] - 2026-02-25
+### Added
+- Save YAML button in the visualization window to save the ROS occupancy map parameters file directly, alongside the existing Save Image button
+- Image File Name field in the visualization window to set the image filename used in the YAML; defaults to the stage name
+- Update YAML button to rebuild the YAML content with the new filename without regenerating the image
+- Save Image dialog now pre-fills the filename from the Image File Name field
+
+## [2.4.3] - 2026-02-23
+### Changed
+- Add ui test dependency
+
+## [2.4.2] - 2026-02-05
+### Changed
+- Added dock info for Robot Hierarchy window
+
+## [2.4.1] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.4.0] - 2025-11-05
+### Changed
+- Refactor codebase and improve docstrings
+
+## [2.3.0] - 2025-10-30
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [2.2.4] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.2.3] - 2025-10-08
 ### Changed
 - Fix incorrect image origin calculation

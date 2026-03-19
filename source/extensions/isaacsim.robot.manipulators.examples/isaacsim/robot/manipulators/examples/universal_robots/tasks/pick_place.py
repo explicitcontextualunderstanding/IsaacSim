@@ -23,15 +23,15 @@ from isaacsim.robot.manipulators.examples.universal_robots import UR10
 
 
 class PickPlace(tasks.PickPlace):
-    """[summary]
+    """UR10 robot pick and place task.
 
     Args:
-        name (str, optional): [description]. Defaults to "ur10_pick_place".
-        cube_initial_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_initial_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
-        target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_size (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
+        name: Task name.
+        cube_initial_position: Initial cube position.
+        cube_initial_orientation: Initial cube orientation.
+        target_position: Target position for placing.
+        cube_size: Size of the cube.
+        offset: Task offset.
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class PickPlace(tasks.PickPlace):
         target_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         if cube_size is None:
             cube_size = np.array([0.0515, 0.0515, 0.0515]) / get_stage_units()
         if target_position is None:
@@ -61,10 +61,10 @@ class PickPlace(tasks.PickPlace):
         return
 
     def set_robot(self) -> UR10:
-        """[summary]
+        """Create and configure the UR10 robot.
 
         Returns:
-            UR10: [description]
+            Configured UR10 robot instance.
         """
         ur10_prim_path = find_unique_string_name(
             initial_name="/World/UR10", is_unique_fn=lambda x: not is_prim_path_valid(x)
@@ -78,12 +78,12 @@ class PickPlace(tasks.PickPlace):
         )
         return self._ur10_robot
 
-    def pre_step(self, time_step_index: int, simulation_time: float) -> None:
-        """[summary]
+    def pre_step(self, time_step_index: int, simulation_time: float):
+        """Called before each physics step to update gripper.
 
         Args:
-            time_step_index (int): [description]
-            simulation_time (float): [description]
+            time_step_index: Current simulation step index.
+            simulation_time: Current simulation time.
         """
         tasks.PickPlace.pre_step(self, time_step_index=time_step_index, simulation_time=simulation_time)
         self._ur10_robot.gripper.update()

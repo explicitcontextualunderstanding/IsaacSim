@@ -16,11 +16,13 @@
 from typing import List, Optional, Sequence, Union
 
 import numpy as np
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from pxr import UsdGeom
 
 from .geometry_prim import GeometryPrim
 from .single_prim_wrapper import _SinglePrimWrapper
+
+torch = import_module("torch")
 
 
 class SingleGeometryPrim(_SinglePrimWrapper):

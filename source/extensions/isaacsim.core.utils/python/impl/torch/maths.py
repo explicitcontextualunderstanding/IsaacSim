@@ -16,8 +16,10 @@ import os
 import random
 
 import numpy as np
-import torch
 import warp as wp
+from isaacsim.core.deprecation_manager import import_module
+
+torch = import_module("torch")
 
 
 @torch.jit.script

@@ -16,20 +16,22 @@ import typing
 from typing import Any
 
 import numpy as np
-import torch
 import warp as wp
+from isaacsim.core.deprecation_manager import import_module
 from pxr import Gf
 from scipy.spatial.transform import Rotation
 
+torch = import_module("torch")
 
-def gf_quat_to_tensor(orientation: typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternion], device=None) -> wp.types.array:
+
+def gf_quat_to_tensor(orientation: typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternion], device=None) -> wp.array:
     """Converts a pxr Quaternion type to a torch array (scalar first).
 
     Args:
-        orientation (typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternion]): [description]
+        orientation (typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternion]): Input quaternion from USD.
 
     Returns:
-       wp.types.array: quaternion tensor
+       wp.array: quaternion tensor
     """
 
     quat = torch.zeros(4, dtype=torch.float32, device=device)
@@ -41,12 +43,12 @@ def gf_quat_to_tensor(orientation: typing.Union[Gf.Quatd, Gf.Quatf, Gf.Quaternio
 
 
 def euler_angles_to_quats(
-    euler_angles: wp.types.array, degrees: bool = False, extrinsic: bool = True, device=None
-) -> wp.types.array:
+    euler_angles: wp.array, degrees: bool = False, extrinsic: bool = True, device=None
+) -> wp.array:
     """Vectorized version of converting euler angles to quaternion (scalar first)
 
     Args:
-        euler_angles (wp.types.array): euler angles with shape (N, 3)
+        euler_angles (wp.array): euler angles with shape (N, 3)
         extrinsic (bool, optional): True if the euler angles follows the extrinsic angles
                    convention (equivalent to ZYX ordering but returned in the reverse) and False if it follows
                    the intrinsic angles conventions (equivalent to XYZ ordering).
@@ -54,7 +56,7 @@ def euler_angles_to_quats(
         degrees (bool, optional): True if degrees, False if radians. Defaults to False.
 
     Returns:
-        wp.types.array: quaternions representation of the angles (N, 4) - scalar first.
+        wp.array: quaternions representation of the angles (N, 4) - scalar first.
     """
     if extrinsic:
         order = "xyz"
@@ -68,15 +70,15 @@ def euler_angles_to_quats(
     return result
 
 
-def rad2deg(radian_value: wp.types.array, device=None) -> wp.types.array:
+def rad2deg(radian_value: wp.array, device=None) -> wp.array:
     """_summary_
 
     Args:
-        radian_value (wp.types.array): _description_
+        radian_value (wp.array): _description_
         device (_type_, optional): _description_. Defaults to None.
 
     Returns:
-        wp.types.array: _description_
+        wp.array: _description_
     """
 
     rad_torch = wp.to_torch(radian_value)
@@ -84,7 +86,7 @@ def rad2deg(radian_value: wp.types.array, device=None) -> wp.types.array:
     return wp.from_torch(rad_deg)
 
 
-def deg2rad(degree_value: wp.types.array, device=None) -> wp.types.array:
+def deg2rad(degree_value: wp.array, device=None) -> wp.array:
     """_summary_
 
     Args:
@@ -92,7 +94,7 @@ def deg2rad(degree_value: wp.types.array, device=None) -> wp.types.array:
         device (_type_, optional): _description_. Defaults to None.
 
     Returns:
-        wp.types.array: _description_
+        wp.array: _description_
     """
 
     degree_torch = wp.to_torch(degree_value)

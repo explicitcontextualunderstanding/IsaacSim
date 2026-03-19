@@ -18,6 +18,12 @@ The following table summarizes the available objects.
 
 .. currentmodule:: isaacsim.core.experimental.objects
 
+.. rubric:: camera
+.. autosummary::
+    :nosignatures:
+
+    Camera
+
 .. rubric:: ground plane
 .. autosummary::
     :nosignatures:
@@ -62,6 +68,15 @@ Ground Plane
 ^^^^^^^^^^^^
 
 .. autoclass:: isaacsim.core.experimental.objects.GroundPlane
+    :members:
+    :undoc-members:
+    :inherited-members:
+    :show-inheritance:
+
+Camera
+^^^^^^
+
+.. autoclass:: isaacsim.core.experimental.objects.Camera
     :members:
     :undoc-members:
     :inherited-members:

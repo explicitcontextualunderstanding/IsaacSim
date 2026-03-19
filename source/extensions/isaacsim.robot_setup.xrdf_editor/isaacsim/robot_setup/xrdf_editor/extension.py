@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides an interactive editor for creating and modifying Lula Robot Description files and cuMotion XRDF files."""
+
+from __future__ import annotations
+
 import asyncio
 import copy
 import gc
@@ -22,10 +26,11 @@ from functools import partial
 from typing import OrderedDict
 
 import carb
+import carb.eventdispatcher
 import numpy as np
 import omni
 import omni.kit.commands
-import omni.physx as _physx
+import omni.physics.core
 import omni.timeline
 import omni.ui as ui
 import omni.usd
@@ -34,6 +39,7 @@ from isaacsim.core.prims import Articulation, SingleArticulation, SingleXFormPri
 from isaacsim.core.utils.articulations import find_all_articulation_base_paths
 from isaacsim.core.utils.numpy.rotations import quats_to_rot_matrices
 from isaacsim.core.utils.prims import get_prim_at_path, get_prim_object_type
+from isaacsim.core.utils.rotations import gf_quat_to_np_array
 
 # New way of making UI being integrated in through feature updates
 from isaacsim.gui.components.element_wrappers import (
@@ -62,47 +68,104 @@ from isaacsim.gui.components.ui_utils import (
 from isaacsim.gui.components.widgets import DynamicComboBoxModel
 from omni.kit.menu.utils import MenuItemDescription, add_menu_items, remove_menu_items
 from omni.kit.window.property.templates import LABEL_WIDTH
-from pxr import Usd, UsdGeom, UsdPhysics
+from omni.usd import get_world_transform_matrix
+from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
 from .collision_sphere_editor import CollisionSphereEditor
 
-EXTENSION_NAME = "Lula Robot Description Editor"
+EXTENSION_NAME = "cuMotion/Lula Robot Description Editor"
 
 DEFAULT_JERK_LIMIT = 10000
 DEFAULT_ACCELERATION_LIMIT = 10
 MAX_DOF_NUM = 100
 
 
-def is_yaml_file(path: str):
+def is_yaml_file(path: str) -> bool:
+    """Check if a file is a YAML file based on its extension.
+
+    Args:
+        path: File path to check.
+
+    Returns:
+        True if the file has .yaml or .yml extension.
+    """
     _, ext = os.path.splitext(path.lower())
     return ext in [".yaml", ".yml"]
 
 
-def is_xrdf_file(path: str):
+def is_xrdf_file(path: str) -> bool:
+    """Check if a file is an XRDF file based on its extension.
+
+    Args:
+        path: File path to check.
+
+    Returns:
+        True if the file has .yaml, .yml, or .xrdf extension.
+    """
     _, ext = os.path.splitext(path.lower())
     return ext in [".yaml", ".yml", ".xrdf"]
 
 
 def on_filter_xrdf_item(item) -> bool:
+    """Filter function for file browser to show XRDF files and non-Omniverse folders.
+
+    Args:
+        item: File browser item to evaluate.
+
+    Returns:
+        True if item should be shown in the file browser.
+    """
     if not item or item.is_folder:
         return not (item.name == "Omniverse" or item.path.startswith("omniverse:"))
     return is_xrdf_file(item.path)
 
 
 def on_filter_item(item) -> bool:
+    """Filter function for file browser to show YAML files and non-Omniverse folders.
+
+    Args:
+        item: File browser item to evaluate.
+
+    Returns:
+        True if item should be shown in the file browser.
+    """
     if not item or item.is_folder:
         return not (item.name == "Omniverse" or item.path.startswith("omniverse:"))
     return is_yaml_file(item.path)
 
 
 class Extension(omni.ext.IExt):
+    """Provides an interactive editor for creating and modifying Lula Robot Description files and cuMotion XRDF files.
+
+    This extension enables users to generate collision sphere representations of robots, configure joint properties,
+    and export robot configuration data for use with Lula-based algorithms (RmpFlow, RRT, Lula Kinematics) and
+    Isaac cuMotion. The editor allows users to:
+
+    - Select articulated robots from the stage and configure joint properties including default positions,
+      active/fixed joint status, and acceleration/jerk limits
+    - Create collision spheres manually or automatically generate them from robot mesh geometry
+    - Edit, connect, and scale collision spheres on a per-link basis
+    - Import and export robot descriptions in both Lula YAML format and cuMotion XRDF format
+    - Preview sphere generation and manage sphere visibility
+    - Perform undo/redo operations on sphere modifications
+
+    The extension provides a comprehensive UI with panels for robot selection, joint properties configuration,
+    sphere editing tools, and file import/export operations. It integrates with the physics simulation to provide
+    real-time feedback and supports both automatic sphere generation from mesh geometry and manual sphere
+    authoring workflows.
+    """
+
     def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+        """Initialize extension and UI elements.
+
+        Args:
+            ext_id: Extension identifier.
+        """
 
         # Events
         self._usd_context = omni.usd.get_context()
-        self._physxIFace = _physx.get_physx_interface()
-        self._physx_subscription = None
+        self._physics_simulation_interface = omni.physics.core.get_physics_simulation_interface()
+        self._physics_subscription = None
         self._stage_event_sub = None
         self._timeline = omni.timeline.get_timeline_interface()
 
@@ -162,12 +225,13 @@ class Extension(omni.ext.IExt):
         self._collision_sphere_editor = CollisionSphereEditor()
 
     def on_shutdown(self):
+        """Cleanup resources and shutdown the extension."""
         self._show_robot_if_hidden()
         self._collision_sphere_editor.on_shutdown()
         self._usd_context = None
         self._stage_event_sub = None
         self._timeline_event_sub = None
-        self._physx_subscription = None
+        self._physics_subscription = None
         self._models = {}
         remove_menu_items(self._menu_items, "Tools")
         if self._window:
@@ -175,13 +239,39 @@ class Extension(omni.ext.IExt):
         gc.collect()
 
     def _on_window(self, visible):
+        """Handle window visibility changes and manage event subscriptions.
+
+        Args:
+            visible: Whether the window is visible.
+        """
         if self._window.visible:
             # Subscribe to Stage and Timeline Events
             self._usd_context = omni.usd.get_context()
-            events = self._usd_context.get_stage_event_stream()
-            self._stage_event_sub = events.create_subscription_to_pop(self._on_stage_event)
-            stream = self._timeline.get_timeline_event_stream()
-            self._timeline_event_sub = stream.create_subscription_to_pop(self._on_timeline_event)
+            self._stage_event_sub_selection = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SELECTION_CHANGED),
+                on_event=self._on_stage_selection_changed,
+                observer_name="isaacsim.robot_setup.xrdf_editor.Extension._on_stage_selection_changed",
+            )
+            self._stage_event_sub_opened = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.OPENED),
+                on_event=self._on_stage_opened,
+                observer_name="isaacsim.robot_setup.xrdf_editor.Extension._on_stage_opened",
+            )
+            self._stage_event_sub_closed = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.CLOSED),
+                on_event=self._on_stage_closed,
+                observer_name="isaacsim.robot_setup.xrdf_editor.Extension._on_stage_closed",
+            )
+            self._stage_event_sub_sim_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SIMULATION_START_PLAY),
+                on_event=self._on_timeline_play,
+                observer_name="isaacsim.robot_setup.xrdf_editor.Extension._on_timeline_play",
+            )
+            self._stage_event_sub_sim_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SIMULATION_STOP_PLAY),
+                on_event=self._on_timeline_stop,
+                observer_name="isaacsim.robot_setup.xrdf_editor.Extension._on_timeline_stop",
+            )
 
             self._build_ui()
             if not self._new_window and self.articulation:
@@ -189,10 +279,14 @@ class Extension(omni.ext.IExt):
             self._new_window = False
         else:
             self._usd_context = None
-            self._stage_event_sub = None
-            self._timeline_event_sub = None
+            self._stage_event_sub_selection = None
+            self._stage_event_sub_opened = None
+            self._stage_event_sub_closed = None
+            self._stage_event_sub_sim_play = None
+            self._stage_event_sub_sim_stop = None
 
     def _menu_callback(self):
+        """Toggle window visibility and update the selection if timeline is playing."""
         self._window.visible = not self._window.visible
         # Update the Selection Box if the Timeline is already playing
         if not self._timeline.is_stopped():
@@ -200,6 +294,7 @@ class Extension(omni.ext.IExt):
             self._on_selection(self._get_selected_articulation())
 
     def _build_ui(self):
+        """Build the main UI components including selection, command, editor, and tools panels."""
         # if not self._window:
         with self._window.frame:
             with ui.VStack(spacing=5, height=0):
@@ -229,12 +324,12 @@ class Extension(omni.ext.IExt):
 
         self._task = asyncio.ensure_future(dock_window())
 
-    def _on_selection(self, prim_path):
+    def _on_selection(self, prim_path: str):
         """Creates an Articulation Object from the selected articulation prim path.
-           Updates the UI with the Selected articulation.
+                   Updates the UI with the Selected articulation.
 
         Args:
-            prim_path (string): path to selected articulation
+            prim_path: Path to selected articulation.
         """
         if prim_path == self._prev_art_prim_path:
             return
@@ -260,8 +355,10 @@ class Extension(omni.ext.IExt):
             self._refresh_ui(self.articulation)
 
             # start event subscriptions
-            if not self._physx_subscription:
-                self._physx_subscription = self._physxIFace.subscribe_physics_step_events(self._on_physics_step)
+            if not self._physics_subscription:
+                self._physics_subscription = self._physics_simulation_interface.subscribe_physics_on_step_events(
+                    pre_step=False, order=0, on_update=self._on_physics_step
+                )
 
         # Deselect and Reset
         else:
@@ -273,6 +370,12 @@ class Extension(omni.ext.IExt):
             self.articulation = None
 
     def _on_combobox_selection(self, model=None, val=None):
+        """Handle articulation selection from the dropdown combobox.
+
+        Args:
+            model: The combobox model that changed.
+            val: The new value selected.
+        """
         index = self._models["ar_selection_model"].get_item_value_model().as_int
         if index >= 0 and index < len(self.articulation_list):
             self._selected_index = index
@@ -281,6 +384,7 @@ class Extension(omni.ext.IExt):
             self._on_selection(item)
 
     def _refresh_selection_combobox(self):
+        """Update the articulation selection combobox with available articulations from the stage."""
         self.articulation_list = find_all_articulation_base_paths()
         self.articulation_list.insert(0, "None")
         if self._prev_art_prim_path is not None and self._prev_art_prim_path not in self.articulation_list:
@@ -297,6 +401,7 @@ class Extension(omni.ext.IExt):
                 )
 
     def _clear_selection_combobox(self):
+        """Clear the articulation selection combobox and reset selection state."""
         self._selected_index = None
         self._selected_prim_path = None
         self.articulation_list = []
@@ -305,6 +410,7 @@ class Extension(omni.ext.IExt):
         self._models["ar_selection_combobox"].model.add_item_changed_fn(self._on_combobox_selection)
 
     def _clear_link_selection_combobox(self):
+        """Clear the link selection combobox and reset link-to-mesh mapping."""
         self._sphere_gen_link_2_mesh = OrderedDict()
         self._models["sphere_gen_link_selection_model"] = DynamicComboBoxModel([])
         self._models["sphere_gen_link_selection_model_combobox"].model = self._models["sphere_gen_link_selection_model"]
@@ -313,6 +419,12 @@ class Extension(omni.ext.IExt):
         )
 
     def _on_select_sphere_gen_link(self, model, val):
+        """Handles sphere generation link selection from the combobox.
+
+        Args:
+            model: The combobox model containing the selected link.
+            val: The selected value from the model.
+        """
         index = model.get_item_value_model().as_int
         if len(self._sphere_gen_link_2_mesh.keys()) == 0:
             carb.log_error("No links could be identified for this asset. This is possibly because no meshes exist.")
@@ -338,6 +450,7 @@ class Extension(omni.ext.IExt):
         self._prev_link = self._get_selected_link()
 
     def _refresh_sphere_gen_link_combobox(self):
+        """Refreshes the sphere generation link selection combobox with current link-to-mesh mappings."""
         self._models["sphere_gen_link_selection_model"] = DynamicComboBoxModel(
             list(self._sphere_gen_link_2_mesh.keys())
         )
@@ -350,6 +463,11 @@ class Extension(omni.ext.IExt):
         self._refresh_collision_sphere_comboboxes()
 
     def _refresh_collision_sphere_comboboxes(self, keep_sphere_selection=False):
+        """Refreshes the collision sphere selection comboboxes for the selected link.
+
+        Args:
+            keep_sphere_selection: Whether to preserve the currently selected sphere when refreshing.
+        """
         sphere_0_name, _ = self._get_selected_collision_spheres()
 
         sphere_names = self._collision_sphere_editor.get_sphere_names_by_link(self._get_selected_link_path())
@@ -367,6 +485,12 @@ class Extension(omni.ext.IExt):
         self._on_collision_sphere_select_0(None, None)
 
     def _on_collision_sphere_select_0(self, model, val):
+        """Handles first collision sphere selection from the combobox.
+
+        Args:
+            model: The combobox model containing the selected sphere.
+            val: The selected value from the model.
+        """
         sphere_0_name, sphere_1_name = self._get_selected_collision_spheres()
         if sphere_0_name is not None:
             sphere_names = self._connect_sphere_0_options
@@ -385,6 +509,7 @@ class Extension(omni.ext.IExt):
             self._models[name].get_item_value_model().set_value(int(pruned_names.index(sphere_1_name)))
 
     def get_all_sphere_gen_meshes(self):
+        """Identifies and maps all meshes within each link of the selected articulation for sphere generation."""
         stage = self._usd_context.get_stage()
         self._sphere_gen_link_2_mesh = OrderedDict()
 
@@ -454,12 +579,12 @@ class Extension(omni.ext.IExt):
                             + f"any link in the Articulation {self._articulation_base_path}"
                         )
 
-    def get_articulation_values(self, articulation):
+    def get_articulation_values(self, articulation: SingleArticulation):
         """Get and store the latest dof_properties from the articulation.
            Update the Properties UI.
 
         Args:
-            articulation (SingleArticulation): Selected Articulation
+            articulation: Selected Articulation
         """
         # Update static dof properties on new selection
         if self.new_selection:
@@ -475,11 +600,11 @@ class Extension(omni.ext.IExt):
             self.lower_joint_limits = articulation.dof_properties["lower"]
             self.upper_joint_limits = articulation.dof_properties["upper"]
 
-    def _refresh_ui(self, articulation):
+    def _refresh_ui(self, articulation: SingleArticulation):
         """Updates the GUI with a new Articulation's properties.
 
         Args:
-            articulation (SingleArticulation): [description]
+            articulation: The articulation to display in the UI.
         """
         # Get the latest articulation values and update the Properties UI
         self.get_articulation_values(articulation)
@@ -502,6 +627,7 @@ class Extension(omni.ext.IExt):
         self._update_command_ui()
 
     def _reset_ui(self):
+        """Resets and hides UI elements when no articulation is selected."""
         self._show_robot_if_hidden()
 
         """Reset / Hide UI Elements."""
@@ -532,39 +658,64 @@ class Extension(omni.ext.IExt):
     # Callbacks
     ##################################
 
-    def _on_stage_event(self, event):
-        """Callback for Stage Events
+    def _on_stage_selection_changed(self, event: carb.eventdispatcher.Event):
+        """Callback for Stage Selection Changed Event
 
         Args:
-            event (omni.usd.StageEventType): Event Type
+            event: Event
         """
-
         # On every stage event check if any articulations have been added/removed from the Stage
         self._refresh_selection_combobox()
+        self._collision_sphere_editor.copy_all_sphere_data()
+        self._refresh_collision_sphere_comboboxes(keep_sphere_selection=True)
 
-        if event.type == int(omni.usd.StageEventType.SELECTION_CHANGED):
-            self._collision_sphere_editor.copy_all_sphere_data()
-            self._refresh_collision_sphere_comboboxes(keep_sphere_selection=True)
-            pass
+    def _on_stage_opened(self, event: carb.eventdispatcher.Event):
+        """Callback for Stage Opened Event
 
-        elif event.type == int(omni.usd.StageEventType.OPENED) or event.type == int(omni.usd.StageEventType.CLOSED):
-            # stage was opened or closed, cleanup
-            self._physx_subscription = None
+        Args:
+            event: Event
+        """
+        # On every stage event check if any articulations have been added/removed from the Stage
+        self._refresh_selection_combobox()
+        # stage was opened, cleanup
+        self._physics_subscription = None
 
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_START_PLAY):  # Timeline played
-            self._refresh_selection_combobox()
-            self._on_selection(self._get_selected_articulation())
+    def _on_stage_closed(self, event: carb.eventdispatcher.Event):
+        """Callback for Stage Closed Event
 
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_STOP_PLAY):  # Timeline stopped
-            if self._timeline.is_stopped():
-                self._reset_ui()
-                self._on_selection("None")
+        Args:
+            event: Event
+        """
+        # On every stage event check if any articulations have been added/removed from the Stage
+        self._refresh_selection_combobox()
+        # stage was closed, cleanup
+        self._physics_subscription = None
 
-    def _on_physics_step(self, step):
+    def _on_timeline_play(self, event: carb.eventdispatcher.Event):
+        """Callback for Timeline Played Event
+
+        Args:
+            event: Event
+        """
+        self._refresh_selection_combobox()
+        self._on_selection(self._get_selected_articulation())
+
+    def _on_timeline_stop(self, event: carb.eventdispatcher.Event):
+        """Callback for Timeline Stopped Event
+
+        Args:
+            event: Event
+        """
+        if self._timeline.is_stopped():
+            self._reset_ui()
+            self._on_selection("None")
+
+    def _on_physics_step(self, step: float, context):
         """Callback for Physics Step.
 
         Args:
-            step ([type]): [description]
+            step: Physics step size in seconds.
+            context: Physics context.
         """
         if self.articulation is not None:
             if not self.articulation.handles_initialized:
@@ -577,16 +728,12 @@ class Extension(omni.ext.IExt):
                 self._set_joint_positions(step)
         return
 
-    def _on_timeline_event(self, e):
-        """Callback for Timeline Events
+    def _set_joint_positions(self, step: float):
+        """Sets joint positions for the articulation and resets joint velocities to zero.
 
         Args:
-            event (omni.timeline.TimelineEventType): Event Type
+            step: Physics step size in seconds.
         """
-
-        pass
-
-    def _set_joint_positions(self, step):
         if self.articulation is not None:
             joint_velocities = np.zeros_like(self._joint_positions)
             self.articulation.set_joint_positions(self._joint_positions)
@@ -599,6 +746,7 @@ class Extension(omni.ext.IExt):
     ##################################
 
     def _build_info_ui(self):
+        """Builds the information UI panel with extension title, documentation link, and overview."""
         title = EXTENSION_NAME
         doc_link = (
             "https://docs.isaacsim.omniverse.nvidia.com/latest/manipulators/manipulators_robot_description_editor.html"
@@ -638,6 +786,7 @@ class Extension(omni.ext.IExt):
         setup_ui_headers(self._ext_id, __file__, title, doc_link, overview)
 
     def _build_selection_ui(self):
+        """Builds the selection UI panel with articulation and link selection dropdown menus."""
         frame = ui.CollapsableFrame(
             title="Selection Panel",
             height=0,
@@ -680,6 +829,8 @@ class Extension(omni.ext.IExt):
                 self._models[name + "_combobox"].model.add_item_changed_fn(self._on_select_sphere_gen_link)
 
     def _build_command_ui(self):
+        """Builds the joint properties UI panel with joint position, acceleration, and jerk controls."""
+
         def command_panel_build_fn():
             self._joint_frames = []
 
@@ -760,6 +911,9 @@ class Extension(omni.ext.IExt):
         self._models["frame_command_ui"].enabled = False
 
     def _build_editor_ui(self):
+        """Builds the link sphere editor UI panel with sphere generation, adding, connecting, scaling,
+        and clearing tools.
+        """
         self._models["sphere_editor_ui"] = ui.CollapsableFrame(
             title="Link Sphere Editor",
             height=0,
@@ -1022,6 +1176,9 @@ class Extension(omni.ext.IExt):
                         self._models["link_clear_btn"].enabled = True
 
     def _build_tools_ui(self):
+        """Builds the editor tools UI panel with undo/redo, visibility controls, color pickers,
+        and import/export functionality.
+        """
         self._models["editor_tools_ui"] = ui.CollapsableFrame(
             title="Editor Tools",
             height=0,
@@ -1222,6 +1379,17 @@ class Extension(omni.ext.IExt):
                         self._models["xrdf_output_file"] = str_builder(**kwargs)
                         self._models["xrdf_output_file"].add_value_changed_fn(on_select_xrdf_output_file)
 
+                        # Version selection dropdown
+                        version_dropdown = DropDown(
+                            "XRDF Version",
+                            tooltip="Select the XRDF format version to export. Version 1.0 uses 'collision', version 2.0 uses 'world_collision'.",
+                            populate_fn=lambda: ["1.0", "2.0"],
+                        )
+                        version_dropdown.repopulate()
+                        version_dropdown.set_selection_by_index(1)  # Default to 2.0 (index 1)
+                        # Store reference to dropdown so we can read current selection
+                        self._models["xrdf_version_dropdown"] = version_dropdown
+
                         self._models["xrdf_export_btn"] = Button("Export XRDF", "Export", on_click_fn=self._export_xrdf)
                         self._models["xrdf_export_btn"].enabled = False
 
@@ -1322,6 +1490,11 @@ class Extension(omni.ext.IExt):
                         self._models["xrdf_import_btn"].enabled = False
 
     def _update_editor_ui(self):
+        """Updates the editor UI components when an articulation is selected.
+
+        Collapses and shows the sphere editor UI frame, enables import buttons if valid files are selected,
+        and refreshes collision sphere comboboxes.
+        """
         self._models["sphere_editor_ui"].collapsed = False
         self._models["sphere_editor_ui"].visible = True
 
@@ -1333,6 +1506,11 @@ class Extension(omni.ext.IExt):
         self._refresh_collision_sphere_comboboxes()
 
     def _update_command_ui(self):
+        """Updates the command UI with the current articulation properties.
+
+        Enables the joint properties frame, rebuilds the UI with current joint data, and applies
+        joint positions to the selected articulation.
+        """
         if self.articulation is None:
             return
 
@@ -1342,9 +1520,23 @@ class Extension(omni.ext.IExt):
         self.articulation.set_joint_positions(self._joint_positions)
 
     def _trigger_preview_generate_spheres_for_link(self, model=None, val=None):
+        """Triggers sphere generation preview for the selected link.
+
+        Args:
+            model: UI model that triggered the update.
+            val: Value from the UI model.
+        """
         self._generate_spheres_for_link()
 
-    def _generate_spheres_for_link(self, preview=True):
+    def _generate_spheres_for_link(self, preview: bool = True):
+        """Generates collision spheres for the selected link based on its mesh geometry.
+
+        Extracts mesh points and face data, transforms coordinates to the link frame, and generates
+        spheres using the collision sphere editor with the specified number of spheres and radius offset.
+
+        Args:
+            preview: Whether to generate spheres in preview mode.
+        """
         if preview and not self._preview_spheres:
             return
 
@@ -1367,29 +1559,48 @@ class Extension(omni.ext.IExt):
 
         link_path = self._articulation_base_path + link
         mesh_path = link_path + mesh
-        geom_mesh = UsdGeom.Mesh(get_prim_at_path(mesh_path))
-        points = np.array(geom_mesh.GetPointsAttr().Get())
+        geom_prim = get_prim_at_path(mesh_path)
+        geom_mesh = UsdGeom.Mesh(geom_prim)
+
+        # along with raw points in the mesh file, we also need to retrieve
+        # the scale that the user applied to them.
+        # need to get the full scale which could be applied through all parent prims.
+        geom_transform = Gf.Transform(get_world_transform_matrix(geom_prim))
+        scale = np.array(geom_transform.GetScale())
+        unscaled_points = np.array(geom_mesh.GetPointsAttr().Get())  # shape is [N,3]
+        points = np.diag(scale) @ unscaled_points.T  # shape is now [3,N], and points are scaled.
+
         face_inds = np.array(geom_mesh.GetFaceVertexIndicesAttr().Get())
         vert_cts = np.array(geom_mesh.GetFaceVertexCountsAttr().Get())
 
         # Transform coordinates of points into Link frame
-        mesh_xform = SingleXFormPrim(mesh_path)
-        link_xform = SingleXFormPrim(link_path)
+        mesh_xform = Gf.Transform(get_world_transform_matrix(get_prim_at_path(mesh_path)))
+        link_xform = Gf.Transform(get_world_transform_matrix(get_prim_at_path(link_path)))
 
-        mesh_trans, mesh_rot = mesh_xform.get_world_pose()
-        link_trans, link_rot = link_xform.get_world_pose()
+        mesh_trans = np.array(mesh_xform.GetTranslation())
+        link_trans = np.array(link_xform.GetTranslation())
+
+        mesh_rot = gf_quat_to_np_array(mesh_xform.GetRotation().GetQuaternion())
+        link_rot = gf_quat_to_np_array(link_xform.GetRotation().GetQuaternion())
+
         link_rot, mesh_rot = quats_to_rot_matrices(np.array([link_rot, mesh_rot]))
 
         inv_rot = link_rot.T @ mesh_rot
         inv_trans = (link_rot.T @ (mesh_trans - link_trans)).reshape((3, 1))
 
-        link_frame_points = (inv_rot @ points.T + inv_trans).T
+        link_frame_points = (inv_rot @ points + inv_trans).T
 
         self._collision_sphere_editor.generate_spheres(
             link_path, link_frame_points, face_inds, vert_cts, num_spheres, radius_offset, preview
         )
 
     def _get_selected_collision_spheres(self):
+        """Gets the names of the currently selected collision spheres for connection.
+
+        Returns:
+            A tuple containing the names of the first and second selected collision spheres.
+            Returns (None, None) if no spheres are available, or (sphere_name, None) if only one is selected.
+        """
         if not self._connect_sphere_0_options:
             return None, None
 
@@ -1404,12 +1615,22 @@ class Extension(omni.ext.IExt):
         return c0, c1
 
     def _get_selected_link_path(self):
+        """Gets the full USD path to the currently selected link.
+
+        Returns:
+            The full USD path to the selected link, or None if no link is selected.
+        """
         link = self._get_selected_link()
         if link is None:
             return None
         return self._articulation_base_path + link
 
     def _get_selected_link(self):
+        """Gets the currently selected link name from the sphere generation UI.
+
+        Returns:
+            The name of the selected link, or None if no articulation is selected.
+        """
         if self.articulation is None:
             return None
 
@@ -1419,10 +1640,22 @@ class Extension(omni.ext.IExt):
         return link
 
     def _get_selected_articulation(self):
+        """Gets the path of the currently selected articulation from the selection combobox.
+
+        Returns:
+            The USD path of the selected articulation.
+        """
         index = self._models["ar_selection_model"].get_item_value_model().as_int
         return self.articulation_list[index]
 
-    def _preview_collision_spheres(self, model=None):
+    def _preview_collision_spheres(self, model: ui.AbstractValueModel | None = None):
+        """Toggles the preview mode for collision sphere generation.
+
+        When enabled, shows a preview of spheres that will be generated. When disabled, clears the preview.
+
+        Args:
+            model: UI model that triggered the preview toggle.
+        """
         if self._preview_spheres:
             self._preview_spheres = False
             self._collision_sphere_editor.clear_preview()
@@ -1430,7 +1663,12 @@ class Extension(omni.ext.IExt):
             self._preview_spheres = True
             self._generate_spheres_for_link()
 
-    def _hide_link(self, link_name):
+    def _hide_link(self, link_name: str):
+        """Toggles the visibility of all meshes belonging to the specified link.
+
+        Args:
+            link_name: Name of the link whose meshes should be hidden or shown.
+        """
         meshes = self._sphere_gen_link_2_mesh[link_name]
         link_path = self._articulation_base_path + link_name
         mesh_paths = []
@@ -1439,11 +1677,21 @@ class Extension(omni.ext.IExt):
             mesh_paths.append(mesh_path)
         omni.kit.commands.execute("ToggleVisibilitySelectedPrims", selected_paths=mesh_paths)
 
-    def _on_toggle_link_visible(self, model=None):
+    def _on_toggle_link_visible(self, model: ui.AbstractValueModel | None = None):
+        """Toggles visibility of the currently selected link.
+
+        Args:
+            model: The model triggering the visibility change.
+        """
         self._hide_link(self._get_selected_link())
         self._hiding_link = not self._hiding_link
 
-    def _on_toggle_robot_visible(self, model=None):
+    def _on_toggle_robot_visible(self, model: ui.AbstractValueModel | None = None):
+        """Toggles visibility of all robot links except the currently selected one.
+
+        Args:
+            model: The model triggering the visibility change.
+        """
         selected_link = self._get_selected_link()
         links = list(self._sphere_gen_link_2_mesh.keys())
         for link in links:
@@ -1453,12 +1701,14 @@ class Extension(omni.ext.IExt):
         self._hiding_robot = not self._hiding_robot
 
     def _show_robot_if_hidden(self):
+        """Shows the robot if it was previously hidden by restoring visibility of all links."""
         if self._hiding_robot:
             self._models["hide_robot_btn"].call_clicked_fn()
         if self._hiding_link:
             self._models["hide_link_btn"].call_clicked_fn()
 
     def _load_xrdf(self):
+        """Loads robot configuration from a cuMotion XRDF file and updates the editor state."""
         if self.articulation is None:
             return
         path = self._models["xrdf_input_file"].get_value_as_string()
@@ -1475,9 +1725,10 @@ class Extension(omni.ext.IExt):
                 "XRDF file is expected to have a field:\nformat_version\nBut this field "
                 + "is missing. Aborting Import."
             )
-        elif parsed_file["format_version"] != 1.0:
+        elif parsed_file["format_version"] not in [1.0, 2.0]:
             carb.log_warn(
-                "Attempting to read an XRDF file that does not have format version 1.0.  This may not be supported."
+                f"Attempting to read an XRDF file with format version {parsed_file['format_version']}. "
+                + "Only versions 1.0 and 2.0 are supported."
             )
 
         self._active_joints = np.zeros(MAX_DOF_NUM, dtype=bool)
@@ -1492,7 +1743,7 @@ class Extension(omni.ext.IExt):
 
         default_q_map = parsed_file["default_joint_positions"]
 
-        in_mask = np.in1d(cspace, dof_names)
+        in_mask = np.isin(cspace, dof_names)
         if not np.all(in_mask):
             carb.log_warn(
                 "Some joints listed in the cspace of the provided robot_description YAML file are not present in the robot Articulation:"
@@ -1530,7 +1781,12 @@ class Extension(omni.ext.IExt):
 
         self._update_command_ui()
 
-    def _load_robot_description_file(self, model=None):
+    def _load_robot_description_file(self, model: ui.AbstractValueModel | None = None):
+        """Loads robot configuration from a Lula Robot Description YAML file and updates the editor state.
+
+        Args:
+            model: The model triggering the file loading.
+        """
         if self.articulation is None:
             return
         path = self._models["lula_robot_description_input_file"].get_value_as_string()
@@ -1550,7 +1806,7 @@ class Extension(omni.ext.IExt):
 
         file_jerk_limits = parsed_file.get("jerk_limits", None)
 
-        in_mask = np.in1d(cspace, dof_names)
+        in_mask = np.isin(cspace, dof_names)
         if not np.all(in_mask):
             carb.log_warn(
                 "Some joints listed in the cspace of the provided robot_description YAML file are not present in the robot Articulation:"
@@ -1588,7 +1844,15 @@ class Extension(omni.ext.IExt):
 
         self._update_command_ui()
 
-    def _is_valid_xrdf_file(self, path):
+    def _is_valid_xrdf_file(self, path: str) -> bool:
+        """Validates whether the specified file is a properly formatted XRDF file.
+
+        Args:
+            path: Path to the file to validate.
+
+        Returns:
+            True if the file is a valid XRDF file.
+        """
         warning_msg = f"XRDF file {path} is not a valid XRDF file for Merging. Save to a new XRDF file."
         if not os.path.isfile(path):
             carb.log_warn(warning_msg)
@@ -1601,16 +1865,22 @@ class Extension(omni.ext.IExt):
                 return False
 
         if "format" in parsed_file and parsed_file["format"] == "xrdf" and "format_version" in parsed_file:
-            if parsed_file["format_version"] != 1.0:
+            if parsed_file["format_version"] not in [1.0, 2.0]:
                 carb.log_warn(
-                    "Attempting to read an XRDF file that does not have format version 1.0.  This may not be supported."
+                    f"Attempting to read an XRDF file with format version {parsed_file['format_version']}. "
+                    + "Only versions 1.0 and 2.0 are supported."
                 )
             return True
         else:
             carb.log_warn(warning_msg)
             return False
 
-    def recursive_cast_to_float(self, d):
+    def recursive_cast_to_float(self, d: dict):
+        """Recursively converts string values to floats in a dictionary structure.
+
+        Args:
+            d: Dictionary to process for float conversion.
+        """
         from collections.abc import Iterable
 
         for k, v in d.items():
@@ -1634,7 +1904,15 @@ class Extension(omni.ext.IExt):
                     l.append(f)
                 d[k] = l
 
-    def safe_load_yaml(self, path):
+    def safe_load_yaml(self, path: str) -> dict:
+        """Safely loads and parses a YAML file with float conversion.
+
+        Args:
+            path: Path to the YAML file to load.
+
+        Returns:
+            Parsed YAML content as a dictionary.
+        """
         with open(path, "r") as stream:
             try:
                 parsed_file = yaml.safe_load(stream)
@@ -1644,7 +1922,15 @@ class Extension(omni.ext.IExt):
         self.recursive_cast_to_float(parsed_file)
         return parsed_file
 
-    def _copy_information_from_existing_xrdf(self, path):
+    def _copy_information_from_existing_xrdf(self, path: str) -> dict:
+        """Copies non-overridable information from an existing XRDF file for merging.
+
+        Args:
+            path: Path to the existing XRDF file.
+
+        Returns:
+            Dictionary containing the preserved XRDF data.
+        """
         parsed_file = {}
         if not self._is_valid_xrdf_file(path):
             return parsed_file
@@ -1655,19 +1941,26 @@ class Extension(omni.ext.IExt):
         parsed_file.pop("default_joint_positions", None)
         parsed_file.pop("cspace", None)
 
+        # Convert version 1 "collision" to version 2 "world_collision" if needed
+        if "collision" in parsed_file and "world_collision" not in parsed_file:
+            parsed_file["world_collision"] = parsed_file.pop("collision")
+
+        # Use world_collision (version 2) going forward
+        collision_key = "world_collision"
+
         if (
             "self_collision" in parsed_file
             and "geometry" in parsed_file["self_collision"]
-            and "collision" in parsed_file
-            and "geometry" in parsed_file["collision"]
+            and collision_key in parsed_file
+            and "geometry" in parsed_file[collision_key]
         ):
-            if parsed_file["self_collision"]["geometry"] == parsed_file["collision"]["geometry"]:
-                # Since buffer distances in the "collision" group are going to be set to zero,
-                # to keep the relative sphere sizes between "collision" and "self_collision" the
-                # same, "collision" buffer distances will be subtracted "self_collision" buffer
+            if parsed_file["self_collision"]["geometry"] == parsed_file[collision_key]["geometry"]:
+                # Since buffer distances in the "world_collision" group are going to be set to zero,
+                # to keep the relative sphere sizes between "world_collision" and "self_collision" the
+                # same, "world_collision" buffer distances will be subtracted "self_collision" buffer
                 # distances.
-                if "buffer_distance" in parsed_file["collision"]:
-                    collision_buffer_distance = parsed_file["collision"]["buffer_distance"]
+                if "buffer_distance" in parsed_file[collision_key]:
+                    collision_buffer_distance = parsed_file[collision_key]["buffer_distance"]
                     self_collision_buffer_distance = parsed_file["self_collision"].get("buffer_distance", {})
                     for k, v in collision_buffer_distance.items():
                         if k in articulation_frames:
@@ -1677,22 +1970,30 @@ class Extension(omni.ext.IExt):
                                 self_collision_buffer_distance[k] = -v
                             collision_buffer_distance[k] = 0
             else:
-                parsed_file["self_collision"] = {"geometry": parsed_file["collision"]["geometry"]}
+                parsed_file["self_collision"] = {"geometry": parsed_file[collision_key]["geometry"]}
 
-        if "collision" not in parsed_file or "geometry" not in parsed_file["collision"]:
+        if collision_key not in parsed_file or "geometry" not in parsed_file[collision_key]:
             parsed_file.pop("geometry", None)
-            parsed_file.pop("collision", None)
+            parsed_file.pop(collision_key, None)
             parsed_file.pop("self_collision", None)
         else:
             for k in list(parsed_file["geometry"].keys()):
-                if k != parsed_file["collision"]["geometry"]:
+                if k != parsed_file[collision_key]["geometry"]:
                     parsed_file["geometry"].pop(k, None)
                 else:
                     parsed_file["geometry"][k].pop("clone", None)
 
         return parsed_file
 
-    def get_ignore_dict(self, ordered_links):
+    def get_ignore_dict(self, ordered_links: list[str]) -> dict[str, list[str]]:
+        """Generates self-collision ignore rules based on joint connections between robot links.
+
+        Args:
+            ordered_links: List of robot link names in hierarchical order.
+
+        Returns:
+            Dictionary mapping link names to lists of links they should ignore for collision.
+        """
         articulation_path = self._articulation_base_path
         ignore_dict = {}
 
@@ -1725,13 +2026,56 @@ class Extension(omni.ext.IExt):
 
         return extended_ignore_dict
 
-    def _export_xrdf(self, model=None):
+    def _export_xrdf(self, model: ui.AbstractValueModel | None = None):
+        """Exports robot collision spheres and joint configuration to an XRDF file for cuMotion.
+
+        Builds an XRDF file containing the robot's collision sphere representation, active joint
+        configuration, acceleration and jerk limits, and default joint positions. If merge mode is
+        enabled, preserves existing XRDF data not represented in the Robot Description Editor.
+
+        Args:
+            model: UI model that triggered the export.
+        """
         if self.articulation is None:
             return
 
         path = self._models["xrdf_output_file"].get_value_as_string()
+
+        # Get the selected version from the UI dropdown (read directly from dropdown to ensure we get current selection)
+        version_dropdown = self._models.get("xrdf_version_dropdown")
+        if version_dropdown is not None:
+            selection_index = version_dropdown.get_selection_index()
+            format_version = 1.0 if selection_index == 0 else 2.0
+        else:
+            # Fallback to version 2.0 if dropdown not available
+            format_version = 2.0
+        carb.log_info(f"Exporting XRDF with version: {format_version}")
+        # Ensure version is exactly 1.0 or 2.0
+        if format_version != 1.0 and format_version != 2.0:
+            carb.log_warn(f"Invalid XRDF version {format_version}, defaulting to 2.0")
+            format_version = 2.0
+        # Determine collision key based on version
+        if format_version == 2.0:
+            collision_key = "world_collision"
+        else:  # format_version == 1.0 (guaranteed by validation above)
+            collision_key = "collision"
+        carb.log_info(f"Using collision_key: {collision_key} for version {format_version}")
+
         if self._models["xrdf_merge_cb"].get_value():
             parsed_file = self._copy_information_from_existing_xrdf(path)
+            # Convert collision key to match selected version
+            if format_version == 1.0:
+                # Convert world_collision to collision for version 1.0
+                if "world_collision" in parsed_file:
+                    parsed_file["collision"] = parsed_file.pop("world_collision")
+                # Remove world_collision if it still exists
+                parsed_file.pop("world_collision", None)
+            elif format_version == 2.0:
+                # Convert collision to world_collision for version 2.0
+                if "collision" in parsed_file:
+                    parsed_file["world_collision"] = parsed_file.pop("collision")
+                # Remove collision if it still exists
+                parsed_file.pop("collision", None)
         else:
             parsed_file = {}
 
@@ -1740,7 +2084,8 @@ class Extension(omni.ext.IExt):
         ordered_links = art_view.body_names  # Links in order from root to end effector
 
         parsed_file["format"] = "xrdf"
-        parsed_file["format_version"] = 1.0
+        # Ensure format_version is written as a float (1.0 or 2.0)
+        parsed_file["format_version"] = float(format_version)
 
         active_joints_mask = self._active_joints[: self.num_dof]
         acceleration_limits = self._acceleration_limits[: self.num_dof][active_joints_mask]
@@ -1759,9 +2104,9 @@ class Extension(omni.ext.IExt):
             cspace_dict["jerk_limits"].append(jerk_limits[i])
         parsed_file["cspace"] = cspace_dict
 
-        if "geometry" not in parsed_file or "collision" not in parsed_file:
+        if "geometry" not in parsed_file or collision_key not in parsed_file:
             default_name = "auto_generated_collision_sphere_group"
-            parsed_file["collision"] = {"geometry": default_name}
+            parsed_file[collision_key] = {"geometry": default_name}
             parsed_file["geometry"] = {default_name: {"spheres": {}}}
             parsed_file["self_collision"] = {"geometry": default_name}
 
@@ -1769,7 +2114,7 @@ class Extension(omni.ext.IExt):
             ignore_dict = self.get_ignore_dict(ordered_links)
             parsed_file["self_collision"]["ignore"] = ignore_dict
 
-        geometry_group_name = parsed_file["collision"]["geometry"]
+        geometry_group_name = parsed_file[collision_key]["geometry"]
         sphere_dict = parsed_file["geometry"][geometry_group_name].get("spheres", None)
         if sphere_dict is None:
             sphere_dict = {}
@@ -1778,6 +2123,13 @@ class Extension(omni.ext.IExt):
             sphere_dict.pop(link, None)
         self._collision_sphere_editor.write_spheres_to_dict(self._articulation_base_path, sphere_dict)
 
+        # Ensure we only have the correct collision key for the selected version
+        if format_version == 1.0:
+            parsed_file.pop("world_collision", None)  # Remove world_collision if it exists
+        elif format_version == 2.0:
+            parsed_file.pop("collision", None)  # Remove collision if it exists
+
+        # Build key_order based on version
         key_order = [
             "format",
             "format_version",
@@ -1785,7 +2137,7 @@ class Extension(omni.ext.IExt):
             "default_joint_positions",
             "cspace",
             "tool_frames",
-            "collision",
+            collision_key,
             "self_collision",
             "geometry",
         ]
@@ -1834,7 +2186,16 @@ class Extension(omni.ext.IExt):
                     if key != key_order[-1]:
                         f.write("\n")
 
-    def _save_robot_description_file(self, model=None):
+    def _save_robot_description_file(self, model: ui.AbstractValueModel | None = None):
+        """Saves robot collision spheres and joint configuration to a Lula Robot Description YAML file.
+
+        Exports the current robot configuration including collision spheres, active joint definitions,
+        acceleration and jerk limits, and fixed joint positions to a YAML file compatible with
+        Lula-based algorithms like RmpFlow, RRT, and Lula Kinematics.
+
+        Args:
+            model: UI model that triggered the save operation.
+        """
         if self.articulation is None:
             return
 

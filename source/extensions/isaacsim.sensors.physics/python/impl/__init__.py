@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Implementation module for physics sensors in Isaac Sim, providing contact, effort, and IMU sensor classes."""
+
+
 from .commands import *
 from .contact_sensor import ContactSensor
 from .effort_sensor import EffortSensor, EsSensorReading

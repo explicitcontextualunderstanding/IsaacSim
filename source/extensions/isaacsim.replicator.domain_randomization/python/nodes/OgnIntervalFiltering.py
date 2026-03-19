@@ -35,6 +35,7 @@ class OgnIntervalFiltering:
             output_inds = indices
             db.outputs.on_reset = True
         else:
+            # Keep tuple from np.nonzero(); OmniGraph unwraps it for int[] outputs
             output_inds = np.nonzero(np.logical_and(frame_num % interval == 0, frame_num > 0))
             db.outputs.on_reset = False
 

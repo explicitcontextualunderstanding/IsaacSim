@@ -1,11 +1,11 @@
 [package]
-version = "1.1.3"
+version = "1.5.1"
 category = "Simulation"
 title = "Isaac Sim Property Extensions"
 description = "Adds Isaac Sim Specific Property Utils"
 keywords = ["isaac", "property"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -13,6 +13,7 @@ writeTarget.kit = true
 [dependencies]
 "isaacsim.core.deprecation_manager" = {}
 "isaacsim.robot.schema" = {}
+"isaacsim.robot_motion.schema" = {}
 "omni.kit.pip_archive" = {}
 "omni.kit.property.usd" = {}
 "omni.kit.uiapp" = {}
@@ -21,3 +22,6 @@ writeTarget.kit = true
 
 [[python.module]]
 name = "isaacsim.gui.property"
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

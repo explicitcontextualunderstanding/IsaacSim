@@ -1,8 +1,8 @@
 [package]
-version = "3.4.3"
+version = "5.4.0"
 category = "Simulation"
 title = "Isaac Sim Core OmniGraph Nodes"
-description = "Common Isaac Sim OmniGraph nodes"
+description = "Provides OmniGraph nodes for Isaac Sim workflows including articulation control, simulation timing, camera info reading, viewport management, and physics step event handling."
 keywords = ["isaac"]
 changelog = "docs/CHANGELOG.md"
 readme = "docs/README.md"
@@ -11,12 +11,13 @@ icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
-"isaacsim.core.api" = {}
 "isaacsim.core.deprecation_manager" = {}
+"isaacsim.core.experimental.prims" = {}
+"isaacsim.core.experimental.utils" = {}
+"isaacsim.core.rendering_manager" = {}
 "isaacsim.core.simulation_manager" = {}
 "isaacsim.storage.native" = {}
 "omni.graph" = {}
-"omni.isaac.dynamic_control" = {}
 "omni.kit.viewport.utility" = {}
 "omni.kit.viewport.window" = {}
 "omni.replicator.core" = {}
@@ -36,9 +37,19 @@ include = ["*.ogn", "*.py"]
 exclude = ["Ogn*Database.py"]
 
 [[test]]
+name = "startup"
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
+
+[[test]]
 timeout = 900
 dependencies = [
-    "omni.kit.viewport.actions"
+    "isaacsim.core.experimental.objects",  # for GroundPlane
+    "isaacsim.test.utils",  # for image comparison utilities
 ]
 args = [
     "--enable",
@@ -48,7 +59,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -64,6 +75,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -91,6 +103,7 @@ stdoutFailPatterns.exclude = [
     '*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacComputeOdometry: [/TestGraph] Omnigraph Error: no chassis prim found*',
     '*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacCreateRenderProduct: [/TestGraph] OmniGraph Error: Camera prim must be specified*',
     '*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacSetCameraOnRenderProduct: [/TestGraph] OmniGraph Error: Camera prim must be specified*',
+    '*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacAttachHydraTexture: [/TestGraph] OmniGraph Error: Render product prim must be specified*',
     '*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacArticulationController: [/TestGraph] Omnigraph Error: No robot prim found for the articulation controller*',
     '*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacArticulationState: [/TestGraph] OmniGraph Error: No robot prim found for the articulation state*',
     '*[Error] [isaacsim.core.nodes] Physics OnSimulationStep node detected in a non on-demand Graph. Node will only trigger events if the parent Graph is set to compute on-demand*',
@@ -99,11 +112,11 @@ stdoutFailPatterns.exclude = [
     "*[Error] [omni.physx.tensors.plugin] Pattern '/panda' did not match any rigid bodies*",
     "*[Error] [omni.physx.tensors.plugin] Provided pattern list did not match any articulations*",
     "*[Error] [omni.graph.core.plugin] /TestGraph/Template_isaacsim_core_nodes_IsaacJointNameResolver: [/TestGraph] OmniGraph Error: no articulation root prim found*",
-    "*Invalid RationalTime - zero denominator*"
-]
-
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
+    "*Invalid RationalTime - zero denominator*",
+    '*The NumPy module was reloaded*',
+    # IsaacAttachHydraTexture test error exclusions
+    '*[Error] [omni.graph.core.plugin] /ActionGraph/attachHydraTexture: [/ActionGraph] OmniGraph Error: Render product prim does not exist*',
+    '*[Error] [omni.graph.core.plugin] /ActionGraph/attachHydraTexture: [/ActionGraph] OmniGraph Error: Render product prim must be specified*',
+    '*[Error] [omni.graph.core.plugin] /ActionGraph/attachHydraTexture: [/ActionGraph] OmniGraph Error: Prim is not a RenderProduct*',
+    '*[Error] [omni.hydratexture.plugin] Was not able to get a RenderProduct from the path*',
 ]

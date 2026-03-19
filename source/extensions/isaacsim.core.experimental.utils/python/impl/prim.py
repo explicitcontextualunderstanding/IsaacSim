@@ -13,12 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Functions for working with USD/USDRT prims.
+"""
+
 from __future__ import annotations
 
-from typing import Callable, Literal
+import re
+from typing import Any, Callable, Literal
 
 import usdrt
-from pxr import Sdf, Usd
+from pxr import Sdf, Usd, UsdPhysics
 
 from . import foundation as foundation_utils
 from . import stage as stage_utils
@@ -132,13 +137,20 @@ def get_prim_variant_collection(prim: str | Usd.Prim) -> dict[str, list[str]]:
     }
 
 
-def get_prim_at_path(path: str) -> Usd.Prim | usdrt.Usd.Prim:
+def get_prim_at_path(
+    path: str | Sdf.Path | Usd.Prim | usdrt.Usd.Prim | Usd.SchemaBase | usdrt.Usd.SchemaBase,
+) -> Usd.Prim | usdrt.Usd.Prim:
     """Get the prim at a given path.
 
     Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
 
+    .. hint::
+
+        To maximize robustness and versatility, this method supports either a USD/USDRT prim or schema
+        instance as input. In such a case, the held prim is returned.
+
     Args:
-        path: Prim path.
+        path: Prim path. It also accepts a prim/schema instance as input.
 
     Returns:
         Prim.
@@ -155,16 +167,25 @@ def get_prim_at_path(path: str) -> Usd.Prim | usdrt.Usd.Prim:
         >>> prim_utils.get_prim_at_path("/World/Cube")
         Usd.Prim(</World/Cube>)
     """
+    if isinstance(path, (Usd.Prim, usdrt.Usd.Prim)):
+        return path
+    elif isinstance(path, (Usd.SchemaBase, usdrt.Usd.SchemaBase)):
+        return path.GetPrim()
     return stage_utils.get_current_stage().GetPrimAtPath(path)
 
 
-def get_prim_path(prim: Usd.Prim | usdrt.Usd.Prim) -> str:
+def get_prim_path(prim: Usd.Prim | usdrt.Usd.Prim | Usd.SchemaBase | usdrt.Usd.SchemaBase | str | Sdf.Path) -> str:
     """Get the path of a given prim.
 
     Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
 
+    .. hint::
+
+        To maximize robustness and versatility, this method supports either a USD/USDRT schema
+        instance or a path as input. In such a case, the held prim path is returned.
+
     Args:
-        prim: Prim instance.
+        prim: Prim instance. It also accepts a schema instance or a path as input.
 
     Returns:
         Prim path.
@@ -180,7 +201,77 @@ def get_prim_path(prim: Usd.Prim | usdrt.Usd.Prim) -> str:
         >>> prim_utils.get_prim_path(prim)
         '/World/Cube'
     """
+    if isinstance(prim, (str, Sdf.Path)):
+        return prim.pathString if isinstance(prim, Sdf.Path) else prim
+    elif isinstance(prim, usdrt.Usd.SchemaBase):  # USDRT SchemaBase uses `GetPrimPath` instead of `GetPath`
+        return prim.GetPrimPath().pathString
     return prim.GetPath().pathString
+
+
+def find_matching_prim_paths(path: str, *, traverse: bool = False) -> list[str]:
+    """Find all the prim paths in the stage that match the given (regex) path.
+
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
+
+    Args:
+        path: Path to match against the stage. It can be a regex expression or a valid prim path.
+        traverse: Whether to traverse the stage hierarchy to find all matching prims. If ``True``, the function will
+            return all the prim paths in the stage that match the given (regex) path, including its descendants, if any.
+            Otherwise, only the paths of the first matching prim (performing a segment-wise search) will be returned.
+
+    Returns:
+        List of matching prim paths.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> # / (root prim)
+        >>> #  |-- World
+        >>> #  |    |-- prim_0
+        >>> #  |    |    |-- prim_a
+        >>> #  |    |    |-- prim_b
+        >>> stage_utils.define_prim("/World/prim_0/prim_a")  # doctest: +NO_CHECK
+        >>> stage_utils.define_prim("/World/prim_0/prim_b")  # doctest: +NO_CHECK
+        >>>
+        >>> prim_utils.find_matching_prim_paths("/World/prim_.*")
+        ['/World/prim_0']
+        >>> prim_utils.find_matching_prim_paths("/World/prim_.*", traverse=True)
+        ['/World/prim_0', '/World/prim_0/prim_a', '/World/prim_0/prim_b']
+        >>>
+        >>> prim_utils.find_matching_prim_paths(".*_[ab]")
+        []
+        >>> prim_utils.find_matching_prim_paths(".*_[ab]", traverse=True)
+        ['/World/prim_0/prim_a', '/World/prim_0/prim_b']
+    """
+    stage = stage_utils.get_current_stage()
+    # check for a valid prim path first to avoid unnecessary regex search
+    if Sdf.Path.IsValidPathString(path):
+        prim = stage.GetPrimAtPath(path)
+        if prim.IsValid():
+            if traverse:
+                prim_range = Usd.PrimRange(prim) if isinstance(prim, Usd.Prim) else usdrt.Usd.PrimRange(prim)
+                return [prim.GetPath().pathString for prim in prim_range]
+            else:
+                return [path]
+    # regex search
+    if traverse:
+        pattern = re.compile(path)
+        return [res.string for prim in stage.Traverse() if (res := pattern.match(prim.GetPath().pathString))]
+    else:
+        roots, matches = ["/"], []
+        patterns = [re.compile(f"^{token}$") for token in path.strip("/").split("/")]
+        for i, pattern in enumerate(patterns):
+            for root in roots:
+                for child in stage.GetPrimAtPath(root).GetChildren():
+                    if pattern.fullmatch(child.GetName()):
+                        matches.append(child.GetPath().pathString)
+            if i < len(patterns) - 1:
+                roots, matches = matches, []
+        return matches
 
 
 def get_all_matching_child_prims(
@@ -352,10 +443,11 @@ def has_api(
     Args:
         prim: Prim path or prim instance.
         api: API schema name or type, or a list of them.
-        test: Checking operation to test for.
-            - "all": All APIs must be present.
-            - "any": Any API must be present.
-            - "none": No APIs must be present.
+        test: Checking operation to test for. Supported values are:
+
+            - ``"all"``: All APIs must be present.
+            - ``"any"``: Any API must be present.
+            - ``"none"``: No APIs must be present.
 
     Returns:
         Whether the prim has or not (depending on the test) the given API schema applied.
@@ -375,7 +467,7 @@ def has_api(
         >>> prim_utils.has_api(prim, UsdLux.LightAPI)
         True
     """
-    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    prim = stage_utils.get_current_stage(backend="usd").GetPrimAtPath(prim) if isinstance(prim, str) else prim
     # get applied status
     status = []
     applied_schemas = prim.GetAppliedSchemas()
@@ -395,6 +487,39 @@ def has_api(
         raise ValueError(f"Invalid test operation: '{test}'")
 
 
+def ensure_api(prim: str | Usd.Prim, api: type, *args, **kwargs) -> type["UsdAPISchemaBase"]:
+    """Ensure that a prim has the specified API schema applied.
+
+    Backends: :guilabel:`usd`.
+
+    If a prim doesn't have the API schema, it will be applied.
+    If it already has it, the existing API schema will be returned.
+
+    Args:
+        prim: Prim path or prim instance.
+        api: The API schema type to ensure.
+        *args: Additional positional arguments passed to API schema when applying it.
+        **kwargs: Additional keyword arguments passed to API schema when applying it.
+
+    Returns:
+        API schema object.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>> from pxr import UsdLux
+        >>>
+        >>> prim = stage_utils.define_prim("/World/Light", "Xform")
+        >>> prim_utils.ensure_api(prim, UsdLux.LightAPI)
+        UsdLux.LightAPI(Usd.Prim(</World/Light>))
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    return api(prim, *args, **kwargs) if prim.HasAPI(api) else api.Apply(prim, *args, **kwargs)
+
+
 def create_prim_attribute(
     prim: str | Usd.Prim | usdrt.Usd.Prim,
     *,
@@ -404,7 +529,7 @@ def create_prim_attribute(
 ) -> Usd.Attribute | usdrt.Usd.Attribute:
     """Create a new attribute on a USD prim.
 
-    Backends: :guilabel:`usd`.
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
 
     Args:
         prim: Prim path or prim instance.
@@ -440,3 +565,134 @@ def create_prim_attribute(
         )
         attribute = prim.CreateAttribute(name, type_name, custom=True)
     return attribute
+
+
+def get_prim_attribute_value(prim: str | Usd.Prim | usdrt.Usd.Prim, attribute_name: str) -> Any:
+    """Get the value of a prim attribute.
+
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
+
+    For vector and matrix types (e.g., float3, matrix4d, quatf), the value is returned as a Python list.
+    For scalar and other types, the raw attribute value is returned.
+
+    Args:
+        prim: Prim path or prim instance.
+        attribute_name: Name of the attribute to get.
+
+    Returns:
+        The attribute value. Vector and matrix types are returned as lists.
+
+    Raises:
+        ValueError: If the prim does not have the specified attribute.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.define_prim("/World/Cube", "Cube")  # doctest: +NO_CHECK
+        >>>
+        >>> prim_utils.get_prim_attribute_value("/World/Cube", "size")
+        2.0
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    if not prim.HasAttribute(attribute_name):
+        raise ValueError(f"Prim at path '{prim.GetPath()}' does not have attribute '{attribute_name}'")
+    attr = prim.GetAttribute(attribute_name)
+    return attr.Get()
+
+
+def get_prim_attribute_names(prim: str | Usd.Prim | usdrt.Usd.Prim) -> list[str]:
+    """Get all valid attribute names for a prim.
+
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
+
+    Args:
+        prim: Prim path or prim instance.
+
+    Returns:
+        Attribute names authored on the prim.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>>
+        >>> stage_utils.define_prim("/World/Cube", "Cube")  # doctest: +NO_CHECK
+        >>>
+        >>> prim_utils.get_prim_attribute_names("/World/Cube")
+        ['doubleSided', 'extent', 'orientation', 'primvars:displayColor', 'primvars:displayOpacity', 'purpose', 'size', 'visibility', 'xformOpOrder']
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    return [attr.GetName() for attr in prim.GetAttributes()]
+
+
+def is_prim_non_root_articulation_link(prim: str | Usd.Prim | usdrt.Usd.Prim) -> bool:
+    """Check whether a prim corresponds to a non-root link in an articulation.
+
+    Backends: :guilabel:`usd`, :guilabel:`usdrt`, :guilabel:`fabric`.
+
+    This function returns ``True`` only if all the following conditions are met:
+
+    - The prim belongs to an articulation.
+    - The prim is a link (has the ``RigidBodyAPI`` applied).
+    - The prim is related to a joint.
+
+    .. warning::
+
+        While a ``True`` return value guarantees that the prim is a non-root link in an articulation,
+        a ``False`` return value does not guarantee that the prim is an articulation root link.
+
+    Args:
+        prim: Prim path or prim instance.
+
+    Returns:
+        Whether the prim corresponds to a non-root link in an articulation.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import isaacsim.core.experimental.utils.prim as prim_utils
+        >>> import isaacsim.core.experimental.utils.stage as stage_utils
+        >>> from isaacsim.storage.native import get_assets_root_path
+        >>>
+        >>> stage_utils.open_stage(
+        ...     get_assets_root_path() + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
+        ... )  # doctest: +NO_CHECK
+        >>>
+        >>> prim_utils.is_prim_non_root_articulation_link("/panda")
+        False
+        >>> prim_utils.is_prim_non_root_articulation_link("/panda/panda_link0")
+        True
+    """
+    prim = stage_utils.get_current_stage().GetPrimAtPath(prim) if isinstance(prim, str) else prim
+    backend = "usd" if isinstance(prim, Usd.Prim) else "usdrt"
+    # check if the prim belongs to an articulation
+    articulation_root_api = (
+        UsdPhysics.ArticulationRootAPI if backend == "usd" else usdrt.UsdPhysics.ArticulationRootAPI.GetSchemaTypeName()
+    )
+    parent = get_first_matching_parent_prim(prim, predicate=lambda prim, _: prim.HasAPI(articulation_root_api))
+    if parent is None:
+        return False
+    # check if the prim is a link (rigid body)
+    rigid_body_api = UsdPhysics.RigidBodyAPI if backend == "usd" else usdrt.UsdPhysics.RigidBodyAPI.GetSchemaTypeName()
+    if not prim.HasAPI(rigid_body_api):
+        return False
+    # check if the prim is not a root link
+    joint_type = UsdPhysics.Joint if backend == "usd" else usdrt.UsdPhysics.Joint.GetSchemaTypeName()
+    joint_class = UsdPhysics.Joint if backend == "usd" else usdrt.UsdPhysics.Joint
+    joint_prims = get_all_matching_child_prims(parent, predicate=lambda prim, _: prim.IsA(joint_type))
+    for joint_prim in joint_prims:
+        joint = joint_class(joint_prim)
+        if joint_prim.HasAttribute("physics:excludeFromArticulation") and joint.GetExcludeFromArticulationAttr().Get():
+            continue
+        body_targets = joint.GetBody0Rel().GetTargets() + joint.GetBody1Rel().GetTargets()
+        for target in body_targets:
+            if str(target) == get_prim_path(prim):
+                return True
+    return False

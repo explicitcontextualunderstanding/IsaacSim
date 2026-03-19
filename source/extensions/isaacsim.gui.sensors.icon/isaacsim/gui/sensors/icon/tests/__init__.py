@@ -13,4 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .test_sensor_icon import *
+"""Tests for the isaacsim.gui.sensors.icon module."""
+
+
+scan_for_test_modules = True

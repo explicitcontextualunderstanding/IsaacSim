@@ -1,4 +1,28 @@
 # Changelog
+## [1.6.4] - 2026-02-28
+### Changed
+- Updated tests to use new omni.physics.core API (`IPhysicsSimulation.initialize`/`close` replaces removed `attach_stage`/`detach_stage`)
+
+## [1.6.3] - 2025-12-07
+### Changed
+- Fix clang tidy issues in cpp code
+
+## [1.6.2] - 2025-11-28
+### Changed
+- Add missing docstrings
+
+## [1.6.1] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [1.6.0] - 2025-10-27
+### Changed
+- Convert input arguments to NumPy without explicitly import PyTorch
+
+## [1.5.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [1.4.10] - 2025-08-29
 ### Changed
 - Renamed CARB profiling zones to include [IsaacSim] prefix

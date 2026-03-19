@@ -16,6 +16,7 @@
 from typing import Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
+import numpy as np
 import omni.kit.commands
 import omni.kit.test
 import warp as wp
@@ -72,7 +73,9 @@ class TestPreviewSurface(omni.kit.test.AsyncTestCase):
     @parametrize(backends=["usd"], prim_class=PreviewSurfaceMaterial, populate_stage_func=populate_stage)
     async def test_input_values(self, prim, num_prims, device, backend):
         cases = {
-            "diffuseColor": lambda count: draw_sample(shape=(count, 3), dtype=wp.float32),
+            "diffuseColor": lambda count: draw_sample(
+                shape=(count, 3), dtype=wp.float32, low=-0.1, high=1.1
+            ),  # out of range test
             "emissiveColor": lambda count: draw_sample(shape=(count, 3), dtype=wp.float32),
             "specularColor": lambda count: draw_sample(shape=(count, 3), dtype=wp.float32),
             "useSpecularWorkflow": lambda count: draw_sample(
@@ -95,10 +98,13 @@ class TestPreviewSurface(omni.kit.test.AsyncTestCase):
             assert name in cases, f"Missing case: {name}"
         # test cases
         for name, sample_func in cases.items():
+            range_ = prim._inputs[name].get("range")
             cprint(f"  |   input: {name}")
             for indices, expected_count in draw_indices(count=num_prims, step=2):
                 cprint(f"  |    |-- indices: {type(indices).__name__}, expected_count: {expected_count}")
                 for v0, expected_v0 in sample_func(expected_count):
+                    if range_ is not None:
+                        expected_v0 = np.clip(expected_v0, range_[0], range_[1])
                     prim.set_input_values(name, values=v0, indices=indices)
                     output = prim.get_input_values(name, indices=indices)
                     check_array(output, shape=expected_v0.shape, device=device)

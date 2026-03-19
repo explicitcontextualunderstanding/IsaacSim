@@ -218,6 +218,19 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
 
     @parametrize(
         devices=["cuda"],
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "surface"},
+        max_num_prims=1,
+    )
+    async def test_surface_runtime_instance_creation(self, prim, num_prims, device, backend):
+        DeformablePrim("/World/A_0")
+
+    @parametrize(
+        devices=["cuda"],
         backends=["tensor", "usd"],
         operations=["wrap"],
         prim_class=DeformablePrim,
@@ -388,6 +401,19 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
     # --------------------------------------------------------------------
     # auto-surface
     # --------------------------------------------------------------------
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "auto-surface"},
+        max_num_prims=1,
+    )
+    async def test_auto_surface_runtime_instance_creation(self, prim, num_prims, device, backend):
+        DeformablePrim("/World/A_0")
 
     @parametrize(
         devices=["cuda"],
@@ -565,6 +591,19 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
     # --------------------------------------------------------------------
     # volume
     # --------------------------------------------------------------------
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "volume"},
+        max_num_prims=1,
+    )
+    async def test_volume_runtime_instance_creation(self, prim, num_prims, device, backend):
+        DeformablePrim("/World/A_0")
 
     @parametrize(
         devices=["cuda"],
@@ -825,6 +864,19 @@ class TestDeformablePrim(omni.kit.test.AsyncTestCase):
     # --------------------------------------------------------------------
     # auto-volume
     # --------------------------------------------------------------------
+
+    @parametrize(
+        devices=["cuda"],
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        populate_stage_func_kwargs={"deformable_case": "auto-volume"},
+        max_num_prims=1,
+    )
+    async def test_auto_volume_runtime_instance_creation(self, prim, num_prims, device, backend):
+        DeformablePrim("/World/A_0")
 
     @parametrize(
         devices=["cuda"],

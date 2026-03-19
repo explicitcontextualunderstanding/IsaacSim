@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides a kinematic solver interface for computing robot forward and inverse kinematics."""
+
+
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -20,8 +24,8 @@ from .world_interface import WorldInterface
 
 
 class KinematicsSolver(WorldInterface):
-    """An limitted interface for computing robot kinematics that includes forward and inverse kinematics.
-    This interface ommits more advanced kinematics such as Jacobians, as they are not required for most use-cases.
+    """A limited interface for computing robot kinematics that includes forward and inverse kinematics.
+    This interface omits more advanced kinematics such as Jacobians, as they are not required for most use-cases.
 
     This interface inherits from the WorldInterface to standardize the inputs to collision-aware IK solvers, but it is not necessary for
     all implementations to implement the WorldInterface.  See KinematicsSolver.supports_collision_avoidance()
@@ -30,23 +34,23 @@ class KinematicsSolver(WorldInterface):
     def __init__(self):
         pass
 
-    def set_robot_base_pose(self, robot_positions: np.array, robot_orientation: np.array) -> None:
+    def set_robot_base_pose(self, robot_positions: np.array, robot_orientation: np.array):
         """Update position of the robot base. This will be used to compute kinematics relative to the USD stage origin.
 
         Args:
-            robot_positions (np.array): (3 x 1) translation vector describing the translation of the robot base relative to the USD stage origin.
+            robot_positions: (3 x 1) translation vector describing the translation of the robot base relative to the USD stage origin.
                 The translation vector should be specified in the units of the USD stage
-            robot_orientation (np.array): (4 x 1) quaternion describing the orientation of the robot base relative to the USD stage global frame
+            robot_orientation: (4 x 1) quaternion describing the orientation of the robot base relative to the USD stage global frame
         """
         pass
 
     def get_joint_names(self) -> List[str]:
-        """Return a list containing the names of all joints in the given kinematic structure.  The order of this list
+        """Return a list containing the names of all joints in the given kinematic structure. The order of this list
         determines the order in which the joint positions are expected in compute_forward_kinematics(joint_positions,...) and
         the order in which they are returned in compute_inverse_kinematics()
 
         Returns:
-            List[str]: Names of all joints in the robot
+            Names of all joints in the robot.
         """
         return []
 
@@ -54,7 +58,7 @@ class KinematicsSolver(WorldInterface):
         """Return a list of all the frame names in the given kinematic structure
 
         Returns:
-            List[str]: All frame names in the kinematic structure.  Any of which can be used to compute forward or inverse kinematics.
+            All frame names in the kinematic structure. Any of which can be used to compute forward or inverse kinematics.
         """
         return []
 
@@ -64,15 +68,14 @@ class KinematicsSolver(WorldInterface):
         """Compute the position of a given frame in the robot relative to the USD stage global frame
 
         Args:
-            frame_name (str): Name of robot frame on which to calculate forward kinematics
-            joint_positions (np.array): Joint positions for the joints returned by get_joint_names()
-            position_only (bool): If True, only the frame positions need to be calculated and the returned rotation may be left undefined.
+            frame_name: Name of robot frame on which to calculate forward kinematics
+            joint_positions: Joint positions for the joints returned by get_joint_names()
+            position_only: If True, only the frame positions need to be calculated and the returned rotation may be left undefined.
 
         Returns:
-            Tuple[np.array,np.array]:
-            frame_positions: (3x1) vector describing the translation of the frame relative to the USD stage origin
-
-            frame_rotation: (3x3) rotation matrix describing the rotation of the frame relative to the USD stage global frame
+            A tuple of (frame_positions, frame_rotation) where frame_positions is a (3x1) vector describing the translation
+            of the frame relative to the USD stage origin and frame_rotation is a (3x3) rotation matrix describing the
+            rotation of the frame relative to the USD stage global frame.
         """
 
         return np.zeros(3), np.eye(3)
@@ -89,19 +92,18 @@ class KinematicsSolver(WorldInterface):
         """Compute joint positions such that the specified robot frame will reach the desired translations and rotations
 
         Args:
-            frame_name (str): name of the target frame for inverse kinematics
-            target_position (np.array): target translation of the target frame (in stage units) relative to the USD stage origin
-            target_orientation (np.array): target orientation of the target frame relative to the USD stage global frame. Defaults to None.
-            warm_start (np.array): a starting position that will be used when solving the IK problem. Defaults to None.
-            position_tolerance (float): l-2 norm of acceptable position error (in stage units) between the target and achieved translations. Defaults to None.
-            orientation tolerance (float): magnitude of rotation (in radians) separating the target orientation from the achieved orienatation.
-                orientation_tolerance is well defined for values between 0 and pi. Defaults to None.
+            frame_name: Name of the target frame for inverse kinematics
+            target_positions: Target translation of the target frame (in stage units) relative to the USD stage origin
+            target_orientation: Target orientation of the target frame relative to the USD stage global frame.
+            warm_start: A starting position that will be used when solving the IK problem.
+            position_tolerance: L-2 norm of acceptable position error (in stage units) between the target and achieved translations.
+            orientation_tolerance: Magnitude of rotation (in radians) separating the target orientation from the achieved orientation.
+                orientation_tolerance is well defined for values between 0 and pi.
 
         Returns:
-            Tuple[np.array,bool]:
-            joint_positions: in the order specified by get_joint_names() which result in the target frame acheiving the desired position
-
-            success: True if the solver converged to a solution within the given tolerances
+            A tuple of (joint_positions, success) where joint_positions are in the order specified by get_joint_names()
+            which result in the target frame achieving the desired position and success is True if the solver converged to
+            a solution within the given tolerances.
         """
 
         return np.empty()
@@ -111,7 +113,7 @@ class KinematicsSolver(WorldInterface):
         avoidance, none of the obstacle add/remove/enable/disable functions need to be implemented.
 
         Returns:
-            bool: If True, the IK solver will avoid any obstacles that have been added
+            True if the IK solver will avoid any obstacles that have been added.
         """
 
         return False

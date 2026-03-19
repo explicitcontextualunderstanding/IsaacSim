@@ -23,13 +23,13 @@ from isaacsim.robot.manipulators.examples.franka import Franka
 
 
 class Stacking(BaseStacking):
-    """[summary]
+    """Franka robot stacking task.
 
     Args:
-        name (str, optional): [description]. Defaults to "franka_stacking".
-        target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        cube_size (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
+        name: Task name.
+        target_position: Stack target position.
+        cube_size: Size of each cube.
+        offset: Task offset.
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class Stacking(BaseStacking):
         target_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
         if target_position is None:
             target_position = np.array([0.5, 0.5, 0]) / get_stage_units()
         BaseStacking.__init__(
@@ -53,10 +53,10 @@ class Stacking(BaseStacking):
         return
 
     def set_robot(self) -> Franka:
-        """[summary]
+        """Create and configure the Franka robot.
 
         Returns:
-            Franka: [description]
+            Configured Franka robot instance.
         """
         franka_prim_path = find_unique_string_name(
             initial_name="/World/Franka", is_unique_fn=lambda x: not is_prim_path_valid(x)

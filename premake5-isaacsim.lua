@@ -114,7 +114,9 @@ function make_nvcc_command(nvccPath, nvccHostCompilerVS, nvccHostCompilerFlags, 
     -- end
     if os.target() == "windows" then
         ext = ".obj"
-        if isPtx then ext = ".ptx" end
+        if isPtx then
+            ext = ".ptx"
+        end
         local compilerBindir = " --compiler-bindir " .. nvccHostCompilerVS
         local buildString = '"'
             .. nvccPath
@@ -135,7 +137,9 @@ function make_nvcc_command(nvccPath, nvccHostCompilerVS, nvccHostCompilerFlags, 
     end
     if os.target() == "linux" then
         ext = ".o"
-        if isPtx then ext = ".ptx" end
+        if isPtx then
+            ext = ".ptx"
+        end
         local buildString = '"'
             .. nvccPath
             .. '" -std=c++17 '
@@ -253,39 +257,51 @@ function define_test_experience(name, args)
     -- Write bat and sh files as another way to run them:
     for _, config in ipairs(ALL_CONFIGS) do
         local kit_sdk_config = get_value_or_default(args, "kit_sdk_config", kit_sdk_config)
-        if kit_sdk_config == "%{config}" then kit_sdk_config = config end
+        if kit_sdk_config == "%{config}" then
+            kit_sdk_config = config
+        end
         create_test_experience_runner(name, config_path, config, kit_sdk_config, extra_args)
     end
 end
-ROS2_EXTRA = {
-    ["windows"] = [[
+-- Generate ROS2_EXTRA with dynamic path based on depth
+-- rel_path: relative path from test directory to root (e.g., "../" or "../../")
+function get_ros2_extra(os_target, rel_path)
+    if os_target == "windows" then
+        -- Convert forward slashes to backslashes for Windows
+        local win_rel_path = rel_path:gsub("/", "\\")
+        return string.format([[
 set ROS_DISTRO=humble
 set RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 set ROS_DOMAIN_ID=93
-pushd %~dp0\..\exts
-set basedir=%cd%\isaacsim.ros2.bridge\humble\lib
+pushd %%~dp0%sexts
+set basedir=%%cd%%\isaacsim.ros2.core\humble\lib
 popd
-set PATH=%PATH%;%basedir%
-]],
-    ["linux"] = [[
-export ROS_DISTRO=humble
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export ROS_DOMAIN_ID=$((($RANDOM % 18) + 80))
-INTERNAL_LIBS=$(readlink -f $SCRIPT_DIR/../exts/isaacsim.ros2.bridge/humble/lib)
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INTERNAL_LIBS
-]],
-}
+set PATH=%%PATH%%;%%basedir%%
+]], win_rel_path)
+    else
+        -- Source setup_ros_env.sh like isaac-sim.sh does for consistent ROS environment setup
+        -- Save SCRIPT_DIR before sourcing since setup_ros_env.sh overwrites it
+        return string.format([[
+export ROS_DOMAIN_ID=$((($RANDOM %% 18) + 80))
+_SAVED_SCRIPT_DIR="$SCRIPT_DIR"
+if [ -f "$SCRIPT_DIR/%ssetup_ros_env.sh" ]; then
+    source "$SCRIPT_DIR/%ssetup_ros_env.sh"
+fi
+SCRIPT_DIR="$_SAVED_SCRIPT_DIR"
+]], rel_path, rel_path)
+    end
+end
 -- Write experience running .bat/.sh file, like _build\windows-x86_64\release\example.helloext.app.bat
 function create_test_experience_runner(name, config_path, config, kit_sdk_config, extra_args, executable)
     local os_target = os.target()
     if
         string.find(name, "ros2")
-        or string.find(name, "omni.isaac.benchmarks")
         or string.find(name, "tf_viewer")
         or string.find(name, "isaacsim.app.setup")
         or string.find(name, "isaacsim.test.collection")
+        or string.find(name, "startup")
     then
-        extra = ROS2_EXTRA[os_target]
+        extra = get_ros2_extra(os_target, "../")
     else
         extra = ""
     end
@@ -315,7 +331,12 @@ function create_test_experience_runner(name, config_path, config, kit_sdk_config
         )
         f:close()
     else
-        local executable = executable or "kit"
+        local exe = "kit"
+        if _OPTIONS["enable-gcov"] then
+            exe = "kit-gcov"
+        end
+        local executable = executable or exe
+        -- local executable = "kit"
         local arch = io.popen("arch", "r"):read("*l")
         local platform_name = "linux"
 
@@ -351,22 +372,59 @@ function create_test_experience_runner(name, config_path, config, kit_sdk_config
     end
 end
 
-function python_sample_test(name, sample_path, args)
+function python_sample_test(name, sample_path, args, pythonpath_dirs, env_vars)
     local extra_args = args or ""
+    local pythonpath_dirs = pythonpath_dirs or {}
+    local env_vars = env_vars or {}
     for _, config in ipairs(ALL_CONFIGS) do
-        create_python_sample_runner(name, sample_path, config, extra_args)
+        create_python_sample_runner(name, sample_path, config, extra_args, pythonpath_dirs, env_vars)
     end
 end
-function create_python_sample_runner(name, sample_path, config, extra_args)
+function create_python_sample_runner(name, sample_path, config, extra_args, pythonpath_dirs, env_vars)
     local os_target = os.target()
-    if string.find(name, "ros2") then
-        extra = ROS2_EXTRA[os_target]
+    local pythonpath_dirs = pythonpath_dirs or {}
+    local env_vars = env_vars or {}
+
+    -- Calculate relative path depth based on subdirectory nesting
+    local depth = 1  -- Default depth (for tests directly in tests/)
+    for _ in name:gmatch("/") do
+        depth = depth + 1
+    end
+    local rel_path = string.rep("../", depth)
+
+    if string.find(name, "ros2") or string.find(name, "scene_loading") or string.find(name, "test_test_runner") then
+        extra = get_ros2_extra(os_target, rel_path)
     else
         extra = ""
     end
     if os.target() == "linux" then
-        local sh_file_dir = root .. "/_build/linux-x86_64/" .. config .. "/tests"
+        local platform_target = _OPTIONS["platform-target"] or "linux-x86_64"
+        local sh_file_dir = root .. "/_build/" .. platform_target .. "/" .. config .. "/tests"
         local sh_file_path = sh_file_dir .. "/" .. name .. ".sh"
+
+        -- Build PYTHONPATH export statement if directories are specified
+        local pythonpath_export = ""
+        if #pythonpath_dirs > 0 then
+            local pythonpath_parts = {}
+            for _, dir in ipairs(pythonpath_dirs) do
+                table.insert(pythonpath_parts, '"$SAMPLE_DIR/' .. dir .. '"')
+            end
+            pythonpath_export = 'export PYTHONPATH=' .. table.concat(pythonpath_parts, ':') .. ':$PYTHONPATH\n'
+        end
+
+        -- Build environment variable export statements
+        local env_export = ""
+        for key, value in pairs(env_vars) do
+            -- Handle special DYNAMIC marker for depth-based paths
+            if value == "DYNAMIC" then
+                if key == "EXP_PATH" then
+                    env_export = env_export .. 'export EXP_PATH=$SCRIPT_DIR/' .. rel_path .. '\n'
+                end
+            else
+                env_export = env_export .. 'export ' .. key .. '=' .. value .. '\n'
+            end
+        end
+
         local f = io.open(sh_file_path, "w")
         print(sh_file_path)
         f:write(string.format(
@@ -374,12 +432,18 @@ function create_python_sample_runner(name, sample_path, config, extra_args)
 #!/bin/bash
 set -e
 SCRIPT_DIR=$(dirname ${BASH_SOURCE})
-SAMPLE_DIR=$SCRIPT_DIR/../
-%s
-"$SCRIPT_DIR/../python.sh" -m pip install -r $SCRIPT_DIR/../requirements.txt
-"$SCRIPT_DIR/../python.sh" $SAMPLE_DIR/%s %s $@ --no-window
+SAMPLE_DIR=$SCRIPT_DIR/%s
+%s%s%s
+"$SCRIPT_DIR/%spython.sh" -m pip install -r "$SCRIPT_DIR/%srequirements.txt"
+"$SCRIPT_DIR/%spython.sh" $SAMPLE_DIR/%s %s $@ --no-window
         ]],
+            rel_path,
             extra,
+            env_export,
+            pythonpath_export,
+            rel_path,
+            rel_path,
+            rel_path,
             sample_path,
             extra_args
         ))
@@ -389,17 +453,51 @@ SAMPLE_DIR=$SCRIPT_DIR/../
         local bat_file_dir = root .. "/_build/windows-x86_64/" .. config .. "/tests"
         local bat_file_path = bat_file_dir .. "/" .. name .. ".bat"
 
+        -- Convert forward slashes to backslashes for Windows relative path
+        local rel_path = string.rep("..\\", depth)
+
+        -- Build PYTHONPATH set statement if directories are specified
+        local pythonpath_set = ""
+        if #pythonpath_dirs > 0 then
+            local pythonpath_parts = {}
+            for _, dir in ipairs(pythonpath_dirs) do
+                -- Convert forward slashes to backslashes for Windows
+                local win_dir = dir:gsub("/", "\\")
+                table.insert(pythonpath_parts, '%~dp0' .. rel_path .. win_dir)
+            end
+            pythonpath_set = 'set PYTHONPATH=' .. table.concat(pythonpath_parts, ';') .. ';%PYTHONPATH%\n'
+        end
+
+        -- Build environment variable set statements for Windows
+        local env_set = ""
+        for key, value in pairs(env_vars) do
+            -- Handle special DYNAMIC marker for depth-based paths
+            if value == "DYNAMIC" then
+                if key == "EXP_PATH" then
+                    env_set = env_set .. 'set EXP_PATH=%%~dp0' .. rel_path .. '\n'
+                end
+            else
+                env_set = env_set .. 'set ' .. key .. '=' .. value .. '\n'
+            end
+        end
+
         local f = io.open(bat_file_path, "w")
         print(bat_file_path)
         f:write(string.format(
             [[
 @echo off
 setlocal
-%s
-call "%%~dp0..\python.bat" -m pip install -r "%%~dp0..\requirements.txt"
-call "%%~dp0..\python.bat" "%%~dp0..\%s" %s %%*
+%s%s%s
+call "%%~dp0%spython.bat" -m pip install -r "%%~dp0%srequirements.txt"
+call "%%~dp0%spython.bat" "%%~dp0%s%s" %s %%*
         ]],
             extra,
+            env_set,
+            pythonpath_set,
+            rel_path,
+            rel_path,
+            rel_path,
+            rel_path,
             sample_path,
             extra_args
         ))
@@ -415,7 +513,8 @@ function jupyter_sample_test(name, sample_path, args)
 end
 function jupyter_sample_runner(name, sample_path, config, extra_args)
     if os.target() == "linux" then
-        local sh_file_dir = root .. "/_build/linux-x86_64/" .. config .. "/tests"
+        local platform_target = _OPTIONS["platform-target"] or "linux-x86_64"
+        local sh_file_dir = root .. "/_build/" .. platform_target .. "/" .. config .. "/tests"
         local sh_file_path = sh_file_dir .. "/" .. name .. ".sh"
         local f = io.open(sh_file_path, "w")
         print(sh_file_path)
@@ -445,7 +544,6 @@ set SCRIPT_DIR=%%~dp0
 set NO_ROS_ENV=false
 
 REM don't set up ros env for the following apps
-if /i "%%~n0"=="isaac-sim.selector" set NO_ROS_ENV=true
 if /i "%%~n0"=="isaac-sim.compatibility_check" set NO_ROS_ENV=true
 
 REM Check args for a flag to disable ROS environment setup
@@ -509,6 +607,7 @@ call "%%~dp0%s\%s" %s %s %%*
 set -e
 SCRIPT_DIR=$(dirname ${BASH_SOURCE})
 export RESOURCE_NAME="IsaacSim"
+export OLD_PYTHONPATH=$PYTHONPATH
 %s
 exec "$SCRIPT_DIR/%s/%s" %s %s "$@"
 ]],
@@ -527,7 +626,8 @@ function python_script_test(name, script)
 end
 function create_python_script_runner(name, script, config)
     if os.target() == "linux" then
-        local sh_file_dir = root .. "/_build/linux-x86_64/" .. config .. "/tests"
+        local platform_target = _OPTIONS["platform-target"] or "linux-x86_64"
+        local sh_file_dir = root .. "/_build/" .. platform_target .. "/" .. config .. "/tests"
         local sh_file_path = sh_file_dir .. "/" .. name .. ".sh"
         local f = io.open(sh_file_path, "w")
         print(sh_file_path)

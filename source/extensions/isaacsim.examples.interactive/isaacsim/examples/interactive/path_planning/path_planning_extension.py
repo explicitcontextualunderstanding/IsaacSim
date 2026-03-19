@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Path planning demonstration extension for interactive robot manipulation examples in Isaac Sim."""
+
+
 import asyncio
 import os
 
@@ -26,7 +29,33 @@ from isaacsim.gui.components.ui_utils import btn_builder, state_btn_builder, str
 
 
 class PathPlanningExtension(omni.ext.IExt):
+    """Extension that provides an interactive path planning demonstration for robot manipulation.
+
+    This extension registers a path planning example in the Isaac Sim examples browser, showing
+    how to plan paths through complex static environments using the Franka robot. The example
+    demonstrates motion generation using RRT (Rapidly-exploring Random Trees) algorithms for
+    navigating around obstacles.
+
+    The extension creates a UI interface that allows users to:
+    - Plan and execute robot movements to target positions
+    - Add and remove wall obstacles dynamically
+    - Log robot motion data during path execution
+    - Save collected data for analysis
+
+    The demonstration integrates with Isaac Sim's manipulation capabilities and provides both
+    educational value for learning path planning concepts and practical examples of implementing
+    motion planning in robotic applications.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the Path Planning extension when it starts up.
+
+        Sets up the example configuration, creates the UI handler, and registers the example with the browser
+        instance for display in the manipulation category.
+
+        Args:
+            ext_id: The extension identifier string.
+        """
 
         self.example_name = "Path Planning"
         self.category = "Manipulation"
@@ -52,15 +81,40 @@ class PathPlanningExtension(omni.ext.IExt):
         return
 
     def on_shutdown(self):
+        """Cleans up the Path Planning extension when it shuts down.
+
+        Deregisters the example from the browser instance to remove it from the interface.
+        """
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
         return
 
 
 class PathPlanningUI(BaseSampleUITemplate):
+    """User interface for the Path Planning example demonstration.
+
+    This class provides an interactive UI for controlling a Franka robot path planning task in Isaac Sim.
+    It enables users to plan and execute robot movements through complex static environments using path planning
+    algorithms. The interface includes controls for robot movement, environment manipulation through wall
+    obstacles, and data logging capabilities.
+
+    The UI features two main control panels:
+    - Task Control: Provides buttons to move the robot to targets, add/remove wall obstacles
+    - Data Logging: Allows users to log robot data and save it to specified output files
+
+    Args:
+        *args: Variable length argument list passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def build_extra_frames(self):
+        """Builds additional UI frames for task controls and data logging.
+
+        Creates collapsible frames for task control operations and data logging functionality
+        within the path planning interface.
+        """
         extra_stacks = self.get_extra_frames_handle()
         self.task_ui_elements = {}
 
@@ -90,15 +144,28 @@ class PathPlanningUI(BaseSampleUITemplate):
                 self.build_data_logging_ui()
 
     def _on_follow_target_button_event(self):
+        """Handles the follow target button click event.
+
+        Initiates asynchronous path planning and movement to the target position.
+        """
         asyncio.ensure_future(self.sample._on_follow_target_event_async())
         return
 
     def _on_add_wall_button_event(self):
+        """Handles the add wall button click event.
+
+        Adds a wall obstacle to the planning environment and enables the remove wall button.
+        """
         self.sample._on_add_wall_event()
         self.task_ui_elements["Remove Wall"].enabled = True
         return
 
     def _on_remove_wall_button_event(self):
+        """Handles the remove wall button click event.
+
+        Removes wall obstacles from the planning environment and disables the remove wall button
+        if no obstacles remain.
+        """
         self.sample._on_remove_wall_event()
         world = self.sample.get_world()
         current_task = list(world.get_current_tasks().values())[0]
@@ -107,15 +174,30 @@ class PathPlanningUI(BaseSampleUITemplate):
         return
 
     def _on_logging_button_event(self, val):
+        """Handles the logging button state change event.
+
+        Starts or stops data logging based on the button state and enables the save data button.
+
+        Args:
+            val: The logging state value from the button.
+        """
         self.sample._on_logging_event(val)
         self.task_ui_elements["Save Data"].enabled = True
         return
 
     def _on_save_data_button_event(self):
+        """Handles the save data button click event.
+
+        Saves logged path planning data to the specified output directory.
+        """
         self.sample._on_save_data_event(self.task_ui_elements["Output Directory"].get_value_as_string())
         return
 
     def post_reset_button_event(self):
+        """Updates UI element states after the reset button is pressed.
+
+        Enables movement and wall controls while resetting logging controls to their initial state.
+        """
         self.task_ui_elements["Move To Target"].enabled = True
         self.task_ui_elements["Remove Wall"].enabled = False
         self.task_ui_elements["Add Wall"].enabled = True
@@ -124,6 +206,10 @@ class PathPlanningUI(BaseSampleUITemplate):
         return
 
     def post_load_button_event(self):
+        """Updates UI element states after the load button is pressed.
+
+        Enables task control buttons and resets data logging controls to their initial state.
+        """
         self.task_ui_elements["Move To Target"].enabled = True
         self.task_ui_elements["Add Wall"].enabled = True
         self.task_ui_elements["Start Logging"].enabled = True
@@ -131,6 +217,10 @@ class PathPlanningUI(BaseSampleUITemplate):
         return
 
     def post_clear_button_event(self):
+        """Updates UI element states after the clear button is pressed.
+
+        Disables all task control and data logging UI elements.
+        """
         self.task_ui_elements["Move To Target"].enabled = False
         self.task_ui_elements["Remove Wall"].enabled = False
         self.task_ui_elements["Add Wall"].enabled = False
@@ -139,6 +229,11 @@ class PathPlanningUI(BaseSampleUITemplate):
         return
 
     def build_task_controls_ui(self):
+        """Builds the task control UI elements.
+
+        Creates buttons for moving to target, adding walls, and removing walls in the path planning
+        interface. All buttons are initially disabled.
+        """
         with ui.VStack(spacing=5):
             dict = {
                 "label": "Move To Target",
@@ -173,6 +268,10 @@ class PathPlanningUI(BaseSampleUITemplate):
             self.task_ui_elements["Remove Wall"].enabled = False
 
     def build_data_logging_ui(self):
+        """Builds the data logging UI controls.
+
+        Creates UI elements for output directory selection, data logging control, and data saving functionality.
+        """
         with ui.VStack(spacing=5):
             dict = {
                 "label": "Output Directory",

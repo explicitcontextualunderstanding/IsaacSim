@@ -1,11 +1,11 @@
 [package]
-version = "0.1.15"
+version = "1.1.0"
 category = "Simulation"
 title = "Isaac Sim Physics Sensor Simulation Examples"
 description = "Isaac Sim Physics Sensor Simulation Examples extension provides example usage and snippets for Isaac Sim physics-based sensors."
 keywords = ["isaac", "physics", "sensor", "lidar", "examples"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -14,7 +14,8 @@ writeTarget.kit = true
 "isaacsim.core.deprecation_manager" = {}
 "isaacsim.examples.browser" = {}
 "isaacsim.gui.components" = {}
-"isaacsim.sensors.physics" = {}
+"isaacsim.sensors.experimental.physics" = {}
+"isaacsim.storage.native" = {}
 
 [[python.module]]
 name = "isaacsim.sensors.physics.examples"
@@ -26,6 +27,21 @@ name = "isaacsim.sensors.physics.examples.contact_sensor"
 name = "isaacsim.sensors.physics.examples.imu_sensor"
 
 [[test]]
+name = "startup"
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
+
+[[test]]
+dependencies = [
+    "omni.isaac.ml_archive",
+]
+stdoutFailPatterns.exclude = [
+    '*The NumPy module was reloaded*',
+]
 args = [
     "--enable",
     "omni.kit.loop-isaac",
@@ -34,7 +50,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -50,6 +66,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -71,8 +88,5 @@ args = [
     "--/rtx/reservedDescriptors=900000",
 ]
 
-[[test]]
-name = "startup"
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
-]
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

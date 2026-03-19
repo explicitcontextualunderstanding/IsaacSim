@@ -18,8 +18,8 @@ import carb
 import omni.asset_validator.core as av_core
 import usdrt
 from omni.asset_validator.core import registerRule
-from omni.physx import get_physx_simulation_interface
-from omni.physx.bindings._physx import SETTING_UPDATE_TO_USD, ContactEventType, SimulationEvent
+from omni.physics.core import ContactEventType, get_physics_simulation_interface
+from omni.physx.bindings._physx import SETTING_UPDATE_TO_USD
 from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
 
 # from omni.physx.scripts.physicsUtils import get_initial_collider_pairs # ideally, import Ales's code here, blocked atm
@@ -195,6 +195,16 @@ def get_initial_collider_pairs(stage: Usd.Stage) -> typing.Set[typing.Tuple[str,
         This function temporarily modifies physics settings and runs a simulation step.
         The original settings are restored after the function completes.
     """
+
+    def on_contact_event(contact_headers, contact_data, friction_anchors):
+        for contact_header in contact_headers:
+            if contact_header.type == ContactEventType.CONTACT_FOUND:
+                collider0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.collider0))
+                collider1 = str(PhysicsSchemaTools.intToSdfPath(contact_header.collider1))
+                # Store as a tuple, ensuring consistent ordering
+                pair = tuple(sorted([collider0, collider1]))
+                unique_collider_pairs.add(pair)
+
     unique_collider_pairs = set()  # Use a set to store unique collider pairs
     session_sub_layer = Sdf.Layer.CreateAnonymous()
     stage.GetSessionLayer().subLayerPaths.append(session_sub_layer.identifier)
@@ -223,25 +233,20 @@ def get_initial_collider_pairs(stage: Usd.Stage) -> typing.Set[typing.Tuple[str,
     settings.set("/physics/fabricEnabled", False)
 
     initial_attach = False
-    if get_physx_simulation_interface().get_attached_stage() != stage_id:
-        get_physx_simulation_interface().attach_stage(stage_id)
+    if get_physics_simulation_interface().get_attached_stage() != stage_id:
+        get_physics_simulation_interface().initialize(stage_id)
         initial_attach = True
 
-    get_physx_simulation_interface().simulate(1.0 / 60.0, 0.0)
-    get_physx_simulation_interface().fetch_results()
+    contact_report_sub = get_physics_simulation_interface().subscribe_physics_contact_report_events(on_contact_event)
 
-    contact_headers, contact_data = get_physx_simulation_interface().get_contact_report()
-    if len(contact_headers) > 0:
-        for contact_header in contact_headers:
-            if contact_header.type == ContactEventType.CONTACT_FOUND:
-                collider0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.collider0))
-                collider1 = str(PhysicsSchemaTools.intToSdfPath(contact_header.collider1))
-                # Store as a tuple, ensuring consistent ordering
-                pair = tuple(sorted([collider0, collider1]))
-                unique_collider_pairs.add(pair)
+    get_physics_simulation_interface().simulate(1.0 / 60.0, 0.0)
+    get_physics_simulation_interface().fetch_results()
+
+    if contact_report_sub:
+        contact_report_sub = None
 
     if initial_attach:
-        get_physx_simulation_interface().detach_stage()
+        get_physics_simulation_interface().close()
 
     settings.set(SETTING_UPDATE_TO_USD, write_usd)
     settings.set("/physics/fabricEnabled", write_fabric)

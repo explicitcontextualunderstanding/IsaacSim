@@ -25,19 +25,19 @@ from pxr import Gf, Sdf, UsdShade
 
 
 class OmniGlass(VisualMaterial):
-    """[summary]
+    """OmniGlass transparent material for glass-like surfaces.
 
     Args:
-        prim_path (str): [description]
-        name (str, optional): [description]. Defaults to "omni_glass".
-        shader (Optional[UsdShade.Shader], optional): [description]. Defaults to None.
-        color (Optional[np.ndarray], optional): [description]. Defaults to None.
-        ior (Optional[float], optional): [description]. Defaults to None.
-        depth (Optional[float], optional): [description]. Defaults to None.
-        thin_walled (Optional[bool], optional): [description]. Defaults to None.
+        prim_path: USD prim path for the material.
+        name: Name identifier. Defaults to "omni_glass".
+        shader: Existing shader to use. Defaults to None.
+        color: Glass tint color RGB. Defaults to None.
+        ior: Index of refraction. Defaults to None.
+        depth: Glass depth/thickness. Defaults to None.
+        thin_walled: Whether to use thin-walled mode. Defaults to None.
 
     Raises:
-        Exception: [description]
+        Exception: If omni.kit.material.library extension is not enabled.
     """
 
     def __init__(
@@ -99,10 +99,10 @@ class OmniGlass(VisualMaterial):
         return
 
     def set_color(self, color: np.ndarray) -> None:
-        """[summary]
+        """Set the glass tint color.
 
         Args:
-            color (np.ndarray): [description]
+            color: RGB color array.
         """
         if self.shaders_list[0].GetInput("glass_color").Get() is None:
             self.shaders_list[0].CreateInput("glass_color", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*color.tolist()))
@@ -111,10 +111,10 @@ class OmniGlass(VisualMaterial):
         return
 
     def get_color(self) -> Optional[np.ndarray]:
-        """[summary]
+        """Get the glass tint color.
 
         Returns:
-            np.ndarray: [description]
+            RGB color array or None if not set.
         """
         if self.shaders_list[0].GetInput("glass_color").Get() is None:
             carb.log_warn("A color attribute is not set yet")

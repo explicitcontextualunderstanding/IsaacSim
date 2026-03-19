@@ -64,7 +64,7 @@ print("cube pose", cube_1.get_world_pose())
 reading = cs.get_sensor_reading(cube_path + "/Contact_Sensor")
 
 if not reading.is_valid:
-    print("[FAIL] No contact sensor readings")
+    print("[fatal] No contact sensor readings")
     sys.exit(1)
 
 if reading.is_valid:

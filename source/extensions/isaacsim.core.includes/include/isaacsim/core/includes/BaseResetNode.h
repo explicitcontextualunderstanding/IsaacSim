@@ -21,11 +21,10 @@
 
 #include <carb/Defines.h>
 #include <carb/Types.h>
-#include <carb/events/EventsUtils.h>
+#include <carb/eventdispatcher/IEventDispatcher.h>
 
 #include <omni/usd/UsdContextIncludes.h>
 //
-#include <omni/timeline/ITimeline.h>
 #include <omni/timeline/TimelineTypes.h>
 #include <omni/usd/UsdContext.h>
 
@@ -41,7 +40,7 @@ namespace includes
  * @brief Base class for nodes that automatically reset their state when simulation is stopped.
  * @details
  * This class provides automatic reset functionality for nodes in the simulation graph.
- * It subscribes to the timeline event stream and triggers a reset when a stop event is received.
+ * It subscribes to timeline events via IEventDispatcher and triggers a reset when a stop event is received.
  * Derived classes must implement the reset() function to define their specific reset behavior.
  *
  * The class handles:
@@ -60,22 +59,20 @@ public:
      * @details
      * Sets up the timeline event subscription to automatically trigger reset on simulation stop.
      * The subscription is created with the following characteristics:
-     * - Listens for eStop events from the timeline
+     * - Listens for stop events via IEventDispatcher
      * - Automatically triggers reset() when stop occurs
      * - Uses a unique handler name for identification
      *
      * @post Timeline event subscription is created and active
-     * @post Timeline interface is cached and ready for use
      */
     BaseResetNode()
     {
         // When the node is created, we create a stage event subscription
         // The idea is that node is reset whenever stop is pressed
-        m_timeline = carb::getCachedInterface<omni::timeline::ITimeline>();
-        m_timelineEventSub = carb::events::createSubscriptionToPopByType(
-            m_timeline->getTimelineEventStream(),
-            static_cast<carb::events::EventType>(omni::timeline::TimelineEventType::eStop),
-            [this](carb::events::IEvent* e) { reset(); }, 0, "IsaacSimOGNTimelineEventHandler");
+        auto ed = carb::getCachedInterface<carb::eventdispatcher::IEventDispatcher>();
+        m_timelineEventSub = ed->observeEvent(carb::RStringKey("IsaacSimOGNTimelineEventHandler"),
+                                              carb::eventdispatcher::kDefaultOrder, omni::timeline::kGlobalEventStop,
+                                              [this](const carb::eventdispatcher::Event&) { reset(); });
     }
 
     /**
@@ -83,13 +80,8 @@ public:
      * @details
      * Cleans up the timeline event subscription using RAII principles.
      * The subscription is automatically released when the object is destroyed.
-     *
-     * @note The timeline interface pointer is not explicitly cleaned up as it's managed by carb
      */
-    virtual ~BaseResetNode()
-    {
-        m_timelineEventSub = nullptr;
-    }
+    virtual ~BaseResetNode() = default;
 
     /**
      * @brief Pure virtual function to reset the node's state.
@@ -104,10 +96,7 @@ public:
 
 private:
     /** @brief Subscription handle for timeline stop events */
-    carb::events::ISubscriptionPtr m_timelineEventSub;
-
-    /** @brief Cached pointer to the timeline interface */
-    omni::timeline::ITimeline* m_timeline = nullptr;
+    carb::eventdispatcher::ObserverGuard m_timelineEventSub;
 };
 
 } // namespace includes

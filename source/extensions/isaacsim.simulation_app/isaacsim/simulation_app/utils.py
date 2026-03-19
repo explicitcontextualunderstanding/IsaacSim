@@ -64,10 +64,10 @@ def open_stage(usd_path: str) -> bool:
 
 
 def create_new_stage() -> Usd.Stage:
-    """[summary]
+    """Create a new empty USD stage.
 
     Returns:
-        bool: [description]
+        The newly created USD stage.
     """
     import omni.usd
 
@@ -90,14 +90,14 @@ def save_stage(usd_path: str) -> bool:
 
 
 def set_livesync_stage(usd_path: str, enable: bool) -> bool:
-    """[summary]
+    """Enable or disable live sync for a USD stage.
 
     Args:
-        usd_path (str): path to enable live sync for, it will be overwritten with the current stage
-        enable (bool): True to enable livesync, false to disable livesync
+        usd_path: Path to enable live sync for, will be overwritten with the current stage.
+        enable: True to enable livesync, False to disable livesync.
 
     Returns:
-        bool: [description]
+        True if the operation succeeded, False otherwise.
     """
     import omni.usd
 

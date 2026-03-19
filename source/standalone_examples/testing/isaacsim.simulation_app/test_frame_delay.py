@@ -31,6 +31,7 @@ COLLECTION_STEPS = 10
 # parse any command-line arguments specific to the standalone application
 import argparse
 import os
+import sys
 
 from isaacsim import SimulationApp
 
@@ -50,17 +51,18 @@ import pprint
 
 import carb
 import cv2
-import isaacsim.core.utils.numpy.rotations as rot_utils
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.transform as transform_utils
 import numpy as np
 import omni.replicator.core as rep
 import omni.usd
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.utils.prims import add_labels
-from isaacsim.core.utils.viewports import set_camera_view
+from isaacsim.core.experimental.objects import Cube, GroundPlane
+from isaacsim.core.experimental.prims import RigidPrim
+from isaacsim.core.experimental.utils.semantics import add_labels
+from isaacsim.core.rendering_manager import ViewportManager
 from isaacsim.sensors.camera import Camera
 from omni.replicator.core import AnnotatorRegistry, Writer
-from pxr import UsdGeom
+from pxr import UsdGeom, UsdPhysics
 
 # rep.settings.set_render_rtx_realtime(antialiasing="DLAA")
 
@@ -73,6 +75,7 @@ class CustomWriter(Writer):
         self.annotators.append(AnnotatorRegistry.get_annotator("bounding_box_2d_tight"))
 
     def write(self, data):
+        # The base Writer class caches 'data' automatically, accessible via self.get_data()
         pass
 
 
@@ -90,6 +93,65 @@ def get_data(sensor: Camera | Writer) -> tuple[np.ndarray, np.ndarray, np.ndarra
     semantic_segmentation = (semantic_segmentation * 255 / np.max(semantic_segmentation)).astype(np.uint8)
     semantic_segmentation = np.repeat(semantic_segmentation[:, :, np.newaxis], 3, axis=2)
     return rgb[:, :, :3], semantic_segmentation, bbox
+
+
+def calculate_expected_bbox(position: np.ndarray) -> dict:
+    """Calculate expected 2D bounding box from 3D world position.
+
+    This uses the same projection logic as draw_data to compute where the cube
+    should appear in the image based on its world position.
+
+    Args:
+        position: 3D world position of the cube center [x, y, z].
+
+    Returns:
+        Dictionary with x_min, y_min, x_max, y_max pixel coordinates.
+    """
+    # Project 3D position to 2D image coordinates
+    # The cube has scale [1.0, 2.0, 0.2] and size 1.0, so actual dimensions are [1.0, 2.0, 0.2] meters
+    # The bounding box should capture the full extent of the cube
+    center_x = RESOLUTION[1] / 2 + PIXELS_PER_METER * position[0]
+    center_y = RESOLUTION[1] / 2 + PIXELS_PER_METER * position[1]
+
+    # Half-widths in pixels (cube scale is [1.0, 2.0, 0.2])
+    half_width_x = PIXELS_PER_METER / 2  # 0.5 meters on each side
+    half_width_y = PIXELS_PER_METER  # 1.0 meters on each side
+
+    return {
+        "x_min": int(center_x - half_width_x),
+        "y_min": int(center_y - half_width_y),
+        "x_max": int(center_x + half_width_x),
+        "y_max": int(center_y + half_width_y),
+    }
+
+
+def validate_bbox(detected_bbox: dict, expected_bbox: dict, tolerance_pixels: float = 2.0) -> tuple[bool, float]:
+    """Validate that detected bounding box matches expected position within tolerance.
+
+    Args:
+        detected_bbox: Detected bounding box from the sensor/writer.
+        expected_bbox: Expected bounding box calculated from world position.
+        tolerance_pixels: Maximum allowed error in pixels for bbox center.
+
+    Returns:
+        Tuple of (is_valid, error_distance) where error_distance is the pixel distance
+        between detected and expected bbox centers.
+    """
+    # Calculate centers
+    detected_center_x = (detected_bbox["x_min"] + detected_bbox["x_max"]) / 2
+    detected_center_y = (detected_bbox["y_min"] + detected_bbox["y_max"]) / 2
+
+    expected_center_x = (expected_bbox["x_min"] + expected_bbox["x_max"]) / 2
+    expected_center_y = (expected_bbox["y_min"] + expected_bbox["y_max"]) / 2
+
+    # Calculate Euclidean distance between centers
+    error_distance = np.sqrt(
+        (detected_center_x - expected_center_x) ** 2 + (detected_center_y - expected_center_y) ** 2
+    )
+
+    is_valid = error_distance <= tolerance_pixels
+
+    return is_valid, error_distance
 
 
 def draw_data(frame, position, bbox, label):
@@ -183,22 +245,21 @@ def generate_result(data: list[dict], banner: list[str] = []):
 simulation_app.update()
 
 # Setup scene
-set_camera_view(eye=CAMERA_POS, target=[0, 0, 0], camera_prim_path="/OmniverseKit_Persp")
+ViewportManager.set_camera_view("/OmniverseKit_Persp", eye=CAMERA_POS, target=[0, 0, 0])
 
-world = World(stage_units_in_meters=1.0)
-world.scene.add_default_ground_plane()
+GroundPlane("/World/ground_plane")
 
-cube = world.scene.add(
-    DynamicCuboid(
-        prim_path="/cube",
-        name="cube",
-        position=np.array([-3.0, 0.0, 0.1]),
-        scale=np.array([1.0, 2.0, 0.2]),
-        size=1.0,
-        color=np.array([255, 0, 0]),
-    )
+# Create cube with physics
+cube_prim = Cube(
+    "/cube",
+    positions=[[-3.0, 0.0, 0.1]],
+    scales=[[1.0, 2.0, 0.2]],
+    sizes=1.0,
 )
-add_labels(cube.prim, labels=["cube"], instance_name="class")
+UsdPhysics.RigidBodyAPI.Apply(cube_prim.prims[0])
+UsdPhysics.CollisionAPI.Apply(cube_prim.prims[0])
+rigid_cube = RigidPrim("/cube")
+add_labels(cube_prim.prims[0], labels=["cube"], taxonomy="class")
 
 camera = None
 writer = None
@@ -212,10 +273,10 @@ else:
         prim_path=CAMERA_PATH,
         position=np.array(CAMERA_POS),
         resolution=RESOLUTION,
-        orientation=rot_utils.euler_angles_to_quats(np.array([0, 90, 90]), degrees=True),
+        orientation=transform_utils.euler_angles_to_quaternion(np.array([[0, 90, 90]]), degrees=True).numpy().flatten(),
     )
 
-world.reset()
+app_utils.play()
 
 if USE_REPLICATOR_WRITER:
     rep.WriterRegistry.register(CustomWriter)
@@ -230,28 +291,38 @@ else:
 
 # Do some warmup steps
 for _ in range(5):
-    world.step(render=True)
+    simulation_app.update()
 
 data = []
+validation_errors = []
+
 # Get data and object info before running the collection steps
-position = cube.get_world_pose()[0]
+position = rigid_cube.get_world_poses()[0].numpy().flatten()
 rgb, semantic_segmentation, bbox = get_data(camera or writer)
 data.append(
     {"position": position, "rgb": rgb, "semantic_segmentation": semantic_segmentation, "bbox": bbox, "label": "before"}
 )
 
+# Validate initial frame
+expected_bbox = calculate_expected_bbox(position)
+is_valid, error_distance = validate_bbox(bbox, expected_bbox, tolerance_pixels=2.0)
+if not is_valid:
+    error_msg = f"Frame 'before': BBox center error = {error_distance:.2f} pixels (tolerance: 2.0 pixels)"
+    validation_errors.append(error_msg)
+    print(f"[error] {error_msg}")
+
 # Do some collection steps
 for i in range(COLLECTION_STEPS):
     # Move object
-    position = cube.get_world_pose()[0]
+    position = rigid_cube.get_world_poses()[0].numpy().flatten()
     position[0] += 0.5
-    cube.set_world_pose(position=position)
+    rigid_cube.set_world_poses(positions=[position])
 
     # Step the simulation
-    world.step(render=True)
+    simulation_app.update()
 
     # Get data and object info
-    position = cube.get_world_pose()[0]
+    position = rigid_cube.get_world_poses()[0].numpy().flatten()
     rgb, semantic_segmentation, bbox = get_data(camera or writer)
     data.append(
         {
@@ -262,6 +333,14 @@ for i in range(COLLECTION_STEPS):
             "label": f"step {i + 1}",
         }
     )
+
+    # Validate this frame
+    expected_bbox = calculate_expected_bbox(position)
+    is_valid, error_distance = validate_bbox(bbox, expected_bbox, tolerance_pixels=2.0)
+    if not is_valid:
+        error_msg = f"Frame {i + 1}: BBox center error = {error_distance:.2f} pixels (tolerance: 2.0 pixels)"
+        validation_errors.append(error_msg)
+        print(f"[error] {error_msg}")
 
 # Export result
 banner = [
@@ -275,4 +354,23 @@ pprint.pprint(banner)
 print("")
 cv2.imwrite(f"result-{args.resolution}.png", generate_result(data, banner))
 
-simulation_app.close()
+# Print validation summary
+print("\n" + "=" * 80)
+print("VALIDATION SUMMARY")
+print("=" * 80)
+if validation_errors:
+    print(f"[fatal] {len(validation_errors)} frame(s) had bounding box errors exceeding tolerance")
+    print("\nErrors:")
+    for error in validation_errors:
+        print(f"  - {error}")
+    print("\nThis indicates frame delay between object motion and rendered image.")
+    print("=" * 80)
+    simulation_app.close()
+    sys.exit(1)
+else:
+    print(f"SUCCESS: All {len(data)} frames passed validation")
+    print("Bounding boxes matched expected positions within 2.0 pixel tolerance")
+    print("No frame delay detected between object motion and rendered image")
+    print("=" * 80)
+    simulation_app.close()
+    sys.exit(0)

@@ -320,8 +320,8 @@ void onPlay()
     for (const usdrt::SdfPath& usdrtPath : surfaceGripperPaths)
     {
         // For any already existing grippers, add them to the manager
-        const omni::fabric::PathC pathC(usdrtPath);
-        const pxr::SdfPath usdPath = omni::fabric::toSdfPath(pathC);
+        const omni::fabric::Path path(usdrtPath);
+        const pxr::SdfPath usdPath = omni::fabric::toSdfPath(path);
         // CARB_LOG_WARN("Surface Gripper found: %s", usdPath.GetString().c_str());
 
         if (g_surfaceGripperManager)
@@ -488,7 +488,7 @@ CARB_EXPORT void carbOnPluginStartup()
 
     g_surfaceGripperManager = std::make_unique<isaacsim::robot::surface_gripper::SurfaceGripperManager>(g_physx);
     // CARB_LOG_WARN("Surface Gripper Manager created");
-    omni::kit::StageUpdateNodeDesc desc = { 0 };
+    omni::kit::StageUpdateNodeDesc desc = { nullptr };
     desc.displayName = "Surface Gripper Interface";
     desc.onAttach = onAttach;
     desc.onDetach = onDetach;

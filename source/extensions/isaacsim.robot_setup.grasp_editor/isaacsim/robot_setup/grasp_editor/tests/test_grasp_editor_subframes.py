@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test suite for validating grasp subframe positioning and pose computations in robotic grasping scenarios."""
+
+
 import asyncio
 
 import numpy as np
@@ -35,7 +38,30 @@ from pxr import Sdf, UsdLux, UsdPhysics
 
 
 class TestGraspSubframes(omni.kit.test.AsyncTestCase):
+    """Test suite for validating grasp subframe positioning and pose computations in robotic grasping scenarios.
+
+    This test class validates the functionality of the grasp editor system by testing pose calculations between
+    gripper and rigid body subframes. It specifically tests the ability to derive gripper poses from rigid body
+    positions and vice versa, ensuring that grasp specifications can accurately compute transformations between
+    the two coordinate frames.
+
+    The test setup creates a scene with a Robotiq 2F-140 gripper and a soup can object, each with defined
+    subframes. Ground truth poses are established based on authored grasp data, and the tests verify that the
+    grasp specification system can accurately reproduce these poses through coordinate transformations.
+
+    Key test scenarios include:
+    - Computing gripper poses from known rigid body poses using grasp specifications
+    - Computing rigid body poses from known gripper poses using grasp specifications
+    - Moving rigid body subframes to desired positions and orientations
+    - Validating pose accuracy against recorded ground truth data from the Properties Panel
+    """
+
     async def setUp(self):
+        """Set up test environment with gripper, soup can, and grasp specifications.
+
+        Creates a new stage with a Robotiq gripper, tomato soup can with subframe, ground plane,
+        and lighting. Loads grasp data from YAML file for testing grasp pose calculations.
+        """
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.robot_setup.grasp_editor")
         extension_path = ext_manager.get_extension_path(ext_id)
@@ -96,19 +122,38 @@ class TestGraspSubframes(omni.kit.test.AsyncTestCase):
         self._grasp_spec = import_grasps_from_file(self._grasp_file)
         await update_stage_async()
 
-    def assertAlmostEqual(self, a, b, msg="", tol=1e-6):
+    def assertAlmostEqual(self, a, b, msg: str = "", tol: float = 1e-6):
+        """Assert that two arrays are almost equal within tolerance.
+
+        Overrides the default method to support array comparisons by converting inputs to NumPy
+        arrays and checking element-wise differences.
+
+        Args:
+            a: First array or value to compare.
+            b: Second array or value to compare.
+            msg: Optional error message.
+            tol: Tolerance for comparison.
+        """
         # overriding method because it doesn't support iterables
         a = np.array(a)
         b = np.array(b)
         self.assertFalse(np.any(abs((a[a != np.array(None)] - b[b != np.array(None)])) > tol), msg)
 
     async def _create_light(self):
+        """Create a sphere light in the scene for proper illumination.
+
+        Adds a UsdLux SphereLight with specified radius and intensity positioned above the scene.
+        """
         sphereLight = UsdLux.SphereLight.Define(get_current_stage(), Sdf.Path("/World/SphereLight"))
         sphereLight.CreateRadiusAttr(2)
         sphereLight.CreateIntensityAttr(100000)
         SingleXFormPrim(str(sphereLight.GetPath().pathString)).set_world_pose([6.5, 0, 12])
 
     async def tearDown(self):
+        """Clean up test environment after test completion.
+
+        Waits for any pending asset loading operations to complete before updating the stage.
+        """
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             print("tearDown, assets still loading, waiting to finish...")
             await asyncio.sleep(1.0)
@@ -116,11 +161,30 @@ class TestGraspSubframes(omni.kit.test.AsyncTestCase):
 
     # Each ground truth pose for the representative subframes was captured when creating the imported
     # grasp file.  The information in the file should be enough to exactly recover the ground truth pose
-    def compareRigidBodyPoseToGroundTruth(self, grasp_index, translation, orientation):
+    def compareRigidBodyPoseToGroundTruth(self, grasp_index: int, translation, orientation):
+        """Compare rigid body pose against recorded ground truth values.
+
+        Validates that the computed pose matches the expected ground truth pose for the
+        specified grasp index within tolerance.
+
+        Args:
+            grasp_index: Index of the grasp to validate.
+            translation: Computed translation to compare.
+            orientation: Computed orientation quaternion to compare.
+        """
         self.assertAlmostEqual(self._ground_truth_rb_translations[grasp_index], translation)
         self.assertAlmostEqual(self._ground_truth_rb_quats[grasp_index], orientation, tol=1e-3)
 
     def compareGripperPoseToGroundTruth(self, translation, orientation):
+        """Compare gripper pose against recorded ground truth values.
+
+        Validates that the computed gripper pose matches the expected ground truth pose
+        within tolerance.
+
+        Args:
+            translation: Computed gripper translation to compare.
+            orientation: Computed gripper orientation quaternion to compare.
+        """
         self.assertAlmostEqual(self._ground_truth_gripper_translation, translation)
         self.assertAlmostEqual(self._ground_truth_gripper_orientation, orientation, tol=1e-3)
 
@@ -150,6 +214,11 @@ class TestGraspSubframes(omni.kit.test.AsyncTestCase):
             self.compareRigidBodyPoseToGroundTruth(i, t, q)
 
     async def test_move_rb_subframe_to_position(self):
+        """Test moving rigid body subframe to desired position and orientation.
+
+        Validates that the move_rb_subframe_to_position utility function correctly positions
+        the soup can subframe at the specified world pose.
+        """
         # The move_rb_base_to_position
         desired_trans = np.array([0.123, -2.4, 0.6])
         desired_orient = np.array([0.965, 0.0, 0.0, -0.259])  # -30 degree about Z

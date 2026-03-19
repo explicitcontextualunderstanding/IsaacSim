@@ -22,13 +22,15 @@ import sys
 import carb
 import isaacsim.core.utils.deformable_mesh_utils as deformableMeshUtils
 import numpy as np
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.materials.deformable_material import DeformableMaterial
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import DeformablePrim, SingleDeformablePrim
 from isaacsim.storage.native import get_assets_root_path
 from omni.physx.scripts import physicsUtils
 from pxr import Gf, UsdGeom
+
+torch = import_module("torch")
 
 # The example shows how to create and manipulate environments with deformable prim through the DeformablePrim
 parser = argparse.ArgumentParser()

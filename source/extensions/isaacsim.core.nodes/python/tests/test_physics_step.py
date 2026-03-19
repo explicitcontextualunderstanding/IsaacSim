@@ -15,7 +15,7 @@
 import carb
 import omni.graph.core as og
 import omni.kit.test
-from isaacsim.core.nodes.bindings import _isaacsim_core_nodes
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Sdf
 
@@ -24,7 +24,6 @@ class TestPhysicsStep(omni.kit.test.AsyncTestCase):
     async def setUp(self):
         """Set up  test environment, to be torn down when done"""
         self._timeline = omni.timeline.get_timeline_interface()
-        self._core_nodes = _isaacsim_core_nodes.acquire_interface()
         await omni.usd.get_context().new_stage_async()
 
     # ----------------------------------------------------------------------
@@ -34,11 +33,6 @@ class TestPhysicsStep(omni.kit.test.AsyncTestCase):
 
     async def test_physics_step_node(self):
         carb.settings.get_settings().set_bool("/app/player/useFixedTimeStepping", True)
-        carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", False)
-        carb.settings.get_settings().set_int("/app/runLoops/main/rateLimitFrequency", 60)
-        # carb.settings.get_settings().set_int("/persistent/simulation/minFrameRate", 0)
-        omni.timeline.get_timeline_interface().set_target_framerate(60)
-        omni.timeline.get_timeline_interface().set_time_codes_per_second(20)
 
         stage = omni.usd.get_context().get_stage()
 
@@ -72,13 +66,13 @@ class TestPhysicsStep(omni.kit.test.AsyncTestCase):
                 ],
             },
         )
-        steps = self._core_nodes.get_physics_num_steps()
+        steps = SimulationManager.get_num_physics_steps()
         self.assertEqual(steps, 0)
         self._timeline.play()
         for i in range(10):
             await omni.kit.app.get_app().next_update_async()
-            # Check according to the core_nodes.get_physics_num_steps that the cube size grew by the same size as the number of steps.
-            steps = self._core_nodes.get_physics_num_steps()
+            # Check according to the SimulationManager.get_num_physics_steps that the cube size grew by the same size as the number of steps.
+            steps = SimulationManager.get_num_physics_steps()
             cube_size = stage.GetAttributeAtPath("/Cube.size").Get()
             self.assertEqual(cube_size, 2.0 + steps)
 

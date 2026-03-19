@@ -10,15 +10,6 @@
       "default_bucket": "default"
     },
     {
-      "name": "selectortests",
-      "include": ["tests-selector*"],
-      "exclude": [],
-      "buckets": [
-        {"name": "default", "include": ["tests-selector*"]}
-      ],
-      "default_bucket": "default"
-    },
-    {
       "name": "postinstalltests",
       "include": ["post_install*"],
       "exclude": [],
@@ -41,7 +32,6 @@
       "include": ["tests-*.sh"],
       "exclude": [
         "tests-startup*.sh",
-        "tests-selector*.sh",
         "tests-unit*.sh",
         "tests-isaacsim.benchmarks*.sh",
         "tests-standalone*.sh",

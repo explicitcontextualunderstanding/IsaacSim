@@ -16,6 +16,7 @@ import os
 
 from isaacsim import SimulationApp
 
+# Launch Isaac Sim headless with a zero-delay experience so Fabric updates are immediate.
 simulation_app = SimulationApp(
     {"headless": True}, experience=f'{os.environ["EXP_PATH"]}/isaacsim.exp.base.zero_delay.kit'
 )
@@ -23,14 +24,15 @@ simulation_app = SimulationApp(
 import sys
 
 import carb
-import isaacsim.core.utils.prims as prim_utils
-import isaacsim.core.utils.stage as stage_utils
+import isaacsim.core.experimental.utils.backend as backend_utils
+import isaacsim.core.experimental.utils.prim as prim_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
-import torch
-from isaacsim.core.api import SimulationContext
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.prims import Articulation, RigidPrim
-from isaacsim.core.utils.prims import get_prim_attribute_value
+import omni.timeline
+from isaacsim.core.experimental.objects import Cube
+from isaacsim.core.experimental.prims import Articulation, GeomPrim, RigidPrim
+from isaacsim.core.rendering_manager import RenderingManager
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.storage.native import get_assets_root_path
 
 assets_root_path = get_assets_root_path()
@@ -42,77 +44,68 @@ if assets_root_path is None:
 asset_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
 
 
-def main():
-    for device, backend in [["cuda:0", "torch"], ["cpu", "numpy"]]:
-        SimulationContext.clear_instance()
-        stage_utils.create_new_stage()
-        sim = SimulationContext(stage_units_in_meters=1.0, physics_dt=0.01, device=device, backend=backend)
-        prim_utils.create_prim("/World/Origin1", "Xform", translation=[0.0, 0.0, 0.0])
-        cube = DynamicCuboid(
-            prim_path="/World/Origin1/cube",
-            name="cube",
-            position=np.array([-3.0, 0.0, 0.1]),
-            scale=np.array([1.0, 2.0, 0.2]),
-            size=1.0,
-            color=np.array([255, 0, 0]),
-        )
-        stage_utils.add_reference_to_stage(usd_path=asset_path, prim_path="/World/Franka")
-        articulated_system = Articulation("/World/Franka")
-        rigid_link = RigidPrim("/World/Franka/panda_link1")
-        sim.reset()
-        cube.initialize()
-        rigid_link.initialize()
-        articulated_system.initialize()
-        articulated_system.set_world_poses(
-            positions=torch.tensor([[-10, -10, 0]], device=device) if backend == "torch" else [[-10, -10, 0]]
-        )
-        position = cube.get_world_pose()[0]
-        position[0] += 3
-        cube.set_world_pose(position=position)
-        cube_fabric_world_matrix = get_prim_attribute_value(
-            "/World/Origin1/cube", "omni:fabric:worldMatrix", fabric=True
-        )
-        cube_fabric_world_position = np.array(cube_fabric_world_matrix.ExtractTranslation())
-        if not (
-            np.isclose(
-                cube_fabric_world_position,
-                np.array([-3.0, 0.0, 0.1]),
-                atol=0.01,
-            ).all()
-        ):
-            print(f"[FAIL] PhysX is not synced with Fabric CPU")
-            sys.exit(1)
-        sim.render()
-        panda_link1_fabric_world_matrix = get_prim_attribute_value(
-            "/World/Franka/panda_link1", "omni:fabric:worldMatrix", fabric=True
-        )
-        panda_link1_fabric_world_position = np.array(panda_link1_fabric_world_matrix.ExtractTranslation())
-        if not (
-            np.isclose(
-                panda_link1_fabric_world_position,
-                np.array([-10.0, -10.0, 0.33]),
-                atol=0.01,
-            ).all()
-        ):
-            print(f"[FAIL] Kinematic Tree is not updated in fabric")
-            sys.exit(1)
-        cube_fabric_world_matrix = get_prim_attribute_value(
-            "/World/Origin1/cube", "omni:fabric:worldMatrix", fabric=True
-        )
-        cube_fabric_world_position = np.array(cube_fabric_world_matrix.ExtractTranslation())
-        if not (
-            np.isclose(
-                cube_fabric_world_position,
-                np.array([0.0, 0.0, 0.1]),
-                atol=0.01,
-            ).all()
-        ):
-            print(f"[FAIL] PhysX is not synced with Fabric CPU")
-            sys.exit(1)
-
-    print(f"[PASS] Fabric frame delay test passed")
-    simulation_app.close()
+def _get_fabric_world_position(prim_path: str) -> np.ndarray:
+    # Fabric attributes are exposed through the Fabric backend, not USD.
+    with backend_utils.use_backend("fabric"):
+        world_matrix = prim_utils.get_prim_attribute_value(prim_path, "omni:fabric:worldMatrix")
+    return np.array(world_matrix.ExtractTranslation())
 
 
-if __name__ == "__main__":
-    main()
+def _assert_fabric_position(prim_path: str, expected: np.ndarray, message: str) -> None:
+    position = _get_fabric_world_position(prim_path)
+    if not np.isclose(position, expected, atol=0.01).all():
+        print(f"[fatal] {message}", position, expected)
+        sys.exit(1)
+
+
+def _run_backend_test(device: str, backend: str, timeline) -> None:
+    print(f"Running test with device: {device}, backend: {backend}")
+    timeline.stop()
+    # Create a fresh stage and configure simulation settings for each backend.
+    stage_utils.create_new_stage()
+    SimulationManager.set_device(device)
+    SimulationManager.set_physics_dt(0.01)
+    SimulationManager.set_backend(backend)
+    # Spawn a cube and a Franka articulation to validate Fabric data for both rigid and kinematic prims.
+    stage_utils.define_prim("/World/Origin1", "Xform")
+    cube = Cube(
+        "/World/Origin1/cube",
+        sizes=1.0,
+        positions=[-3.0, 0.0, 0.1],
+        scales=[1.0, 2.0, 0.2],
+    )
+    # Apply collision and rigid body APIs to the cube so PhysX writes into Fabric.
+    GeomPrim("/World/Origin1/cube", apply_collision_apis=True)
+    RigidPrim("/World/Origin1/cube")
+    # Load the Franka robot asset and prepare prim handles.
+    stage_utils.add_reference_to_stage(usd_path=asset_path, path="/World/Franka")
+    articulated_system = Articulation("/World/Franka")
+    RigidPrim("/World/Franka/panda_link1")
+    timeline.play()
+
+    # Ensure PhysX has produced Fabric data at least once before querying.
+    SimulationManager.step(steps=1, update_fabric=True)
+    # Move the articulation root to validate kinematic updates.
+    articulated_system.set_world_poses(positions=[[-10, -10, 0]])
+    # Teleport the cube so we can verify Fabric's world matrix sync pre- and post-render.
+    position, _ = cube.get_world_poses()
+    position = position.numpy()[0]
+    position[0] += 3
+    cube.set_world_poses(positions=position.reshape(1, 3))
+
+    # A render tick should synchronize PhysX and kinematic updates into Fabric.
+    RenderingManager.render()
+    _assert_fabric_position(
+        "/World/Franka/panda_link1", np.array([-10.0, -10.0, 0.33]), "Kinematic Tree is not updated in fabric"
+    )
+    # After render, Fabric should now reflect the teleported cube position.
+    _assert_fabric_position("/World/Origin1/cube", np.array([0.0, 0.0, 0.1]), "PhysX is not synced with Fabric CPU")
+
+
+timeline = omni.timeline.get_timeline_interface()
+# Run the same validation for GPU/Tensor and CPU backends.
+for device, backend in [["cuda:0", "tensor"], ["cpu", "usd"], ["cpu", "usdrt"], ["cpu", "fabric"]]:
+    _run_backend_test(device, backend, timeline)
+
+print(f"[PASS] Fabric frame delay test passed")
+simulation_app.close()

@@ -1,4 +1,20 @@
 # Changelog
+## [2.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [2.1.26] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [2.1.25] - 2025-12-07
+### Changed
+- Update description
+
+## [2.1.24] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.1.23] - 2025-09-16
 ### Fixed
 - Fix graph creation for Articulation Position, Velocity, and Gripper windows so that reopening usd after save works correctly. Add unit tests for these cases.
@@ -107,21 +123,21 @@
 
 ## [1.2.2] - 2024-09-13
 ### Fixed
-- changed pxr.OmniGraphSchema import to OmniGraphSchema
+- Changed pxr.OmniGraphSchema import to OmniGraphSchema
 
 ## [1.2.1] - 2024-05-22
 ### Changed
-- docs link changed from internal to external
+- Docs link changed from internal to external
 
 ## [1.2.0] - 2024-05-09
 ### Changed
-- only ask for robot parent prim, automatically search for Articulation Root API under the hood
+- Only ask for robot parent prim, automatically search for Articulation Root API under the hood
 
 ## [1.1.0] - 2024-04-13
 ### Added
-- needed robot root input separately from articulation root for Articulation Position/Velocity controller graphs
-- documentation button for omnigraph shortcuts
+- Needed robot root input separately from articulation root for Articulation Position/Velocity controller graphs
+- Documentation button for omnigraph shortcuts
 
 ## [1.0.0] - 2024-03-20
 ### Added
-- created isaacsim.robot.manipulators.ui
+- Created isaacsim.robot.manipulators.ui

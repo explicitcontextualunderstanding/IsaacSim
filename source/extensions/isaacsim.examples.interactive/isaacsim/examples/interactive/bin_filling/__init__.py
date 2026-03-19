@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive example demonstrating robotic bin filling using a UR10 manipulator with surface gripper in Isaac Sim."""
+
+
 from isaacsim.examples.interactive.bin_filling.bin_filling import BinFilling
 from isaacsim.examples.interactive.bin_filling.bin_filling_extension import BinFillingExtension
+
+__all__ = ["BinFilling"]

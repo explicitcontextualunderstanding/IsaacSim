@@ -18,9 +18,9 @@ import asyncio
 import isaacsim.core.utils.deformable_mesh_utils as DeformableMeshUtils
 import numpy as np
 import omni.kit.test
-import torch
 from isaacsim.core.api import World
 from isaacsim.core.api.materials.deformable_material import DeformableMaterial
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import DeformablePrim, SingleDeformablePrim
 from isaacsim.core.utils.stage import create_new_stage_async, update_stage_async
 
@@ -32,6 +32,8 @@ from omni.physx.scripts import deformableUtils, physicsUtils
 from pxr import Gf, Usd, UsdGeom
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 
 class TestDeformablePrim(CoreTestCase):

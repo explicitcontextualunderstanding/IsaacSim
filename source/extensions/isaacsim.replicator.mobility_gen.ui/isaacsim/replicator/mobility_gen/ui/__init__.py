@@ -13,4 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""UI components for the Mobility Gen extension in Isaac Sim's Replicator framework."""
+
+
 from .extension import *
+
+__all__ = []

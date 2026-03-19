@@ -18,14 +18,14 @@ from pxr import Usd, UsdShade
 
 
 class VisualMaterial(object):
-    """[summary]
+    """Base class for visual material representations.
 
     Args:
-        name (str): [description]
-        prim_path (str): [description]
-        prim (Usd.Prim): [description]
-        shaders_list (list[UsdShade.Shader]): [description]
-        material (UsdShade.Material): [description]
+        name: Name identifier for the material.
+        prim_path: USD prim path for the material.
+        prim: The USD prim object.
+        shaders_list: List of shaders used by the material.
+        material: The USD material object.
     """
 
     def __init__(
@@ -45,45 +45,45 @@ class VisualMaterial(object):
 
     @property
     def material(self) -> UsdShade.Material:
-        """[summary]
+        """Get the USD material object.
 
         Returns:
-            UsdShade.Material: [description]
+            The UsdShade.Material object.
         """
         return self._material
 
     @property
     def shaders_list(self) -> List[UsdShade.Shader]:
-        """[summary]
+        """Get the list of shaders used by the material.
 
         Returns:
-            [type]: [description]
+            List of UsdShade.Shader objects.
         """
         return self._shaders_list
 
     @property
     def name(self) -> str:
-        """[summary]
+        """Get the material name.
 
         Returns:
-            str: [description]
+            The material name.
         """
         return self._name
 
     @property
     def prim_path(self) -> str:
-        """[summary]
+        """Get the USD prim path.
 
         Returns:
-            str: [description]
+            The prim path string.
         """
         return self._prim_path
 
     @property
     def prim(self) -> Usd.Prim:
-        """[summary]
+        """Get the USD prim object.
 
         Returns:
-            Usd.Prim: [description]
+            The Usd.Prim object.
         """
         return self._prim

@@ -1,4 +1,28 @@
 # Changelog
+## [1.5.1] - 2026-03-05
+### Fixed
+- Fixed incorrect type annotation (List to list)
+
+## [1.5.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, and update docstrings
+
+## [1.4.0] - 2026-02-20
+### Added
+- Introduced widget for applying IsaacSiteAPI to Xformable prims
+
+## [1.3.0] - 2026-01-28
+### Added
+- Introduced new widget for setting the IsaacMotionPlanningAPI collisionEnabled attribute
+
+## [1.2.1] - 2025-12-01
+### Changed
+- Add missing license headers
+
+## [1.2.0] - 2025-11-25
+### Added
+- Introduced widgets for the Robot Schema
+
 ## [1.1.3] - 2025-05-19
 ### Changed
 - Update copyright and license to apache v2.0
@@ -46,7 +70,7 @@
 ## [0.2.1] - 2023-06-12
 ### Changed
 - Update to kit 105.1
-- python 3.11 super().__init__ added
+- Python 3.11 super().__init__ added
 
 ## [0.2.0] - 2023-01-21
 ### Added
@@ -54,7 +78,7 @@
 
 ## [0.1.1] - 2020-10-09
 ### Changed
-- file structure
+- File structure
 
 ## [0.1.0] - 2020-07-08
 ### Added

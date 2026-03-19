@@ -214,7 +214,7 @@ public:
      * @param[in] size New size in number of elements
      * @param[in] cudaStream CUDA stream to use for asynchronous operation
      */
-    virtual void resizeAsync(size_t size, cudaStream_t cudaStream = 0)
+    virtual void resizeAsync(size_t size, cudaStream_t cudaStream = nullptr)
     {
         if ((size != m_size && size > 0) || m_buffer == nullptr)
         {
@@ -256,7 +256,7 @@ public:
      * @param[in] size Number of elements to copy
      * @param[in] kind Type of memory copy operation
      */
-    virtual void copy(const void* src, size_t size, enum cudaMemcpyKind kind = cudaMemcpyDeviceToHost)
+    virtual void copy(const void* src, size_t size, cudaMemcpyKind kind = cudaMemcpyDeviceToHost)
     {
         ScopedDevice scopedDevice(m_device);
         CUDA_CHECK(cudaMemcpy(m_buffer, src, size * sizeof(T), kind));
@@ -271,8 +271,8 @@ public:
      */
     virtual void copyAsync(const void* src,
                            size_t size,
-                           enum cudaMemcpyKind kind = cudaMemcpyDeviceToHost,
-                           cudaStream_t cudaStream = 0)
+                           cudaMemcpyKind kind = cudaMemcpyDeviceToHost,
+                           cudaStream_t cudaStream = nullptr)
     {
         ScopedDevice scopedDevice(m_device);
         CUDA_CHECK(cudaMemcpyAsync(m_buffer, src, size * sizeof(T), kind, cudaStream));
@@ -388,6 +388,12 @@ public:
  * - Fill the buffer with a constant value.
  * - Generate a string representation of the buffer.
  *
+ * The buffer uses a capacity-based allocation strategy similar to std::vector.
+ * It maintains both a logical size (number of elements in use) and a capacity
+ * (number of elements allocated). This allows buffer reuse when resizing to
+ * smaller sizes or when growing within existing capacity, avoiding expensive
+ * cudaMalloc/cudaFree operations.
+ *
  * @tparam T The data type stored in the buffer.
  *
  * @note Uses RAII principles for automatic resource management.
@@ -438,9 +444,22 @@ public:
     }
 
     /**
+     * @brief Gets the current capacity of the buffer.
+     * @details
+     * Returns the number of elements that can be stored without reallocation.
+     * The capacity is always greater than or equal to the size.
+     *
+     * @return Number of elements allocated
+     */
+    virtual size_t capacity() const
+    {
+        return m_capacity;
+    }
+
+    /**
      * @brief Clear the buffer.
      * @details
-     * Clear the buffer by freeing the memory and resetting the size to 0.
+     * Clear the buffer by freeing the memory and resetting the size and capacity to 0.
      */
     virtual void clear()
     {
@@ -450,6 +469,7 @@ public:
             m_buffer = nullptr;
         }
         m_size = 0;
+        m_capacity = 0;
     }
 
     /**
@@ -486,6 +506,7 @@ public:
             // Switch to new device
             m_memoryType = device < 0 ? MemoryType::eHost : MemoryType::eDevice;
             m_device = device;
+            m_capacity = 0; // Reset capacity when changing devices
             resize(m_size); // Recreate the buffer on the new device
             // Transfer/restore data from temporary buffer
             if (keepData)
@@ -503,15 +524,22 @@ public:
     /**
      * @brief Resizes the device buffer (synchronous version of \ref resizeAsync).
      * @details
-     * Reallocates memory if the new size is different from the current size.
-     * Handles deallocation of existing memory if necessary.
+     * Adjusts the logical size of the buffer. Only reallocates memory if the new
+     * size exceeds the current capacity. When shrinking, the allocated memory is
+     * retained for potential future growth, improving performance by avoiding
+     * unnecessary cudaMalloc/cudaFree or cudaHostAlloc/cudaFreeHost calls.
      *
      * @param[in] size New size in number of elements.
-     * @return True if the size was changed, false otherwise.
      */
     virtual void resize(size_t size)
     {
-        if (size != m_size || m_buffer == nullptr)
+        if (size == 0)
+        {
+            clear();
+            return;
+        }
+
+        if (size > m_capacity || m_buffer == nullptr)
         {
             ScopedDevice scopedDevice(m_device);
             if (m_buffer)
@@ -519,33 +547,34 @@ public:
                 CUDA_CHECK(m_memoryType == MemoryType::eDevice ? cudaFree(m_buffer) : cudaFreeHost(m_buffer));
                 m_buffer = nullptr;
             }
-            if (size > 0)
-            {
-                CUDA_CHECK(m_memoryType == MemoryType::eDevice ?
-                               cudaMalloc(&m_buffer, size * sizeof(T)) :
-                               cudaHostAlloc(&m_buffer, size * sizeof(T), cudaHostAllocDefault));
-                m_size = size;
-            }
-            else
-            {
-                clear();
-            }
+            CUDA_CHECK(m_memoryType == MemoryType::eDevice ?
+                           cudaMalloc(&m_buffer, size * sizeof(T)) :
+                           cudaHostAlloc(&m_buffer, size * sizeof(T), cudaHostAllocDefault));
+            m_capacity = size;
         }
+        m_size = size;
     }
 
     /**
      * @brief Resizes the device buffer asynchronously (asynchronous version of \ref resize).
      * @details
-     * Reallocates memory if the new size is different from the current size.
-     * Handles deallocation of existing memory if necessary.
+     * Adjusts the logical size of the buffer. Only reallocates memory if the new
+     * size exceeds the current capacity. When shrinking, the allocated memory is
+     * retained for potential future growth, improving performance by avoiding
+     * unnecessary cudaMallocAsync/cudaFreeAsync or cudaHostAlloc/cudaFreeHost calls.
      *
      * @param[in] size New size in number of elements.
      * @param[in] cudaStream CUDA stream to use for the operation.
-     * @return True if the size was changed, false otherwise.
      */
-    virtual void resizeAsync(size_t size, cudaStream_t cudaStream = 0)
+    virtual void resizeAsync(size_t size, cudaStream_t cudaStream = nullptr)
     {
-        if (size != m_size || m_buffer == nullptr)
+        if (size == 0)
+        {
+            clear();
+            return;
+        }
+
+        if (size > m_capacity || m_buffer == nullptr)
         {
             ScopedDevice scopedDevice(m_device);
             if (m_buffer)
@@ -554,18 +583,12 @@ public:
                                                                  cudaFreeHost(m_buffer));
                 m_buffer = nullptr;
             }
-            if (size > 0)
-            {
-                CUDA_CHECK(m_memoryType == MemoryType::eDevice ?
-                               cudaMallocAsync(&m_buffer, size * sizeof(T), cudaStream) :
-                               cudaHostAlloc(&m_buffer, size * sizeof(T), cudaHostAllocDefault));
-                m_size = size;
-            }
-            else
-            {
-                clear();
-            }
+            CUDA_CHECK(m_memoryType == MemoryType::eDevice ?
+                           cudaMallocAsync(&m_buffer, size * sizeof(T), cudaStream) :
+                           cudaHostAlloc(&m_buffer, size * sizeof(T), cudaHostAllocDefault));
+            m_capacity = size;
         }
+        m_size = size;
     }
 
     /**
@@ -600,7 +623,7 @@ public:
      * @param[in] size Number of elements to copy.
      * @param[in] cudaStream CUDA stream to use for the operation.
      */
-    virtual void copyToAsync(void* dst, size_t size, cudaStream_t cudaStream = 0)
+    virtual void copyToAsync(void* dst, size_t size, cudaStream_t cudaStream = nullptr)
     {
         if (size > m_size)
         {
@@ -647,7 +670,7 @@ public:
      * @param[in] size Number of elements to copy.
      * @param[in] cudaStream CUDA stream to use for the operation.
      */
-    virtual void copyFromAsync(const void* src, size_t size, cudaStream_t cudaStream = 0)
+    virtual void copyFromAsync(const void* src, size_t size, cudaStream_t cudaStream = nullptr)
     {
         if (size > m_size)
         {
@@ -725,7 +748,7 @@ public:
      * @param[in] cudaStream CUDA stream to use for the operation.
      * @return True if the fill was successful, false otherwise.
      */
-    virtual bool fillAsync(const T& value, cudaStream_t cudaStream = 0)
+    virtual bool fillAsync(const T& value, cudaStream_t cudaStream = nullptr)
     {
         if (m_buffer != nullptr)
         {
@@ -826,17 +849,19 @@ private:
     T* m_buffer = nullptr;
     /** @brief Current size of the buffer in elements. */
     size_t m_size = 0;
+    /** @brief Current capacity of the buffer in elements. */
+    size_t m_capacity = 0;
     /** @brief Device ID where memory is allocated (higher or equal to 0 for CUDA device, -1 for CPU). */
     int m_device = -1;
 };
 
 
 /** @brief Type alias for a device buffer of bytes */
-typedef DeviceBufferBase<uint8_t> DeviceBuffer;
+using DeviceBuffer = DeviceBufferBase<uint8_t>;
 /** @brief Type alias for a host buffer of bytes */
-typedef HostBufferBase<uint8_t> HostBuffer;
+using HostBuffer = HostBufferBase<uint8_t>;
 /** @brief Type alias for a generic buffer of bytes */
-typedef GenericBufferBase<uint8_t> GenericBuffer;
+using GenericBuffer = GenericBufferBase<uint8_t>;
 
 }
 }

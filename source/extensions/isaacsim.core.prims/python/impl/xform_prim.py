@@ -21,9 +21,9 @@ import carb
 import isaacsim.core.utils.fabric as fabric_utils
 import isaacsim.core.utils.interops as interops_utils
 import numpy as np
-import torch
 import usdrt
 import warp as wp
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims.impl.prim import Prim
 from isaacsim.core.simulation_manager import IsaacEvents, SimulationManager
 from isaacsim.core.utils.prims import (
@@ -36,6 +36,8 @@ from isaacsim.core.utils.stage import get_current_stage
 from isaacsim.core.utils.types import XFormPrimViewState
 from isaacsim.core.utils.xforms import get_local_pose, get_world_pose
 from pxr import Gf, Usd, UsdGeom, UsdShade
+
+torch = import_module("torch")
 
 
 class XFormPrim(Prim):
@@ -1125,7 +1127,7 @@ class XFormPrim(Prim):
             if not xformable_prim.HasWorldXform():
                 xformable_prim.SetWorldXformFromUsd()
 
-    def _reset_fabric_selection(self, dt) -> None:
+    def _reset_fabric_selection(self, dt, context=None) -> None:
         self._selection = None
         for data_tensor_name in self._fabric_data_valid.keys():
             self._fabric_data_valid[data_tensor_name] = False

@@ -16,57 +16,46 @@
 
 import time
 
-import carb
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.prim as prim_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.kit.test
 import omni.replicator.core as rep
-from isaacsim.core.api import SimulationContext
-from isaacsim.core.api.objects.ground_plane import GroundPlane
+from isaacsim.core.experimental.objects import GroundPlane
+from isaacsim.core.rendering_manager import ViewportManager
 from isaacsim.core.simulation_manager import _simulation_manager
-from isaacsim.core.utils.stage import get_current_stage, open_stage_async
-from isaacsim.core.utils.viewports import set_camera_view
-from isaacsim.storage.native import get_assets_root_path
-from omni.kit.viewport.utility import get_active_viewport
-from pxr import Sdf, UsdLux
 
 
 class TestAnnotators(omni.kit.test.AsyncTestCase):
     async def setUp(self):
         """Set up  test environment, to be torn down when done"""
         await omni.usd.get_context().new_stage_async()
-        self._timeline = omni.timeline.get_timeline_interface()
-        self._viewport_api = get_active_viewport()
-        self._render_product_path = self._viewport_api.get_render_product_path()
-        self._simulation_context = SimulationContext()
-        await self._simulation_context.initialize_simulation_context_async()
+        self._render_product_path = prim_utils.get_prim_path(ViewportManager.get_render_product())
 
-        ground_plane = GroundPlane("/World/ground_plane", visible=True)
-        self._stage = get_current_stage()
-        distantLight = UsdLux.DistantLight.Define(self._stage, Sdf.Path("/DistantLight"))
+        GroundPlane("/World/ground_plane")
+        stage_utils.define_prim("/DistantLight", "DistantLight")
 
-        set_camera_view(eye=[-6, 0, 6.5], target=[-6, 0, -1], camera_prim_path="/OmniverseKit_Persp")
-        await omni.kit.app.get_app().next_update_async()
+        ViewportManager.set_camera_view("/OmniverseKit_Persp", eye=[-6, 0, 6.5], target=[-6, 0, -1])
+        await app_utils.update_app_async()
 
     # ----------------------------------------------------------------------
     async def tearDown(self):
-        # self._action.execute(viewport_api=self._viewport_api, visible=True)
         pass
 
     # ----------------------------------------------------------------------
     async def test_noop(self):
         annotator = rep.AnnotatorRegistry.get_annotator("IsaacNoop")
         annotator.attach([self._render_product_path])
-        self._timeline.play()
-        await omni.kit.app.get_app().next_update_async()
-        await omni.kit.app.get_app().next_update_async()
+        app_utils.play()
+        await app_utils.update_app_async(steps=2)
         annotator.detach()
 
     # async def test_read_camera_info(self):
     #     annotator = rep.AnnotatorRegistry.get_annotator("IsaacReadCameraInfo")
     #     annotator.attach([self._render_product_path])
-    #     self._timeline.play()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
+    #     app_utils.play()
+    #     await app_utils.update_app_async(steps=2)
     #     data = annotator.get_data()
     #     # print(data)
     #     self.assertAlmostEqual(data["focalLength"], 18.14756202697754)
@@ -82,11 +71,11 @@ class TestAnnotators(omni.kit.test.AsyncTestCase):
         fabric_time_annotator.attach([self._render_product_path])
 
         # Testing that reset on stop works
-        self._timeline.play()
-        await omni.kit.app.get_app().next_update_async()
-        self._timeline.stop()
-        await omni.kit.app.get_app().next_update_async()
-        self._timeline.play()
+        app_utils.play()
+        await app_utils.update_app_async()
+        app_utils.stop()
+        await app_utils.update_app_async()
+        app_utils.play()
         await omni.syntheticdata.sensors.next_render_simulation_async(self._render_product_path, 10)
         fabric_time_data = fabric_time_annotator.get_data()
         data_read_sim_time = annotator_read_sim_time.get_data()
@@ -112,7 +101,7 @@ class TestAnnotators(omni.kit.test.AsyncTestCase):
         annotator = rep.AnnotatorRegistry.get_annotator(rv + "IsaacConvertRGBAToRGB")
         annotator.attach([self._render_product_path])
 
-        self._timeline.play()
+        app_utils.play()
         await omni.syntheticdata.sensors.next_render_simulation_async(self._render_product_path, 10)
         data = annotator.get_data()
         self.assertTrue(np.all(data["data"] > 150))
@@ -125,9 +114,8 @@ class TestAnnotators(omni.kit.test.AsyncTestCase):
         annotator = rep.AnnotatorRegistry.get_annotator(rv + "IsaacConvertDepthToPointCloud")
         annotator.attach([self._render_product_path])
 
-        self._timeline.play()
+        app_utils.play()
         await omni.syntheticdata.sensors.next_render_simulation_async(self._render_product_path, 10)
         data = annotator.get_data()
         self.assertTrue(np.all(np.linalg.norm(data["data"], axis=1) > 0))
-
         annotator.detach()

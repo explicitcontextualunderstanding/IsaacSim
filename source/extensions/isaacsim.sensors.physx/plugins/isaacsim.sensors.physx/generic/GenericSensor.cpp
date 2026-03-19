@@ -387,22 +387,22 @@ void GenericSensor::tick()
         wrapData(m_lastSample);
         if (m_drawLines && m_drawPoints)
         {
-            scan<true, true>(m_finalTranslation, m_finalRotation, m_physx, m_pxScene, m_depth, m_hitPos, m_linearDepth,
+            scan<true, true>(m_finalTranslation, m_finalRotation, m_pxScene, m_depth, m_hitPos, m_linearDepth,
                              m_intensity, m_zenith, m_azimuth, m_offset, m_maxDepth, m_minDepth, m_metersPerUnit, zUp);
         }
         else if (m_drawLines)
         {
-            scan<false, true>(m_finalTranslation, m_finalRotation, m_physx, m_pxScene, m_depth, m_hitPos, m_linearDepth,
+            scan<false, true>(m_finalTranslation, m_finalRotation, m_pxScene, m_depth, m_hitPos, m_linearDepth,
                               m_intensity, m_zenith, m_azimuth, m_offset, m_maxDepth, m_minDepth, m_metersPerUnit, zUp);
         }
         else if (m_drawPoints)
         {
-            scan<true, false>(m_finalTranslation, m_finalRotation, m_physx, m_pxScene, m_depth, m_hitPos, m_linearDepth,
+            scan<true, false>(m_finalTranslation, m_finalRotation, m_pxScene, m_depth, m_hitPos, m_linearDepth,
                               m_intensity, m_zenith, m_azimuth, m_offset, m_maxDepth, m_minDepth, m_metersPerUnit, zUp);
         }
         else
         {
-            scan<false, false>(m_finalTranslation, m_finalRotation, m_physx, m_pxScene, m_depth, m_hitPos, m_linearDepth,
+            scan<false, false>(m_finalTranslation, m_finalRotation, m_pxScene, m_depth, m_hitPos, m_linearDepth,
                                m_intensity, m_zenith, m_azimuth, m_offset, m_maxDepth, m_minDepth, m_metersPerUnit, zUp);
         }
         dumpData();

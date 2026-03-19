@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module extends the edit menu functionality within an application, providing mechanisms to manipulate edit menu actions related to selection, duplication, deletion, and other common editing tasks for prims in a USD stage."""
+"""Edit menu behaviors for selection and prim operations."""
 
 __all__ = ["EditMenuExtension", "get_extension_path"]
 
@@ -20,7 +20,9 @@ import asyncio
 import contextlib
 import os
 import sys
+from collections.abc import Callable
 from functools import partial
+from typing import Any
 
 import carb.input
 import omni.kit.app
@@ -30,7 +32,7 @@ import omni.kit.usd.layers as layers
 import omni.ui as ui
 import omni.usd
 from omni.kit.menu.utils import LayoutSourceSearch, MenuItemDescription, MenuLayout
-from pxr import Kind, Sdf, Tf
+from pxr import Kind, Sdf, Tf, Usd
 
 from .edit_actions import deregister_actions, register_actions
 from .selection import Selection
@@ -38,8 +40,8 @@ from .selection_window import SelectionSetWindow
 
 # pylint: disable=redefined-outer-name
 
-_extension_instance = None
-_extension_path = None
+_extension_instance: "EditMenuExtension | None" = None
+_extension_path: str | None = None
 
 PERSISTENT_SETTINGS_PREFIX = "/persistent"
 CAPTURE_FRAME_PATH = "/app/captureFrame/path"
@@ -47,21 +49,27 @@ KEEP_TRANSFORM_FOR_REPARENTING = "/persistent/app/stage/movePrimInPlace"
 
 
 class EditMenuExtension:
-    def __init__(self, ext_id):
+    """Build and manage the Edit menu.
+
+    Args:
+        ext_id: Extension identifier provided by the extension manager.
+    """
+
+    def __init__(self, ext_id: str):
         omni.kit.menu.utils.set_default_menu_priority("Edit", -9)
-        self._select_recent_menu_list = [MenuItemDescription(name="None", enabled=False)]
-        self._selection_set_menu_list = [MenuItemDescription(name="None", enabled=False)]
-        self._selection_kind_menu_list = [MenuItemDescription(name="None", enabled=False)]
-        self._select_recent = []
-        self._selection_set = []
-        self._ext_name = None
-        self._create_selection_window = None
-        self._edit_menu_list = None
-        self._context_menus = None
-        self._preferences_page = None
-        self._cm_hooks = None
-        self._hooks = None
-        self._edit_select_menu = None
+        self._select_recent_menu_list: list[MenuItemDescription] = [MenuItemDescription(name="None", enabled=False)]
+        self._selection_set_menu_list: list[MenuItemDescription] = [MenuItemDescription(name="None", enabled=False)]
+        self._selection_kind_menu_list: list[MenuItemDescription] = [MenuItemDescription(name="None", enabled=False)]
+        self._select_recent: list[Selection] = []
+        self._selection_set: list[Selection] = []
+        self._ext_name = "isaacsim.gui.menu.edit_menu"
+        self._create_selection_window: SelectionSetWindow | None = None
+        self._edit_menu_list: list[MenuItemDescription] | None = None
+        self._context_menus: list[Any] = []
+        self._preferences_page: object | None = None
+        self._cm_hooks: object | None = None
+        self._hooks: list[Any] = []
+        self._edit_select_menu: list[MenuItemDescription] | None = None
 
         global _extension_instance
         _extension_instance = self
@@ -69,7 +77,6 @@ class EditMenuExtension:
         global _extension_path
         _extension_path = omni.kit.app.get_app_interface().get_extension_manager().get_extension_path(ext_id)
 
-        self._ext_name = "isaacsim.gui.menu.edit_menu"
         register_actions(self._ext_name, EditMenuExtension, lambda: _extension_instance)
 
         self._select_recent_menu_list = [MenuItemDescription(name="None", enabled=False)]
@@ -81,7 +88,6 @@ class EditMenuExtension:
         self._edit_menu_list = None
         self._build_edit_menu()
 
-        self._context_menus = []
         manager = omni.kit.app.get_app().get_extension_manager()
         self._cm_hooks = manager.subscribe_to_extension_enable(
             lambda _: self._register_context_menu(),
@@ -91,8 +97,6 @@ class EditMenuExtension:
         )
 
         manager = omni.kit.app.get_app().get_extension_manager()
-        self._preferences_page = None
-        self._hooks = []
         self._hooks.append(
             manager.subscribe_to_extension_enable(
                 on_enable_fn=lambda _: self._register_page(),
@@ -141,6 +145,14 @@ class EditMenuExtension:
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
     def shutdown(self):
+        """Remove menu items, hooks, and UI resources.
+
+        Example:
+            .. code-block:: python
+
+                menu = EditMenuExtension("ext.id")
+                menu.shutdown()
+        """
         global _extension_instance
 
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
@@ -164,6 +176,7 @@ class EditMenuExtension:
         deregister_actions(self._ext_name)
 
     def _register_page(self):
+        """Register the screenshot preferences page if available."""
         try:
             from omni.kit.window.preferences import register_page
 
@@ -174,6 +187,7 @@ class EditMenuExtension:
             pass
 
     def _unregister_page(self):
+        """Unregister the screenshot preferences page if present."""
         if self._preferences_page:
             try:
                 import omni.kit.window.preferences
@@ -185,27 +199,48 @@ class EditMenuExtension:
 
     @staticmethod
     def post_notification(message: str, info: bool = False, duration: int = 3):
-        """Posts a notification message to the UI.
+        """Post a notification message to the UI.
 
         Args:
-            message (str): The message to be displayed in the notification.
-            info (bool, optional): If True, displays an info notification; otherwise, a warning. Defaults to False.
-            duration (int, optional): The duration in seconds for which the notification should be visible. Defaults to 3.
+            message: The message to display.
+            info: Whether to display an info notification.
+            duration: Duration in seconds for the notification.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.post_notification("Selection updated.")
         """
         _type = nm.NotificationStatus.INFO if info else nm.NotificationStatus.WARNING
         nm.post_notification(message, status=_type, duration=duration)
 
-    def _usd_kinds(self):
+    def _usd_kinds(self) -> list[str]:
+        """Return the USD kinds used for selection filters.
+
+        Returns:
+            USD kind tokens used for selection.
+        """
         return ["model", "assembly", "group", "component", "subcomponent"]
 
-    def _usd_kinds_display(self):
+    def _usd_kinds_display(self) -> list[str]:
+        """Return displayable USD kinds for selection filters.
+
+        Returns:
+            USD kinds to show in the menu.
+        """
         return self._usd_kinds()[1:]
 
-    def _plugin_kinds(self):
+    def _plugin_kinds(self) -> set[str]:
+        """Return plugin-defined kinds not covered by USD defaults.
+
+        Returns:
+            Plugin-defined USD kinds.
+        """
         all_kinds = set(Kind.Registry.GetAllKinds())
         return all_kinds - set(self._usd_kinds())
 
     def _create_selection_set(self):
+        """Create or show the selection set naming dialog."""
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if not paths:
             EditMenuExtension.post_notification("Cannot Create Selection Set as no prims are selected")
@@ -217,6 +252,7 @@ class EditMenuExtension:
             self._create_selection_window = SelectionSetWindow(self._add_to_selection_set)
 
     def _build_recent_menu(self):
+        """Build the Select Recent submenu items."""
         if self._select_recent:
             self._select_recent_menu_list.clear()
 
@@ -233,8 +269,15 @@ class EditMenuExtension:
 
             omni.kit.menu.utils.rebuild_menus()
 
-    def _on_select_recent(self, index):
+    def _on_select_recent(self, index: int):
+        """Handle selection of a recent item by index.
+
+        Args:
+            index: Index of the recent selection to apply.
+        """
+
         async def select_func():
+            """Execute a recent selection on the next update."""
             await omni.kit.app.get_app().next_update_async()
             do_recent = self._select_recent[index]
             omni.kit.commands.execute("SelectListCommand", selection=do_recent.selection)
@@ -243,7 +286,12 @@ class EditMenuExtension:
 
         asyncio.ensure_future(select_func())
 
-    def _add_to_selection_set(self, description):
+    def _add_to_selection_set(self, description: str):
+        """Add the current selection to the named selection set.
+
+        Args:
+            description: Label to assign to the selection set.
+        """
         new_selection = omni.usd.get_context().get_selection().get_selected_prim_paths()
         for selection in self._selection_set:
             if selection.description == description:
@@ -253,7 +301,13 @@ class EditMenuExtension:
         self._selection_set.append(Selection(description, new_selection))
         self._build_selection_set_menu()
 
-    def _add_to_recent(self, description, selection):
+    def _add_to_recent(self, description: str, selection: list[str]):
+        """Add a selection to the recent list.
+
+        Args:
+            description: Label describing the selection.
+            selection: Selection paths to store.
+        """
         found = False
         for prev_selection in self._select_recent:
             if prev_selection.description == description and prev_selection.selection == selection:
@@ -266,8 +320,15 @@ class EditMenuExtension:
 
         self._build_recent_menu()
 
-    def _on_select_selection_set(self, index):
+    def _on_select_selection_set(self, index: int):
+        """Handle selection of a saved selection set by index.
+
+        Args:
+            index: Index of the selection set to apply.
+        """
+
         async def select_func():
+            """Execute a selection set action on the next update."""
             await omni.kit.app.get_app().next_update_async()
             do_select = self._selection_set[index]
             omni.kit.commands.execute("SelectListCommand", selection=do_select.selection)
@@ -275,6 +336,7 @@ class EditMenuExtension:
         asyncio.ensure_future(select_func())
 
     def _build_selection_set_menu(self):
+        """Build the Select Set submenu items."""
         self._selection_set_menu_list.clear()
 
         self._selection_set.sort(key=lambda x: x.description)
@@ -290,14 +352,22 @@ class EditMenuExtension:
 
         omni.kit.menu.utils.rebuild_menus()
 
-    def _on_select_by_kind(self, kind):
+    def _on_select_by_kind(self, kind: str):
+        """Handle selection of prims by kind.
+
+        Args:
+            kind: USD kind to select.
+        """
+
         async def select_func():
+            """Execute a select-by-kind action on the next update."""
             await omni.kit.app.get_app().next_update_async()
             omni.kit.commands.execute("SelectKindCommand", kind=kind)
 
         asyncio.ensure_future(select_func())
 
     def _build_selection_kind_menu(self):
+        """Build the Select by Kind submenu items."""
         self._selection_kind_menu_list.clear()
 
         for kind in self._usd_kinds_display():
@@ -315,7 +385,17 @@ class EditMenuExtension:
             )
 
     def _build_edit_menu(self):
-        def is_edit_type_enabled(type_name: str):
+        """Build the Edit menu items and register update hooks."""
+
+        def is_edit_type_enabled(type_name: str) -> bool:
+            """Return whether an edit feature is enabled by settings.
+
+            Args:
+                type_name: Settings suffix for the feature.
+
+            Returns:
+                True if the feature is enabled or unset, False otherwise.
+            """
             settings = carb.settings.get_settings()
             enabled = settings.get(f"/exts/isaacsim.gui.menu/enable{type_name}")
             if enabled is True or enabled is False:
@@ -508,13 +588,21 @@ class EditMenuExtension:
             observer_name="isaacsim.gui.menu stage watcher",
         )
 
-    def _on_stage_event(self, event):
+    def _on_stage_event(self, event: carb.events.IEvent):
+        """Refresh edit menu items after a stage event.
+
+        Args:
+            event: Stage event payload.
+        """
+
         async def refresh_menu_items():
+            """Refresh the Edit menu items."""
             omni.kit.menu.utils.refresh_menu_items("Edit")
 
         asyncio.ensure_future(refresh_menu_items())
 
     def _register_context_menu(self):
+        """Register Edit-related context menus."""
         import omni.kit.context_menu
 
         select_context_menu_dict = {
@@ -543,31 +631,72 @@ class EditMenuExtension:
         )
 
     def _unregister_context_menu(self):
+        """Unregister context menus and release resources."""
         for menu in self._context_menus:
             menu.release()
         self._context_menus.clear()
 
     @staticmethod
-    def prim_selected():
-        """Is one or more prims selected"""
+    def prim_selected() -> bool:
+        """Check whether one or more prims are selected.
+
+        Returns:
+            True if any prim is selected, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.prim_selected():
+                    print("Selection exists")
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         return bool(paths)
 
     @staticmethod
-    def is_in_live_session():
-        """Is kit in live session"""
+    def is_in_live_session() -> bool:
+        """Check whether the stage is in a live session.
+
+        Returns:
+            True if the stage is live-syncing, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.is_in_live_session():
+                    print("Live session")
+        """
         usd_context = omni.usd.get_context()
         live_syncing = layers.get_layers(usd_context).get_live_syncing()
         return live_syncing.is_stage_in_live_session()
 
     @staticmethod
-    def is_not_in_live_session():
-        """Is kit not in live session"""
+    def is_not_in_live_session() -> bool:
+        """Check whether the stage is not in a live session.
+
+        Returns:
+            True if the stage is not live-syncing, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.is_not_in_live_session():
+                    print("Not live")
+        """
         return not EditMenuExtension.is_in_live_session()
 
     @staticmethod
-    def can_delete():
-        """Can selected prims be deleted (prims do not have no_delete metadata"""
+    def can_delete() -> bool:
+        """Check whether selected prims can be deleted.
+
+        Returns:
+            True if all selected prims are deletable, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.can_delete():
+                    print("Deletion allowed")
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         stage = omni.usd.get_context().get_stage()
         if not stage:
@@ -582,30 +711,70 @@ class EditMenuExtension:
         return True
 
     @staticmethod
-    def is_one_prim_selected():
-        """Is a single prim selected"""
+    def is_one_prim_selected() -> bool:
+        """Check whether a single prim is selected.
+
+        Returns:
+            True when exactly one prim is selected, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.is_one_prim_selected():
+                    print("Single selection")
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         return len(paths) == 1
 
     @staticmethod
-    def can_prims_parent():
-        """Can selected prims be Parented"""
+    def can_prims_parent() -> bool:
+        """Check whether the current selection can be parented.
+
+        Returns:
+            True if two or more prims are selected, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.can_prims_parent():
+                    print("Can parent")
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if paths:
             return len(paths) > 1
         return False
 
     @staticmethod
-    def can_prims_unparent():
-        """Can selected prims be Unparented"""
+    def can_prims_unparent() -> bool:
+        """Check whether the current selection can be unparented.
+
+        Returns:
+            True if any prims are selected, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.can_prims_unparent():
+                    print("Can unparent")
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if paths:
             return True
         return False
 
     @staticmethod
-    def can_be_instanced():
-        """Can selected prims be instanced"""
+    def can_be_instanced() -> bool:
+        """Check whether selected prims can be instanced.
+
+        Returns:
+            True if all selected prims are instanceable, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if EditMenuExtension.can_be_instanced():
+                    print("Instanceable")
+        """
         allowed_types_for_instancing = ["Xform"]
         stage = omni.usd.get_context().get_stage()
         if not stage:
@@ -619,7 +788,13 @@ class EditMenuExtension:
 
     @staticmethod
     def instance_prim():
-        """Creates an instance of the selected prim(s) in the USD stage."""
+        """Create instances for the selected prims.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.instance_prim()
+        """
         usd_context = omni.usd.get_context()
         paths = usd_context.get_selection().get_selected_prim_paths()
         if not paths:
@@ -632,12 +807,18 @@ class EditMenuExtension:
 
     # When combine_layers is True, it means to duplicate with flattening references.
     @staticmethod
-    def duplicate_prim(duplicate_layers, combine_layers):
-        """Duplicates the selected prim(s) in the USD stage with options for layer handling.
+    def duplicate_prim(duplicate_layers: bool, combine_layers: bool):
+        """Duplicate selected prims with layer options.
 
         Args:
-            duplicate_layers (bool): If True, duplicates the prims across all layers.
-            combine_layers (bool): If True, duplicates the prims with references flattened."""
+            duplicate_layers: Whether to duplicate across all layers.
+            combine_layers: Whether to flatten references during duplication.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.duplicate_prim(duplicate_layers=False, combine_layers=False)
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if not paths:
             EditMenuExtension.post_notification("Cannot duplicate prim as no prims are selected")
@@ -662,7 +843,13 @@ class EditMenuExtension:
 
     @staticmethod
     def parent_prims():
-        """Parents the selected prims to the last selected prim in the USD stage."""
+        """Parent selected prims to the last selected prim.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.parent_prims()
+        """
         stage = omni.usd.get_context().get_stage()
         if not stage:
             EditMenuExtension.post_notification("Cannot parent prim as no stage is loaded")
@@ -679,7 +866,13 @@ class EditMenuExtension:
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if paths:
 
-            def prim_renamed(old_prim_name: Sdf.Path, new_prim_name: Sdf.Path):
+            def prim_renamed(old_prim_name: Sdf.Path, new_prim_name: Sdf.Path) -> None:
+                """Update cached selection paths after a rename.
+
+                Args:
+                    old_prim_name: Original prim path.
+                    new_prim_name: Updated prim path.
+                """
                 try:
                     index = paths.index(old_prim_name.pathString)
                     paths[index] = new_prim_name.pathString
@@ -711,7 +904,13 @@ class EditMenuExtension:
 
     @staticmethod
     def unparent_prims():
-        """Unparents the selected prims in the USD stage."""
+        """Unparent selected prims.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.unparent_prims()
+        """
         stage = omni.usd.get_context().get_stage()
         if not stage:
             EditMenuExtension.post_notification("Cannot unparent prim as no stage is loaded")
@@ -736,7 +935,16 @@ class EditMenuExtension:
 
     @staticmethod
     def create_xform_to_group() -> bool:
-        """Groups the selected prims under a new Xform in the USD stage."""
+        """Group selected prims under a new Xform.
+
+        Returns:
+            True if the group was created, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                success = EditMenuExtension.create_xform_to_group()
+        """
         usd_context = omni.usd.get_context()
         paths = usd_context.get_selection().get_selected_prim_paths()
         if not paths:
@@ -758,7 +966,16 @@ class EditMenuExtension:
 
     @staticmethod
     def ungroup_prims() -> bool:
-        """Ungroups the selected prims in the USD stage."""
+        """Ungroup selected prims.
+
+        Returns:
+            True if ungrouping succeeded, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                success = EditMenuExtension.ungroup_prims()
+        """
         usd_context = omni.usd.get_context()
         paths = usd_context.get_selection().get_selected_prim_paths()
         if not paths:
@@ -785,11 +1002,17 @@ class EditMenuExtension:
         return False
 
     @staticmethod
-    def delete_prim(destructive):
-        """Deletes the selected prim(s) from the USD stage.
+    def delete_prim(destructive: bool):
+        """Delete selected prims from the stage.
 
         Args:
-            destructive (bool): If True, deletes the prims destructively."""
+            destructive: Whether to delete prims destructively.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.delete_prim(destructive=False)
+        """
         usd_context = omni.usd.get_context()
         paths = usd_context.get_selection().get_selected_prim_paths()
         if not paths:
@@ -865,7 +1088,8 @@ class EditMenuExtension:
                         "Continuing the operation will deactivate the prim."
                     )
 
-            def deactivating_prims():
+            def deactivating_prims() -> None:
+                """Deactivate prims after user confirmation."""
                 omni.kit.commands.execute(
                     "ToggleActivePrims", prim_paths=paths, stage_or_context=usd_context, active=False
                 )
@@ -881,14 +1105,26 @@ class EditMenuExtension:
 
     @staticmethod
     def focus_prim():
-        """Focuses the viewport camera on the selected prim(s)."""
+        """Focus the viewport camera on selected prims.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.focus_prim()
+        """
         from omni.kit.viewport.utility import frame_viewport_selection
 
         frame_viewport_selection()
 
     @staticmethod
     def toggle_visibillity():
-        """Toggles the visibility of the selected prim(s) in the viewport."""
+        """Toggle visibility of selected prims in the viewport.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.toggle_visibillity()
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if not paths:
             EditMenuExtension.post_notification("Cannot Toggle Visibility as no prims are selected")
@@ -898,7 +1134,13 @@ class EditMenuExtension:
 
     @staticmethod
     def deactivate_prims():
-        """Deactivates the selected prim(s) in the USD stage."""
+        """Deactivate selected prims.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.deactivate_prims()
+        """
         usd_context = omni.usd.get_context()
         paths = usd_context.get_selection().get_selected_prim_paths()
         if not paths:
@@ -907,8 +1149,17 @@ class EditMenuExtension:
         omni.kit.commands.execute("ToggleActivePrims", prim_paths=paths, stage_or_context=usd_context, active=False)
 
     @staticmethod
-    def toggle_global_visibility():
-        """Toggles the global visualization mode in the viewport."""
+    def toggle_global_visibility() -> object | None:
+        """Toggle global visualization mode in the viewport.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.toggle_global_visibility()
+
+        Returns:
+            Result of the action execution, or None if unavailable.
+        """
         carb.log_error(
             "isaacsim.gui.menu.toggle_global_visibility is deprecated, use omni.kit.viewport.actions.toggle_global_visibility"
         )
@@ -920,11 +1171,20 @@ class EditMenuExtension:
         carb.log_error("omni.kit.viewport.actions must be enabled")
         return None
 
-    def get_screenshot_path(self, settings):
-        """Get path to save screenshot.
+    def get_screenshot_path(self, settings: carb.settings.ISettings) -> str:
+        """Get the screenshot save path from settings.
 
         Args:
-            settings: carb.settings()
+            settings: Settings interface for reading capture paths.
+
+        Returns:
+            The screenshot directory path.
+
+        Example:
+            .. code-block:: python
+
+                settings = carb.settings.get_settings()
+                path = _extension_instance.get_screenshot_path(settings)
         """
         # get path from /persistent/app/captureFrame/path
         screenshot_path = settings.get(PERSISTENT_SETTINGS_PREFIX + CAPTURE_FRAME_PATH)
@@ -938,11 +1198,16 @@ class EditMenuExtension:
         return screenshot_path
 
     @staticmethod
-    def capture_screenshot(on_complete_fn: callable = None):
-        """Captures a screenshot of the active viewport or the entire application.
+    def capture_screenshot(on_complete_fn: Callable[[bool, str], None] | None = None):
+        """Capture a screenshot of the active viewport or the app.
 
         Args:
-            on_complete_fn (callable, optional): A callback function that gets called upon completion of the screenshot capture. Defaults to None.
+            on_complete_fn: Optional callback invoked after capture completes.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.capture_screenshot()
         """
         from datetime import datetime
 
@@ -952,6 +1217,9 @@ class EditMenuExtension:
 
         # Check if the user specified the screenshots folder.
         settings = carb.settings.get_settings()
+        if _extension_instance is None:
+            carb.log_error("Capture screenshot failed: extension instance is not available.")
+            return
         screenshot_path = _extension_instance.get_screenshot_path(settings)
         if screenshot_path:
             if os.path.isdir(screenshot_path):
@@ -959,7 +1227,13 @@ class EditMenuExtension:
             else:
                 carb.log_error(f"Can't save screenshot to {str(screenshot_path)} because it is not a directory")
 
-        async def capture_frame(capture_filename: str, on_complete_fn: callable):
+        async def capture_frame(capture_filename: str, on_complete_fn: Callable[[bool, str], None] | None) -> None:
+            """Capture a frame and invoke the completion callback.
+
+            Args:
+                capture_filename: Output filename for the capture.
+                on_complete_fn: Callback to invoke after capture completes.
+            """
             import omni.kit.app
 
             carb.log_warn(f"Capturing {capture_filename}")
@@ -1011,6 +1285,12 @@ class EditMenuExtension:
 
     @staticmethod
     def _rename_viewport_active_camera(old_prim_name: Sdf.Path, new_prim_name: Sdf.Path):
+        """Update the active viewport camera path after a rename.
+
+        Args:
+            old_prim_name: Old camera prim path.
+            new_prim_name: New camera prim path.
+        """
         try:
             from omni.kit.viewport.utility import get_active_viewport
 
@@ -1021,19 +1301,36 @@ class EditMenuExtension:
             pass
 
     @staticmethod
-    def rename_prim(stage, prim, window, field_widget):
-        """Renames the specified prim in the USD stage.
+    def rename_prim(
+        stage: Usd.Stage,
+        prim: Usd.Prim,
+        window: ui.Widget | None,
+        field_widget: ui.StringField | None,
+    ):
+        """Rename a prim using the provided UI field.
 
         Args:
-            stage (Usd.Stage): The stage where the prim resides.
-            prim (Usd.Prim): The prim to rename.
-            window (ui.Widget): The UI window associated with the rename operation.
-            field_widget (ui.StringField): The UI string field containing the new name for the prim."""
+            stage: Stage where the prim resides.
+            prim: Prim to rename.
+            window: UI window associated with the rename operation.
+            field_widget: UI field that contains the new prim name.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension.rename_prim(stage, prim, window, field_widget)
+        """
         if window:
             window.visible = False
         if field_widget:
 
-            def select_new_prim(old_prim_name: Sdf.Path, new_prim_name: Sdf.Path):
+            def select_new_prim(old_prim_name: Sdf.Path, new_prim_name: Sdf.Path) -> None:
+                """Select the renamed prim in the stage.
+
+                Args:
+                    old_prim_name: Original prim path.
+                    new_prim_name: Updated prim path.
+                """
                 omni.usd.get_context().get_selection().set_selected_prim_paths([new_prim_name.pathString], True)
 
             if prim.GetPath().name != field_widget.model.get_value_as_string():
@@ -1056,7 +1353,17 @@ class EditMenuExtension:
                         f"Cannot rename {old_prim_name} to {new_prim_name} as its not a valid USD path"
                     )
 
-    def menu_rename_prim_dialog(self):
+    def menu_rename_prim_dialog(self) -> object | None:
+        """Open a rename dialog for the currently selected prim.
+
+        Returns:
+            The rename task result if handled by the stage widget, None otherwise.
+
+        Example:
+            .. code-block:: python
+
+                EditMenuExtension("ext.id").menu_rename_prim_dialog()
+        """
         import omni.usd
 
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
@@ -1100,7 +1407,12 @@ class EditMenuExtension:
                 style={"VStack::top_level_stack": {"margin": 5}, "Button": {"margin": 0}},
             ):
 
-                async def focus(field):
+                async def focus(field: ui.StringField) -> None:
+                    """Focus the field on the next update.
+
+                    Args:
+                        field: Field to focus.
+                    """
                     await omni.kit.app.get_app().next_update_async()
                     field.focus_keyboard()
 
@@ -1118,15 +1430,24 @@ class EditMenuExtension:
 
                     editing_started = False
 
-                    def on_begin():
+                    def on_begin() -> None:
+                        """Mark the start of text editing."""
                         nonlocal editing_started
                         editing_started = True
 
-                    def on_end():
+                    def on_end() -> None:
+                        """Mark the end of text editing."""
                         nonlocal editing_started
                         editing_started = False
 
-                    def window_pressed_key(key_index, key_flags, key_down):
+                    def window_pressed_key(key_index: int, key_flags: int, key_down: bool) -> None:
+                        """Handle key presses in the rename dialog.
+
+                        Args:
+                            key_index: Keyboard key code.
+                            key_flags: Modifier flags.
+                            key_down: Whether the key was pressed.
+                        """
                         nonlocal editing_started
                         key_mod = key_flags & ~ui.Widget.FLAG_WANT_CAPTURE_KEYBOARD
                         if (
@@ -1147,15 +1468,21 @@ class EditMenuExtension:
         return None
 
 
-def get_extension_path(sub_directory):
-    """Retrieves the full path to a specified subdirectory within the extension's directory.
+def get_extension_path(sub_directory: str) -> str:
+    """Return the extension path, optionally joined with a subdirectory.
 
     Args:
-        sub_directory (str): The name of the subdirectory within the extension's directory. If empty, returns the path to the extension's root directory.
+        sub_directory: Subdirectory to append to the base path.
 
     Returns:
-        str: The normalized full path to the specified subdirectory within the extension's directory."""
-    path = _extension_path
+        The normalized path for the extension or subdirectory.
+
+    Example:
+        .. code-block:: python
+
+            data_path = get_extension_path("data")
+    """
+    path = _extension_path or ""
     if sub_directory:
         path = os.path.normpath(os.path.join(path, sub_directory))
     return path

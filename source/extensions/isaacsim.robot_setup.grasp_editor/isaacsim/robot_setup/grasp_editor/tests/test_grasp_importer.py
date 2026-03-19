@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Tests for grasp data importing functionality in the isaacsim.robot_setup.grasp_editor extension.
+"""
+
+
 import asyncio
 
 import numpy as np
@@ -33,7 +38,32 @@ from pxr import Sdf, UsdGeom, UsdLux, UsdPhysics
 
 
 class TestGraspImporter(omni.kit.test.AsyncTestCase):
+    """Test class for the grasp importer functionality in the isaacsim.robot_setup.grasp_editor extension.
+
+    This test class validates the grasp importing system by testing the loading, parsing, and manipulation of grasp
+    data from YAML files. It creates a test scenario with a Robotiq 2F-85 gripper and a Rubik's cube, then
+    verifies that grasp specifications can be correctly imported and used to compute gripper poses and rigid body
+    positions.
+
+    The test setup includes:
+    - A USD stage with proper lighting and camera positioning
+    - A Robotiq 2F-85 gripper with a fixed joint constraint
+    - A Rubik's cube as the target object for grasping
+    - Import of grasp data from a YAML configuration file
+
+    The test validates:
+    - Accessor methods for grasp names and dictionaries
+    - Computation of gripper poses from rigid body poses
+    - Computation of rigid body poses from gripper poses
+    - Numerical accuracy of pose transformations with visual verification capabilities
+    """
+
     async def setUp(self):
+        """Set up the test environment with a gripper, cube, and grasp specifications.
+
+        Creates a new stage with a Robotiq gripper and Rubik's cube, loads grasp data from YAML file,
+        and configures the scene lighting and camera view for testing.
+        """
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.robot_setup.grasp_editor")
         extension_path = ext_manager.get_extension_path(ext_id)
@@ -67,25 +97,48 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
 
         self._grasp_spec = import_grasps_from_file(self._grasp_file)
 
-    def assertAlmostEqual(self, a, b, msg=""):
+    def assertAlmostEqual(self, a, b, msg: str = ""):
+        """Assert that two arrays are almost equal within a tolerance of 1e-3.
+
+        Overrides the standard assertAlmostEqual to support NumPy arrays and iterables,
+        excluding None values from comparison.
+
+        Args:
+            a: First array or iterable to compare.
+            b: Second array or iterable to compare.
+            msg: Optional message to display on assertion failure.
+        """
         # overriding method because it doesn't support iterables
         a = np.array(a)
         b = np.array(b)
         self.assertFalse(np.any(abs((a[a != np.array(None)] - b[b != np.array(None)])) > 1e-3), msg)
 
     async def _create_light(self):
+        """Create a sphere light in the scene for illumination.
+
+        Adds a UsdLux.SphereLight with specified radius and intensity positioned above the scene.
+        """
         sphereLight = UsdLux.SphereLight.Define(get_current_stage(), Sdf.Path("/World/SphereLight"))
         sphereLight.CreateRadiusAttr(2)
         sphereLight.CreateIntensityAttr(100000)
         SingleXFormPrim(str(sphereLight.GetPath().pathString)).set_world_pose([6.5, 0, 12])
 
     async def tearDown(self):
+        """Clean up the test environment after test execution.
+
+        Waits for any remaining asset loading to complete before updating the stage.
+        """
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             print("tearDown, assets still loading, waiting to finish...")
             await asyncio.sleep(1.0)
         await update_stage_async()
 
     async def test_accessors(self):
+        """Test the GraspSpec accessor methods for retrieving grasp data.
+
+        Verifies that grasp names, dictionaries, and individual grasp data can be correctly
+        accessed from the loaded grasp specification file.
+        """
         self.assertTrue(self._grasp_spec.get_grasp_names() == ["grasp_0", "grasp_1"])
 
         d = self._grasp_spec.get_grasp_dicts()
@@ -108,6 +161,11 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
     # These tests simply store golden values of positions that looked visually correct when compared
     # to pictures of the grasps saved to the `isaac_grasp` file.
     async def test_compute_gripper_pose(self):
+        """Test computing gripper pose from rigid body pose.
+
+        Verifies that the grasp specification can correctly compute gripper positions and orientations
+        based on the cube's rigid body pose for different grasp configurations.
+        """
         rb_trans, rb_quat = self._cube_xform.get_world_pose()
 
         print(f"rb_trans: {rb_trans}, rb_quat: {rb_quat}")
@@ -131,6 +189,11 @@ class TestGraspImporter(omni.kit.test.AsyncTestCase):
         # self._gripper_xform.set_world_pose(pos, orient)
 
     async def test_compute_rigid_body_pose(self):
+        """Test computing rigid body pose from gripper pose.
+
+        Verifies that the grasp specification can correctly compute object positions and orientations
+        based on the gripper's pose for different grasp configurations.
+        """
         gripper_trans, gripper_quat = self._gripper_xform.get_world_pose()
 
         pos, orient = self._grasp_spec.compute_rigid_body_pose_from_gripper_pose("grasp_0", gripper_trans, gripper_quat)

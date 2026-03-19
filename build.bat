@@ -22,4 +22,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: Check Windows Long Paths support
+call "%~dp0tools\check_longpaths.bat"
+
 call "%~dp0repo" build %*

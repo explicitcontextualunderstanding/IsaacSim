@@ -19,36 +19,32 @@ import omni.kit.test
 class TestPipArchive(omni.kit.test.AsyncTestCase):
     # import all packages to make sure dependencies were not missed
     async def test_import_all(self):
+        import contourpy
         import cycler
-        import gunicorn
-        import jinja2
+        import dateutil
+        import fontTools
         import kiwisolver
         import llvmlite
-        import markupsafe
         import matplotlib
         import nest_asyncio
-        import numba
         import osqp
         import packaging
-        import pint
         import pyparsing
         import pyperclip
         import qdldl
-        import tornado
+        import six
 
-        self.assertIsNotNone(numba)
-        self.assertIsNotNone(llvmlite)
-        self.assertIsNotNone(nest_asyncio)
-        self.assertIsNotNone(jinja2)
-        self.assertIsNotNone(markupsafe)
-        self.assertIsNotNone(matplotlib)
-        self.assertIsNotNone(pyparsing)
+        self.assertIsNotNone(contourpy)
         self.assertIsNotNone(cycler)
+        self.assertIsNotNone(dateutil)
+        self.assertIsNotNone(fontTools)
         self.assertIsNotNone(kiwisolver)
-        self.assertIsNotNone(pint)
-        self.assertIsNotNone(packaging)
-        self.assertIsNotNone(gunicorn)
+        self.assertIsNotNone(llvmlite)
+        self.assertIsNotNone(matplotlib)
+        self.assertIsNotNone(nest_asyncio)
         self.assertIsNotNone(osqp)
-        self.assertIsNotNone(qdldl)
-        self.assertIsNotNone(tornado)
+        self.assertIsNotNone(packaging)
+        self.assertIsNotNone(pyparsing)
         self.assertIsNotNone(pyperclip)
+        self.assertIsNotNone(qdldl)
+        self.assertIsNotNone(six)

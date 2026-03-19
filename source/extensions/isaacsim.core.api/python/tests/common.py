@@ -17,9 +17,11 @@ import gc
 import time
 
 import omni
-import torch
 from isaacsim.core.api import World
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.stage import update_stage_async
+
+torch = import_module("torch")
 
 
 class CoreTestCase(omni.kit.test.AsyncTestCase):

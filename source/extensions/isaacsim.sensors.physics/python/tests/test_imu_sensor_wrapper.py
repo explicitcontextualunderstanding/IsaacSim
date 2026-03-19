@@ -14,52 +14,52 @@
 # limitations under the License.
 
 import asyncio
-import math
 
 import numpy as np
 import omni.kit.test
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.stage import add_reference_to_stage, create_new_stage_async, update_stage_async
+import omni.timeline
+from isaacsim.core.experimental.objects import Cube, GroundPlane
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim, XformPrim
+from isaacsim.core.experimental.utils import prim as prim_utils
+from isaacsim.core.experimental.utils import stage as stage_utils
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.sensors.physics import IMUSensor
 from isaacsim.storage.native import get_assets_root_path_async
+
+from .common import EARTH_GRAVITY, GRAVITY_TOLERANCE, ORIENTATION_TOLERANCE, SMALL_TOLERANCE, reset_timeline
 
 
 class TestIMU(omni.kit.test.AsyncTestCase):
     # Before running each test
     async def setUp(self):
-        await create_new_stage_async()
-        self.my_world = World(stage_units_in_meters=1.0)
-        await self.my_world.initialize_simulation_context_async()
-        await update_stage_async()
-        self.my_world.scene.add_default_ground_plane()
+        await stage_utils.create_new_stage_async()
+        SimulationManager.setup_simulation(dt=1.0 / 60.0)
+        self._timeline = omni.timeline.get_timeline_interface()
+        GroundPlane("/World/defaultGroundPlane", positions=[0.0, 0.0, 0.0])
         assets_root_path = await get_assets_root_path_async()
         asset_path = assets_root_path + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
-        add_reference_to_stage(usd_path=asset_path, prim_path="/World/Carter")
-        my_carter = self.my_world.scene.add(
-            SingleArticulation(prim_path="/World/Carter", name="my_carter", position=np.array([0, 0.0, 0.5]))
-        )
+        stage_utils.add_reference_to_stage(usd_path=asset_path, path="/World/Carter")
 
-        self._imu = self.my_world.scene.add(IMUSensor(prim_path="/World/Carter/chassis_link/Imu_Sensor", name="imu"))
+        XformPrim("/World/Carter", positions=[0, 0.0, 0.5], reset_xform_op_properties=True)
 
-        cube_1 = self.my_world.scene.add(
-            DynamicCuboid(
-                prim_path="/World/cube", name="cube_1", position=np.array([2, 2, 2.5]), scale=np.array([20, 0.2, 5])
-            )
-        )
+        self._imu = IMUSensor(prim_path="/World/Carter/chassis_link/Imu_Sensor", name="imu")
 
-        cube_2 = self.my_world.scene.add(
-            DynamicCuboid(
-                prim_path="/World/cube_2", name="cube_2", position=np.array([2, -2, 2.5]), scale=np.array([20, 0.2, 5])
-            )
-        )
-        await self.my_world.reset_async()
+        Cube("/World/cube", sizes=1.0, positions=[2.0, 2.0, 2.5], scales=[20.0, 0.2, 5.0])
+        GeomPrim("/World/cube", apply_collision_apis=True)
+        RigidPrim("/World/cube", masses=[1.0])
+
+        Cube("/World/cube_2", sizes=1.0, positions=[2.0, -2.0, 2.5], scales=[20.0, 0.2, 5.0])
+        GeomPrim("/World/cube_2", apply_collision_apis=True)
+        RigidPrim("/World/cube_2", masses=[1.0])
+
+        await reset_timeline(self._timeline, steps=1)
         return
 
     # After running each test
     async def tearDown(self):
-        self.my_world.clear_instance()
+        if self._timeline.is_playing():
+            self._timeline.stop()
+        SimulationManager.invalidate_physics()
         await omni.kit.app.get_app().next_update_async()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             # print("tearDown, assets still loading, waiting to finish...")
@@ -68,8 +68,8 @@ class TestIMU(omni.kit.test.AsyncTestCase):
         return
 
     async def test_data_acquisition(self):
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
         data = self._imu.get_current_frame()
         for key in ["time", "physics_step", "lin_acc", "ang_vel", "orientation"]:
             self.assertTrue(key in data.keys())
@@ -78,17 +78,35 @@ class TestIMU(omni.kit.test.AsyncTestCase):
             self.assertTrue(key in data.keys())
         return
 
+    async def test_data_values_gravity_toggle(self):
+        await reset_timeline(self._timeline, steps=2)
+        data = None
+        for _ in range(60):
+            data = self._imu.get_current_frame()
+            if abs(float(data["lin_acc"][2]) - EARTH_GRAVITY) <= GRAVITY_TOLERANCE:
+                break
+            await omni.kit.app.get_app().next_update_async()
+        self.assertIsNotNone(data)
+        self.assertGreater(data["time"], 0.0)
+        self.assertAlmostEqual(float(data["lin_acc"][2]), EARTH_GRAVITY, delta=GRAVITY_TOLERANCE)
+
+        data_no_gravity = self._imu.get_current_frame(read_gravity=False)
+        self.assertAlmostEqual(float(data_no_gravity["lin_acc"][2]), 0.0, delta=GRAVITY_TOLERANCE)
+
+        orientation_norm = float(np.linalg.norm(data["orientation"]))
+        self.assertAlmostEqual(orientation_norm, 1.0, delta=ORIENTATION_TOLERANCE)
+
     async def test_pause_resume(self):
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
         data = self._imu.get_current_frame()
         current_time = data["time"]
         current_step = data["physics_step"]
         self._imu.pause()
-        await update_stage_async()
-        await update_stage_async()
-        await update_stage_async()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
+        await omni.kit.app.get_app().next_update_async()
         data = self._imu.get_current_frame()
         self.assertTrue(data["time"] == current_time)
         self.assertTrue(data["physics_step"] == current_step)
@@ -96,23 +114,33 @@ class TestIMU(omni.kit.test.AsyncTestCase):
         current_time = data["time"]
         current_step = data["physics_step"]
         self._imu.resume()
-        await update_stage_async()
+        await omni.kit.app.get_app().next_update_async()
         data = self._imu.get_current_frame()
         self.assertTrue(data["time"] != current_time)
         self.assertTrue(data["physics_step"] != current_step)
-        await self.my_world.reset_async()
+        await reset_timeline(self._timeline, steps=1)
         data = self._imu.get_current_frame()
-        self.assertTrue(math.isclose(data["time"], 0.016666, abs_tol=0.0001))
+        self.assertAlmostEqual(data["time"], 0.033333, delta=0.0001)
 
-        # print(data["physics_step"])
-        self.assertTrue(data["physics_step"] == 2)  # data["physics_step"] is 2
+        self.assertTrue(data["physics_step"] == 3)
         return
 
     async def test_properties(self):
         self._imu.set_frequency(20)
-        # print(self._imu.get_frequency())
-        # print(self._imu.get_dt())
-        self.assertTrue(math.isclose(20, self._imu.get_frequency(), abs_tol=2))
+        self.assertAlmostEqual(20, self._imu.get_frequency(), delta=2)
         self._imu.set_dt(0.2)
-        self.assertTrue(math.isclose(0.2, self._imu.get_dt(), abs_tol=0.01))
+        self.assertAlmostEqual(0.2, self._imu.get_dt(), delta=SMALL_TOLERANCE)
         return
+
+    async def test_filter_size_parameters(self):
+        filter_imu = IMUSensor(
+            prim_path="/World/Carter/chassis_link/Imu_Sensor_filtered",
+            name="imu_filtered",
+            linear_acceleration_filter_size=5,
+            angular_velocity_filter_size=7,
+            orientation_filter_size=9,
+        )
+        imu_prim = prim_utils.get_prim_at_path(filter_imu.prim_path)
+        self.assertEqual(imu_prim.GetAttribute("linearAccelerationFilterWidth").Get(), 5)
+        self.assertEqual(imu_prim.GetAttribute("angularVelocityFilterWidth").Get(), 7)
+        self.assertEqual(imu_prim.GetAttribute("orientationFilterWidth").Get(), 9)

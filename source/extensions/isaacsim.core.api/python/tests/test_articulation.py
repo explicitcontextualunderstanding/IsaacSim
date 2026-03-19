@@ -19,8 +19,8 @@ import asyncio
 #   omni.kit.test - std python's unittest module with additional wrapping to add support for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-import torch
 from isaacsim.core.api import World
+from isaacsim.core.deprecation_manager import import_module
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
 from isaacsim.core.prims import SingleArticulation
@@ -36,6 +36,8 @@ from isaacsim.storage.native import get_assets_root_path_async
 from pxr import PhysxSchema, UsdPhysics
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 
 class TestSingleArticulation(CoreTestCase):

@@ -16,9 +16,10 @@
 import asyncio
 import gc
 
+import carb.eventdispatcher
 import omni
 import omni.kit.commands
-import omni.physx as _physx
+import omni.physics.core
 import omni.timeline
 import omni.ui as ui
 import omni.usd
@@ -80,8 +81,8 @@ class Extension(omni.ext.IExt):
 
         # Events
         self._usd_context = omni.usd.get_context()
-        self._physxIFace = _physx.get_physx_interface()
-        self._physx_subscription = None
+        self._physics_simulation_interface = omni.physics.core.get_physics_simulation_interface()
+        self._physics_subscription = None
         self._stage_event_sub = None
         self._timeline = omni.timeline.get_timeline_interface()
 
@@ -101,16 +102,34 @@ class Extension(omni.ext.IExt):
         if self._window.visible:
             # Subscribe to Stage and Timeline Events
             self._usd_context = omni.usd.get_context()
-            events = self._usd_context.get_stage_event_stream()
-            self._stage_event_sub = events.create_subscription_to_pop(self._on_stage_event)
-            stream = self._timeline.get_timeline_event_stream()
-            self._timeline_event_sub = stream.create_subscription_to_pop(self._on_timeline_event)
+            self._stage_event_sub_opened = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.OPENED),
+                on_event=self._on_stage_opened,
+                observer_name="template_extension._on_stage_opened",
+            )
+            self._stage_event_sub_closed = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.CLOSED),
+                on_event=self._on_stage_closed,
+                observer_name="template_extension._on_stage_closed",
+            )
+            self._timeline_event_sub_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.timeline.GLOBAL_EVENT_PLAY,
+                on_event=self._on_timeline_play,
+                observer_name="template_extension._on_timeline_play",
+            )
+            self._timeline_event_sub_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.timeline.GLOBAL_EVENT_STOP,
+                on_event=self._on_timeline_stop,
+                observer_name="template_extension._on_timeline_stop",
+            )
 
             self._build_ui()
         else:
             self._usd_context = None
-            self._stage_event_sub = None
-            self._timeline_event_sub = None
+            self._stage_event_sub_opened = None
+            self._stage_event_sub_closed = None
+            self._timeline_event_sub_play = None
+            self._timeline_event_sub_stop = None
             self.ui_builder.cleanup()
 
     def _build_ui(self):
@@ -141,24 +160,32 @@ class Extension(omni.ext.IExt):
         self._window.visible = not self._window.visible
         self.ui_builder.on_menu_callback()
 
-    def _on_timeline_event(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.PLAY):
-            if not self._physx_subscription:
-                self._physx_subscription = self._physxIFace.subscribe_physics_step_events(self._on_physics_step)
-        elif event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physx_subscription = None
-
+    def _on_timeline_play(self, event):
+        """Timeline play event callback."""
+        if not self._physics_subscription:
+            self._physics_subscription = self._physics_simulation_interface.subscribe_physics_on_step_events(
+                pre_step=False, order=0, on_update=self._on_physics_step
+            )
         self.ui_builder.on_timeline_event(event)
 
-    def _on_physics_step(self, step):
+    def _on_timeline_stop(self, event):
+        """Timeline stop event callback."""
+        self._physics_subscription = None
+        self.ui_builder.on_timeline_event(event)
+
+    def _on_physics_step(self, step, context):
         self.ui_builder.on_physics_step(step)
 
-    def _on_stage_event(self, event):
-        if event.type == int(StageEventType.OPENED) or event.type == int(StageEventType.CLOSED):
-            # stage was opened or closed, cleanup
-            self._physx_subscription = None
-            self.ui_builder.cleanup()
+    def _on_stage_opened(self, event):
+        """Stage opened event callback."""
+        self._physics_subscription = None
+        self.ui_builder.cleanup()
+        self.ui_builder.on_stage_event(event)
 
+    def _on_stage_closed(self, event):
+        """Stage closed event callback."""
+        self._physics_subscription = None
+        self.ui_builder.cleanup()
         self.ui_builder.on_stage_event(event)
 
     def _build_extension_ui(self):

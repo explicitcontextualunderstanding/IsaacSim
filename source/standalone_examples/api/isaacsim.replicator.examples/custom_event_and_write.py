@@ -24,55 +24,69 @@ import omni.replicator.core as rep
 import omni.usd
 
 omni.usd.get_context().new_stage()
+
+# Set global random seed for the replicator randomizer to ensure reproducibility
+rep.set_global_seed(11)
+
+# Setting capture on play to False will prevent the replicator from capturing data each frame
+rep.orchestrator.set_capture_on_play(False)
+
 # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
 carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
-distance_light = rep.create.light(rotation=(315, 0, 0), intensity=4000, light_type="distant")
+rep.functional.create.xform(name="World")
+rep.functional.create.distant_light(intensity=4000, rotation=(315, 0, 0), parent="/World", name="DistantLight")
+small_cube = rep.functional.create.cube(scale=0.75, position=(-1.5, 1.5, 0), parent="/World", name="SmallCube")
+large_cube = rep.functional.create.cube(scale=1.25, position=(1.5, -1.5, 0), parent="/World", name="LargeCube")
 
-large_cube = rep.create.cube(scale=1.25, position=(1, 1, 0))
-small_cube = rep.create.cube(scale=0.75, position=(-1, -1, 0))
-large_cube_prim = large_cube.get_output_prims()["prims"][0]
-small_cube_prim = small_cube.get_output_prims()["prims"][0]
-
-rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512))
-writer = rep.WriterRegistry.get("BasicWriter")
-out_dir = os.path.join(os.getcwd(), "_out_custom_event")
-print(f"Writing data to {out_dir}")
-writer.initialize(output_dir=out_dir, rgb=True)
-writer.attach(rp)
+# Graph-based randomizations triggered on custom events
+with rep.trigger.on_custom_event(event_name="randomize_small_cube"):
+    small_cube_node = rep.get.prim_at_path(small_cube.GetPath())
+    with small_cube_node:
+        rep.randomizer.rotation()
 
 with rep.trigger.on_custom_event(event_name="randomize_large_cube"):
-    with large_cube:
+    large_cube_node = rep.get.prim_at_path(large_cube.GetPath())
+    with large_cube_node:
         rep.randomizer.rotation()
 
-with rep.trigger.on_custom_event(event_name="randomize_small_cube"):
-    with small_cube:
-        rep.randomizer.rotation()
+# Use the disk backend to write the data to disk
+out_dir = os.path.join(os.getcwd(), "_out_custom_event")
+print(f"Writing data to {out_dir}")
+backend = rep.backends.get("DiskBackend")
+backend.initialize(output_dir=out_dir)
+
+cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+rp = rep.create.render_product(cam, (512, 512))
+writer = rep.WriterRegistry.get("BasicWriter")
+writer.initialize(backend=backend, rgb=True)
+writer.attach(rp)
 
 
 def run_example():
-    print(f"Randomizing small cube")
+    print(f"Capturing at original positions")
+    rep.orchestrator.step(rt_subframes=8)
+
+    print("Randomizing small cube rotation (graph-based) and capturing...")
     rep.utils.send_og_event(event_name="randomize_small_cube")
-    print("Capturing frame")
     rep.orchestrator.step(rt_subframes=8)
 
-    print("Moving small cube")
-    small_cube_prim.GetAttribute("xformOp:translate").Set((-2, -2, 0))
-    print("Capturing frame")
+    print("Moving small cube position (USD API) and capturing...")
+    small_cube.GetAttribute("xformOp:translate").Set((-1.5, 1.5, -2))
     rep.orchestrator.step(rt_subframes=8)
 
-    print(f"Randomizing large cube")
+    print("Randomizing large cube rotation (graph-based) and capturing...")
     rep.utils.send_og_event(event_name="randomize_large_cube")
-    print("Capturing frame")
     rep.orchestrator.step(rt_subframes=8)
 
-    print("Moving large cube")
-    large_cube_prim.GetAttribute("xformOp:translate").Set((2, 2, 0))
-    print("Capturing frame")
+    print("Moving large cube position (USD API) and capturing...")
+    large_cube.GetAttribute("xformOp:translate").Set((1.5, -1.5, 2))
     rep.orchestrator.step(rt_subframes=8)
 
-    # Wait until all the data is saved to disk
+    # Wait until all the data is saved to disk and cleanup writer and render product
     rep.orchestrator.wait_until_complete()
+    writer.detach()
+    rp.destroy()
 
 
 run_example()

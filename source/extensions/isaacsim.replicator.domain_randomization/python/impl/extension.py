@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension implementation for the Isaac Sim domain randomization extension."""
+
+
 import omni.ext
 
 
 class Extension(omni.ext.IExt):
-    """Object that tracks the lifetime of the Python part of the extension loading"""
+    """Object that tracks the lifetime of the Python part of the extension loading."""
 
     def on_startup(self):
         """Set up initial conditions for the Python part of the extension"""

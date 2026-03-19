@@ -14,7 +14,7 @@
 # limitations under the License.
 
 launch_config:
-  renderer: RaytracedLighting
+  renderer: RealTimePathTracing
   headless: false
 env_url: ''
 working_area_size:

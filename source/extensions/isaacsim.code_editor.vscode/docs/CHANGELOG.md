@@ -1,4 +1,12 @@
 # Changelog
+## [1.1.2] - 2026-03-09
+### Fixed
+- Hardened subprocess call to avoid shell=True with string concatenation
+
+## [1.1.1] - 2026-03-02
+### Changed
+- Add Overview.md, add python_api.md, add SETTINGS.md and update docstrings
+
 
 ## [1.1.0] - 2025-06-10
 ### Changed
@@ -35,7 +43,7 @@
 
 ## [1.0.3] - 2024-12-07
 ### Fixed
-- moved from deprecated editor_menu.add_item to omni.kit.menu.utils
+- Moved from deprecated editor_menu.add_item to omni.kit.menu.utils
 
 ## [1.0.2] - 2024-10-28
 ### Changed

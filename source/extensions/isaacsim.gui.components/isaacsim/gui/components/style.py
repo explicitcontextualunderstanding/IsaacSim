@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Defines styling constants and configuration for Isaac Sim GUI components."""
+
+
 import carb.settings
 import omni.ui as ui
 from omni.kit.window.extensions.common import get_icons_path
@@ -29,7 +32,18 @@ COLOR_Z = 0xFFA07D4F
 COLOR_W = 0xFFAA5555
 
 
-def get_style():
+def get_style() -> dict[str, dict[str, any]]:
+    """Returns the GUI style configuration dictionary for the isaacsim.gui.components extension.
+
+    The style configuration adapts to the current UI style setting (NvidiaLight or NvidiaDark) and provides
+    comprehensive styling for UI components including windows, buttons, fields, labels, sliders, checkboxes,
+    collapsible frames, tree views, and icon buttons. Each component includes styling for different states
+    such as hovered, pressed, selected, and disabled.
+
+    Returns:
+        A dictionary mapping UI component selectors to their style properties including colors,
+        fonts, borders, and layout attributes.
+    """
 
     icons_path = get_icons_path()
 

@@ -12,63 +12,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Recorder for system and GPU memory usage statistics."""
+
 import os
 import platform
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import omni.client
 import omni.stats
 import psutil
 
-from .. import stats
 from ..metrics import measurements
-from .interface import InputContext, MeasurementData, MeasurementDataRecorder
-
-if TYPE_CHECKING:
-    from ..settings import BenchmarkSettings
+from .interface import InputContext, MeasurementData, MeasurementDataRecorder, MeasurementDataRecorderRegistry
 
 
-class GPUStats(stats.OmniStats):
-    """
-    GPU Pipelines
-    GPU Memory (Total, plus seperate for each GPU)
-    GPU Utilization
-    """
-
-    def __init__(self):
-        self._stats_if = omni.stats.get_stats_interface()
-        scopes = self._stats_if.get_scopes()
-        self._scopes = [x for x in scopes if x["name"] not in ["USD Stage", "RTX Scene"]]
-
-
-class HydraEngineMemoryStats:
-    """
-    this needs omni.hydra.engine
-    """
-
-    names = ["Hydra Engine Mem Stats"]
-
-    def __init__(self):
-        self._memStat_nodes = get_mem_stats(True)
-
-    def get_stats(self) -> Dict:
-        stats_dict = {}
-        for stat_node in self._memStat_nodes:
-            memStat_name = stat_node["category"].replace(" ", "_")
-            memStat_size = stat_node["size"]
-            stats_dict[memStat_name] = memStat_size
-
-        return {self.names[0]: stats_dict}
-
-
+@MeasurementDataRecorderRegistry.register("memory")
 class MemoryRecorder(MeasurementDataRecorder):
-    """
-    Gathers some basic System Memory and GPU Memory stats
-    """
+    """Gather basic system and GPU memory statistics."""
 
     def get_data(self) -> MeasurementData:
+        """Get memory usage measurements.
 
+        Returns:
+            Collected memory usage measurements.
+
+        Example:
+
+        .. code-block:: python
+
+            data = recorder.get_data()
+        """
         (
             rss,
             vms,
@@ -93,9 +67,18 @@ class MemoryRecorder(MeasurementDataRecorder):
 
     def get_hardware_stats(
         self,
-    ) -> Tuple[float, float, float, float, float, float, float]:
-        """Get hardware stats."""
+    ) -> tuple[float, float, float, float, float, float]:
+        """Get system and GPU memory statistics.
 
+        Returns:
+            Tuple of (rss, vms, uss, pb, tracked_gpu_memory, dedicated_gpu_memory).
+
+        Example:
+
+        .. code-block:: python
+
+            stats = recorder.get_hardware_stats()
+        """
         # RAM used for kit.exe.
         process = psutil.Process(os.getpid())
         # Physical Memory Working Set
@@ -109,7 +92,7 @@ class MemoryRecorder(MeasurementDataRecorder):
         uss = round(uss_mb / 1024, 3)  # GB
 
         # Private Bytes (Windows only)
-        pb = 0  # Set pb to 0 if running on Linux
+        pb = 0.0  # Set pb to 0 if running on Linux
         if platform.system() == "Windows":
             pb_mb = process.memory_full_info().private / (1024**2)  # MB
             pb = round(pb_mb / 1024, 3)  # GB
@@ -135,7 +118,7 @@ class MemoryRecorder(MeasurementDataRecorder):
                 if node["category"] == "Total Physical GPU Memory":
                     tracked_gpu_memory = round(node["size"] / 1024, 3)  # MB to GB
 
-        dedicated_gpu_memory = 0
+        dedicated_gpu_memory = 0.0
         try:
             from omni.hydra.engine.stats import get_device_info
 

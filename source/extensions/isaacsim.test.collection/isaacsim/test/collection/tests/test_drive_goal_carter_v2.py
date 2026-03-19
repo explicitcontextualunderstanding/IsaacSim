@@ -13,29 +13,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for Nova Carter goal-driven navigation with path planning functionality."""
+
+
 import carb
 import carb.tokens
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 
 # NOTE:
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
-#   For most things refer to unittest docs: https://docs.   .org/3/library/unittest.html
+#   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
+import omni.timeline
 import usdrt.Sdf
-from isaacsim.core.api import World
-from isaacsim.core.utils.extensions import get_extension_path_from_name
-from isaacsim.core.utils.rotations import quat_to_euler_angles
-from isaacsim.core.utils.stage import open_stage_async
+from isaacsim.core.experimental.utils.app import get_extension_path
+from isaacsim.core.experimental.utils.transform import quaternion_to_euler_angles
+from isaacsim.core.rendering_manager import RenderingManager
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Gf, PhysicsSchemaTools
 
-from .robot_helpers import init_robot_sim, setup_robot_og
+from .robot_helpers import (
+    init_robot_sim,
+    open_stage_async,
+    setup_robot_og,
+)
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
+    """Tests for Nova Carter goal-driven navigation with path planning."""
+
     # Before running each test
     async def setUp(self):
+        """Set up test environment with Nova Carter and navigation graph."""
         self._timeline = omni.timeline.get_timeline_interface()
 
         self._assets_root_path = await get_assets_root_path_async()
@@ -43,7 +56,7 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
             carb.log_error("Could not find Isaac Sim assets folder")
             return
 
-        self._extension_path = get_extension_path_from_name("isaacsim.test.collection")
+        self._extension_path = get_extension_path("isaacsim.test.collection")
 
         # add in carter (from nucleus)
         self.usd_path = self._assets_root_path + "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd"
@@ -54,18 +67,21 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
 
         # Make sure the stage loaded
         self.assertTrue(result)
-        World.clear_instance()
+
         # This needs to be set so that kit updates match physics updates
         self._physics_rate = 60
-        carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", True)
-        carb.settings.get_settings().set_int("/app/runLoops/main/rateLimitFrequency", int(self._physics_rate))
-        carb.settings.get_settings().set_int("/persistent/simulation/minFrameRate", int(self._physics_rate))
         self._physics_dt = 1 / self._physics_rate
-        self._world = World(stage_units_in_meters=1.0, physics_dt=self._physics_dt, rendering_dt=self._physics_dt)
-        await self._world.initialize_simulation_context_async()
+
+        # Set stage units
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+
+        # Set physics dt and rendering dt via managers
+        SimulationManager.set_physics_dt(self._physics_dt)
+        RenderingManager.set_dt(self._physics_dt)
+
+        await app_utils.update_app_async()
 
         self._stage = omni.usd.get_context().get_stage()
-        self._stage.SetTimeCodesPerSecond(60.0)
 
         await omni.kit.app.get_app().next_update_async()
         # setup omnigraph
@@ -129,12 +145,12 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
                 ],
             },
         )
-        omni.timeline.get_timeline_interface().set_time_codes_per_second(60)
 
         pass
 
     # After running each test
     async def tearDown(self):
+        """Clean up test environment and stop timeline."""
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
@@ -144,6 +160,7 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
 
     # Actual test, notice it is "async" function, so "await" can be used if needed
     async def test_quintic_planner(self):
+        """Test quintic polynomial path planner generates valid paths."""
         # Start Simulation and wait
         self._timeline.play()
 
@@ -170,6 +187,7 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_check_goal_2d(self):
+        """Test 2D goal checking detects when robot reaches target."""
         # Start Simulation and wait
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
@@ -179,9 +197,11 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
 
         # Get position and rotation data provided to node, then set target equal to pos/rot and check for reachedGoal booleans
         pos = og.Controller.attribute(self.graph_path + "/GetTranslation.outputs:translation").get()
-        _, _, rot = quat_to_euler_angles(
-            og.Controller.attribute(self.graph_path + "/GetRotationQuaternion.outputs:quaternion").get()
-        )
+        # Get quaternion in XYZW format and convert to WXYZ for experimental API
+        quat_xyzw = og.Controller.attribute(self.graph_path + "/GetRotationQuaternion.outputs:quaternion").get()
+        quat_wxyz = [quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]]
+        euler = quaternion_to_euler_angles(quat_wxyz)
+        rot = euler.numpy().flatten()[2]  # Extract yaw angle
 
         # disconnect target & targetChanged from QuinticPathPlanner to avoid overwriting artificial values
         og.Controller.disconnect(
@@ -212,6 +232,7 @@ class TestDriveGoalCarterv2(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_stanley_control_pid(self):
+        """Test Stanley control provides valid steering commands."""
         # Start Simulation and wait
         self._timeline.play()
         await omni.kit.app.get_app().next_update_async()

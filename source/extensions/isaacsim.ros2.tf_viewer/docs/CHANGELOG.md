@@ -1,4 +1,16 @@
 # Changelog
+## [2.1.24] - 2025-11-10
+### Changed
+- Added CUDA build dependencies
+
+## [2.1.23] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [2.1.22] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.1.21] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 2.1.20)
@@ -77,7 +89,7 @@
 
 ## [2.1.2] - 2025-03-09
 ### Fixed
-- fix failing unit tests
+- Fix failing unit tests
 
 ## [2.1.1] - 2025-03-05
 ### Changed

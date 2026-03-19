@@ -21,14 +21,14 @@ from isaacsim.robot.manipulators.grippers.parallel_gripper import ParallelGrippe
 
 
 class PickPlaceController(manipulators_controllers.PickPlaceController):
-    """[summary]
+    """Pick and place controller for the Franka robot.
 
     Args:
-        name (str): [description]
-        gripper (ParallelGripper): [description]
-        robot_articulation (SingleArticulation): [description]
-        end_effector_initial_height (Optional[float], optional): [description]. Defaults to None.
-        events_dt (Optional[List[float]], optional): [description]. Defaults to None.
+        name: Name identifier for the controller.
+        gripper: The parallel gripper to use.
+        robot_articulation: The robot articulation to control.
+        end_effector_initial_height: Initial height of end effector.
+        events_dt: Timesteps for pick/place events.
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class PickPlaceController(manipulators_controllers.PickPlaceController):
         robot_articulation: SingleArticulation,
         end_effector_initial_height: Optional[float] = None,
         events_dt: Optional[List[float]] = None,
-    ) -> None:
+    ):
         if events_dt is None:
             events_dt = [0.008, 0.005, 1, 0.1, 0.05, 0.05, 0.0025, 1, 0.008, 0.08]
         manipulators_controllers.PickPlaceController.__init__(

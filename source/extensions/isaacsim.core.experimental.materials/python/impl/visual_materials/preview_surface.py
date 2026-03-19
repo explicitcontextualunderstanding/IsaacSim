@@ -47,58 +47,72 @@ class PreviewSurfaceMaterial(VisualMaterial):
           - Description
           - Shape / Length
           - Type
+          - Range
         * - ``"diffuseColor"``
           - Color reflected from the material surface when light hits it.
           - ``(N, 3)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"emissiveColor"``
           - Color of the light emitted by the material.
           - ``(N, 3)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"specularColor"``
           - Color of the highlights that appear on a surface when it reflects light.
           - ``(N, 3)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"useSpecularWorkflow"``
           - Operation mode (specular workflow: 1, metallic workflow: 0).
           - ``(N, 1)``
           - ``int``
+          - ``[0, 1]``
         * - ``"metallic"``
           - Metallic (1.0 for metallic surfaces and 0.0 for non-metallic surfaces, in between for mixed surfaces).
           - ``(N, 1)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"roughness"``
           - Roughness (specular lobe).
           - ``(N, 1)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"clearcoat"``
           - Clearcoat (second specular lobe amount).
           - ``(N, 1)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"clearcoatRoughness"``
           - Clearcoat roughness (second specular lobe roughness).
           - ``(N, 1)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"opacity"``
           - Opacity (0.0 for fully transparent, 1.0 for fully opaque, in between for translucent).
           - ``(N, 1)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"opacityThreshold"``
           - Opacity threshold.
           - ``(N, 1)``
           - ``float``
+          - ``[0.0, 1.0]``
         * - ``"ior"``
           - Index of refraction (IOR).
           - ``(N, 1)``
           - ``float``
+          -
         * - ``"normal"``
           - Normal vector.
           - ``(N, 3)``
           - ``float``
+          - ``[-1.0, 1.0]``
         * - ``"displacement"``
           - Displacement (in the direction of the normal).
           - ``(N, 1)``
           - ``float``
+          -
 
     Args:
         paths: Single path or list of paths to USD prims. Can include regular expressions for matching multiple prims.
@@ -156,19 +170,19 @@ class PreviewSurfaceMaterial(VisualMaterial):
         super().__init__(paths, resolve_paths=False)
 
         self._inputs = {
-            "diffuseColor": Sdf.ValueTypeNames.Float3,
-            "emissiveColor": Sdf.ValueTypeNames.Float3,
-            "specularColor": Sdf.ValueTypeNames.Float3,
-            "useSpecularWorkflow": Sdf.ValueTypeNames.Int,
-            "metallic": Sdf.ValueTypeNames.Float,
-            "roughness": Sdf.ValueTypeNames.Float,
-            "clearcoat": Sdf.ValueTypeNames.Float,
-            "clearcoatRoughness": Sdf.ValueTypeNames.Float,
-            "opacity": Sdf.ValueTypeNames.Float,
-            "opacityThreshold": Sdf.ValueTypeNames.Float,
-            "ior": Sdf.ValueTypeNames.Float,
-            "normal": Sdf.ValueTypeNames.Float3,
-            "displacement": Sdf.ValueTypeNames.Float,
+            "diffuseColor": {"type": Sdf.ValueTypeNames.Float3, "range": (0.0, 1.0)},
+            "emissiveColor": {"type": Sdf.ValueTypeNames.Float3, "range": (0.0, 1.0)},
+            "specularColor": {"type": Sdf.ValueTypeNames.Float3, "range": (0.0, 1.0)},
+            "useSpecularWorkflow": {"type": Sdf.ValueTypeNames.Int, "range": (0, 1)},
+            "metallic": {"type": Sdf.ValueTypeNames.Float, "range": (0.0, 1.0)},
+            "roughness": {"type": Sdf.ValueTypeNames.Float, "range": (0.0, 1.0)},
+            "clearcoat": {"type": Sdf.ValueTypeNames.Float, "range": (0.0, 1.0)},
+            "clearcoatRoughness": {"type": Sdf.ValueTypeNames.Float, "range": (0.0, 1.0)},
+            "opacity": {"type": Sdf.ValueTypeNames.Float, "range": (0.0, 1.0)},
+            "opacityThreshold": {"type": Sdf.ValueTypeNames.Float, "range": (0.0, 1.0)},
+            "ior": {"type": Sdf.ValueTypeNames.Float},
+            "normal": {"type": Sdf.ValueTypeNames.Float3, "range": (-1.0, 1.0)},
+            "displacement": {"type": Sdf.ValueTypeNames.Float},
         }
 
     """

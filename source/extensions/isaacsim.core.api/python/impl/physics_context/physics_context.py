@@ -17,6 +17,7 @@ from typing import List, Optional, Tuple
 import carb
 import omni
 import omni.kit.app
+import omni.physics.core
 from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.core.utils.carb import get_carb_setting, set_carb_setting
 from isaacsim.core.utils.constants import AXES_INDICES
@@ -82,8 +83,7 @@ class PhysicsContext(object):
                 self._physx_scene_api = PhysxSchema.PhysxSceneAPI.Apply(current_physics_prim)
         # set the default physics scene
         SimulationManager.set_default_physics_scene(self._prim_path)
-        self._physx_interface = omni.physx.get_physx_interface()
-        self._physx_sim_interface = omni.physx.get_physx_simulation_interface()
+        self._physics_sim_interface = omni.physics.core.get_physics_simulation_interface()
         self._timeline = omni.timeline.get_timeline_interface()
         self._device = SimulationManager.get_physics_sim_device()
         if "cuda" in self._device:
@@ -119,10 +119,6 @@ class PhysicsContext(object):
             if "gravity" in sim_params.keys():
                 up_axis = UsdGeom.GetStageUpAxis(get_current_stage())
                 self.set_gravity(sim_params["gravity"][AXES_INDICES[up_axis]])
-
-            self._physx_residual_api = None
-            if "enable_solver_residuals" in sim_params.keys():
-                self.enable_residual_reporting(sim_params["enable_solver_residuals"])
 
             if "substeps" in sim_params.keys():
                 substeps = sim_params["substeps"]
@@ -188,7 +184,6 @@ class PhysicsContext(object):
                 self.set_friction_correlation_distance(sim_params["friction_correlation_distance"])
 
             # create default physics material
-            # TODO: double check this with kelly
             if "default_physics_material" in sim_params.keys():
                 default_material_path = self._prim_path + "/defaultMaterial"
                 default_material = UsdShade.Material.Define(get_current_stage(), default_material_path)
@@ -310,59 +305,6 @@ class PhysicsContext(object):
             Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
         """
         SimulationManager.enable_ccd(flag=flag)
-
-    def enable_residual_reporting(self, flag: bool):
-        """Set the physx scene flag to enable/disable solver residual reporting.
-
-        Args:
-            flag (bool): enables or disables scene residuals on the PhysicsScene
-
-        Raises:
-            Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
-        """
-        if not is_prim_path_valid(self._prim_path):
-            raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
-        self._physx_residual_api = PhysxSchema.PhysxResidualReportingAPI.Apply(self.get_current_physics_scene_prim())
-        if self._physx_scene_api.GetEnableResidualReportingAttr().Get() is None:
-            self._physx_scene_api.CreateEnableResidualReportingAttr(flag)
-        else:
-            self._physx_scene_api.GetEnableResidualReportingAttr().Set(flag)
-
-    def get_solver_velocity_residual(self, report_max: bool = True):
-        """Enable physics scene residual reporting API and chooses between RMS vs Max criteri for velocity residuals.
-
-        Args:
-            report_max (bool): Use the max residual criterion if True, otherwise use the RMS criterion.
-
-        Raises:
-            Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
-        """
-        if not is_prim_path_valid(self._prim_path):
-            raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
-        if self._physx_residual_api is None:
-            self.enable_residual_reporting(True)
-        if report_max:
-            return self._physx_residual_api.GetPhysxResidualReportingMaxResidualVelocityIterationAttr().Get()
-        else:
-            return self._physx_residual_api.GetPhysxResidualReportingRmsResidualVelocityIterationAttr().Get()
-
-    def get_solver_position_residual(self, report_max: bool = True):
-        """Enable physics scene residual reporting API and chooses between RMS vs Max criteri for position residuals.
-
-        Args:
-            report_max (bool): Use the max residual criterion if True, otherwise use the RMS criterion.
-
-        Raises:
-            Exception: If the prim path registered in context doesn't correspond to a valid prim path currently.
-        """
-        if not is_prim_path_valid(self._prim_path):
-            raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
-        if self._physx_residual_api is None:
-            self.enable_residual_reporting(True)
-        if report_max:
-            return self._physx_residual_api.GetPhysxResidualReportingMaxResidualPositionIterationAttr().Get()
-        else:
-            return self._physx_residual_api.GetPhysxResidualReportingRmsResidualPositionIterationAttr().Get()
 
     def is_ccd_enabled(self) -> bool:
         """Checks if ccd is enabled.
@@ -561,8 +503,8 @@ class PhysicsContext(object):
         )
 
     def _step(self, current_time: float, update_fabric: bool = False) -> None:
-        self._physx_sim_interface.simulate(self.get_physics_dt(), current_time)
-        self._physx_sim_interface.fetch_results()
+        self._physics_sim_interface.simulate(self.get_physics_dt(), current_time)
+        self._physics_sim_interface.fetch_results()
         if update_fabric:
             if self._physx_fabric_interface is None:
                 if omni.kit.app.get_app().get_extension_manager().is_extension_enabled("omni.physx.fabric"):
@@ -573,13 +515,13 @@ class PhysicsContext(object):
                 self._physx_fabric_interface.update(current_time, self.get_physics_dt())
 
     def set_invert_collision_group_filter(self, invert_collision_group_filter: bool) -> None:
-        """[summary]
+        """Set whether to invert the collision group filter.
 
         Args:
-            invert_collision_group_filter (bool): [description]
+            invert_collision_group_filter: Whether to invert collision group filtering.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -590,26 +532,26 @@ class PhysicsContext(object):
         return
 
     def get_invert_collision_group_filter(self) -> int:
-        """[summary]
+        """Get whether collision group filter is inverted.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            Whether collision group filtering is inverted.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetInvertCollisionGroupFilterAttr().Get()
 
     def set_bounce_threshold(self, value: float) -> None:
-        """[summary]
+        """Set the bounce threshold for contact resolution.
 
         Args:
-            value (float): [description]
+            value: The bounce threshold value.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -620,26 +562,26 @@ class PhysicsContext(object):
         return
 
     def get_bounce_threshold(self) -> float:
-        """[summary]
+        """Get the bounce threshold for contact resolution.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            float: [description]
+            The current bounce threshold value.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetBounceThresholdAttr().Get()
 
     def set_friction_offset_threshold(self, value: float) -> None:
-        """[summary]
+        """Set the friction offset threshold.
 
         Args:
-            value (float): [description]
+            value: The friction offset threshold value.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -650,26 +592,26 @@ class PhysicsContext(object):
         return
 
     def get_friction_offset_threshold(self) -> float:
-        """[summary]
+        """Get the friction offset threshold.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            float: [description]
+            The current friction offset threshold value.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetFrictionOffsetThresholdAttr().Get()
 
     def set_friction_correlation_distance(self, value: float) -> None:
-        """[summary]
+        """Set the friction correlation distance.
 
         Args:
-            value (float): [description]
+            value: The friction correlation distance value.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -680,13 +622,13 @@ class PhysicsContext(object):
         return
 
     def get_friction_correlation_distance(self) -> float:
-        """[summary]
+        """Get the friction correlation distance.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            float: [description]
+            The current friction correlation distance value.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -699,7 +641,7 @@ class PhysicsContext(object):
             enable_scene_query_support (bool): Whether to enable scene query support
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -713,7 +655,7 @@ class PhysicsContext(object):
         """Retrieves the Enable Scene Query Support attribute in Physx Scene
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
             bool: enable scene query support attribute
@@ -723,13 +665,13 @@ class PhysicsContext(object):
         return self._physx_scene_api.GetEnableSceneQuerySupportAttr().Get()
 
     def set_gpu_max_rigid_contact_count(self, value: int) -> None:
-        """[summary]
+        """Set the maximum number of rigid body contacts on GPU.
 
         Args:
-            value (int): [description]
+            value: The maximum rigid contact count.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -740,26 +682,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_max_rigid_contact_count(self) -> int:
-        """[summary]
+        """Get the maximum number of rigid body contacts on GPU.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The maximum rigid contact count.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuMaxRigidContactCountAttr().Get()
 
     def set_gpu_max_rigid_patch_count(self, value: int) -> None:
-        """[summary]
+        """Set the maximum number of rigid body contact patches on GPU.
 
         Args:
-            value (int): [description]
+            value: The maximum rigid patch count.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -770,26 +712,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_max_rigid_patch_count(self) -> int:
-        """[summary]
+        """Get the maximum number of rigid body contact patches on GPU.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The maximum rigid patch count.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuMaxRigidPatchCountAttr().Get()
 
     def set_gpu_found_lost_pairs_capacity(self, value: int) -> None:
-        """[summary]
+        """Set the GPU capacity for found/lost contact pairs.
 
         Args:
-            value (int): [description]
+            value: The found/lost pairs capacity.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -800,26 +742,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_found_lost_pairs_capacity(self) -> int:
-        """[summary]
+        """Get the GPU capacity for found/lost contact pairs.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The found/lost pairs capacity.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuFoundLostPairsCapacityAttr().Get()
 
     def set_gpu_found_lost_aggregate_pairs_capacity(self, value: int) -> None:
-        """[summary]
+        """Set the GPU capacity for found/lost aggregate contact pairs.
 
         Args:
-            value (int): [description]
+            value: The found/lost aggregate pairs capacity.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -830,26 +772,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_found_lost_aggregate_pairs_capacity(self) -> int:
-        """[summary]
+        """Get the GPU capacity for found/lost aggregate contact pairs.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The found/lost aggregate pairs capacity.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuFoundLostAggregatePairsCapacityAttr().Get()
 
     def set_gpu_total_aggregate_pairs_capacity(self, value: int) -> None:
-        """[summary]
+        """Set the GPU capacity for total aggregate contact pairs.
 
         Args:
-            value (int): [description]
+            value: The total aggregate pairs capacity.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -860,26 +802,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_total_aggregate_pairs_capacity(self) -> int:
-        """[summary]
+        """Get the GPU capacity for total aggregate contact pairs.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The total aggregate pairs capacity.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuTotalAggregatePairsCapacityAttr().Get()
 
     def set_gpu_max_soft_body_contacts(self, value: int) -> None:
-        """[summary]
+        """Set the maximum number of soft body contacts on GPU.
 
         Args:
-            value (int): [description]
+            value: The maximum soft body contacts count.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -890,26 +832,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_max_soft_body_contacts(self) -> int:
-        """[summary]
+        """Get the maximum number of soft body contacts on GPU.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The maximum soft body contacts count.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuMaxSoftBodyContactsAttr().Get()
 
     def set_gpu_max_particle_contacts(self, value: int) -> None:
-        """[summary]
+        """Set the maximum number of particle contacts on GPU.
 
         Args:
-            value (int): [description]
+            value: The maximum particle contacts count.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -920,26 +862,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_max_particle_contacts(self) -> int:
-        """[summary]
+        """Get the maximum number of particle contacts on GPU.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The maximum particle contacts count.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuMaxParticleContactsAttr().Get()
 
     def set_gpu_heap_capacity(self, value: int) -> None:
-        """[summary]
+        """Set the GPU heap capacity for physics simulation.
 
         Args:
-            value (int): [description]
+            value: The GPU heap capacity in bytes.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -950,26 +892,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_heap_capacity(self) -> int:
-        """[summary]
+        """Get the GPU heap capacity for physics simulation.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The GPU heap capacity in bytes.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuHeapCapacityAttr().Get()
 
     def set_gpu_temp_buffer_capacity(self, value: int) -> None:
-        """[summary]
+        """Set the GPU temporary buffer capacity.
 
         Args:
-            value (int): [description]
+            value: The GPU temp buffer capacity in bytes.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -980,26 +922,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_temp_buffer_capacity(self) -> int:
-        """[summary]
+        """Get the GPU temporary buffer capacity.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The GPU temp buffer capacity in bytes.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuTempBufferCapacityAttr().Get()
 
     def set_gpu_max_num_partitions(self, value: int) -> None:
-        """[summary]
+        """Set the maximum number of GPU partitions for simulation.
 
         Args:
-            value (int): [description]
+            value: The maximum number of partitions.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -1010,26 +952,26 @@ class PhysicsContext(object):
         return
 
     def get_gpu_max_num_partitions(self) -> int:
-        """[summary]
+        """Get the maximum number of GPU partitions for simulation.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The maximum number of partitions.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
         return self._physx_scene_api.GetGpuMaxNumPartitionsAttr().Get()
 
     def set_gpu_collision_stack_size(self, value: int) -> None:
-        """[summary]
+        """Set the GPU collision stack size.
 
         Args:
-            value (int): [description]
+            value: The collision stack size.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")
@@ -1040,13 +982,13 @@ class PhysicsContext(object):
         return
 
     def get_gpu_collision_stack_size(self) -> int:
-        """[summary]
+        """Get the GPU collision stack size.
 
         Raises:
-            Exception: [description]
+            Exception: If the physics scene path is invalid.
 
         Returns:
-            int: [description]
+            The collision stack size.
         """
         if not is_prim_path_valid(self._prim_path):
             raise Exception("The Physics Context's physics scene path is invalid, you need to reinit Physics Context")

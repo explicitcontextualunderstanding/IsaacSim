@@ -228,15 +228,15 @@ def euler_angles_to_quat(euler_angles: np.ndarray, degrees: bool = False, extrin
 
 
 def lookat_to_quatf(camera: Gf.Vec3f, target: Gf.Vec3f, up: Gf.Vec3f) -> Gf.Quatf:
-    """[summary]
+    """Compute a quaternion rotation from camera position looking at target.
 
     Args:
-        camera (Gf.Vec3f): [description]
-        target (Gf.Vec3f): [description]
-        up (Gf.Vec3f): [description]
+        camera: The camera position as a 3D vector.
+        target: The target position to look at as a 3D vector.
+        up: The up direction vector.
 
     Returns:
-        Gf.Quatf: Pxr quaternion object.
+        Pxr quaternion object representing the look-at rotation.
     """
     F = (target - camera).GetNormalized()
     R = Gf.Cross(up, F).GetNormalized()

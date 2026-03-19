@@ -19,19 +19,14 @@
 
 #include <carb/Defines.h>
 #include <carb/Types.h>
-#include <carb/events/EventsUtils.h>
-#include <carb/logging/Logger.h>
 
 #include <isaacsim/core/includes/BaseResetNode.h>
-#include <isaacsim/core/includes/Conversions.h>
 #include <isaacsim/core/includes/UsdUtilities.h>
 #include <isaacsim/core/nodes/ICoreNodes.h>
 #include <omni/fabric/FabricUSD.h>
-#include <omni/physics/tensors/IArticulationView.h>
-#include <omni/physics/tensors/ISimulationView.h>
-#include <omni/physics/tensors/TensorApi.h>
 #include <omni/usd/UsdContext.h>
 #include <omni/usd/UsdContextIncludes.h>
+#include <pxr/usd/usdPhysics/articulationRootAPI.h>
 
 #include <OgnIsaacJointNameResolverDatabase.h>
 #include <unordered_map>
@@ -44,8 +39,6 @@ namespace core
 namespace nodes
 {
 
-using namespace omni::physics::tensors;
-
 class OgnIsaacJointNameResolver : public isaacsim::core::includes::BaseResetNode
 {
 public:
@@ -53,13 +46,6 @@ public:
     {
         auto& state =
             OgnIsaacJointNameResolverDatabase::sPerInstanceState<OgnIsaacJointNameResolver>(nodeObj, instanceId);
-
-        state.m_tensorInterface = carb::getCachedInterface<TensorApi>();
-        if (!state.m_tensorInterface)
-        {
-            CARB_LOG_ERROR("Failed to acquire Tensor Api interface\n");
-            return;
-        }
         state.m_robotPath = "";
     }
 
@@ -74,14 +60,10 @@ public:
             const auto& prim = db.inputs.targetPrim();
             state.m_robotPath = db.inputs.robotPath();
 
-            // if robotPath field is empty
             if (state.m_robotPath.empty())
             {
-
-                // if targetPrim field is populated
                 if (!prim.empty())
                 {
-
                     state.m_robotPath = omni::fabric::toSdfPath(prim[0]).GetText();
                 }
                 else
@@ -91,9 +73,8 @@ public:
                 }
             }
 
-
             state.m_firstFrame = false;
-            // Find our stage
+
             const auto stageId = context.iContext->getStageId(context);
             auto stage = pxr::UsdUtilsStageCache::Get().Find(pxr::UsdStageCache::Id::FromLongInt(stageId));
 
@@ -102,7 +83,6 @@ public:
                 db.logError("Could not find USD stage %ld", stageId);
                 return false;
             }
-            state.m_simView = state.m_tensorInterface->createSimulationView(stageId);
 
             const pxr::UsdPrim startPrim = stage->GetPrimAtPath(pxr::SdfPath(state.m_robotPath));
 
@@ -112,9 +92,7 @@ public:
                 return false;
             }
 
-            auto* articulation = state.m_simView->createArticulationView(state.m_robotPath.c_str());
-            // Checking we have a valid articulation
-            if (!articulation)
+            if (!startPrim.HasAPI<pxr::UsdPhysicsArticulationRootAPI>())
             {
                 db.logError("Articulation not found for prim %s", state.m_robotPath);
                 return false;
@@ -141,7 +119,6 @@ public:
 
     void resolvePrims(OgnIsaacJointNameResolverDatabase& db)
     {
-        // Check if the input string is a key in the dictionary
         const auto& inNames = db.inputs.jointNames();
         auto& outNames = db.outputs.jointNames();
         outNames.resize(inNames.size());
@@ -168,8 +145,6 @@ private:
     std::unordered_map<std::string, pxr::UsdPrim> m_nameOverrideMap;
     bool m_firstFrame = true;
     std::string m_robotPath;
-    TensorApi* m_tensorInterface = nullptr;
-    ISimulationView* m_simView = nullptr;
 };
 
 REGISTER_OGN_NODE()

@@ -38,22 +38,23 @@ includedirs {
     "%{root}/_build/target-deps/omni_client_library/include",
     "%{root}/_build/target-deps/python/include",
     "%{root}/source/extensions/isaacsim.sensors.physx/include",
-    isaac_sim_extsbuild_dir .. "/isaacsim.util.debug_draw/include",
+    isaac_sim_extra_extsbuild_dir .. "/isaacsim.util.debug_draw/include",
 }
 libdirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
     "%{root}/_build/target-deps/omni-isaacsim-schema/%{platform}/%{config}/lib",
     "%{root}/_build/target-deps/usd_ext_physics/%{cfg.buildcfg}/lib",
     extsbuild_dir .. "/omni.usd.core/bin",
-    isaac_sim_extsbuild_dir .. "/isaacsim.util.debug_draw/bin",
+    isaac_sim_extra_extsbuild_dir .. "/isaacsim.util.debug_draw/bin",
 }
 
 links {
     "isaacSensorSchema",
     "rangeSensorSchema",
     "omni.usd",
+    "isaacsim.util.debug_draw.primitive_drawing",
 }
-extra_usd_libs = { "usdGeom", "usdPhysics" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -62,15 +63,12 @@ add_usd(extra_usd_libs)
 filter { "system:linux" }
 includedirs {
     "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include/boost",
-    "%{root}/_build/target-deps/python/include/python3.11",
+    "%{root}/_build/target-deps/python/include/python3.12",
 }
-links { "isaacsim.util.debug_draw.plugin" }
-
 filter { "system:windows" }
 libdirs {
     "%{root}/_build/target-deps/tbb/lib/intel64/vc14",
 }
-links { "isaacsim.util.debug_draw.primitive_drawing" }
 filter {}
 
 filter { "configurations:debug" }

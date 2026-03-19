@@ -443,10 +443,12 @@ static void onAttach(long int stageId, double metersPerUnit, void* userData)
     g_stage = stage;
     g_metersPerUnit = static_cast<float>(metersPerUnit);
     g_lineDrawing = std::make_unique<isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper>(
-        omni::usd::UsdContext::getContext(), isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::eLines);
+        omni::usd::UsdContext::getContext(),
+        isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::RenderingMode::eLines);
 
     g_cellDrawing = std::make_unique<isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper>(
-        omni::usd::UsdContext::getContext(), isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::eLines, true);
+        omni::usd::UsdContext::getContext(),
+        isaacsim::util::debug_draw::drawing::PrimitiveDrawingHelper::RenderingMode::eLines, true);
 }
 
 /**

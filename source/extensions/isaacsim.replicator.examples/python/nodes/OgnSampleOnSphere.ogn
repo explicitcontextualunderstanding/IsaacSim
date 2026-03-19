@@ -1,7 +1,7 @@
 {
     "OgnSampleOnSphere": {
         "version": 1,
-        "description": "Assignes uniformly sampled location on a sphere.",
+        "description": "Assigns uniformly sampled location on a sphere.",
         "language": "Python",
         "categoryDefinitions": "config/CategoryDefinition.json",
         "categories": ["isaacReplicatorExamples"],

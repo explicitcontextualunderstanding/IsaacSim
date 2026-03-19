@@ -1,4 +1,43 @@
 # Changelog
+## [1.7.2] - 2026-03-09
+### Fixed
+- Hardened subprocess calls to avoid shell=True with string concatenation
+
+## [1.7.1] - 2026-03-05
+### Fixed
+- Fixed incorrect type annotation for SearchWidget
+
+## [1.7.0] - 2026-03-04
+### Changed
+- Add Overview.md, python_api.md, and update docstrings
+
+## [1.6.1] - 2026-02-23
+### Changed
+- Remove unused dependencies
+
+## [1.6.0] - 2026-02-07
+### Changed
+- Add menu.open_content_browser_to_path to open the Content Browser to a specific path
+
+## [1.5.0] - 2025-12-22
+### Added
+- Add menu.create_submenu to recursively build MenuItemDescription lists from dicts describing submenus
+
+## [1.4.1] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [1.4.0] - 2025-10-30
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [1.3.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.3.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
 
 ## [1.2.1] - 2025-10-09
 ### Removed
@@ -34,7 +73,7 @@
 
 ## [1.1.3] - 2025-05-11
 ### Changed
-- minor adjustment to the button decorator so it adapts to different button sizes centered.
+- Minor adjustment to the button decorator so it adapts to different button sizes centered.
 
 ## [1.1.2] - 2025-05-10
 ### Changed
@@ -42,11 +81,11 @@
 
 ## [1.1.1] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [1.1.0] - 2025-05-03
 ### Changed
-- add an optional set_on_end_edit_fn callback for float fields
+- Add an optional set_on_end_edit_fn callback for float fields
 
 ## [1.0.14] - 2025-04-09
 ### Changed
@@ -87,11 +126,11 @@
 
 ## [1.0.4] - 2025-01-13
 ### Changed
-- fixed button tooltips
+- Fixed button tooltips
 
 ## [1.0.3] - 2024-10-29
 ### Changed
-- added an info_collapsed argument for setup_ui_headers
+- Added an info_collapsed argument for setup_ui_headers
 
 ## [1.0.2] - 2024-10-28
 ### Changed
@@ -115,7 +154,7 @@
 
 ## [0.15.1] - 2024-04-13
 ### Added
-- optional tooltip entry for SelectPrimWidget and ParamWidget
+- Optional tooltip entry for SelectPrimWidget and ParamWidget
 
 ## [0.15.0] - 2024-03-14
 ### Added
@@ -228,14 +267,14 @@
 
 ## [0.5.2] - 2023-01-19
 ### Fixed
-- split calback tests to reduce errors
+- Split calback tests to reduce errors
 
 ### Changed
-- rename startup to test_ui
+- Rename startup to test_ui
 
 ## [0.5.1] - 2023-01-11
 ### Fixed
-- revert to old menu click function to fix hot reload errors
+- Revert to old menu click function to fix hot reload errors
 
 ## [0.5.0] - 2023-01-06
 ### Added
@@ -267,7 +306,7 @@
 
 ## [0.2.1] - 2022-06-02
 ### Changed
-- expose labels for file/folder picker
+- Expose labels for file/folder picker
 
 ## [0.2.0] - 2022-05-25
 ### Added
@@ -279,7 +318,7 @@
 
 ## [0.1.2] - 2021-12-14
 ### Changed
-- adjust tooltip for ui Buttons with changed background color
+- Adjust tooltip for ui Buttons with changed background color
 
 ## [0.1.1] - 2021-09-28
 ### Fixed

@@ -105,7 +105,7 @@ class Mesh(XformPrim):
         translations: list | np.ndarray | wp.array | None = None,
         orientations: list | np.ndarray | wp.array | None = None,
         scales: list | np.ndarray | wp.array | None = None,
-        reset_xform_op_properties: bool = False,
+        reset_xform_op_properties: bool = True,
     ) -> None:
         self._geoms = []
         stage = stage_utils.get_current_stage(backend="usd")

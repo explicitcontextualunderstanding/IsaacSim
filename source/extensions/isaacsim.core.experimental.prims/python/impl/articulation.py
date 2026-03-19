@@ -18,21 +18,24 @@ from __future__ import annotations
 import weakref
 
 import carb
+import carb.eventdispatcher
 import isaacsim.core.experimental.utils.backend as backend_utils
 import isaacsim.core.experimental.utils.ops as ops_utils
+import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
-import isaacsim.core.utils.numpy as numpy_utils
 import numpy as np
 import omni.kit.app
 import omni.physics.tensors
 import omni.physx
 import omni.physx.bindings
 import omni.physx.bindings._physx
+import omni.timeline
+import usdrt
 import warp as wp
 from isaacsim.core.simulation_manager import SimulationManager
-from isaacsim.core.utils.prims import get_articulation_root_api_prim_path
 from pxr import PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
 
+from . import _transform
 from .prim import _MSG_PHYSICS_TENSOR_ENTITY_NOT_INITIALIZED, _MSG_PHYSICS_TENSOR_ENTITY_NOT_VALID, _MSG_PRIM_NOT_VALID
 from .xform_prim import XformPrim
 
@@ -57,7 +60,6 @@ class Articulation(XformPrim):
             If the input shape is smaller than expected, data will be broadcasted (following NumPy broadcast rules).
         reset_xform_op_properties: Whether to reset the transformation operation attributes of the prims to a standard set.
             See :py:meth:`reset_xform_op_properties` for more details.
-        enable_residual_reports: Whether to enable residual reporting for the articulations.
 
     Raises:
         ValueError: If no prims are found matching the specified path(s).
@@ -80,7 +82,6 @@ class Articulation(XformPrim):
         ...     "/World/prim_.*",
         ...     positions=[[x, 0, 0] for x in range(3)],
         ...     reset_xform_op_properties=True,
-        ...     enable_residual_reports=True,
         ... )  # doctest: +NO_CHECK
         >>>
         >>> # play the simulation so that the Physics tensor entity becomes valid
@@ -99,12 +100,9 @@ class Articulation(XformPrim):
         orientations: list | np.ndarray | wp.array | None = None,
         scales: list | np.ndarray | wp.array | None = None,
         reset_xform_op_properties: bool = False,
-        # Articulation
-        enable_residual_reports: bool = False,
     ) -> None:
+        paths = Articulation.fetch_articulation_root_api_prim_paths(paths)
         # define properties
-        paths = [paths] if isinstance(paths, str) else paths
-        paths = [get_articulation_root_api_prim_path(path) for path in paths]
         # - default state properties
         self._default_linear_velocities = None
         self._default_angular_velocities = None
@@ -137,6 +135,9 @@ class Articulation(XformPrim):
         # -- articulation physics view
         self._physics_articulation_view = None
         self._physics_tensor_entity_initialized = False
+        # -- C++ data view for read-only access
+        self._cpp_data_view = None
+        self._cpp_data_view_id = None
         # initialize base class
         super().__init__(
             paths,
@@ -147,20 +148,23 @@ class Articulation(XformPrim):
             scales=scales,
             reset_xform_op_properties=reset_xform_op_properties,
         )
-        # initialize instance from arguments
-        self._enable_residual_reports = enable_residual_reports
-        if enable_residual_reports:
-            Articulation.ensure_api(self.prims, PhysxSchema.PhysxResidualReportingAPI)
+
         # setup subscriptions
-        self._subscription_to_timeline_stop_event = (
-            SimulationManager._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-                int(omni.timeline.TimelineEventType.STOP),
-                lambda event, obj=weakref.proxy(self): obj._on_timeline_stop(event),
-            )
+        def safe_timeline_stop_callback(event, obj=weakref.proxy(self)):
+            try:
+                obj._on_timeline_stop(event)
+            except ReferenceError:
+                # Object has been garbage collected, ignore the event
+                pass
+
+        self._subscription_to_timeline_stop_event = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=safe_timeline_stop_callback,
+            observer_name="isaacsim.core.experimental.prims.Articulation._on_timeline_stop",
         )
         # setup physics-related configuration if simulation is running
         if SimulationManager._physics_sim_view__warp is not None:
-            SimulationManager._physx_sim_interface.flush_changes()
+            SimulationManager._physics_sim_interface.flush_changes()
             self._on_physics_ready(None)
 
     def __del__(self):
@@ -546,6 +550,48 @@ class Articulation(XformPrim):
         return self._physics_articulation_view.generalized_mass_matrix_shape
 
     """
+    Static methods.
+    """
+
+    @staticmethod
+    def fetch_articulation_root_api_prim_paths(paths: str | list[str]) -> list[str | None]:
+        """Fetch the prim paths that have the Articulation Root API applied.
+
+        Args:
+            paths: Single path or list of paths to USD prims. Can include regular expressions for matching multiple prims.
+
+        Returns:
+            List of prim paths that have the Articulation Root API applied.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.experimental.prims import Articulation
+            >>>
+            >>> Articulation.fetch_articulation_root_api_prim_paths("/World/prim_.*")
+            ['/World/prim_0', '/World/prim_1', '/World/prim_2']
+            >>> # check for a sub-tree of prims on which the ArticulationRootAPI has not been applied
+            >>> Articulation.fetch_articulation_root_api_prim_paths("/World/prim_0/panda_link0")
+            [None]
+        """
+        existent_paths, nonexistent_paths = Articulation.resolve_paths(paths)
+        assert (
+            not nonexistent_paths
+        ), f"Specified paths must correspond to existing prims: {', '.join(nonexistent_paths)}"
+        backend = backend_utils.get_current_backend(["usd", "usdrt", "fabric"])
+        predicate = lambda prim, _: prim.HasAPI(
+            UsdPhysics.ArticulationRootAPI
+            if backend == "usd"
+            else usdrt.UsdPhysics.ArticulationRootAPI.GetSchemaTypeName()
+        )
+        articulation_root_api_prim_paths = []
+        for path in existent_paths:
+            prim = prim_utils.get_first_matching_child_prim(path, predicate=predicate, include_self=True)
+            articulation_root_api_prim_paths.append(prim_utils.get_prim_path(prim) if prim is not None else None)
+        return articulation_root_api_prim_paths
+
+    """
     Methods.
     """
 
@@ -750,7 +796,7 @@ class Articulation(XformPrim):
                         joint_api = UsdPhysics.PrismaticJoint(dof_prim)
                         lower[i][j] = joint_api.GetLowerLimitAttr().Get()
                         upper[i][j] = joint_api.GetUpperLimitAttr().Get()
-                    else:
+                    elif self.dof_types[dof_index] == omni.physics.tensors.DofType.Rotation:
                         joint_api = UsdPhysics.RevoluteJoint(dof_prim)
                         lower[i][j] = np.deg2rad(joint_api.GetLowerLimitAttr().Get())
                         upper[i][j] = np.deg2rad(joint_api.GetUpperLimitAttr().Get())
@@ -1126,7 +1172,9 @@ class Articulation(XformPrim):
                 for j, dof_index in enumerate(dof_indices.numpy()):
                     dof_prim = stage.GetPrimAtPath(self.dof_paths[index][dof_index])
                     _, drive_type = self._get_drive_api_and_type(index, dof_index)
-                    dof_prim.ApplyAPI("PhysxDrivePerformanceEnvelopeAPI", drive_type)
+                    # ignore those DOFs that do not have the PhysxDrivePerformanceEnvelopeAPI applied
+                    if not dof_prim.HasAPI("PhysxDrivePerformanceEnvelopeAPI"):
+                        continue
                     speed_effort_gradient = dof_prim.GetAttribute(
                         f"physxDrivePerformanceEnvelope:{drive_type}:speedEffortGradient"
                     ).Get()
@@ -2192,7 +2240,7 @@ class Articulation(XformPrim):
                     ),
                     dtype=np.float32,
                 )
-            local_translations, local_orientations = numpy_utils.transformations.get_local_from_world(
+            local_translations, local_orientations = _transform.local_from_world(
                 parent_transforms, world_positions.numpy(), world_orientations.numpy()
             )
             return (
@@ -2268,7 +2316,7 @@ class Articulation(XformPrim):
                     ),
                     dtype=np.float32,
                 )
-            world_positions, world_orientations = numpy_utils.transformations.get_world_from_local(
+            world_positions, world_orientations = _transform.world_from_local(
                 parent_transforms, translations.numpy(), orientations.numpy()
             )
             self.set_world_poses(positions=world_positions, orientations=world_orientations, indices=indices)
@@ -2368,69 +2416,6 @@ class Articulation(XformPrim):
         data = self._physics_articulation_view.get_root_velocities()  # shape: (N, 6)
         indices = ops_utils.resolve_indices(indices, count=len(self), device=data.device)
         return data[indices, :3].contiguous().to(self._device), data[indices, 3:].contiguous().to(self._device)
-
-    def get_solver_residual_reports(
-        self,
-        *,
-        indices: int | list | np.ndarray | wp.array | None = None,
-        report_maximum: bool = True,
-    ) -> tuple[wp.array, wp.array]:
-        """Get the physics solver residuals (position and velocity) of the prims.
-
-        Backends: :guilabel:`usd`.
-
-        The solver residual quantifies the convergence of the iterative physics solver.
-        A perfectly converged solution has a residual value of zero.
-        For articulations, the solver residual is computed across all joints that are part of the articulations.
-
-        Search for *Solver Residual* in |physx_docs| for more details.
-
-        Args:
-            indices: Indices of prims to process (shape ``(N,)``). If not defined, all wrapped prims are processed.
-            report_maximum: Whether to report the maximum (true) or the root mean square (false) residual.
-
-        Returns:
-            Two-elements tuple. 1) The solver residuals for position (shape ``(N, 1)``).
-            2) The solver residuals for velocity (shape ``(N, 1)``).
-
-        Raises:
-            AssertionError: Residual reporting is not enabled.
-            AssertionError: Wrapped prims are not valid.
-
-        Example:
-
-        .. code-block:: python
-
-            >>> # get the solver residuals of all prims
-            >>> position_residuals, velocity_residuals = prims.get_solver_residual_reports()
-            >>> position_residuals.shape, velocity_residuals.shape
-            ((3, 1), (3, 1))
-            >>>
-            >>> # get the solver residuals of the first and last prims
-            >>> position_residuals, velocity_residuals = prims.get_solver_residual_reports(indices=[0, 2])
-            >>> position_residuals.shape, velocity_residuals.shape
-            ((2, 1), (2, 1))
-        """
-        assert (
-            self._enable_residual_reports
-        ), "Enable residual reporting in Articulation class constructor to use residuals API"
-        assert self.valid, _MSG_PRIM_NOT_VALID
-        # USD API
-        indices = ops_utils.resolve_indices(indices, count=len(self), device="cpu")
-        position_residuals = np.zeros(shape=(indices.shape[0], 1), dtype=np.float32)
-        velocity_residuals = np.zeros(shape=(indices.shape[0], 1), dtype=np.float32)
-        for i, index in enumerate(indices.numpy()):
-            residual_api = Articulation.ensure_api([self.prims[index]], PhysxSchema.PhysxResidualReportingAPI)[0]
-            if report_maximum:
-                position_residuals[i] = residual_api.GetPhysxResidualReportingMaxResidualPositionIterationAttr().Get()
-                velocity_residuals[i] = residual_api.GetPhysxResidualReportingMaxResidualVelocityIterationAttr().Get()
-            else:
-                position_residuals[i] = residual_api.GetPhysxResidualReportingRmsResidualPositionIterationAttr().Get()
-                velocity_residuals[i] = residual_api.GetPhysxResidualReportingRmsResidualVelocityIterationAttr().Get()
-        return (
-            ops_utils.place(position_residuals, device=self._device),
-            ops_utils.place(velocity_residuals, device=self._device),
-        )
 
     def set_default_state(
         self,
@@ -4574,14 +4559,36 @@ class Articulation(XformPrim):
         self._link_paths, self._joint_paths, self._dof_paths = [], [], []
         # query articulation metadata for each prim
         stage = stage_utils.get_current_stage(backend="usd")
-        stage_id = stage_utils.get_stage_id(stage)
-        for path in self.paths:
-            omni.physx.get_physx_property_query_interface().query_prim(
-                stage_id=stage_id,
-                query_mode=omni.physx.bindings._physx.PhysxPropertyQueryMode.QUERY_ARTICULATION,
-                prim_id=PhysicsSchemaTools.sdfPathToInt(path),
-                articulation_fn=query_report,
+        active_engine = SimulationManager.get_active_physics_engine()
+        if active_engine == "physx":
+            for path in self.paths:
+                omni.physx.get_physx_property_query_interface().query_prim(
+                    stage_id=stage_utils.get_stage_id(stage),
+                    query_mode=omni.physx.bindings._physx.PhysxPropertyQueryMode.QUERY_ARTICULATION,
+                    prim_id=PhysicsSchemaTools.sdfPathToInt(path),
+                    articulation_fn=query_report,
+                )
+        elif active_engine == "newton":
+            # Use Newton's property query interface
+            try:
+                from isaacsim.physics.newton.impl import get_newton_property_query_interface
+
+                query_interface = get_newton_property_query_interface()
+                for path in self.paths:
+                    query_interface.query_prim(
+                        stage_id=stage_utils.get_stage_id(stage),
+                        query_mode=1,  # QUERY_ARTICULATION
+                        prim_id=PhysicsSchemaTools.sdfPathToInt(path),
+                        articulation_fn=query_report,
+                    )
+            except ImportError:
+                carb.log_warn("Newton property query interface not available")
+                return
+        else:
+            carb.log_warn(
+                f"Skipping articulation properties query for '{active_engine}' engine as it is not implemented"
             )
+            return
         # update amounts and indices
         self._num_links = len(self._link_names)
         self._link_index_dict = {name: i for i, name in enumerate(self._link_names)}
@@ -4704,7 +4711,113 @@ class Articulation(XformPrim):
             self._num_shapes = self._physics_articulation_view.max_shapes
             self._num_fixed_tendons = self._physics_articulation_view.max_fixed_tendons
 
+        # C++ data view setup is intentionally opt-in to avoid affecting
+        # existing Python-only workflows/tests unless explicitly requested.
+
+    def _setup_cpp_data_view(self):
+        """Set up C++ read-only data view for this articulation.
+
+        For PhysX: C++ sets up TensorApi callbacks internally -- no Python work needed.
+        For Newton: Python registers fill callbacks that copy tensor data into C++ buffers.
+        Transforms are handled in C++ via IFabricHierarchy for both engines.
+        """
+        if self._cpp_data_view is not None:
+            return
+        from ._cpp_buffers import get_device_ordinal
+        from .extension import get_prim_data_reader
+
+        reader = get_prim_data_reader()
+        if reader is None:
+            return
+
+        stage = stage_utils.get_current_stage(backend="usd")
+        if stage is None:
+            return
+        reader.initialize(stage_utils.get_stage_id(stage), get_device_ordinal())
+
+        art_view = self._physics_articulation_view
+        if art_view is None:
+            return
+
+        is_newton = hasattr(art_view, "_newton_stage")
+        engine_type = "newton" if is_newton else "physx"
+        view_id = f"articulation_{id(self)}"
+        self._cpp_data_view_id = view_id
+
+        self._cpp_data_view = reader.create_articulation_view(view_id, self.paths, engine_type)
+
+        if is_newton:
+            self._setup_newton_articulation_callbacks(art_view)
+
+    def _setup_newton_articulation_callbacks(self, art_view):
+        """Register Python fill callbacks for Newton-backed articulation fields."""
+        from ._cpp_buffers import wrap_cpp_buffer
+
+        count = art_view.count
+        max_dofs = art_view.max_dofs
+        max_links = art_view.max_links
+        view = self._cpp_data_view
+
+        field_defs = {
+            "dof_positions": (count * max_dofs, (count, max_dofs), art_view.get_dof_positions),
+            "dof_velocities": (count * max_dofs, (count, max_dofs), art_view.get_dof_velocities),
+            "dof_efforts": (count * max_dofs, (count, max_dofs), art_view.get_dof_actuation_forces),
+            "root_transforms": (count * 7, (count, 7), art_view.get_root_transforms),
+            "root_velocities": (count * 6, (count, 6), art_view.get_root_velocities),
+            "link_masses": (count * max_links, (count, max_links), art_view.get_masses),
+        }
+
+        for field_name, (size, shape, getter_fn) in field_defs.items():
+            view.allocate_buffer(field_name, size, "float")
+            cpp_buf = wrap_cpp_buffer(view, field_name, shape=shape)
+            fn = getter_fn
+
+            def make_cb(f=fn, b=cpp_buf):
+                def cb():
+                    wp.copy(b, f())
+
+                return cb
+
+            view.register_field_callback(field_name, make_cb())
+
+        # Push DOF names and types into the C++ view so get_dof_names/get_dof_types work for Newton.
+        if count > 0 and self._cpp_data_view_id and art_view._backend.meta_types:
+            from .extension import get_prim_data_reader
+
+            reader = get_prim_data_reader()
+            if reader is not None:
+                meta = art_view._backend.meta_types[0]
+                names = list(meta.dof_names)
+                try:
+                    import omni.physics.tensors as physics_tensors
+
+                    types = [1 if t == physics_tensors.DofType.Translation else 0 for t in meta.dof_types]
+                except (ImportError, AttributeError):
+                    types = [0] * len(names)
+                if names and len(types) == len(names):
+                    reader.set_articulation_dof_metadata(self._cpp_data_view_id, names, types)
+
+    def initialize_cpp_data_view(self):
+        """Initialize the optional C++ read-only data view.
+
+        This method is opt-in and can be called by users that need C++ consumers
+        to read articulation data through `IPrimDataReader`.
+        """
+        self._setup_cpp_data_view()
+
+    def _teardown_cpp_data_view(self):
+        """Clean up C++ data view."""
+        if self._cpp_data_view_id is not None:
+            from .extension import get_prim_data_reader
+
+            reader = get_prim_data_reader()
+            if reader is not None:
+                reader.remove_view(self._cpp_data_view_id)
+            self._cpp_data_view = None
+            self._cpp_data_view_id = None
+
     def _on_timeline_stop(self, event):
         """Handle timeline stop event."""
+        self._teardown_cpp_data_view()
         # invalidate articulation view
         self._physics_articulation_view = None

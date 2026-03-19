@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""A basic Hello World example module for Isaac Sim that demonstrates fundamental scene setup and extension development."""
+
+
 from isaacsim.examples.interactive.hello_world.hello_world import HelloWorld
 from isaacsim.examples.interactive.hello_world.hello_world_extension import HelloWorldExtension
+
+__all__ = ["HelloWorld", "HelloWorldExtension"]

@@ -14,20 +14,45 @@
 # limitations under the License.
 
 
+"""Interactive sample demonstrating gamepad control of a Kaya robot in Isaac Sim."""
+
+
 import carb
+import isaacsim.core.experimental.utils.stage as stage_utils
 import omni.graph.core as og
 import omni.usd
-from isaacsim.core.api.objects.ground_plane import GroundPlane
-from isaacsim.examples.interactive.base_sample import BaseSample
+from isaacsim.examples.base.base_sample_experimental import BaseSample
 from isaacsim.storage.native import get_assets_root_path
 from pxr import Sdf, UsdLux
 
 
 class KayaGamepad(BaseSample):
-    def __init__(self) -> None:
+    """Interactive sample demonstrating gamepad control of a Kaya robot.
+
+    This sample sets up a complete scene with a Kaya robot that can be controlled using a gamepad controller.
+    The robot is loaded with pre-configured action graphs that handle gamepad input for movement control.
+    The scene includes a ground plane environment and proper lighting for visualization.
+
+    The sample creates:
+    - A Kaya robot with gamepad controller integration
+    - A default grid environment as the ground plane
+    - A dome light for scene illumination
+
+    This demonstrates how to create interactive robotic simulations where users can directly control
+    robots using standard gaming controllers, making it useful for teleoperation scenarios,
+    testing robot behaviors, and interactive demonstrations.
+    """
+
+    def __init__(self):
         super().__init__()
+        self._kaya_prim_path = "/kaya"
 
     def setup_scene(self):
+        """Sets up the simulation scene with Kaya robot, ground plane, and lighting.
+
+        Loads the Kaya robot with gamepad controller, adds a ground plane environment,
+        and configures dome lighting for the scene.
+        """
         assets_root_path = get_assets_root_path()
         if assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
@@ -36,13 +61,35 @@ class KayaGamepad(BaseSample):
         # add kaya robot rigged with gamepad controller
         kaya_ogn_usd = assets_root_path + "/Isaac/Robots/NVIDIA/Kaya/kaya_ogn_gamepad.usd"
         stage = omni.usd.get_context().get_stage()
-        graph_prim = stage.DefinePrim("/kaya", "Xform")
+        graph_prim = stage.DefinePrim(self._kaya_prim_path, "Xform")
         graph_prim.GetReferences().AddReference(kaya_ogn_usd)
 
-        # add ground plane and light
-        GroundPlane("/World/ground_plane", visible=True)
+        # add ground plane using experimental API
+        ground_plane = stage_utils.add_reference_to_stage(
+            usd_path=get_assets_root_path() + "/Isaac/Environments/Grid/default_environment.usd",
+            path="/World/ground_plane",
+        )
+
+        # add dome light
         dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
         dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(450.0)
 
-    def world_cleanup(self):
+    async def setup_post_load(self):
+        """Called after the scene is loaded."""
+        pass
+
+    async def setup_pre_reset(self):
+        """Called before world reset."""
+        pass
+
+    async def setup_post_reset(self):
+        """Called after world reset."""
+        pass
+
+    async def setup_post_clear(self):
+        """Called after clearing the scene."""
+        pass
+
+    def physics_cleanup(self):
+        """Function called when extension shutdowns and starts again, (hot reloading feature)"""
         pass

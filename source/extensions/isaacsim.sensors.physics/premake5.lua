@@ -14,7 +14,6 @@
 -- limitations under the License.
 
 local ext = get_current_extension_info()
-local ogn = get_ogn_project_information(ext, "isaacsim/sensors/physics")
 local targetDepsDir = "%{root}/_build/target-deps"
 local hostDepsDir = "%{root}/_build/host-deps"
 
@@ -25,9 +24,7 @@ project_ext_plugin(ext, "isaacsim.sensors.physics.plugin")
 
 dependson { "prebuild", "carb.physics-usd.plugin", "omni.physx.plugin" }
 add_files("impl", "plugins")
-add_files("ogn", ogn.nodes_path)
 
-add_ogn_dependencies(ogn, { "python/nodes" })
 
 include_physx()
 add_cuda_dependencies()
@@ -59,7 +56,7 @@ links {
     --   "physicsSchemaTools", "omni.usd",
 }
 
-extra_usd_libs = { "usdGeom", "usdPhysics", "usdUtils" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "usdUtils", "ts" }
 
 -- Begin OpenUSD
 add_usd(extra_usd_libs)
@@ -67,7 +64,7 @@ add_usd(extra_usd_libs)
 filter { "system:linux" }
 includedirs {
     target_deps .. "/usd/%{cfg.buildcfg}/include/boost",
-    target_deps .. "/python/include/python3.11",
+    target_deps .. "/python/include/python3.12",
 }
 filter { "system:windows" }
 libdirs {
@@ -81,7 +78,6 @@ filter { "configurations:release" }
 defines { "NDEBUG" }
 filter {}
 
-project_ext_ogn(ext, ogn)
 
 -- Python Bindings for Carbonite Plugin
 project_ext_bindings {

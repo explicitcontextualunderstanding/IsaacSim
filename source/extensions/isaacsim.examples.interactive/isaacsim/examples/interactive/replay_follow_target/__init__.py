@@ -13,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive example demonstrating replay functionality for recorded robot trajectories and scene data from the Follow Target manipulation task."""
+
+
 from isaacsim.examples.interactive.replay_follow_target.replay_follow_target import ReplayFollowTarget
 from isaacsim.examples.interactive.replay_follow_target.replay_follow_target_extension import (
     ReplayFollowTargetExtension,
 )
+
+__all__ = ["ReplayFollowTarget"]

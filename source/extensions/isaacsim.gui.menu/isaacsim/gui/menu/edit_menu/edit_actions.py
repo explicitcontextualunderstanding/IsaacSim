@@ -12,33 +12,43 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module provides functions to register and deregister a variety of editing-related actions for extensions using the omni.kit.actions.core module."""
+"""Edit menu action registration helpers."""
 
 __all__ = ["register_actions", "deregister_actions"]
 
 # pylint: disable=protected-access
 import asyncio
+from collections.abc import Callable
+from typing import Any
 
 import omni.kit.actions.core
 
 
-def register_actions(extension_id, cls, get_self_fn):
-    """Registers actions related to editing operations for a given extension.
-
-    This function sets up a series of editing actions and associates them with callback functions,
-    which are intended to be triggered by the user through the application's UI. It uses the action
-    registry provided by the omni.kit.actions.core module to register each action with a unique name,
-    a callback, a display name for the UI, a description, and a tag to categorize the action.
+def register_actions(extension_id: str, cls: type[Any], get_self_fn: Callable[[], Any]):
+    """Register edit-related actions for an extension.
 
     Args:
-        extension_id (str): The identifier of the extension for which the actions are to be registered.
-        cls: The class that contains the implementation of the actions. This class should provide methods that correspond to the actions being registered.
-        get_self_fn (callable): A function that, when called, returns an instance of the class that contains the action implementations.
+        extension_id: Identifier of the extension registering actions.
+        cls: Class that implements the action handlers.
+        get_self_fn: Callable that returns the class instance.
 
-    Returns:
-        None"""
+    Example:
+        .. code-block:: python
 
-    def select_prim(description: str, select_name: callable, show_error=True):
+            register_actions("isaacsim.gui.menu.edit_menu", EditMenuExtension, lambda: instance)
+    """
+
+    def select_prim(description: str, select_name: str, show_error: bool = True) -> None:
+        """Select prims using a selection action and track the result.
+
+        Args:
+            description: Label for the selection operation.
+            select_name: Action name to execute.
+            show_error: Whether to post errors when no prims are selected.
+
+        Returns:
+            None.
+        """
         paths = omni.usd.get_context().get_selection().get_selected_prim_paths()
         if not paths:
             if show_error:
@@ -46,7 +56,14 @@ def register_actions(extension_id, cls, get_self_fn):
             return None
         return do_select(description, select_name, paths)
 
-    def do_select(description: str, select_name: callable, paths: list[str]):
+    def do_select(description: str, select_name: str, paths: list[str]) -> None:
+        """Execute a selection action and update the recent list.
+
+        Args:
+            description: Label for the selection operation.
+            select_name: Action name to execute.
+            paths: Current selection paths.
+        """
         old_selection = omni.usd.get_context().get_selection().get_selected_prim_paths()
 
         async def select_func():
@@ -290,10 +307,16 @@ def register_actions(extension_id, cls, get_self_fn):
     )
 
 
-def deregister_actions(extension_id):
-    """Deregisters all actions associated with a given extension ID from the action registry.
+def deregister_actions(extension_id: str):
+    """Deregister all actions for an extension.
 
     Args:
-        extension_id (str): The unique identifier of the extension whose actions are to be deregistered."""
+        extension_id: The unique identifier of the extension whose actions are to be deregistered.
+
+    Example:
+        .. code-block:: python
+
+            deregister_actions("isaacsim.gui.menu.edit_menu")
+    """
     action_registry = omni.kit.actions.core.get_action_registry()
     action_registry.deregister_all_actions_for_extension(extension_id)

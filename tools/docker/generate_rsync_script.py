@@ -27,13 +27,6 @@ def __parse_arguments(argv=None):
     )
 
     parser.add_argument(
-        "--hardcode-pip-prebundle-links",
-        action="store_true",
-        default=False,
-        help="This will setup a symlink to handle pip_prebundles for docker builds.",
-    )
-
-    parser.add_argument(
         "--extra-exclude-list", type=str, help="Set this to add an extra exclude file to the rsync script", default=""
     )
 
@@ -46,7 +39,6 @@ def main(argv=None):
 
     target = arguments.target
     output_folder = arguments.output_folder
-    hardcode_pip_prebundle_links = arguments.hardcode_pip_prebundle_links
 
     package_paths = []
     exclude_paths = []
@@ -104,11 +96,6 @@ def main(argv=None):
         out_file.write("mkdir -p ${output_folder}\n\n")
         out_file.write("\necho Starting rsync, please wait...\n")
         exclude_flag = ""
-        if hardcode_pip_prebundle_links:
-            out_file.write(
-                f'find _build/{arguments.platform}/release -type l -iname "pip_prebundle" > pip_prebundle_locations.txt\n\n'
-            )
-            exclude_flag += "--exclude-from=./pip_prebundle_locations.txt"
         if len(exclude_paths):
             exclude_flag += " --exclude-from=./exclude_list.txt"
         if len(arguments.extra_exclude_list):
@@ -137,6 +124,11 @@ def main(argv=None):
                 )
             out_file.write("\n")
 
+        if len(files_strip):
+            out_file.write(
+                "\n# Make files writable so strip can modify in place; ignore strip errors (non-ELF/wrong-arch)\n"
+            )
+            out_file.write("chmod -R u+w ${output_folder}\n")
         for file_strip_array in files_strip:
             for file_strip in file_strip_array:
                 out_file.write("\n#Stripping files\n")
@@ -146,18 +138,11 @@ def main(argv=None):
                     excludes = " ".join(
                         [f"-not -path '{file_strip_exclude[0]}' " for file_strip_exclude in files_strip_exclude]
                     )
+                # Use 'strip "$1" || true' so unrecognized format (e.g. wrong-arch .so) or permission errors don't fail the build
                 out_file.write(
-                    f"find ${{output_folder}} -type f -ipath '{file_strip}' {excludes} -exec strip {{}} \\;\n"
+                    f"find ${{output_folder}} -type f -ipath '{file_strip}' {excludes} -exec sh -c 'strip \"$1\" || true' _ {{}} \\;\n"
                 )
 
-        if hardcode_pip_prebundle_links:
-            out_file.write("\n#Setup hardcoded symlinks for pip_prebundle")
-            out_file.write(
-                """
-for location in $(cat pip_prebundle_locations.txt); do
-    ln -s /drivesim-ov/_build/target-deps/pip_prebundle ${output_folder}${location}
-done\n"""
-            )
     os.chmod("./generated_rsync_package.sh", 0o755)
 
 

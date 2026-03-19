@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI component for saving robot configurations as USD files with articulation APIs and physics setups."""
+
+
 import os
 
 import omni.ui as ui
@@ -26,6 +30,24 @@ from ..utils.ui_utils import ButtonWithIcon, custom_header, separator
 
 
 class SaveRobot:
+    """UI component for saving robot configurations as USD files in Isaac Sim.
+
+    This class provides an interface for configuring and exporting robot assets with proper articulation APIs,
+    robot schemas, and optional minimal environment components. It handles the complete workflow from selecting
+    an articulation root to generating the final USD files with physics configurations and variant sets.
+
+    The interface includes:
+    - Articulation root selection with asset picker integration
+    - Optional minimal environment components (ground plane, default light, physics scene)
+    - Robot schema application and USD file generation with proper layering
+    - Variant USD creation for different environment configurations
+
+    Args:
+        visible: Whether the UI frame is initially visible.
+        *args: Variable positional arguments.
+        **kwargs: Additional keyword arguments.
+    """
+
     def __init__(self, visible, *args, **kwargs):
         self.visible = visible
         self.frame = ui.Frame(visible=visible)
@@ -34,6 +56,7 @@ class SaveRobot:
         self._select_robot_asset_window = None
 
     def destroy(self):
+        """Cleanup method that destroys the UI frame and associated widgets."""
         self.frame.destroy()
         if self._articulation_root_widget:
             self._articulation_root_widget.destroy()
@@ -43,6 +66,7 @@ class SaveRobot:
         self._select_robot_asset_window = None
 
     def _build_frame(self):
+        """Builds the UI frame for the robot saving interface."""
         with ui.CollapsableFrame("Save Robot", build_header_fn=custom_header):
             with ui.ScrollingFrame():
                 with ui.VStack(name="setting_content_vstack"):
@@ -121,6 +145,7 @@ class SaveRobot:
                             ui.Spacer(height=10)
 
     def save_robot(self):
+        """Saves the configured robot to USD files with physics and schema configurations."""
         ProgressRegistry().set_step_progress("Save Robot", ProgressColorState.COMPLETE)
 
         # save current layers
@@ -163,11 +188,21 @@ class SaveRobot:
         create_variant_usd(add_ground, add_lights, add_physics_scene)
         omni.usd.get_context().save_as_stage(os.path.join(robot.robot_root_folder, f"{robot.name}.usd"))
 
-    def set_visible(self, visible):
+    def set_visible(self, visible: bool):
+        """Sets the visibility of the save robot frame.
+
+        Args:
+            visible: Whether the frame should be visible.
+        """
         if self.frame:
             self.frame.visible = visible
 
-    def select(self, selected_paths):
+    def select(self, selected_paths: list[str]):
+        """Handles selection of robot asset paths from the asset picker.
+
+        Args:
+            selected_paths: List of selected USD prim paths for the robot asset.
+        """
         self._select_robot_asset_window.visible = False
         self._selected_paths = selected_paths
         if self._selected_paths:
@@ -175,6 +210,7 @@ class SaveRobot:
             self._articulation_root_widget.checked = True
 
     def select_robot_asset(self):
+        """Opens the robot asset picker window for selecting the articulation root."""
         if not self._select_robot_asset_window:
             stage = omni.usd.get_context().get_stage()
             self._select_robot_asset_window = RobotAssetPicker(

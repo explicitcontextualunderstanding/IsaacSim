@@ -16,11 +16,6 @@
 import platform
 import sys
 
-# Exit early if running on ARM64 (aarch64) architecture
-if platform.machine().lower() in ["aarch64", "arm64"]:
-    print("Livestream is not supported on ARM64 architecture. Exiting.")
-    sys.exit(0)
-
 from isaacsim import SimulationApp
 
 # This sample enables a livestream server to connect to when running headless
@@ -31,7 +26,7 @@ CONFIG = {
     "window_height": 1080,
     "headless": True,
     "hide_ui": False,  # Show the GUI
-    "renderer": "RaytracedLighting",
+    "renderer": "RealTimePathTracing",
     "display_options": 3286,  # Set display options to show default grid
 }
 
@@ -39,13 +34,13 @@ CONFIG = {
 # Start the omniverse application
 kit = SimulationApp(launch_config=CONFIG)
 
-from isaacsim.core.utils.extensions import enable_extension
+from isaacsim.core.experimental.utils.app import enable_extension
 
 # Default Livestream settings
 kit.set_setting("/app/window/drawMouse", True)
 
 # Enable Livestream extension
-enable_extension("omni.services.livestream.nvcf")
+enable_extension("omni.kit.livestream.app")
 
 # Run until closed
 while kit._app.is_running() and not kit.is_exiting():

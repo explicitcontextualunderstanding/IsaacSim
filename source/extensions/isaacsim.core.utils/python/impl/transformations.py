@@ -17,15 +17,15 @@ from typing import Sequence, Tuple, Union
 
 import numpy as np
 
-# python
-import torch
-
 # isaacsim
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.rotations import gf_quat_to_np_array
 
 # omniverse
 from pxr import Gf, Usd, UsdGeom
 from scipy.spatial.transform import Rotation
+
+torch = import_module("torch")
 
 
 def tf_matrix_from_pose(translation: Sequence[float], orientation: Sequence[float]) -> np.ndarray:
@@ -67,14 +67,14 @@ def pose_from_tf_matrix(transformation: np.ndarray) -> Tuple[np.ndarray, np.ndar
 def tf_matrices_from_poses(
     translations: Union[np.ndarray, torch.Tensor], orientations: Union[np.ndarray, torch.Tensor]
 ) -> Union[np.ndarray, torch.Tensor]:
-    """[summary]
+    """Compute transformation matrices from translation and orientation arrays.
 
     Args:
-        translations (Union[np.ndarray, torch.Tensor]): translations with shape (N, 3).
-        orientations (Union[np.ndarray, torch.Tensor]): quaternion representation (scalar first) with shape (N, 4).
+        translations: Translations with shape (N, 3).
+        orientations: Quaternion orientations (scalar first) with shape (N, 4).
 
     Returns:
-        Union[np.ndarray, torch.Tensor]: transformation matrices with shape (N, 4, 4)
+        Transformation matrices with shape (N, 4, 4).
     """
     # Note: Imported here to prevent cyclic dependency in the module.
     from isaacsim.core.api.simulation_context.simulation_context import SimulationContext

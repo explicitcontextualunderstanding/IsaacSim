@@ -18,8 +18,8 @@ from __future__ import annotations
 import re
 from abc import ABC
 
+import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
-import isaacsim.core.utils.prims as prims_utils
 import warp as wp
 from isaacsim.core.simulation_manager import IsaacEvents, SimulationManager
 from pxr import Sdf, Usd
@@ -219,16 +219,10 @@ class Prim(ABC):
         Raises:
             ValueError: If resulting paths are mixed or invalid and ``raise_on_mixed_paths`` is True.
         """
-        # TODO: check if a generic regex search (when specialized one fails) is working with physics view
-        # [
-        #     res.string
-        #     for prim in stage_utils.traverse_stage()
-        #     if (res := re.search(path, prims_utils.get_prim_path(prim)))
-        # ]
         existing_paths, nonexistent_paths, invalid_paths = [], [], []
         paths = [paths] if isinstance(paths, str) else paths
         for path in paths:
-            result = prims_utils.find_matching_prim_paths(path)
+            result = prim_utils.find_matching_prim_paths(path)
             # existing paths, it could be a regex or a single path
             if result:
                 existing_paths.append(result)
@@ -283,7 +277,7 @@ class Prim(ABC):
 
     def _deregister_callbacks(self) -> None:
         """Deregister all internal callbacks."""
-        for callback_id in self._callback_ids:
+        for callback_id in getattr(self, "_callback_ids", []):
             SimulationManager.deregister_callback(callback_id)
         self._callback_ids = []
 

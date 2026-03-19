@@ -1,4 +1,20 @@
 # Changelog
+## [2.6.1] - 2026-02-06
+### Changed
+- Optimize GenericBuffer to re-use memory without allocation if requested size fits within existing capacity.
+
+## [2.6.0] - 2026-01-07
+### Added
+- Add `Defines.h` header with `ISAACSIM_EXPORT` and `ISAACSIM_IMPORT` macros for DLL visibility
+
+## [2.5.4] - 2025-12-06
+### Changed
+- Run clang tidy
+- Migrate BaseResetNode to Events 2.0.
+
+## [2.5.3] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
 
 ## [2.5.2] - 2025-10-02
 ### Changed

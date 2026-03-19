@@ -19,6 +19,7 @@ repo_build = require("omni/repo/build")
 -- Repo root
 root = repo_build.get_abs_path(".")
 
+isaac_sim_extra_extsbuild_dir = "%{root}/_build/%{platform}/%{config}/extsbuild"
 -- Deprecated Extension Path
 deprecated_exts_path = "%{root}/_build/%{platform}/%{config}/extsDeprecated"
 -- extensions needed to build isaac sim
@@ -31,6 +32,9 @@ function isaacsim_build_settings()
     exceptionhandling("On")
     rtti("On")
     defines { "__STDC_VERSION__=0" } -- Define this to zero to prevent errors
+    
+    -- Remove FatalCompileWarnings flag to avoid warnings being treated as errors
+    removeflags { "FatalCompileWarnings" }
 
     filter { "system:windows" }
     defines {
@@ -52,22 +56,12 @@ end
 
 function isaacsim_kit_settings()
     -- Setup include paths. Add kit SDK include paths too.
-    -- TODO: cleanup once we confirm builds working on windows
     includedirs {
-        -- targetDepsDir,
-        -- targetDepsDir .. "/pybind11/include",
-        -- carbSDKInclude,
-        -- kit_sdk .. "/include",
-        -- kit_sdk .. "/_build/target-deps/",
-        -- kit_dev_dir .. "/include",
         "%{root}/_build/target-deps/gsl/include",
     }
 
     -- Carbonite carb lib
     libdirs {
-        -- carbSDKLibs,
-        -- carbSDKLibs .. "/scripting-python-3.10",
-        -- "%{kit_sdk}/plugins",
         "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
     }
 end
@@ -223,10 +217,10 @@ function group_apps(kit)
 
     define_local_experience("isaac-sim", "isaacsim.exp.full")
     define_local_experience("isaac-sim.fabric", "isaacsim.exp.full.fabric")
+    define_local_experience("isaac-sim.newton", "isaacsim.exp.full.newton")
     define_local_experience("isaac-sim.compatibility_check", "isaacsim.exp.compatibility_check")
+    define_local_experience("isaac-sim.streaming", "isaacsim.exp.full.streaming", "--no-window ")
     if os.hostarch() == "x86_64" then
-        define_local_experience("isaac-sim.selector", "isaacsim.exp.selector")
-        define_local_experience("isaac-sim.streaming", "isaacsim.exp.full.streaming", "--no-window ")
         define_local_experience("isaac-sim.xr.vr", "isaacsim.exp.base.xr.vr")
     end
     define_local_experience(

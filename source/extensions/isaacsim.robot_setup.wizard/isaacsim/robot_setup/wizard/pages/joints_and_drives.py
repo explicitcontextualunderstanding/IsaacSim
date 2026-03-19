@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides UI components for configuring joints and drives in the robot setup wizard."""
+
+
 from functools import partial
 
 import carb
@@ -48,8 +52,34 @@ from ..utils.ui_utils import ButtonWithIcon, custom_header, info_frame, next_ste
 
 
 class JointItem(SearchableItem):
+    """Represents a joint item in the robot setup wizard.
+
+    This class encapsulates joint configuration data including joint properties, parent-child relationships,
+    breakage settings, joint limits, and drive parameters. It extends SearchableItem to enable filtering and
+    searching within the joint tree view interface.
+
+    Args:
+        name: The name of the joint.
+        joint_type: The type of joint (e.g., 'prismatic', 'revolute', 'spherical', 'fixed', 'd6').
+        axis: The axis along which the joint moves (e.g., 'X', 'Y', 'Z').
+        drive_type: The drive type for the joint ('acceleration', 'force', or 'None').
+        parent: The parent body name for the joint.
+        child: The child body name for the joint.
+        editable: Whether the joint item can be edited in the UI.
+        **kwargs: Additional joint and drive settings including 'break_force', 'break_torque', 'lower_limit',
+            'upper_limit', 'max_force', 'target_position', 'target_velocity', 'damping', and 'stiffness'.
+    """
+
     def __init__(
-        self, name, joint_type, axis, drive_type="None", parent="body0", child="body1", editable=True, **kwargs
+        self,
+        name: str,
+        joint_type: str,
+        axis: str,
+        drive_type: str = "None",
+        parent: str = "body0",
+        child: str = "body1",
+        editable: bool = True,
+        **kwargs,
     ):
         super().__init__()
         self.name = ui.SimpleStringModel(name)
@@ -75,6 +105,10 @@ class JointItem(SearchableItem):
         self.text = " ".join((name, joint_type, axis, drive_type))
 
     def refresh_text(self):
+        """Updates the display text by combining joint properties into a single text string.
+
+        Combines the joint name, type, axis, drive type, parent, and child properties into a searchable text representation for the tree view.
+        """
         # TODO: should refresh text when item edited, so should add some on_item_changed callback in build function
         self.text = " ".join(
             (
@@ -88,11 +122,10 @@ class JointItem(SearchableItem):
         )
 
     def set_property(self, property_name, value):
-        """
-        Sets the value of a specified property and refreshes the display text.
+        """Sets the value of a specified property and refreshes the display text.
 
         Args:
-            property_name (str): The name of the property to set (e.g., 'name', 'parent', 'child', 'axis', 'type', 'drive').
+            property_name: The name of the property to set (e.g., 'name', 'parent', 'child', 'axis', 'type', 'drive').
             value: The value to set for the property.
         """
         if hasattr(self, property_name):
@@ -101,11 +134,30 @@ class JointItem(SearchableItem):
 
 
 class JointsModel(TreeViewWithPlacerHolderModel):  # the model for the tree view
+    """Tree view model for managing joint items in the robot setup wizard.
+
+    This model extends TreeViewWithPlacerHolderModel to provide specialized functionality for handling
+    joint configuration data. It manages a collection of JointItem objects and provides methods for
+    retrieving their properties as UI models for display in tree view columns. The model also supports
+    editing individual joint items through a popup window interface.
+
+    The model tracks joint properties including name, type, axis, drive type, parent and child transforms.
+    It integrates with the joint creation and editing workflow by maintaining references to edit windows
+    and handling item value retrieval for the tree view display system.
+
+    Args:
+        items: Initial collection of joint items to populate the model.
+    """
+
     def __init__(self, items):
         super().__init__(items)
         self._edit_window = None
 
     def destroy(self):
+        """Destroys the joints model and cleans up associated resources.
+
+        Cleans up the edit window if it exists and calls the parent class destroy method.
+        """
         if self._edit_window:
             self._edit_window.destroy()
         self._edit_window = None
@@ -113,11 +165,14 @@ class JointsModel(TreeViewWithPlacerHolderModel):  # the model for the tree view
         super().destroy()
 
     def get_item_value_model(self, item, column_id):
-        """
-        Return value model.
+        """Return value model.
         It's the object that tracks the specific value.
         In our case we use ui.SimpleStringModel for the first column
         and SimpleFloatModel for the second column.
+
+        Args:
+            item: The joint item to get the value model from.
+            column_id: The column identifier (1-6) corresponding to different joint properties.
         """
         if isinstance(item, JointItem):
             if column_id == 1:
@@ -134,6 +189,13 @@ class JointsModel(TreeViewWithPlacerHolderModel):  # the model for the tree view
                 return item.child
 
     def edit_item(self, item):
+        """Opens the edit joint window for the specified item.
+
+        Creates a new edit window if one doesn't exist, or shows the existing window and updates it with the item's data.
+
+        Args:
+            item: The joint item to edit.
+        """
         # This item is not necessarily the tree view selection.
         if not self._edit_window:
             self._edit_window = CreateJointWindow("Edit Joint", self, item)
@@ -143,7 +205,13 @@ class JointsModel(TreeViewWithPlacerHolderModel):  # the model for the tree view
 
 
 class JointsandDrives:
-    """Frame for the `Add Joints & Drivers` page"""
+    """Frame for the `Add Joints & Drivers` page.
+
+    Args:
+        visible: Whether the frame is visible.
+        *args: Additional positional arguments.
+        **kwargs: Additional keyword arguments.
+    """
 
     def __init__(self, visible, *args, **kwargs):
         self.visible = visible
@@ -161,6 +229,10 @@ class JointsandDrives:
         self._previous_joint_item = None
 
     def destroy(self):
+        """Cleans up all resources and UI components for the joints and drives frame.
+
+        Clears subscriptions, destroys models, windows, tree views, and settings stacks to prevent memory leaks.
+        """
         self.__subscription = None
         if self._joint_model:
             self._joint_model.destroy()
@@ -181,6 +253,10 @@ class JointsandDrives:
         self._previous_joint_item = None
 
     def _build_frame(self):
+        """Builds the main UI frame for the joints and drives creation interface.
+
+        Creates the collapsible frame with joint creation controls, tree view for joint list, joint settings panel, drive settings panel, and save robot button.
+        """
         with ui.ScrollingFrame():
             with ui.CollapsableFrame("Joints and Drives", build_header_fn=custom_header):
                 with ui.ScrollingFrame():
@@ -237,12 +313,23 @@ class JointsandDrives:
                             )
 
     def joint_settings(self):
+        """Creates the joint settings panel for the currently selected joint.
+
+        Builds the settings UI stack and populates it with the joint settings content if a joint is selected in the tree view.
+        """
         self._joint_settings_stack = ui.ZStack(visible=bool(self._tree_view.selection))
         if not self._tree_view.selection:
             return
         self.build_joint_settings_content(self._tree_view.selection[0])
 
     def build_joint_settings_content(self, current_item):
+        """Builds the joint settings UI content for the specified joint item.
+
+        Creates input fields for parent/child xforms, breakable joint settings with force/torque limits, and joint limit settings with lower/upper bounds.
+
+        Args:
+            current_item: The JointItem to build settings content for.
+        """
         self._joint_settings_stack.clear()
         with self._joint_settings_stack:
             ui.Rectangle(name="save_stack")
@@ -299,11 +386,25 @@ class JointsandDrives:
                     )
 
     def _update_xform(self, current_item, value_model, model):
+        """Updates the xform (transform) value for a joint and notifies the model of changes.
+
+        Args:
+            current_item: The JointItem being updated.
+            value_model: The UI model containing the xform value.
+            model: The string field model containing the new xform value.
+        """
         new_value = model.get_value_as_string()
         value_model.set_value(new_value)
         self._joint_model._item_changed(current_item)
 
     def _set_joint_breakable(self, enable):
+        """Configures the joint breakable settings and enables/disables break force and torque fields.
+
+        When disabled, sets break force and torque to infinity. Updates the UI field states accordingly.
+
+        Args:
+            enable: Whether the joint should be breakable.
+        """
         if not enable:
             self._break_force_field._value_model.set_value(float("inf"))
             self._break_torque_field._value_model.set_value(float("inf"))
@@ -311,6 +412,13 @@ class JointsandDrives:
         self._break_torque_field.enable = enable
 
     def _set_joint_limit(self, enable):
+        """Configures the joint limit settings and enables/disables limit fields.
+
+        When disabled, sets lower limit to negative infinity and upper limit to positive infinity. Updates the UI field states accordingly.
+
+        Args:
+            enable: Whether the joint should have limited range.
+        """
         if not enable:
             self._lower_limit_field._value_model.set_value(float("-inf"))
             self._upper_limit_field._value_model.set_value(float("inf"))
@@ -318,12 +426,23 @@ class JointsandDrives:
         self._upper_limit_field.enable = enable
 
     def drive_settings(self):
+        """Creates the drive settings panel for the currently selected joint.
+
+        Builds the drive settings UI stack and populates it with the drive settings content if a joint is selected in the tree view.
+        """
         self._drive_settings_stack = ui.ZStack(visible=bool(self._tree_view.selection))
         if not self._tree_view.selection:
             return
         self.build_drive_settings_content(self._tree_view.selection[0])
 
     def build_drive_settings_content(self, current_item):
+        """Builds the drive settings UI content for the specified joint item.
+
+        Creates input fields for drive type, max force, target position/velocity, and damping/stiffness parameters.
+
+        Args:
+            current_item: The JointItem to build drive settings content for.
+        """
         self._drive_settings_stack.clear()
         with self._drive_settings_stack:
             ui.Rectangle(name="save_stack")
@@ -352,12 +471,23 @@ class JointsandDrives:
                     ResetableField(current_item.stiffness, ui.FloatField)
 
     def rebuild_settings(self, item):
+        """Rebuilds both joint and drive settings panels for the specified joint item.
+
+        Args:
+            item: The JointItem to rebuild settings for.
+        """
         self.build_joint_settings_content(item)
         self.build_drive_settings_content(item)
 
     def _create_joint(self, current_item):
-        """
-        create joints and apply settings to the robot
+        """Creates joints and applies settings to the robot.
+
+        Extracts joint parameters from the current item and creates the corresponding
+        joint prim on the USD stage. If a joint already exists at the path, it removes
+        the old one before creating the new joint.
+
+        Args:
+            current_item: The JointItem containing the joint configuration.
         """
         robot = RobotRegistry().get()
         stage = omni.usd.get_context().get_stage()
@@ -413,15 +543,33 @@ class JointsandDrives:
         )
 
     def create_joint_window(self):
+        """Opens the joint creation window.
+
+        Creates a new CreateJointWindow instance if it doesn't exist and makes it visible.
+        """
         if not self._create_joint_window:
             self._create_joint_window = CreateJointWindow("Create Joint", self._joint_model)
         self._create_joint_window._window.visible = True
 
     def _filter_by_text(self, filters):
+        """Filters the joint model by text search.
+
+        Args:
+            filters: The text filters to apply to the joint model.
+        """
         if self._joint_model:
             self._joint_model.filter_by_text(filters)
 
     def _model_changed(self, model, item):
+        """Handles changes to the joint model.
+
+        Validates joint names, updates UI visibility based on the number of joints,
+        and manages the tree view ID column delegate.
+
+        Args:
+            model: The joint model that changed.
+            item: The specific item that changed, or None if the root changed.
+        """
         # item data changed
         if item:
             # we only update the settings panel when the item triggers the change is the same as the one selected in the
@@ -462,14 +610,23 @@ class JointsandDrives:
             self.id_column.remove_item()
 
     def set_visible(self, visible):
+        """Controls the visibility of the joints and drives frame.
+
+        When made visible, parses existing joint parameters from the robot.
+
+        Args:
+            visible: Whether to make the frame visible.
+        """
         if self.frame:
             if visible:
                 self._parse_joints_params()
             self.frame.visible = visible
 
     def _parse_joints_params(self):
-        """
-        if there are already joints in the robot, we need to parse the joints params from the robot and display them in the tree view
+        """Parses joint parameters from the robot and displays them in the tree view.
+
+        Retrieves existing joints from the robot's Joints scope and creates JointItem
+        objects with their settings to populate the joint model.
         """
 
         robot = RobotRegistry().get()
@@ -514,6 +671,15 @@ class JointsandDrives:
                 )
 
     def __selection_changed(self, selection):
+        """Handles tree view selection changes.
+
+        Saves the settings of the previously selected joint and updates the settings
+        panels for the newly selected joint. Fixed joints hide the settings panels
+        while other joint types show them.
+
+        Args:
+            selection: The selected items from the tree view.
+        """
         # save the settings of the previously selected joint
         if self._previous_joint_item:
             self._save_joint_settings(self._previous_joint_item)
@@ -533,6 +699,12 @@ class JointsandDrives:
             self._previous_joint_item = None
 
     def treeview_empty_page(self):
+        """Creates an empty page placeholder for the tree view.
+
+        Displays a message indicating that the joint list is empty and provides instructions
+        to create new joints. The page visibility is controlled by the number of joints
+        in the model.
+        """
         self._treeview_empty_page = ui.VStack(visible=True, height=self._treeview_initial_height)
         with self._treeview_empty_page:
             ui.Spacer(height=ui.Fraction(3))
@@ -547,6 +719,11 @@ class JointsandDrives:
         self._treeview_empty_page.visible = bool(self._joint_model._searchable_num == 0)
 
     def _build_tree_view(self):
+        """Builds the tree view component for displaying joints.
+
+        Creates the tree view with headers, delegates, and an empty page placeholder.
+        Sets up a resizable splitter and configures the ID column for joint numbering.
+        """
         with ui.ZStack():
             scrolling_frame = ui.ScrollingFrame(name="treeview", height=self._treeview_initial_height)
             with scrolling_frame:
@@ -590,6 +767,11 @@ class JointsandDrives:
             placer.set_offset_y_changed_fn(move)
 
     def _save_joint_settings(self, item):
+        """Saves joint and drive settings from UI to the model.
+
+        Args:
+            item: The JointItem to save settings for.
+        """
         # saving joint and drive settings from ui to model
         if item:
             if item.joint_type.get_value_as_string() != "Fixed":
@@ -607,8 +789,10 @@ class JointsandDrives:
                 item.set_property("stiffness", item.stiffness.get_value_as_float())
 
     def add_joint_to_robot(self):
-        """
-        When click next button, add all joints to the robot
+        """Adds all joints from the joint model to the robot when the next button is clicked.
+
+        Iterates through all joint items in the joint model and creates each joint in the USD stage
+        with their configured settings. Applies joint APIs to the robot after all joints are created.
         """
         robot = RobotRegistry().get()
         robot_name = robot.name
@@ -622,7 +806,13 @@ class JointsandDrives:
 
 
 class CreateJointWindow:
-    """This is the pop up window of Create/Edit joint"""
+    """This is the pop up window of Create/Edit joint.
+
+    Args:
+        window_title: Title displayed in the window.
+        model: The model for displaying joint data in the main page.
+        item: The joint item currently being edited or created.
+    """
 
     def __init__(self, window_title, model, item=None):
         self._is_edit = window_title == "Edit Joint"  # the same window is used for create and edit
@@ -647,6 +837,7 @@ class CreateJointWindow:
         self._window.frame.set_build_fn(self._rebuild_frame)
 
     def destroy(self):
+        """Cleans up and destroys the window and its resources."""
         self.__subscription = None
         if self._select_new_joint_target_window:
             self._select_new_joint_target_window.destroy()
@@ -656,11 +847,22 @@ class CreateJointWindow:
         self._window = None
 
     def _model_changed(self, model, item):
+        """Updates the window UI when the joint model data changes.
+
+        Args:
+            model: The joint model that changed.
+            item: The joint item that was modified.
+        """
         # when model item changes (such as being changed in the main window), we need to update the ui if the window is visible
         if item and self._window.visible:
             self._update_ui(item)
 
     def _update_ui(self, item):
+        """Updates the window UI elements with data from the joint item.
+
+        Args:
+            item: The joint item to display data from.
+        """
         # update the main window from model item data
         # parent xform
         self._parent_xform_widget.checked = bool(item)
@@ -685,6 +887,7 @@ class CreateJointWindow:
         self._window.frame.invalidate_raster()
 
     def _update_item(self):
+        """Updates the current joint item with values from the UI form fields."""
         # update joint item from the create window ui
         if not self._current_joint_item:
             return
@@ -702,6 +905,7 @@ class CreateJointWindow:
         self._current_joint_model._item_changed(self._current_joint_item)
 
     def _switch_xforms(self):
+        """Swaps the parent and child transform values in the UI fields."""
 
         if not self._child_xform_stack.enabled:
             return
@@ -711,12 +915,23 @@ class CreateJointWindow:
         self._child_xform_model.set_value(parent_value)
 
     def on_collapsed_changed(self, collapsed):
+        """Adjusts the window height based on the collapsed state of the info panel.
+
+        Args:
+            collapsed: Whether the info panel is collapsed.
+        """
         if collapsed:
             self._window.height = self._collapsed_height
         else:
             self._window.height = self._window_height
 
     def _update_joint_type(self, model, root_item):
+        """Updates UI visibility and behavior based on the selected joint type.
+
+        Args:
+            model: The joint type model.
+            root_item: The root item containing the joint type selection.
+        """
         root_model = model.get_item_value_model(root_item)
         value = root_model.get_value_as_int()
         joint_type = self.joint_types[value]
@@ -732,6 +947,11 @@ class CreateJointWindow:
             self._drive_widget.visible = True
 
     def _on_create_clicked(self, closed=False):
+        """Creates or updates a joint when the create button is clicked.
+
+        Args:
+            closed: Whether to close the window after creating the joint.
+        """
         # when create clicked, update the joint model
         joint_name = self._joint_name_widget.model.get_value_as_string()
         joint_type = JOINT_TYPES[self._joint_type_widget.model.get_item_value_model().get_value_as_int()]
@@ -762,11 +982,13 @@ class CreateJointWindow:
         self._update_ui(None)
 
     def _on_cancel_clicked(self):
+        """Cancels joint creation and hides the window."""
         self._window.visible = False
         self._update_ui(None)
         self._current_joint_item = None
 
     def _on_save_clicked(self):
+        """Saves changes to the current joint and closes the window."""
         if not self._current_joint_item:
             return
 
@@ -774,6 +996,7 @@ class CreateJointWindow:
         self._window.visible = False
 
     def _rebuild_frame(self):
+        """Rebuilds the UI frame layout for the create/edit joint window."""
         with ui.HStack(height=0):
             ui.Spacer(width=10)
             with ui.VStack(style=get_popup_window_style(), spacing=10):
@@ -911,12 +1134,24 @@ class CreateJointWindow:
                         ui.Spacer(width=10)
 
     def select(self, model, selected_paths):
+        """Handles the selection of paths from the robot asset picker.
+
+        Args:
+            model: The UI model to update with the selected path.
+            selected_paths: List of selected path strings from the picker.
+        """
         self._select_new_joint_target_window.visible = False
         self._selected_paths = selected_paths
         if self._selected_paths:
             model.set_value(self._selected_paths[0])
 
     def select_new_joint_target(self, model, title):
+        """Opens a robot asset picker window for selecting joint target paths.
+
+        Args:
+            model: The UI model to update with the selected path.
+            title: The window title for the robot asset picker.
+        """
         if not self._select_new_joint_target_window:
             stage = omni.usd.get_context().get_stage()
             self._select_new_joint_target_window = RobotAssetPicker(
@@ -931,6 +1166,11 @@ class CreateJointWindow:
         self._select_new_joint_target_window.visible = True
 
     def _on_joint_name_changed(self, m):
+        """Validates the joint name when changed and updates the invalid name label visibility.
+
+        Args:
+            m: The string model containing the joint name value.
+        """
         joint_name_value = m.get_value_as_string()
         if Sdf.Path.IsValidIdentifier(joint_name_value):
             self._invalid_joint_name_label.visible = False

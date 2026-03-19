@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for recording synthetic data in Isaac Sim through the Replicator framework."""
+
+
 import asyncio
 
 import omni.ext
@@ -23,10 +26,27 @@ from .synthetic_recorder_window import SyntheticRecorderWindow
 
 
 class SyntheticRecorderExtension(omni.ext.IExt, MenuHelperExtensionFull):
+    """Extension for recording synthetic data in Isaac Sim.
+
+    This extension provides a user interface for recording synthetic sensor data and annotations
+    through the Replicator framework. It adds a "Synthetic Data Recorder" window accessible
+    from the Tools/Replicator menu, enabling users to configure and manage synthetic data
+    recording sessions for machine learning workflows.
+    """
+
     WINDOW_NAME = "Synthetic Data Recorder"
+    """The name displayed in the window title bar."""
     MENU_GROUP = "Tools/Replicator"
+    """The menu group path where the extension appears in the application menu."""
 
     def on_startup(self, ext_id):
+        """Called when the Synthetic Data Recorder extension is starting up.
+
+        Adds the Synthetic Data Recorder window to the Tools/Replicator menu group.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         # Add the menu item
         self.menu_startup(
             lambda: SyntheticRecorderWindow(SyntheticRecorderExtension.WINDOW_NAME, ext_id),
@@ -36,4 +56,8 @@ class SyntheticRecorderExtension(omni.ext.IExt, MenuHelperExtensionFull):
         )
 
     def on_shutdown(self):
+        """Called when the Synthetic Data Recorder extension is shutting down.
+
+        Removes the menu items created during startup.
+        """
         self.menu_shutdown()

@@ -117,8 +117,6 @@ class World(SimulationContext):
         self._task_scene_built = False
         self._current_tasks = dict()
         self._scene = Scene()
-        # if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
-        #     self.start_simulation()
         self._data_logger = DataLogger()
         return
 

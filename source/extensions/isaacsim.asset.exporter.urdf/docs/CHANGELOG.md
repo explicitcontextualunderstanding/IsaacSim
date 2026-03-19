@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.3] - 2026-02-24
+### Changed
+- Temporarily disable nova carter and go2 unit test for urdf converter fix
+
+## [1.4.2] - 2026-02-23
+### Changed
+- Add explicit omni.physics.physx dependency
+
+## [1.4.1] - 2025-12-14
+### Changed
+- Update lxml==6.0.2
+
+## [1.4.0] - 2025-10-30
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [1.3.5] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [1.3.4] - 2025-10-09
 ### Changed
 - Switch UI element to remove duplicate code
@@ -46,7 +66,7 @@
 - Moved Urdf Exporter into File menu next to the other Exporter
 - Options are integrated into the File Exporter dialog
 - Removed option to export from USD file without opening it on Stage
-- usd to urdf library upgraded to python 3.11
+- Usd to urdf library upgraded to python 3.11
 
 ## [1.1.5] - 2025-03-26
 ### Changed
@@ -90,7 +110,7 @@
 
 ## [1.0.0] - 2024-09-27
 ### Fixed
-- extension renamed to isaacsim.asset.exporter.urdf
+- Extension renamed to isaacsim.asset.exporter.urdf
 
 ## [0.3.2] - 2024-08-28
 ### Fixed
@@ -98,7 +118,7 @@
 
 ## [0.3.1] - 2024-07-23
 ### Fixed
-- removed unnecessary dependencies
+- Removed unnecessary dependencies
 
 ## [0.3.0] - 2024-04-26
 ### Fixed

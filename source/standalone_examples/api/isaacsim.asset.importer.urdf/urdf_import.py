@@ -13,89 +13,139 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import os
+
 from isaacsim import SimulationApp
 
-# URDF import, configuration and simulation sample
-kit = SimulationApp({"renderer": "RaytracedLighting", "headless": False})
-import omni.kit.commands
-from isaacsim.core.prims import Articulation
-from isaacsim.core.utils.extensions import get_extension_path_from_name
-from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, UsdLux, UsdPhysics
+simulation_app = SimulationApp({"headless": True})
 
-# Setting up import configuration:
-status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-import_config.merge_fixed_joints = False
-import_config.convex_decomp = False
-import_config.import_inertia_tensor = True
-import_config.fix_base = False
-import_config.distance_scale = 1.0
+import omni.kit.app
 
-# Get path to extension data:
-extension_path = get_extension_path_from_name("isaacsim.asset.importer.urdf")
-# Import URDF, prim_path contains the path the path to the usd prim in the stage.
-status, prim_path = omni.kit.commands.execute(
-    "URDFParseAndImportFile",
-    urdf_path=extension_path + "/data/urdf/robots/carter/urdf/carter.urdf",
-    import_config=import_config,
-    get_articulation_root=True,
+
+def _enable_scene_optimizer_extension():
+    ext_manager = omni.kit.app.get_app().get_extension_manager()
+    ext_manager.set_extension_enabled_immediate("omni.scene.optimizer.core", True)
+
+
+_enable_scene_optimizer_extension()
+
+from isaacsim.asset.importer.urdf.impl import URDFImporter, URDFImporterConfig
+
+parser = argparse.ArgumentParser(description="Import a URDF file using Isaac Sim.")
+parser.add_argument("--urdf", required=False, default=None, help="Path to the URDF file (.urdf) to import.")
+parser.add_argument(
+    "--usd-path",
+    required=False,
+    default=None,
+    help="Directory to write converted USD assets.",
 )
-# Get stage handle
-stage = omni.usd.get_context().get_stage()
+parser.add_argument(
+    "--merge-mesh",
+    action=argparse.BooleanOptionalAction,
+    default=None,
+    help="Merge meshes after conversion.",
+)
+parser.add_argument(
+    "--debug-mode",
+    action=argparse.BooleanOptionalAction,
+    default=None,
+    help="Enable debug mode and keep intermediate outputs.",
+)
+parser.add_argument(
+    "--collision-from-visuals",
+    action=argparse.BooleanOptionalAction,
+    default=None,
+    help="Generate collision geometry from visuals.",
+)
+parser.add_argument(
+    "--collision-type",
+    default=None,
+    help="Collision geometry type (e.g. default, Convex Hull, Convex Decomposition).",
+)
+parser.add_argument(
+    "--allow-self-collision",
+    action=argparse.BooleanOptionalAction,
+    default=None,
+    help="Allow self-collision for the imported asset.",
+)
+parser.add_argument(
+    "--test",
+    action=argparse.BooleanOptionalAction,
+    default=False,
+    help="Run in test mode: uses carter.urdf test asset into a temp directory",
+)
+parser.add_argument(
+    "--ros-package",
+    action="append",
+    metavar="NAME:PATH",
+    help="ROS package mapping in format 'name:path'. Can be specified multiple times for multiple packages.",
+)
+args, unknown = parser.parse_known_args()
 
-# Enable physics
-scene = UsdPhysics.Scene.Define(stage, Sdf.Path("/physicsScene"))
-# Set gravity
-scene.CreateGravityDirectionAttr().Set(Gf.Vec3f(0.0, 0.0, -1.0))
-scene.CreateGravityMagnitudeAttr().Set(9.81)
-# Set solver settings
-PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/physicsScene"))
-physxSceneAPI = PhysxSchema.PhysxSceneAPI.Get(stage, "/physicsScene")
-physxSceneAPI.CreateEnableCCDAttr(True)
-physxSceneAPI.CreateEnableStabilizationAttr(True)
-physxSceneAPI.CreateEnableGPUDynamicsAttr(False)
-physxSceneAPI.CreateBroadphaseTypeAttr("MBP")
-physxSceneAPI.CreateSolverTypeAttr("TGS")
 
-# Add ground plane
-PhysicsSchemaTools.addGroundPlane(stage, "/groundPlane", "Z", 1500, Gf.Vec3f(0, 0, -0.25), Gf.Vec3f(0.5))
+def main():
+    """Run the URDF import workflow with CLI configuration.
 
-# Add lighting
-distantLight = UsdLux.DistantLight.Define(stage, Sdf.Path("/DistantLight"))
-distantLight.CreateIntensityAttr(500)
+    Returns:
+        Exit code integer.
 
-# Get handle to the Drive API for both wheels
-left_wheel_drive = UsdPhysics.DriveAPI.Get(stage.GetPrimAtPath("/carter/joints/left_wheel"), "angular")
-right_wheel_drive = UsdPhysics.DriveAPI.Get(stage.GetPrimAtPath("/carter/joints/right_wheel"), "angular")
+    """
+    try:
+        import_config = URDFImporterConfig()
 
-# Set the velocity drive target in degrees/second
-left_wheel_drive.GetTargetVelocityAttr().Set(150)
-right_wheel_drive.GetTargetVelocityAttr().Set(150)
+        if args.test:
+            ext_manager = omni.kit.app.get_app().get_extension_manager()
+            ext_id = ext_manager.get_enabled_extension_id("isaacsim.asset.importer.urdf")
+            extension_path = ext_manager.get_extension_path(ext_id)
+            args.urdf = os.path.join(extension_path, "data", "urdf", "robots", "carter", "urdf", "carter.urdf")
+        else:
+            if args.urdf is None:
+                raise RuntimeError(
+                    "URDF file path is required. Use --urdf to specify a file or --test to use a test asset."
+                )
+            if not os.path.isabs(args.urdf):
+                args.urdf = os.path.abspath(args.urdf)
 
-# Set the drive damping, which controls the strength of the velocity drive
-left_wheel_drive.GetDampingAttr().Set(15000)
-right_wheel_drive.GetDampingAttr().Set(15000)
+            if not os.path.exists(args.urdf):
+                raise RuntimeError(f"URDF file not found: {args.urdf}")
 
-# Set the drive stiffness, which controls the strength of the position drive
-# In this case because we want to do velocity control this should be set to zero
-left_wheel_drive.GetStiffnessAttr().Set(0)
-right_wheel_drive.GetStiffnessAttr().Set(0)
+        import_config.urdf_path = args.urdf
 
-# Start simulation
-omni.timeline.get_timeline_interface().play()
-# perform one simulation step so physics is loaded and dynamic control works.
-kit.update()
-art = Articulation(prim_path)
-art.initialize()
+        if args.usd_path is not None:
+            import_config.usd_path = os.path.abspath(args.usd_path)
 
-if not art.is_physics_handle_valid():
-    print(f"{prim_path} is not an articulation")
-else:
-    print(f"Got articulation ({prim_path})")
+        if args.merge_mesh is not None:
+            import_config.merge_mesh = args.merge_mesh
+        if args.debug_mode is not None:
+            import_config.debug_mode = args.debug_mode
+        if args.collision_from_visuals is not None:
+            import_config.collision_from_visuals = args.collision_from_visuals
+        if args.collision_type is not None:
+            import_config.collision_type = args.collision_type
+        if args.allow_self_collision is not None:
+            import_config.allow_self_collision = args.allow_self_collision
 
-# perform simulation
-for frame in range(1000):
-    kit.update()
+        if args.ros_package:
+            ros_packages = []
+            for package_spec in args.ros_package:
+                if ":" not in package_spec:
+                    raise ValueError(f"Invalid ROS package format: {package_spec}. Expected format: 'name:path'")
+                name, path = package_spec.split(":", 1)
+                ros_packages.append({"name": name.strip(), "path": path.strip()})
+            import_config.ros_package_paths = ros_packages
 
-# Shutdown and exit
-omni.timeline.get_timeline_interface().stop()
-kit.close()
+        importer = URDFImporter(import_config)
+        output_usd = importer.import_urdf()
+        if not output_usd:
+            raise RuntimeError("URDF import failed.")
+
+        print(f"URDF import successful. Output USD file: {output_usd}")
+        simulation_app.close()
+    except Exception as e:
+        print(f"Error: {e}")
+        simulation_app.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import carb.eventdispatcher
 import carb.events
+import omni.timeline
 import omni.usd
 
 
@@ -27,11 +29,14 @@ class BaseResetNode:
 
         timeline = omni.timeline.get_timeline_interface()
 
-        self.timeline_event_sub = timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-            int(omni.timeline.TimelineEventType.STOP), self.on_stop_play, name="IsaacSimOGNCoreNodesStageEventHandler"
+        self.timeline_event_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=self.on_stop_play,
+            observer_name="isaacsim.core.nodes.BaseResetNode.on_stop_play",
         )
 
-    def on_stop_play(self, event: carb.events.IEvent):
+    def on_stop_play(self, event: carb.eventdispatcher.Event):
+        """Timeline stop event callback - reset node state."""
         self.custom_reset()
         self.initialized = False
 

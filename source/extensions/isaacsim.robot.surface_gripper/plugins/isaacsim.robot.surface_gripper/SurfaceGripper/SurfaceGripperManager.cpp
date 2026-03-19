@@ -45,8 +45,8 @@ void SurfaceGripperManager::onStop()
 {
     for (auto& component : m_components)
     {
-        component.second->mDoStart = true;
-        component.second->onStop();
+        component->mDoStart = true;
+        component->onStop();
     }
     if (m_gripperLayer)
     {
@@ -69,7 +69,19 @@ void SurfaceGripperManager::onComponentAdd(const pxr::UsdPrim& prim)
         std::unique_ptr<SurfaceGripperComponent> component = std::make_unique<SurfaceGripperComponent>();
         component->initialize(prim, m_stage, m_writeToUsd);
 
-        m_components[prim.GetPath().GetString()] = std::move(component);
+        const std::string key = prim.GetPath().GetString();
+        auto it = m_componentIndexByKey.find(key);
+        if (it == m_componentIndexByKey.end())
+        {
+            m_componentKeys.push_back(key);
+            m_components.push_back(std::move(component));
+            m_componentIndexByKey[key] = m_components.size() - 1;
+        }
+        else
+        {
+            m_components[it->second] = std::move(component);
+            m_componentKeys[it->second] = key;
+        }
     }
     if (m_components.size() > 0)
     {
@@ -104,177 +116,172 @@ void SurfaceGripperManager::onComponentChange(const pxr::UsdPrim& prim)
     isaacsim::core::includes::PrimManagerBase<SurfaceGripperComponent>::onComponentChange(prim);
 
     // Update properties of this prim
-    if (m_components.find(prim.GetPath().GetString()) != m_components.end())
-    {
-        m_components[prim.GetPath().GetString()]->onComponentChange();
-    }
+    const std::string key = prim.GetPath().GetString();
+    auto it = m_componentIndexByKey.find(key);
+    if (it != m_componentIndexByKey.end())
+        m_components[it->second]->onComponentChange();
 }
 
 void SurfaceGripperManager::onPhysicsStep(const double& dt)
 {
     CARB_PROFILE_ZONE(0, "[IsaacSim] SurfaceGripperManager::onPhysicsStep");
-
-    isaacsim::robot::surface_gripper::parallelForIndex(m_components.size(),
-                                                       [&](size_t i)
-                                                       {
-                                                           auto it = m_components.begin();
-                                                           std::advance(it, i);
-                                                           it->second->onPhysicsStep(dt);
-                                                       });
-    // Collect all PhysX and USD actions from components
-    std::vector<PhysxAction> actions;
-    std::vector<UsdAction> usdActions;
-    for (auto& kv : m_components)
+    isaacsim::robot::surface_gripper::parallelForIndex(
+        m_components.size(), [&](size_t i) { m_components[i]->onPhysicsStep(dt); });
+    // Execute all PhysX and USD actions directly from components, clearing queues as we go
+    executePhysxActions();
+    executeUsdActions();
+}
+void SurfaceGripperManager::executePhysxActions()
+{
+    // CARB_PROFILE_ZONE(0, "[IsaacSim] SurfaceGripperManager::onPhysicsStep::PhysxAction");
+    for (auto& component : m_components)
     {
-        kv.second->consumePhysxActions(actions);
-        kv.second->consumeUsdActions(usdActions);
-    }
-
-    // Execute PhysX actions serially
-    {
-        CARB_PROFILE_ZONE(0, "[IsaacSim] SurfaceGripperManager::onPhysicsStep::PhysxAction");
+        auto& actions = component->m_physxActions;
         for (const PhysxAction& a : actions)
         {
-            if (a.type == PhysxActionType::Attach)
+            switch (a.type)
             {
-                physx::PxJoint* joint = static_cast<physx::PxJoint*>(
-                    m_physXInterface->getPhysXPtr(pxr::SdfPath(a.jointPath), omni::physx::PhysXType::ePTJoint));
-                if (!joint)
-                    continue;
+            case PhysxActionType::Attach:
+            {
+                physx::PxJoint* joint = a.joint;
                 physx::PxRigidActor* actor0 = a.actor0;
                 physx::PxRigidActor* actor1 = a.actor1;
-                if (!actor0 || !actor1)
-                    continue;
                 joint->setActors(actor0, actor1);
                 joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, a.localPose1);
                 // On attach: constraints disabled, collision disabled
                 joint->setConstraintFlag(physx::PxConstraintFlag::eDISABLE_CONSTRAINT, false);
                 joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, false);
+                break;
             }
-            else if (a.type == PhysxActionType::Detach)
+            case PhysxActionType::Detach:
             {
-                physx::PxJoint* joint = static_cast<physx::PxJoint*>(
-                    m_physXInterface->getPhysXPtr(pxr::SdfPath(a.jointPath), omni::physx::PhysXType::ePTJoint));
-                if (!joint)
-                    continue;
-                // On detach: constraints enabled, collision enabled
+                physx::PxJoint* joint = a.joint;
                 joint->setConstraintFlag(physx::PxConstraintFlag::eDISABLE_CONSTRAINT, true);
                 joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, true);
+                break;
+            }
+            default:
+                break;
             }
         }
+        actions.clear();
     }
+}
 
+void SurfaceGripperManager::executeUsdActions()
+{
     // Execute USD actions serially (one edit context scope)
-    if (m_writeToUsd && !usdActions.empty() && m_stage)
+    if (m_writeToUsd && m_stage)
     {
         CARB_PROFILE_ZONE(0, "[IsaacSim] SurfaceGripperManager::onPhysicsStep::UsdAction");
         pxr::SdfChangeBlock changeBlock;
         auto layer = m_stage->GetRootLayer();
         pxr::SdfLayerRefPtr refPtr(layer.operator->());
         pxr::UsdEditContext context(m_stage, m_gripperLayer ? m_gripperLayer : refPtr);
-        for (const UsdAction& ua : usdActions)
+        for (auto& component : m_components)
         {
-            switch (ua.type)
+            auto& usdActions = component->m_usdActions;
+            for (const UsdAction& ua : usdActions)
             {
-            case UsdActionType::WriteStatus:
-            {
-                pxr::UsdPrim selfPrim = m_stage->GetPrimAtPath(pxr::SdfPath(ua.primPath));
-                if (!selfPrim)
-                    continue;
-                pxr::UsdAttribute gripperStatusAttr = selfPrim.GetAttribute(
-                    isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::STATUS));
-                if (gripperStatusAttr)
+                switch (ua.type)
                 {
-                    gripperStatusAttr.Set(pxr::TfToken(ua.statusToken));
-                }
-                break;
-            }
-            case UsdActionType::WriteGrippedObjectsAndFilters:
-            {
-                pxr::UsdPrim selfPrim = m_stage->GetPrimAtPath(pxr::SdfPath(ua.primPath));
-                if (!selfPrim)
-                    continue;
-                pxr::SdfPathVector objectPathsVec;
-                objectPathsVec.reserve(ua.grippedObjectPaths.size());
-                for (const auto& p : ua.grippedObjectPaths)
-                    objectPathsVec.push_back(pxr::SdfPath(p));
-
-                pxr::UsdRelationship rel = selfPrim.GetRelationship(
-                    isaacsim::robot::schema::relationNames.at(isaacsim::robot::schema::Relations::GRIPPED_OBJECTS));
-                if (!rel)
+                case UsdActionType::WriteStatus:
                 {
-                    rel = selfPrim.CreateRelationship(
-                        isaacsim::robot::schema::relationNames.at(isaacsim::robot::schema::Relations::GRIPPED_OBJECTS),
-                        false);
-                }
-                if (ua.grippedObjectPaths.empty())
-                    rel.ClearTargets(true);
-                else
-                    rel.SetTargets(objectPathsVec);
-
-                if (!ua.body0PathForFilterPairs.empty())
-                {
-                    pxr::UsdPrim body0Prim = m_stage->GetPrimAtPath(pxr::SdfPath(ua.body0PathForFilterPairs));
-                    if (body0Prim)
-                    {
-                        pxr::UsdPhysicsFilteredPairsAPI filterPairsAPI = pxr::UsdPhysicsFilteredPairsAPI(body0Prim);
-                        if (!filterPairsAPI)
-                            filterPairsAPI = pxr::UsdPhysicsFilteredPairsAPI::Apply(body0Prim);
-                        if (ua.grippedObjectPaths.empty())
-                            filterPairsAPI.GetFilteredPairsRel().ClearTargets(true);
-                        else
-                            filterPairsAPI.GetFilteredPairsRel().SetTargets(objectPathsVec);
-                    }
-                }
-                break;
-            }
-            case UsdActionType::WriteAttachmentPointBatch:
-            {
-                // Apply AttachmentPointAPI
-                for (const std::string& pathStr : ua.apiPathsToApply)
-                {
-                    pxr::UsdPrim p = m_stage->GetPrimAtPath(pxr::SdfPath(pathStr));
-                    if (p && !p.HasAPI(isaacsim::robot::schema::className(
-                                 isaacsim::robot::schema::Classes::ATTACHMENT_POINT_API)))
-                    {
-                        isaacsim::robot::schema::ApplyAttachmentPointAPI(p);
-                    }
-                }
-
-                // Set ExcludeFromArticulation
-                for (const std::string& pathStr : ua.excludeFromArticulationPaths)
-                {
-                    pxr::UsdPrim p = m_stage->GetPrimAtPath(pxr::SdfPath(pathStr));
-                    if (p)
-                    {
-                        pxr::UsdPhysicsJoint joint(p);
-                        joint.GetExcludeFromArticulationAttr().Set(true);
-                    }
-                }
-
-                // Write clearance offsets
-                for (const auto& kv : ua.clearanceOffsets)
-                {
-                    const std::string& pathStr = kv.first;
-                    float value = kv.second;
-                    pxr::UsdPrim p = m_stage->GetPrimAtPath(pxr::SdfPath(pathStr));
-                    if (!p)
+                    pxr::UsdPrim selfPrim = m_stage->GetPrimAtPath(pxr::SdfPath(ua.primPath));
+                    if (!selfPrim)
                         continue;
-                    pxr::UsdAttribute attr = p.GetAttribute(isaacsim::robot::schema::getAttributeName(
-                        isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET));
-                    if (!attr)
+                    pxr::UsdAttribute gripperStatusAttr = selfPrim.GetAttribute(
+                        isaacsim::robot::schema::getAttributeName(isaacsim::robot::schema::Attributes::STATUS));
+                    if (gripperStatusAttr)
                     {
-                        attr = p.CreateAttribute(isaacsim::robot::schema::getAttributeName(
-                                                     isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET),
-                                                 pxr::SdfValueTypeNames->Float, false);
+                        gripperStatusAttr.Set(pxr::TfToken(ua.statusToken));
                     }
-                    attr.Set(value);
+                    break;
                 }
-                break;
+                case UsdActionType::WriteGrippedObjectsAndFilters:
+                {
+                    pxr::UsdPrim selfPrim = m_stage->GetPrimAtPath(pxr::SdfPath(ua.primPath));
+                    if (!selfPrim)
+                        continue;
+                    pxr::SdfPathVector objectPathsVec;
+                    objectPathsVec.reserve(ua.grippedObjectPaths.size());
+                    for (const auto& p : ua.grippedObjectPaths)
+                        objectPathsVec.push_back(pxr::SdfPath(p));
+
+                    pxr::UsdRelationship rel = selfPrim.GetRelationship(
+                        isaacsim::robot::schema::relationNames.at(isaacsim::robot::schema::Relations::GRIPPED_OBJECTS));
+                    if (rel)
+                    {
+                        if (ua.grippedObjectPaths.empty())
+                            rel.ClearTargets(true);
+                        else
+                            rel.SetTargets(objectPathsVec);
+                    }
+                    if (!ua.body0PathForFilterPairs.empty())
+                    {
+                        pxr::UsdPrim body0Prim = m_stage->GetPrimAtPath(pxr::SdfPath(ua.body0PathForFilterPairs));
+                        if (body0Prim)
+                        {
+                            pxr::UsdPhysicsFilteredPairsAPI filterPairsAPI = pxr::UsdPhysicsFilteredPairsAPI(body0Prim);
+                            if (!filterPairsAPI)
+                                filterPairsAPI = pxr::UsdPhysicsFilteredPairsAPI::Apply(body0Prim);
+                            if (ua.grippedObjectPaths.empty())
+                                filterPairsAPI.GetFilteredPairsRel().ClearTargets(true);
+                            else
+                                filterPairsAPI.GetFilteredPairsRel().SetTargets(objectPathsVec);
+                        }
+                    }
+                    break;
+                }
+                case UsdActionType::WriteAttachmentPointBatch:
+                {
+                    // Apply AttachmentPointAPI
+                    for (const std::string& pathStr : ua.apiPathsToApply)
+                    {
+                        pxr::UsdPrim p = m_stage->GetPrimAtPath(pxr::SdfPath(pathStr));
+                        if (p && !p.HasAPI(isaacsim::robot::schema::className(
+                                     isaacsim::robot::schema::Classes::ATTACHMENT_POINT_API)))
+                        {
+                            isaacsim::robot::schema::ApplyAttachmentPointAPI(p);
+                        }
+                    }
+
+                    // Set ExcludeFromArticulation
+                    for (const std::string& pathStr : ua.excludeFromArticulationPaths)
+                    {
+                        pxr::UsdPrim p = m_stage->GetPrimAtPath(pxr::SdfPath(pathStr));
+                        if (p)
+                        {
+                            pxr::UsdPhysicsJoint joint(p);
+                            joint.GetExcludeFromArticulationAttr().Set(true);
+                        }
+                    }
+
+                    // Write clearance offsets
+                    for (const auto& kv : ua.clearanceOffsets)
+                    {
+                        const std::string& pathStr = kv.first;
+                        float value = kv.second;
+                        pxr::UsdPrim p = m_stage->GetPrimAtPath(pxr::SdfPath(pathStr));
+                        if (!p)
+                            continue;
+                        pxr::UsdAttribute attr = p.GetAttribute(isaacsim::robot::schema::getAttributeName(
+                            isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET));
+                        if (!attr)
+                        {
+                            attr = p.CreateAttribute(isaacsim::robot::schema::getAttributeName(
+                                                         isaacsim::robot::schema::Attributes::CLEARANCE_OFFSET),
+                                                     pxr::SdfValueTypeNames->Float, false);
+                        }
+                        attr.Set(value);
+                    }
+                    break;
+                }
+                default:
+                    break;
+                }
             }
-            default:
-                break;
-            }
+            usdActions.clear();
         }
     }
 }
@@ -287,10 +294,10 @@ void SurfaceGripperManager::onStart()
     }
     for (auto& component : m_components)
     {
-        if (component.second->mDoStart == true)
+        if (component->mDoStart == true)
         {
-            component.second->onStart();
-            component.second->mDoStart = false;
+            component->onStart();
+            component->mDoStart = false;
         }
     }
 }
@@ -303,8 +310,8 @@ void SurfaceGripperManager::tick(double dt)
 
     for (auto& component : m_components)
     {
-        component.second->preTick();
-        component.second->tick();
+        component->preTick();
+        component->tick();
     }
 }
 
@@ -313,42 +320,23 @@ void SurfaceGripperManager::setWriteToUsd(bool writeToUsd)
     m_writeToUsd = writeToUsd;
     for (auto& component : m_components)
     {
-        component.second->setWriteToUsd(writeToUsd);
+        component->setWriteToUsd(writeToUsd);
     }
 }
 
 bool SurfaceGripperManager::setGripperStatus(const std::string& primPath, GripperStatus status)
 {
-    if (m_writeToUsd)
-    {
-        pxr::SdfChangeBlock changeBlock;
-        auto layer = m_stage->GetRootLayer();
-        pxr::SdfLayerRefPtr refPtr(layer.operator->());
-        pxr::UsdEditContext context(m_stage, m_gripperLayer ? m_gripperLayer : refPtr);
-        auto it = m_components.find(primPath);
-        if (it != m_components.end())
-        {
-            return it->second->setGripperStatus(status);
-        }
-    }
-    else
-    {
-        auto it = m_components.find(primPath);
-        if (it != m_components.end())
-        {
-            return it->second->setGripperStatus(status);
-        }
-    }
+    auto it = m_componentIndexByKey.find(primPath);
+    if (it != m_componentIndexByKey.end())
+        return m_components[it->second]->setGripperStatus(status);
     return false;
 }
 
 GripperStatus SurfaceGripperManager::getGripperStatus(const std::string& primPath)
 {
-    auto it = m_components.find(primPath);
-    if (it != m_components.end())
-    {
-        return it->second->getGripperStatus();
-    }
+    auto it = m_componentIndexByKey.find(primPath);
+    if (it != m_componentIndexByKey.end())
+        return m_components[it->second]->getGripperStatus();
     else
     {
         CARB_LOG_ERROR("Gripper not found: %s", primPath.c_str());
@@ -359,26 +347,63 @@ GripperStatus SurfaceGripperManager::getGripperStatus(const std::string& primPat
 std::vector<std::string> SurfaceGripperManager::getAllGrippers() const
 {
     std::vector<std::string> result;
-    for (const auto& component : m_components)
-    {
-        result.push_back(component.first);
-    }
+    result.reserve(m_componentKeys.size());
+    for (const auto& key : m_componentKeys)
+        result.push_back(key);
     return result;
 }
 
 SurfaceGripperComponent* SurfaceGripperManager::getGripper(const std::string& primPath)
 {
-    auto it = m_components.find(primPath);
-    if (it != m_components.end())
-    {
-        return it->second.get();
-    }
+    auto it = m_componentIndexByKey.find(primPath);
+    if (it != m_componentIndexByKey.end())
+        return m_components[it->second].get();
     return nullptr;
 }
 
 SurfaceGripperComponent* SurfaceGripperManager::getGripper(const pxr::UsdPrim& prim)
 {
     return getGripper(prim.GetPath().GetString());
+}
+
+void SurfaceGripperManager::onComponentRemove(const pxr::SdfPath& primPath)
+{
+    std::unique_lock<std::mutex> lck(m_componentMtx);
+
+    if (m_components.empty())
+        return;
+
+    std::vector<std::unique_ptr<SurfaceGripperComponent>> newComponents;
+    std::vector<std::string> newKeys;
+    newComponents.reserve(m_components.size());
+    newKeys.reserve(m_componentKeys.size());
+
+    for (size_t i = 0; i < m_components.size(); ++i)
+    {
+        const std::string& key = m_componentKeys[i];
+        if (pxr::SdfPath(key).HasPrefix(primPath))
+        {
+            // drop component
+            continue;
+        }
+        newKeys.push_back(key);
+        newComponents.push_back(std::move(m_components[i]));
+    }
+
+    m_components = std::move(newComponents);
+    m_componentKeys = std::move(newKeys);
+
+    m_componentIndexByKey.clear();
+    for (size_t i = 0; i < m_componentKeys.size(); ++i)
+        m_componentIndexByKey[m_componentKeys[i]] = i;
+}
+
+void SurfaceGripperManager::deleteAllComponents()
+{
+    std::unique_lock<std::mutex> lck(m_componentMtx);
+    m_components.clear();
+    m_componentKeys.clear();
+    m_componentIndexByKey.clear();
 }
 
 } // namespace surface_gripper

@@ -1,0 +1,133 @@
+-- SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+-- http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
+if os.target() == "linux" then
+    local ext = get_current_extension_info()
+    local ogn = get_ogn_project_information(ext, "isaacsim/ucx/nodes")
+    project_ext(ext)
+
+    -- Build the C++ plugin that provides the OmniGraph nodes
+    project_ext_plugin(ext, "isaacsim.ucx.nodes.plugin")
+
+    add_files("impl", "plugins")
+    add_files("ogn", ogn.nodes_path)
+
+    -- Add OGN dependencies for the nodes
+    add_ogn_dependencies(ogn, { "python/nodes" })
+    add_ogn_dependencies(ogn, { "nodes" })
+
+    includedirs {
+        "%{root}/source/extensions/isaacsim.core.includes/include",
+        "%{root}/source/extensions/isaacsim.core.nodes/include",
+        "%{root}/source/extensions/isaacsim.ucx.core/include",
+        "%{root}/source/extensions/isaacsim.ucx.nodes/include",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/librmm/include",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/libucx/include",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/libucxx/include",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/rapids_logger/include",
+        "%{kit_sdk_bin_dir}/dev/fabric/include/",
+        "%{root}/_build/target-deps/omni_physics/%{config}/include",
+        "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/include",
+        "%{root}/_build/target-deps/usd_ext_physics/%{cfg.buildcfg}/include",
+        extsbuild_dir .. "/omni.syntheticdata/include",
+    }
+
+    -- Add PhysX includes (needed for PxActor.h and other PhysX headers)
+    include_physx()
+
+    -- Add CUDA dependencies (needed for CUDA functions used in the plugin)
+    add_cuda_dependencies()
+
+    -- Add USD library directories and links
+    libdirs {
+        "%{root}/_build/target-deps/usd/%{cfg.buildcfg}/lib",
+        "%{root}/_build/target-deps/usd_ext_physics/%{cfg.buildcfg}/lib",
+        extsbuild_dir .. "/omni.usd.core/bin",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/librmm/lib64",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/libucx/lib",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/libucxx/lib64",
+        "%{root}/_build/target-deps/pip_ucx_prebundle/rapids_logger/lib64",
+        extsbuild_dir .. "/isaacsim.ucx.core/bin",
+    }
+
+    links {
+        "physxSchema",
+        "omni.usd",
+        "isaacsim.ucx.core",
+        "ucxx",
+        "ucp",
+        "ucs",
+        "uct",
+        "ucm",
+        "rmm",
+        "rapids_logger",
+    }
+
+    extra_usd_libs = { "usdGeom", "usdPhysics", "ts" }
+
+    -- Begin OpenUSD
+    add_usd(extra_usd_libs)
+    -- End OpenUSD
+
+    filter { "system:linux" }
+    disablewarnings { "error=pragmas", "error=narrowing", "error=unused-but-set-variable", "error=unused-variable" }
+    buildoptions("-fvisibility=default")
+    linkoptions { "-Wl,--export-dynamic" }
+    filter { "system:windows" }
+    buildoptions("-D_CRT_SECURE_NO_WARNINGS")
+    filter {}
+
+    filter { "configurations:debug" }
+    defines { "_DEBUG" }
+    filter { "configurations:release" }
+    defines { "NDEBUG" }
+    filter {}
+
+    -- Generate the OGN project (this handles all the .ogn files)
+    project_ext_ogn(ext, ogn)
+
+    -- Python Bindings for the plugin (minimal, if needed)
+    project_ext_bindings {
+        ext = ext,
+        project_name = ogn.python_project,
+        module = "_ucx_nodes",
+        src = ogn.bindings_path,
+        target_subdir = ogn.bindings_target_path,
+    }
+    add_files("bindings", "bindings/*.*")
+    add_files("python", "python/*.py")
+    add_files("python/nodes", "python/nodes/*.py")
+    add_files("python/tests", "python/tests/*.py")
+
+    includedirs {
+        "%{root}/source/extensions/isaacsim.ucx.nodes/include",
+    }
+
+    -- Copy/link necessary files for packaging
+    repo_build.prebuild_copy {
+        { "python/__init__.py", ogn.python_target_path },
+        { "python/extension.py", ogn.python_target_path },
+    }
+
+    repo_build.prebuild_link {
+        { "python/tests", ogn.python_target_path .. "/tests" },
+        { "python/nodes", ogn.python_target_path .. "/nodes" },
+        { "include", ext.target_dir .. "/include" },
+        { "docs", ext.target_dir .. "/docs" },
+        { "data", ext.target_dir .. "/data" },
+    }
+else
+    print("SKIPPING BUILD - UCX nodes extension only supported on linux-x86_64")
+end

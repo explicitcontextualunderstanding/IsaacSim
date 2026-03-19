@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
+import re
 import typing
 
+import carb
 import numpy
 from omni.physx.scripts import deformableUtils, physicsUtils
 from pxr import Gf, PhysxSchema, Sdf, Tf, Usd, UsdGeom, UsdPhysics, Vt
@@ -32,8 +34,8 @@ def loadTetFile(path):
     with open(full_path) as reader:
         lines = reader.readlines()
 
-    flt_grp = "([-+]?\d*\.\d+|\d+)"
-    v_pat = re.compile(r"^\s*[vV]\s*" + flt_grp + "\s*" + flt_grp + "\s*" + flt_grp + "\s*$")
+    flt_grp = r"([-+]?\d*\.\d+|\d+)"
+    v_pat = re.compile(r"^\s*[vV]\s*" + flt_grp + r"\s*" + flt_grp + r"\s*" + flt_grp + r"\s*$")
     t_pat = re.compile(r"^\s*[tT]\s*(\d*)\s*(\d*)\s*(\d*)\s*(\d*)\s*$")
 
     for line in lines:

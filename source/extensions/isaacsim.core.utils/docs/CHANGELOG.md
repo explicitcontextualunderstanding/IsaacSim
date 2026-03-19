@@ -1,5 +1,72 @@
 # Changelog
 
+## [4.0.4] - 2026-02-28
+### Changed
+- Updated test to use new omni.physics.core API (`IPhysicsStageUpdate.on_attach` replaces removed `IPhysicsSimulation.attach_stage`)
+
+## [4.0.3] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [4.0.2] - 2026-02-02
+### Changed
+- Fix quaternion order issue in torch transformation utils
+- Added test cases for torch transformation utils for the broken function
+
+## [4.0.1] - 2025-12-09
+### Changed
+- set_camera_prim_path now also applies the OmniRtxCameraExposureAPI_1 schema to the camera prim
+- set_camera_prim_path now also sets the exposure:time attribute to 0.02
+
+## [4.0.0] - 2025-11-28
+### Removed
+- Removed deprecated `nucleus` module (use `isaacsim.storage.native` instead):
+  - `get_url_root`, `create_folder`, `delete_folder`, `_list_files`, `download_assets_async`
+  - `check_server`, `check_server_async`, `build_server_list`, `find_nucleus_server`
+  - `get_server_path`, `get_server_path_async`, `verify_asset_root_path`
+  - `get_full_asset_path`, `get_full_asset_path_async`
+  - `get_nvidia_asset_root_path`, `get_isaac_asset_root_path`
+  - `get_assets_root_path`, `get_assets_root_path_async`, `get_assets_server`
+  - `_collect_files`, `is_dir_async`, `is_file_async`, `is_file`
+  - `recursive_list_folder`, `list_folder`
+- Removed deprecated `create_hydra_texture` from `render_product` (use `omni.replicator.core.create.render_product` instead)
+- Removed deprecated semantics functions using old SemanticsAPI (use new LabelsAPI equivalents):
+  - `add_update_semantics` -> use `add_labels`
+  - `remove_all_semantics` -> use `remove_labels`
+  - `get_semantics` -> use `get_labels`
+  - `check_missing_semantics` -> use `check_missing_labels`
+  - `check_incorrect_semantics` -> use `check_incorrect_labels`
+  - `count_semantics_in_scene` -> use `count_labels_in_scene`
+
+## [3.7.4] - 2025-11-27
+### Changed
+- Add missing docstrings
+
+## [3.7.3] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [3.7.2] - 2025-10-31
+### Changed
+- Fix invalid escape sequences
+
+## [3.7.1] - 2025-10-31
+### Changed
+- Update deprecated python unittest methods
+
+## [3.7.0] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [3.6.1] - 2025-10-22
+### Changed
+- Remove deprecated dependencies
+
+## [3.6.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [3.5.1] - 2025-09-08
 ### Fixed
 - Fix test configuration to allow runing all tests
@@ -110,7 +177,7 @@
 ### Changed
 - Added semantics util functions to use the new UsdSemantics.LabelsAPI
 - Added deprecation warnings for the old SemanticsAPI
-- changed add_update_semantics to add_labels in utils.prims
+- Changed add_update_semantics to add_labels in utils.prims
 
 ## [2.2.19] - 2025-04-15
 ### Changed
@@ -127,7 +194,7 @@
 
 ## [2.2.16] - 2025-04-07
 ### Changed
-- added prim validation check to some functions in prims.py
+- Added prim validation check to some functions in prims.py
 
 ## [2.2.15] - 2025-04-04
 ### Changed
@@ -175,7 +242,7 @@
 
 ## [2.2.4] - 2024-12-09
 ### Fixed
-- unit test
+- Unit test
 
 ## [2.2.3] - 2024-11-18
 ### Changed
@@ -275,7 +342,7 @@
 
 ## [0.5.0] - 2023-09-06
 ### Changed
-- updated Create > Isaac > Robots menu
+- Updated Create > Isaac > Robots menu
 
 ## [0.4.0] - 2023-08-17
 ### Added
@@ -307,7 +374,7 @@
 
 ## [0.2.0] - 2022-09-01
 ### Changed
-- removed legacy viewport calls
+- Removed legacy viewport calls
 
 ## [0.1.11] - 2022-03-16
 ### Changed
@@ -348,13 +415,13 @@
 
 ## [0.1.4] - 2021-05-24
 ### Added
-- add physics utils extension
-- add create menu
+- Add physics utils extension
+- Add create menu
 
 ## [0.1.3] - 2021-02-17
 ### Added
-- update to python 3.7
-- update to omni.kit.uiapp
+- Update to python 3.7
+- Update to omni.kit.uiapp
 
 ## [0.1.2] - 2021-01-04
 ### Added

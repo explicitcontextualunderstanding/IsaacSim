@@ -95,9 +95,8 @@ class VisualCapsule(SingleGeometryPrim):
             capsule_geom = UsdGeom.Capsule(prim)
         else:
             capsule_geom = UsdGeom.Capsule.Define(get_current_stage(), prim_path)
-            # TODO: double check the capsule extent
             if radius is None:
-                radius = 1.0
+                radius = 0.5
             if height is None:
                 height = 1.0
             if visible is None:

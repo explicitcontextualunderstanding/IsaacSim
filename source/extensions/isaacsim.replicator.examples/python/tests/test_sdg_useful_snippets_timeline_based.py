@@ -15,6 +15,7 @@
 
 import carb.settings
 import omni.kit
+import omni.timeline
 import omni.usd
 from isaacsim.test.utils.file_validation import validate_folder_contents
 
@@ -25,8 +26,19 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
         omni.usd.get_context().new_stage()
         await omni.kit.app.get_app().next_update_async()
         self.original_dlss_exec_mode = carb.settings.get_settings().get("rtx/post/dlss/execMode")
+        # Save the original timeline states to ensure they are restored after the test
+        timeline = omni.timeline.get_timeline_interface()
+        self.original_timeline_looping = timeline.is_looping()
+        self.original_timeline_end_time = timeline.get_end_time()
 
     async def tearDown(self):
+        # Set the timeline to the original states after the test
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.stop()
+        timeline.set_looping(self.original_timeline_looping)
+        timeline.set_end_time(self.original_timeline_end_time)
+        timeline.commit()
+
         omni.usd.get_context().close_stage()
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
@@ -57,14 +69,48 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             # Create a new stage
             await omni.usd.get_context().new_stage_async()
 
+            # Disable capture on play to capture data manually using step
+            rep.orchestrator.set_capture_on_play(False)
+
             # Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
             carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
-            # Disable capture on play (data will only be accessed at custom times)
-            carb.settings.get_settings().set("/omni/replicator/captureOnPlay", False)
-
             # Make sure fixed time stepping is set (the timeline will be advanced with the same delta time)
             carb.settings.get_settings().set("/app/player/useFixedTimeStepping", True)
+
+            # Create scene with a semantically annotated cube with physics
+            rep.functional.create.xform(name="World")
+            rep.functional.create.dome_light(intensity=250, parent="/World", name="DomeLight")
+            cube = rep.functional.create.cube(
+                position=(0, 0, 2), parent="/World", name="Cube", semantics={"class": "cube"}
+            )
+            rep.functional.physics.apply_collider(cube)
+            rep.functional.physics.apply_rigid_body(cube)
+
+            # Create render product (disabled until data capture is needed)
+            cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+            rp = rep.create.render_product(cam, resolution=(512, 512), name="rp")
+            rp.hydra_texture.set_updates_enabled(False)
+
+            # Create the backend for the writer
+            out_dir_rgb = os.path.join(os.getcwd(), "_out_writer_fps_rgb")
+            print(f"Writer data will be written to: {out_dir_rgb}")
+            backend = rep.backends.get("DiskBackend")
+            backend.initialize(output_dir=out_dir_rgb)
+
+            # Create a writer and an annotator as examples of different ways of accessing data
+            writer_rgb = rep.WriterRegistry.get("BasicWriter")
+            writer_rgb.initialize(backend=backend, rgb=True)
+            writer_rgb.attach(rp)
+
+            # Create an annotator to access the data directly
+            annot_depth = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
+            annot_depth.attach(rp)
+
+            # Run the simulation for the given number of frames and access the data at the desired framerates
+            print(
+                f"Starting simulation: {duration_seconds:.2f}s duration, {SENSOR_FPS:.0f} FPS sensor, {STAGE_FPS:.0f} FPS timeline"
+            )
 
             # Set the timeline parameters
             timeline = omni.timeline.get_timeline_interface()
@@ -75,30 +121,7 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             timeline.play()
             timeline.commit()
 
-            # Create scene with a semantically annotated cube with physics
-            rep.functional.create.dome_light(intensity=250)
-            cube = rep.functional.create.cube(position=(0, 0, 3), semantics={"class": "cube"})
-            rep.functional.physics.apply_collider(cube)
-            rep.functional.physics.apply_rigid_body(cube)
-
-            # Create render product (disabled until data capture is needed)
-            rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512), name="rp")
-            rp.hydra_texture.set_updates_enabled(False)
-
-            # Create a writer and an annotator as examples of different ways of accessing data
-            out_dir_rgb = os.path.join(os.getcwd(), "_out_writer_fps_rgb")
-            print(f"Writer data will be written to: {out_dir_rgb}")
-            writer_rgb = rep.WriterRegistry.get("BasicWriter")
-            writer_rgb.initialize(output_dir=out_dir_rgb, rgb=True)
-            writer_rgb.attach(rp)
-            annot_depth = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
-            annot_depth.attach(rp)
-
             # Run the simulation for the given number of frames and access the data at the desired framerates
-            print(
-                f"Starting simulation: {duration_seconds:.2f}s duration, {SENSOR_FPS:.0f} FPS sensor, {STAGE_FPS:.0f} FPS timeline"
-            )
-
             frame_count = 0
             previous_time = timeline.get_current_time()
             elapsed_time = 0.0
@@ -136,16 +159,16 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             # Wait for writer to finish
             await rep.orchestrator.wait_until_complete_async()
 
+            # Cleanup
+            timeline.pause()
+            writer_rgb.detach()
+            annot_depth.detach()
+            rp.destroy()
+
         # Run example with duration for all captures plus a buffer of 5 frames
         duration = (NUM_CAPTURES * SENSOR_DT) + (5.0 / STAGE_FPS)
         # asyncio.ensure_future(run_custom_fps_example_async(duration_seconds=duration))
         await run_custom_fps_example_async(duration_seconds=duration)
-
-        # Cleanup the timeline
-        timeline = omni.timeline.get_timeline_interface()
-        timeline.stop()
-        timeline.commit()
-        timeline.set_looping(True)
 
         # Validate the output directory contents
         out_dir = os.path.join(os.getcwd(), "_out_writer_fps_rgb")
@@ -159,7 +182,7 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
         import carb.eventdispatcher
         import carb.settings
         import omni.kit.app
-        import omni.physx
+        import omni.physics.core
         import omni.timeline
         import omni.usd
         from pxr import PhysxSchema, UsdPhysics
@@ -191,18 +214,17 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
         VERBOSE = False
 
         async def run_subscribers_and_events_async():
-            def on_timeline_event(event: omni.timeline.TimelineEventType):
+            def on_timeline_event(event: carb.eventdispatcher.Event):
                 nonlocal timeline_events
-                if event.type == omni.timeline.TimelineEventType.CURRENT_TIME_TICKED.value:
-                    timeline_events.append(event.payload)
-                    if VERBOSE:
-                        print(f"  [timeline][{len(timeline_events)}] {event.payload}")
-
-            def on_physics_step(dt: float):
-                nonlocal physx_events
-                physx_events.append(dt)
+                timeline_events.append(event)
                 if VERBOSE:
-                    print(f"  [physics][{len(physx_events)}] dt={dt}")
+                    print(f"  [timeline][{len(timeline_events)}] {event}")
+
+            def on_physics_step(dt: float, context):
+                nonlocal physics_events
+                physics_events.append(dt)
+                if VERBOSE:
+                    print(f"  [physics][{len(physics_events)}] dt={dt}")
 
             def on_stage_render_event(event: carb.eventdispatcher.Event):
                 nonlocal stage_render_events
@@ -318,9 +340,15 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             # Subscribe to events
             print(f"Subscribing to events...")
             timeline_events = []
-            timeline_sub = timeline.get_timeline_event_stream().create_subscription_to_pop(on_timeline_event)
-            physx_events = []
-            physx_sub = omni.physx.get_physx_interface().subscribe_physics_step_events(on_physics_step)
+            timeline_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.timeline.GLOBAL_EVENT_CURRENT_TIME_TICKED,
+                on_event=on_timeline_event,
+                observer_name="test_sdg_useful_snippets_timeline_based.on_timeline_event",
+            )
+            physics_events = []
+            physics_sub = omni.physics.core.get_physics_simulation_interface().subscribe_physics_on_step_events(
+                pre_step=False, order=0, on_update=on_physics_step
+            )
             stage_render_events = []
             stage_render_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
                 event_name=omni.usd.get_context().stage_rendering_event_name(
@@ -354,11 +382,11 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             if stage_render_sub:
                 stage_render_sub.reset()
                 stage_render_sub = None
-            if physx_sub:
-                physx_sub.unsubscribe()
-                physx_sub = None
+            if physics_sub:
+                physics_sub.unsubscribe()
+                physics_sub = None
             if timeline_sub:
-                timeline_sub.unsubscribe()
+                timeline_sub.reset()
                 timeline_sub = None
 
             # Print summary statistics
@@ -366,16 +394,18 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
             print(f"- App updates: {NUM_APP_UPDATES}")
             print(f"- Wall time: {elapsed_wall_time:.4f} seconds")
             print(f"- Timeline events: {len(timeline_events)}")
-            print(f"- Physics events: {len(physx_events)}")
+            print(f"- Physics events: {len(physics_events)}")
             print(f"- Stage render events: {len(stage_render_events)}")
             print(f"- App update events: {len(app_update_events)}")
 
             # Calculate and display real-time performance factor
-            if len(physx_events) > 0:
-                sim_time = sum(physx_events)
+            if len(physics_events) > 0:
+                sim_time = sum(physics_events)
                 realtime_factor = sim_time / elapsed_wall_time if elapsed_wall_time > 0 else 0
                 print(f"- Simulation time: {sim_time:.4f}s")
                 print(f"- Real-time factor: {realtime_factor:.2f}x")
+
+            # asyncio.ensure_future(run_subscribers_and_events_async())
 
             # TEST PART:
             # Cleanup the timeline
@@ -385,13 +415,13 @@ class TestSDGUsefulSnippets(omni.kit.test.AsyncTestCase):
 
             # Check that events were captured
             self.assertTrue(len(timeline_events) > 0, "Timeline events should be captured")
-            self.assertTrue(len(physx_events) > 0, "Physx events should be captured")
+            self.assertTrue(len(physics_events) > 0, "Physx events should be captured")
             self.assertTrue(len(stage_render_events) > 0, "Stage render events should be captured")
             self.assertTrue(len(app_update_events) > 0, "App update events should be captured")
 
             # Check that all events have been captured and the subscribers have been reset
             self.assertTrue(timeline_sub is None, "Timeline subscriber should be reset")
-            self.assertTrue(physx_sub is None, "Physx subscriber should be reset")
+            self.assertTrue(physics_sub is None, "Physx subscriber should be reset")
             self.assertTrue(stage_render_sub is None, "Stage render subscriber should be reset")
             self.assertTrue(app_sub is None, "App update subscriber should be reset")
 

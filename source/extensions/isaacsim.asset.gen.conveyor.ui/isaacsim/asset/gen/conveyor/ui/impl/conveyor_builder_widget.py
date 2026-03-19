@@ -18,8 +18,10 @@ import json
 from math import asin, degrees
 
 import carb
+import carb.eventdispatcher
 import omni
 import omni.ui as ui
+import omni.usd
 from pxr import Gf, Sdf, UsdGeom, UsdShade
 from pxr.Usd import EditContext, Stage
 
@@ -81,8 +83,16 @@ class ConveyorBuilderWidget:
                 UsdShade.Material(stage.GetPrimAtPath(Sdf.Path("/ConveyorBuilder/conveyorBuilder_Temp_mat"))),
                 UsdShade.Tokens.strongerThanDescendants,
             )
-        self._stage_event_subscription = self._events.create_subscription_to_pop(
-            self._on_stage_event, name="Onshape Usd Exporter stage Watch"
+        self._usd_context = omni.usd.get_context()
+        self._stage_event_sub_selection = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SELECTION_CHANGED),
+            on_event=self._on_selection_changed,
+            observer_name="isaacsim.asset.gen.conveyor.ui._on_selection_changed",
+        )
+        self._stage_event_sub_closed = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.CLOSED),
+            on_event=self._on_stage_closed,
+            observer_name="isaacsim.asset.gen.conveyor.ui._on_stage_closed",
         )
 
     def __init__(self, mdl_file, style):
@@ -143,8 +153,8 @@ class ConveyorBuilderWidget:
         self._on_kit_selection_changed()
 
     def shutdown(self):
-        del self._stage_event_subscription
         self._stage_event_subscription = None
+        self._stage_event_sub_closed = None
         stage = omni.usd.get_context().get_stage()
         self.builder.clear_system(stage)
         if stage:
@@ -155,13 +165,13 @@ class ConveyorBuilderWidget:
                         stage.RemovePrim(temp_prim.GetPath())
                     stage.RemovePrim(temp_prim.GetPath())
 
-    def _on_stage_event(self, event):
-        """Called with omni.usd.context when stage event"""
+    def _on_selection_changed(self, event):
+        """Stage selection changed event callback."""
+        self._on_kit_selection_changed()
 
-        if event.type == int(omni.usd.StageEventType.SELECTION_CHANGED):
-            self._on_kit_selection_changed()
-        if event.type == int(omni.usd.StageEventType.CLOSED):
-            self.shutdown()
+    def _on_stage_closed(self, event):
+        """Stage closed event callback."""
+        self.shutdown()
 
     def get_selection(self):
         stage = omni.usd.get_context().get_stage()

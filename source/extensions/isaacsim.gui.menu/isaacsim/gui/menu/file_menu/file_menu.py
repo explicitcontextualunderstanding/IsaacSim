@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module extends the Omniverse Kit editor with enhanced file operation capabilities, including handling recent files, saving and opening scenes, and managing USD stage events."""
+"""File menu layout and behaviors for Isaac Sim."""
 
 __all__ = ["FileMenuDelegate", "FileMenuExtension"]
 
@@ -35,46 +35,50 @@ from omni.ui import color as cl
 
 from .file_actions import deregister_actions, register_actions
 
-_extension_instance = None
-_extension_path = None
+_extension_instance: "FileMenuExtension | None" = None
+_extension_path: str | None = None
 INTERACTIVE_TEXT = cl.shade(cl("#1A91C5"))
 
 
 class FileMenuDelegate(IconMenuDelegate):
-    """A delegate class for customizing the appearance and behavior of the File menu.
-
-    This class provides methods to determine the length of displayed text in the menu, specifically
-    for the 'Open Recent' menu, allowing for an ellipsis to be used on longer file paths."""
+    """Customize the File menu appearance."""
 
     # for recents menu
-    def get_elided_length(self, menu_name):
-        """Determines the maximum pixel width of text that can be displayed for a given menu.
+    def get_elided_length(self, menu_name: str) -> int:
+        """Return the max text width for a menu name.
 
         Args:
-            menu_name (str): The name of the menu to check for text elision.
+            menu_name: Menu name to evaluate.
 
         Returns:
-            int: The maximum pixel width of the text allowed in the menu or 0 if no limit."""
+            Maximum pixel width for the text, or 0 for no limit.
 
+        Example:
+            .. code-block:: python
+
+                delegate = FileMenuDelegate()
+                max_width = delegate.get_elided_length("Open Recent")
+        """
         if menu_name == "Open Recent":
             return 160
         return 0
 
 
 class FileMenuExtension:
-    """A class that extends the Omniverse Kit editor with file menu functionalities.
+    """Build and manage the File menu.
 
-    This class provides enhanced file operation capabilities within the Omniverse Kit editor's file menu, including the ability to handle recent files, save and open scenes, and manage USD stage events. It is responsible for registering file actions, constructing the file menu, and updating the recent files list based on file events.
+    Args:
+        ext_id: Extension identifier provided by the extension manager.
     """
 
-    def __init__(self, ext_id=""):
+    def __init__(self, ext_id: str = ""):
         super().__init__()
         omni.kit.menu.utils.set_default_menu_priority("File", -10)
-        self._ext_name = None
-        self._max_recent_files = None
-        self._file_delegate = None
-        self._file_menu_list = None
-        self._recent_menu_list = None
+        self._ext_name = ""
+        self._max_recent_files = 0
+        self._file_delegate: FileMenuDelegate | None = None
+        self._file_menu_list: list[MenuItemDescription] | None = None
+        self._recent_menu_list: list[MenuItemDescription] | None = None
         self._event_sub = None
         self._stage_event_subscription = None
         self._stage_sub = None
@@ -143,6 +147,14 @@ class FileMenuExtension:
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
     def shutdown(self):
+        """Remove menu items and deregister file actions.
+
+        Example:
+            .. code-block:: python
+
+                menu = FileMenuExtension()
+                menu.shutdown()
+        """
         global _extension_instance
 
         _extension_instance = None
@@ -154,11 +166,18 @@ class FileMenuExtension:
         self._recent_menu_list = None
         self._file_menu_list = None
         self._event_sub = None
+        self._stage_event_subscription = None
 
-    def _on_stage_event(self, event):
+    def _on_stage_event(self, event: carb.events.IEvent):
+        """Handle stage events that require rebuilding the menu.
+
+        Args:
+            event: Stage event payload.
+        """
         self._build_file_menu()
 
     def _build_file_menu(self):
+        """Build the File menu items."""
         # setup menu
         self._file_menu_list = [
             MenuItemDescription(
@@ -224,7 +243,12 @@ class FileMenuExtension:
         self._build_sample_menu()
         omni.kit.menu.utils.add_menu_items(self._file_menu_list, "File", -10, delegate=self._file_delegate)
 
-    def _build_recent_menu(self, event: carb.events.IEvent = None):
+    def _build_recent_menu(self, event: carb.events.IEvent | None = None):
+        """Build or refresh the Open Recent submenu.
+
+        Args:
+            event: Event payload that triggered the refresh.
+        """
         recent_files = get_latest_urls_from_event_queue(self._max_recent_files, asset_type=asset_types.ASSET_TYPE_USD)
         sub_menu = []
         # add reopen
@@ -264,7 +288,12 @@ class FileMenuExtension:
 
         self._recent_menu_list = recent_menu_list
 
-    def _build_sample_menu(self):
+    def _build_sample_menu(self) -> None:
+        """Build the Samples submenu when configured.
+
+        Returns:
+            None.
+        """
         settings = carb.settings.get_settings()
         if settings.get("/exts/isaacsim.gui.menu/disableSampleMenu"):
             return
@@ -287,30 +316,52 @@ class FileMenuExtension:
 
         sample_menu_list = [MenuItemDescription(name="Samples", appear_after="Open Recent", sub_menu=sub_menu)]
         omni.kit.menu.utils.add_menu_items(sample_menu_list, "File")
+        return
 
     @staticmethod
-    def is_new_stage():
-        """Determines if the current USD stage is a new, unsaved stage.
+    def is_new_stage() -> bool:
+        """Check whether the current stage is new and unsaved.
 
         Returns:
-            bool: True if the stage is new and unsaved, False otherwise."""
+            True if the stage is new and unsaved, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if FileMenuExtension.is_new_stage():
+                    print("Unsaved stage")
+        """
         return omni.usd.get_context().is_new_stage()
 
     @staticmethod
-    def can_open():
-        """Checks if the USD stage is in a state where it can be opened.
+    def can_open() -> bool:
+        """Check whether the stage can be opened.
 
         Returns:
-            bool: True if the stage can be opened, False otherwise."""
+            True if the stage can be opened, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if FileMenuExtension.can_open():
+                    print("Stage can open")
+        """
         stage_state = omni.usd.get_context().get_stage_state()
         return stage_state in [omni.usd.StageState.OPENED, omni.usd.StageState.CLOSED]
 
     @staticmethod
-    def can_save():
-        """Checks if the USD stage is in a state where it can be saved.
+    def can_save() -> bool:
+        """Check whether the stage can be saved.
 
         Returns:
-            bool: True if the stage can be saved, False otherwise."""
+            True if the stage can be saved, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if FileMenuExtension.can_save():
+                    print("Stage can save")
+        """
         return (
             omni.usd.get_context().get_stage_state() == omni.usd.StageState.OPENED
             and not FileMenuExtension.is_new_stage()
@@ -318,33 +369,51 @@ class FileMenuExtension:
         )
 
     @staticmethod
-    def can_close():
-        """Checks if the USD stage is in a state where it can be closed.
+    def can_close() -> bool:
+        """Check whether the stage can be closed.
 
         Returns:
-            bool: True if the stage can be closed, False otherwise."""
+            True if the stage can be closed, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if FileMenuExtension.can_close():
+                    print("Stage can close")
+        """
         return omni.usd.get_context().get_stage_state() == omni.usd.StageState.OPENED
 
     @staticmethod
-    def can_close_and_not_is_new_stage():
-        """Checks if the USD stage can be closed and is not a new, unsaved stage.
+    def can_close_and_not_is_new_stage() -> bool:
+        """Check whether the stage can be closed and is not new.
 
         Returns:
-            bool: True if the stage can be closed and is not new, False otherwise."""
+            True if the stage can be closed and is not new, False otherwise.
+
+        Example:
+            .. code-block:: python
+
+                if FileMenuExtension.can_close_and_not_is_new_stage():
+                    print("Stage can close safely")
+        """
         return FileMenuExtension.can_close() and not FileMenuExtension.is_new_stage()
 
 
-def get_extension_path(sub_directory):
-    """
-    Returns the normalized path by joining the given sub-directory with the extension's base path.
+def get_extension_path(sub_directory: str) -> str:
+    """Return the extension path, optionally joined with a subdirectory.
 
     Args:
-        sub_directory (str): The sub-directory to append to the base path of the extension. If empty, the base path is returned as is.
+        sub_directory: Subdirectory to append to the base path.
 
     Returns:
-        str: The normalized path combining the extension's base path with the provided sub-directory.
+        The normalized path for the extension or subdirectory.
+
+    Example:
+        .. code-block:: python
+
+            data_path = get_extension_path("data")
     """
-    path = _extension_path
+    path = _extension_path or ""
     if sub_directory:
         path = os.path.normpath(os.path.join(path, sub_directory))
     return path

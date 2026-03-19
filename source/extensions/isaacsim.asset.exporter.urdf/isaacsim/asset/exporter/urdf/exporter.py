@@ -27,12 +27,9 @@ import numpy as np
 # NVIDIA
 import omni
 import omni.ui as ui
-from isaacsim.core.utils.stage import open_stage
-from isaacsim.gui.components.element_wrappers import Button, CheckBox, CollapsableFrame, DropDown, StringField
-from isaacsim.gui.components.ui_utils import get_style
+from isaacsim.gui.components.element_wrappers import CheckBox, DropDown, StringField
 from omni.physx import get_physx_property_query_interface
 from omni.physx.bindings._physx import PhysxPropertyQueryMode, PhysxPropertyQueryResult
-from omni.usd import StageEventType
 from pxr import Gf, PhysicsSchemaTools, Sdf, Usd, UsdPhysics, UsdUtils
 
 if os.name == "nt":

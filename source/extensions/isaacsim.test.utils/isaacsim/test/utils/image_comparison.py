@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Image comparison utilities for testing and validation."""
+
+
 import os
+import re
 
 import numpy as np
 from PIL import Image
@@ -35,12 +39,12 @@ def compute_difference_metrics(
     of requested percentiles of absolute differences.
 
     Args:
-        param golden_array: Reference image array.
-        param test_array: Test image array to compare.
-        param percentiles: Sequence of percentiles to compute for absolute differences.
-        param allclose_rtol: Relative tolerance for the allclose metric.
-        param allclose_atol: Absolute tolerance for the allclose metric.
-        param ignore_blank_pixels: If True, ignore blank pixels in the comparison.
+        golden_array: Reference image array.
+        test_array: Test image array to compare.
+        percentiles: Sequence of percentiles to compute for absolute differences.
+        allclose_rtol: Relative tolerance for the allclose metric.
+        allclose_atol: Absolute tolerance for the allclose metric.
+        ignore_blank_pixels: If True, ignore blank pixels in the comparison.
 
     Returns:
         A dictionary containing the computed metrics: ``allclose``, ``rtol``, ``atol``,
@@ -61,6 +65,43 @@ def compute_difference_metrics(
         >>> metrics = compute_difference_metrics(a, b)
         >>> bool(metrics["allclose"])  # True if arrays are close with defaults
         True
+    """
+    return _compute_difference_metrics_impl(
+        golden_array=golden_array,
+        test_array=test_array,
+        percentiles=percentiles,
+        allclose_rtol=allclose_rtol,
+        allclose_atol=allclose_atol,
+        ignore_blank_pixels=ignore_blank_pixels,
+    )
+
+
+def _compute_difference_metrics_impl(
+    golden_array: np.ndarray,
+    test_array: np.ndarray,
+    *,
+    percentiles: list[float] | tuple[float, ...],
+    allclose_rtol: float,
+    allclose_atol: float,
+    ignore_blank_pixels: bool,
+) -> dict[str, object]:
+    """Internal implementation of compute_difference_metrics.
+
+    Args:
+        golden_array: Reference image array.
+        test_array: Test image array to compare.
+        percentiles: Sequence of percentiles to compute for absolute differences.
+        allclose_rtol: Relative tolerance for the allclose metric.
+        allclose_atol: Absolute tolerance for the allclose metric.
+        ignore_blank_pixels: If True, ignore blank pixels in the comparison.
+
+    Returns:
+        A dictionary containing the computed metrics: ``allclose``, ``rtol``, ``atol``,
+        ``mean_abs``, ``max_abs``, ``rmse``, and ``percentiles`` (a mapping from percentile
+        to value).
+
+    Raises:
+        ValueError: If image shapes do not match.
     """
     if golden_array.shape != test_array.shape:
         raise ValueError(f"Image shapes do not match: golden {golden_array.shape} vs test {test_array.shape}")
@@ -104,16 +145,13 @@ def compute_difference_metrics(
     }
 
 
-def print_difference_statistics(metrics: dict[str, object]) -> None:
+def print_difference_statistics(metrics: dict[str, object]):
     """Pretty-print image difference metrics.
 
     Prints a stable summary of the metrics computed by ``compute_difference_metrics``.
 
     Args:
-        param metrics: Dictionary returned by ``compute_difference_metrics``.
-
-    Returns:
-        None.
+        metrics: Dictionary returned by ``compute_difference_metrics``.
 
     Example:
 
@@ -159,22 +197,25 @@ def compare_arrays_within_tolerances(
     """Compare two image arrays against tolerance-based criteria.
 
     Args:
-        param golden_array: Reference image array.
-        param test_array: Test image array to compare.
-        param allclose_rtol: Relative tolerance for np.allclose (default: 1e-05). Pass None to
+        golden_array: Reference image array.
+        test_array: Test image array to compare.
+        allclose_rtol: Relative tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_atol=None too).
-        param allclose_atol: Absolute tolerance for np.allclose (default: 1e-08). Pass None to
+        allclose_atol: Absolute tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_rtol=None too).
-        param mean_tolerance: Maximum acceptable mean absolute difference (optional).
-        param max_tolerance: Maximum acceptable max absolute difference (optional).
-        param absolute_tolerance: Maximum absolute difference for any pixel (optional).
-        param percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
-        param rmse_tolerance: Maximum acceptable root mean square error (optional).
-        param print_all_stats: If True, compute and print all metrics regardless of criteria.
+        mean_tolerance: Maximum acceptable mean absolute difference (optional).
+        max_tolerance: Maximum acceptable max absolute difference (optional).
+        absolute_tolerance: Maximum absolute difference for any pixel (optional).
+        percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
+        rmse_tolerance: Maximum acceptable root mean square error (optional).
+        print_all_stats: If True, compute and print all metrics regardless of criteria.
 
     Returns:
         A dictionary with keys: ``passed`` (bool), ``criteria`` (mapping of criterion
         to bool), ``metrics`` (the computed metrics), and ``thresholds`` (configured values).
+
+    Raises:
+        ValueError: If image shapes do not match.
 
     Example:
 
@@ -274,22 +315,25 @@ def compare_images_within_tolerances(
     """Compare two image files against tolerance-based criteria.
 
     Args:
-        param golden_file_path: Path to the reference image file.
-        param test_file_path: Path to the test image file to compare.
-        param allclose_rtol: Relative tolerance for np.allclose (default: 1e-05). Pass None to
+        golden_file_path: Path to the reference image file.
+        test_file_path: Path to the test image file to compare.
+        allclose_rtol: Relative tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_atol=None too).
-        param allclose_atol: Absolute tolerance for np.allclose (default: 1e-08). Pass None to
+        allclose_atol: Absolute tolerance for np.allclose. Pass None to
             disable allclose check (requires allclose_rtol=None too).
-        param mean_tolerance: Maximum acceptable mean absolute difference (optional).
-        param max_tolerance: Maximum acceptable max absolute difference (optional).
-        param absolute_tolerance: Maximum absolute difference for any pixel (optional).
-        param percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
-        param rmse_tolerance: Maximum acceptable root mean square error (optional).
-        param print_all_stats: If True, compute and print all metrics regardless of criteria.
+        mean_tolerance: Maximum acceptable mean absolute difference (optional).
+        max_tolerance: Maximum acceptable max absolute difference (optional).
+        absolute_tolerance: Maximum absolute difference for any pixel (optional).
+        percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
+        rmse_tolerance: Maximum acceptable root mean square error (optional).
+        print_all_stats: If True, compute and print all metrics regardless of criteria.
 
     Returns:
         A dictionary with keys: ``passed`` (bool), ``criteria`` (mapping of criterion
         to bool), ``metrics`` (the computed metrics), and ``thresholds`` (configured values).
+
+    Raises:
+        FileNotFoundError: If either image file does not exist.
 
     Example:
 
@@ -343,3 +387,196 @@ def compare_images_within_tolerances(
         rmse_tolerance=rmse_tolerance,
         print_all_stats=print_all_stats,
     )
+
+
+def compare_images_in_directories(
+    golden_dir: str,
+    test_dir: str,
+    path_pattern: str | None = None,
+    allclose_rtol: float | None = 1e-05,
+    allclose_atol: float | None = 1e-08,
+    mean_tolerance: float | None = None,
+    max_tolerance: float | None = None,
+    absolute_tolerance: float | None = None,
+    percentile_tolerance: tuple | None = None,
+    rmse_tolerance: float | None = None,
+    print_all_stats: bool = False,
+    print_per_file_results: bool = True,
+) -> dict[str, object]:
+    """Compare matching image files in two directories against tolerance-based criteria.
+
+    This function finds all image files matching the specified pattern in both directories,
+    compares them pairwise, and returns comprehensive results for all comparisons.
+
+    The function only compares files that exist in both directories. If the golden directory
+    has files not present in the test directory, they are listed in ``golden_only_files`` and
+    contribute to ``file_list_match`` being False. Similarly, files only in the test directory
+    are listed in ``test_only_files``.
+
+    Args:
+        golden_dir: Path to the directory containing reference images.
+        test_dir: Path to the directory containing test images.
+        path_pattern: RegEx (Regular Expression) pattern to match filenames.
+            If None, all files are considered.
+        allclose_rtol: Relative tolerance for np.allclose. Pass None to
+            disable allclose check (requires allclose_atol=None too).
+        allclose_atol: Absolute tolerance for np.allclose. Pass None to
+            disable allclose check (requires allclose_rtol=None too).
+        mean_tolerance: Maximum acceptable mean absolute difference (optional).
+        max_tolerance: Maximum acceptable max absolute difference (optional).
+        absolute_tolerance: Maximum absolute difference for any pixel (optional).
+        percentile_tolerance: Tuple of (percentile, tolerance) for percentile-based comparison (optional).
+        rmse_tolerance: Maximum acceptable root mean square error (optional).
+        print_all_stats: If True, print detailed statistics for each comparison.
+        print_per_file_results: If True, print a summary for each file comparison.
+
+    Returns:
+        A dictionary with keys: ``all_passed`` (bool indicating if all files passed and file lists
+        match), ``file_results`` (mapping from filename to comparison result), ``passed_count`` (int),
+        ``failed_count`` (int), ``golden_files`` (list of golden filenames), ``test_files`` (list of
+        test filenames), ``file_list_match`` (bool indicating if file lists match exactly),
+        ``golden_only_files`` (list of files only in golden directory), and ``test_only_files``
+        (list of files only in test directory).
+
+    Raises:
+        FileNotFoundError: If either directory does not exist.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> import os
+        >>> from isaacsim.test.utils.image_comparison import compare_images_in_directories
+        >>>
+        >>> result = compare_images_in_directories(
+        ...     golden_dir="/path/to/golden",
+        ...     test_dir="/path/to/test",
+        ...     path_pattern=r"^rgb.*\\.png$",
+        ...     mean_tolerance=10.0,
+        ... )
+        ...
+        >>> result["all_passed"]
+        True
+        >>> result["golden_only_files"]
+        []
+        >>> result["test_only_files"]
+        []
+    """
+    if not os.path.exists(golden_dir):
+        raise FileNotFoundError(f"Golden directory not found: {golden_dir}")
+    if not os.path.exists(test_dir):
+        raise FileNotFoundError(f"Test directory not found: {test_dir}")
+
+    pattern_re = re.compile(path_pattern) if path_pattern is not None else None
+
+    def matches_pattern(filename: str) -> bool:
+        if pattern_re is None:
+            return True
+        return pattern_re.search(filename) is not None
+
+    golden_files = sorted([f for f in os.listdir(golden_dir) if matches_pattern(f)])
+    test_files = sorted([f for f in os.listdir(test_dir) if matches_pattern(f)])
+
+    golden_only = sorted(set(golden_files) - set(test_files))
+    test_only = sorted(set(test_files) - set(golden_files))
+    file_list_match = golden_files == test_files
+
+    if not file_list_match:
+        pattern_desc = f"pattern '{path_pattern}'" if path_pattern is not None else "all files"
+        print(f"WARNING: File lists do not match for {pattern_desc}:")
+        if golden_only:
+            print(f"  Files only in golden dir: {golden_only}")
+        if test_only:
+            print(f"  Files only in test dir: {test_only}")
+
+    file_results: dict[str, dict[str, object]] = {}
+    passed_count = 0
+    failed_count = 0
+
+    common_files = sorted(set(golden_files) & set(test_files))
+    if not common_files:
+        pattern_desc = f"pattern '{path_pattern}'" if path_pattern is not None else "all files"
+        print(f"No common files found matching {pattern_desc} in both directories.")
+        return {
+            "all_passed": False,
+            "file_results": {},
+            "passed_count": 0,
+            "failed_count": 0,
+            "golden_files": golden_files,
+            "test_files": test_files,
+            "file_list_match": file_list_match,
+            "golden_only_files": golden_only,
+            "test_only_files": test_only,
+        }
+
+    if print_per_file_results:
+        tolerance_info = []
+        if mean_tolerance is not None:
+            tolerance_info.append(f"mean_tolerance={mean_tolerance}")
+        if max_tolerance is not None:
+            tolerance_info.append(f"max_tolerance={max_tolerance}")
+        if absolute_tolerance is not None:
+            tolerance_info.append(f"absolute_tolerance={absolute_tolerance}")
+        if percentile_tolerance is not None:
+            tolerance_info.append(f"percentile_tolerance={percentile_tolerance}")
+        if rmse_tolerance is not None:
+            tolerance_info.append(f"rmse_tolerance={rmse_tolerance}")
+        if not tolerance_info and allclose_rtol is not None and allclose_atol is not None:
+            tolerance_info.append(f"rtol={allclose_rtol}, atol={allclose_atol}")
+
+        tolerance_str = ", ".join(tolerance_info) if tolerance_info else "default allclose"
+        pattern_desc = f"pattern '{path_pattern}'" if path_pattern is not None else "all files"
+        print(f"Comparing images matching {pattern_desc} with {tolerance_str}")
+
+    for file_name in common_files:
+        golden_file_path = os.path.join(golden_dir, file_name)
+        test_file_path = os.path.join(test_dir, file_name)
+
+        result = compare_images_within_tolerances(
+            golden_file_path=golden_file_path,
+            test_file_path=test_file_path,
+            allclose_rtol=allclose_rtol,
+            allclose_atol=allclose_atol,
+            mean_tolerance=mean_tolerance,
+            max_tolerance=max_tolerance,
+            absolute_tolerance=absolute_tolerance,
+            percentile_tolerance=percentile_tolerance,
+            rmse_tolerance=rmse_tolerance,
+            print_all_stats=print_all_stats,
+        )
+
+        file_results[file_name] = result
+
+        if result["passed"]:
+            passed_count += 1
+            if print_per_file_results:
+                metrics = result["metrics"]
+                if mean_tolerance is not None:
+                    print(f"\t'{file_name}': PASSED (mean_diff={metrics['mean_abs']:.3f})")
+                else:
+                    print(f"\t'{file_name}': PASSED")
+        else:
+            failed_count += 1
+            if print_per_file_results:
+                metrics = result["metrics"]
+                print(f"\t'{file_name}': FAILED")
+                if mean_tolerance is not None:
+                    print(f"\t  Expected mean_diff <= {mean_tolerance}, got {metrics['mean_abs']:.3f}")
+                if max_tolerance is not None:
+                    print(f"\t  Expected max_diff <= {max_tolerance}, got {metrics['max_abs']:.3f}")
+                if rmse_tolerance is not None:
+                    print(f"\t  Expected RMSE <= {rmse_tolerance}, got {metrics['rmse']:.3f}")
+
+    all_passed = (failed_count == 0) and file_list_match
+
+    return {
+        "all_passed": all_passed,
+        "file_results": file_results,
+        "passed_count": passed_count,
+        "failed_count": failed_count,
+        "golden_files": golden_files,
+        "test_files": test_files,
+        "file_list_match": file_list_match,
+        "golden_only_files": golden_only,
+        "test_only_files": test_only,
+    }

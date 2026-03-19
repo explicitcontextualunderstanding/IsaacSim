@@ -165,7 +165,7 @@ public:
         {
             return;
         }
-        cudaArray_t levelArray = 0;
+        cudaArray_t levelArray = nullptr;
         CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, mmarr, mipLevel));
         if (!levelArray)
         {

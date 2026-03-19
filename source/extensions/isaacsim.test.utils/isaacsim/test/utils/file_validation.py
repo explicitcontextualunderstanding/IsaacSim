@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Utilities for validating file system contents and structures in Isaac Sim tests."""
+
+
 from collections import Counter
 from pathlib import Path
 

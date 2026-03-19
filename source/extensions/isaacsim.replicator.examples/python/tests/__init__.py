@@ -13,4 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test module for Isaac Sim replicator examples."""
+
+
 scan_for_test_modules = True

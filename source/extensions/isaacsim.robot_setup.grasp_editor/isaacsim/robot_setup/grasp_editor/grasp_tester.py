@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Testing framework for evaluating robotic grasp stability and effectiveness through automated simulation."""
+
+
 from typing import List
 
 import numpy as np
@@ -28,6 +31,26 @@ STABILITY_TEST_THRESHOLD = 1e-4
 
 
 class GraspTestSettings:
+    """Configuration settings for testing robotic grasps.
+
+    This class stores all the parameters needed to configure and execute grasp tests on articulated robots,
+    including joint positions, external forces, and reference frames for both the robot and the object being
+    grasped.
+
+    Args:
+        articulation_path: USD path to the articulated robot.
+        articulation_pose_frame: Reference frame for the articulated robot's pose measurements.
+        active_joints: Names of joints that actively participate in the grasp.
+        active_joint_open_positions: Joint positions when the gripper is fully open.
+        active_joint_closed_positions: Joint positions when the gripper is fully closed.
+        active_joint_close_speeds: Velocities for closing the active joints.
+        inactive_joint_fixed_positions: Fixed positions for joints not participating in the grasp.
+        rigid_body_path: USD path to the rigid body object being grasped.
+        rigid_body_pose_frame: Reference frame for the rigid body's pose measurements.
+        external_force_magnitude: Magnitude of external force applied during testing.
+        external_torque_magnitude: Magnitude of external torque applied during testing.
+    """
+
     def __init__(
         self,
         articulation_path: str,
@@ -58,6 +81,21 @@ class GraspTestSettings:
 
 
 class GraspTestResults:
+    """Contains the results of a grasp test performed by the GraspTester.
+
+    This class encapsulates all data collected during a grasp test, including the test configuration,
+    final articulation pose relative to the grasped object, joint positions when the gripper stabilized,
+    and the overall success status with a confidence rating.
+
+    Args:
+        grasp_test_settings: The configuration settings used for the grasp test.
+        articulation_rel_trans: Translation of the articulation frame relative to the rigid body frame.
+        articulation_rel_quat: Quaternion rotation of the articulation frame relative to the rigid body frame.
+        stable_positions: Final joint positions when the gripper reached a stable state during closing.
+        suggested_confidence: Confidence score for the grasp quality, ranging from 0.0 to 1.0.
+        success: Whether the grasp test passed all stability and force/torque resistance checks.
+    """
+
     def __init__(
         self,
         grasp_test_settings: GraspTestSettings,
@@ -76,6 +114,39 @@ class GraspTestResults:
 
 
 class GraspTester:
+    """Tests the stability and effectiveness of robotic grasps through automated simulation.
+
+    The GraspTester evaluates grasp quality by executing a multi-phase testing protocol that simulates
+    real-world conditions. It closes gripper joints to establish initial contact, applies external forces
+    and torques to challenge the grasp, and monitors joint stability throughout the process.
+
+    The testing process includes:
+
+    1. **Gripper Closure**: Commands active joints to move from open to closed positions at specified
+       velocities, monitoring for position convergence to detect stable contact.
+
+    2. **Stability Assessment**: Uses a rolling window analysis of joint positions to determine when
+       the grasp has stabilized, ensuring the system has reached equilibrium.
+
+    3. **External Disturbance Testing**: Applies configurable forces and torques to the grasped object
+       to test grasp robustness under external perturbations.
+
+    4. **Success Evaluation**: Determines grasp success based on whether the gripper maintains contact
+       after disturbances and doesn't reach fully closed positions (indicating object escape).
+
+    The class operates as a generator-based state machine, allowing step-by-step execution that can be
+    integrated into simulation loops. Each update step advances the testing protocol and provides status
+    messages for user feedback.
+
+    Test results include relative pose information between the gripper and grasped object, final joint
+    positions, and a confidence score reflecting grasp quality. Failed grasps are categorized by failure
+    mode (object escape during closure vs. inability to withstand external forces) with corresponding
+    confidence scores.
+
+    The testing framework supports articulated grippers with configurable active and inactive joints,
+    allowing evaluation of complex multi-fingered grasping systems with varied joint control strategies.
+    """
+
     def __init__(self):
         self._test_grasp_generator = None
         self._test_timestep = 0

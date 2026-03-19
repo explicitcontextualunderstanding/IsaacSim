@@ -13,5 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .impl.commands import *
+"""Public MJCF importer Python API."""
+
+from .impl.config import MJCFImporterConfig
+from .impl.converter import MJCFImporter
 from .impl.extension import *

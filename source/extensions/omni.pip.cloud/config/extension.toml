@@ -4,13 +4,13 @@ order = -100
 reloadable = false
 
 [package]
-version = "1.4.3"
+version = "1.5.1"
 category = "Internal"
 title = "Cloud package Pip Archive"
 description = "General packages for cloud"
 keywords = ["isaac", "pip"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
@@ -35,3 +35,6 @@ path = "pip_prebundle"
 # That is empty module, added here only to make tests discoverable in test run
 [[python.module]]
 name = "omni.pip.cloud"
+
+[documentation]
+pages = ["docs/Overview.md", "docs/CHANGELOG.md"]

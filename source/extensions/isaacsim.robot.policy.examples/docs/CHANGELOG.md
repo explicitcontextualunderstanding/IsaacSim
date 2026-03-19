@@ -1,4 +1,45 @@
 # Changelog
+## [5.1.1] - 2026-03-04
+### Changed
+- Fix api errors
+
+
+## [5.1.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [5.0.4] - 2026-02-04
+### Changed
+- Update physics rate for drawer opening test for CPU test
+
+## [5.0.3] - 2025-12-08
+### Changed
+- Removed rendering manager test time dependency (moved to base sample)
+
+## [5.0.2] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [5.0.1] - 2025-12-02
+### Changed
+- Removed unecessary dependencies
+- Removed remaining experimental api references
+
+## [5.0.0] - 2025-12-01
+### Changed
+- Changed the backend to experimental API using warp and torch
+- Enabled GPU physics to inference policies
+- Moved policy based interactive examples to the isaacsim.robot.policy.examples folder
+
+## [4.3.0] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [4.2.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [4.1.11] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 4.1.10)
@@ -84,7 +125,7 @@
 ## [4.0.0] - 2024-11-01
 ### Removed
 - Unitree quadruped optimized controller class
-- optimized controller based standalone and ROS examples
+- Optimized controller based standalone and ROS examples
 
 ### Added
 - Policy Controller and config loader helpers for Isaac Lab based env config
@@ -176,12 +217,12 @@
 
 ## [1.1.0] - 2022-05-05
 ### Added
-- added the ANYmal robot
+- Added the ANYmal robot
 
 ## [1.0.2] - 2022-04-21
 ### Changed
-- decoupled sensor testing from A1 and Go1 unit test
-- fixed contact sensor bug in example and standalone
+- Decoupled sensor testing from A1 and Go1 unit test
+- Fixed contact sensor bug in example and standalone
 
 ## [1.0.1] - 2022-04-20
 ### Changed
@@ -189,7 +230,7 @@
 
 ## [1.0.0] - 2022-04-13
 ### Added
-- quadruped class, unitree class (support both a1, go1), unitree vision class (unitree class with stereo cameras), and unitree direct class (unitree class that subscribe to external controllers)
-- quadruped controllers
-- documentations and unit tests
-- quadruped standalone with ros 1 and ros 2 vio examples
+- Quadruped class, unitree class (support both a1, go1), unitree vision class (unitree class with stereo cameras), and unitree direct class (unitree class that subscribe to external controllers)
+- Quadruped controllers
+- Documentations and unit tests
+- Quadruped standalone with ros 1 and ros 2 vio examples

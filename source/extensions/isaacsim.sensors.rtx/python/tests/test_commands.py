@@ -19,12 +19,15 @@ Tests the functionality of creating different types of RTX sensors through comma
 
 from pathlib import Path
 
+import carb
 import omni.kit.commands
 import omni.kit.test
+import omni.kit.undo
 import omni.usd
-from isaacsim.core.utils.prims import get_prim_at_path
+from isaacsim.core.utils.prims import delete_prim, get_prim_at_path
 from isaacsim.core.utils.stage import traverse_stage
 from isaacsim.sensors.rtx import SUPPORTED_LIDAR_CONFIGS, SUPPORTED_LIDAR_VARIANT_SET_NAME
+from isaacsim.storage.native import get_assets_root_path
 from pxr import Gf, Sdf, UsdGeom
 
 
@@ -366,6 +369,57 @@ class TestRtxSensorCommands(omni.kit.test.AsyncTestCase):
         # Verify it's an OmniLidar prim
         self.assertTrue(prim.IsA("OmniLidar"))
 
+    async def test_rtx_lidar_default_creation_with_path(self):
+        """Test RTX Lidar default creation (no config, no force_camera_prim)."""
+
+        print(get_prim_at_path("/").GetAllChildren())
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/RtxLidar",
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        # Verify it's an OmniLidar prim
+        self.assertTrue(prim.IsA("OmniLidar"))
+        self.assertEqual(prim.GetPath(), Sdf.Path("/RtxLidar"))
+        delete_prim(prim.GetPath())
+
+        # Create with parent
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/RtxLidar",
+            parent="/Render",
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        # Verify it's an OmniLidar prim
+        self.assertTrue(prim.IsA("OmniLidar"))
+        self.assertEqual(prim.GetPath(), Sdf.Path("/Render/RtxLidar"))
+        delete_prim(prim.GetPath())
+
+        # Create with parent in path
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/Render/RtxLidar",
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        # Verify it's an OmniLidar prim
+        self.assertTrue(prim.IsA("OmniLidar"))
+        self.assertEqual(prim.GetPath(), Sdf.Path("/Render/RtxLidar"))
+
     async def test_rtx_lidar_force_camera_no_config(self):
         """Test RTX Lidar with force_camera_prim=True but no config specified."""
         translation = Gf.Vec3d(0.0, 0.0, 0.0)
@@ -393,3 +447,215 @@ class TestRtxSensorCommands(omni.kit.test.AsyncTestCase):
         plugin_attr = prim.GetAttribute("sensorModelPluginName")
         self.assertTrue(plugin_attr.IsValid())
         self.assertEqual(plugin_attr.Get(), "omni.sensors.nv.lidar.lidar_core.plugin")
+
+    async def test_rtx_lidar_usd_path_no_variant(self):
+        """Test RTX Lidar creation with usd_path (no variant)."""
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        # Use a lidar config without variants
+        usd_path = get_assets_root_path() + "/Isaac/Sensors/NVIDIA/Example_Rotary.usda"
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/RtxLidar_UsdPath",
+            usd_path=usd_path,
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        self.assertTrue(prim.IsA("OmniLidar"))
+
+    async def test_rtx_lidar_usd_path_with_variant(self):
+        """Test RTX Lidar creation with usd_path that has variants."""
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        # Use a lidar config with variants (Ouster OS0)
+        usd_path = get_assets_root_path() + "/Isaac/Sensors/Ouster/OS0/OS0.usd"
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/RtxLidar_UsdPathVariant",
+            usd_path=usd_path,
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        self.assertTrue(prim.IsA("OmniLidar"))
+
+    async def test_rtx_lidar_usd_path_with_variant_selection(self):
+        """Test RTX Lidar creation with usd_path and variant selection."""
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        # Use a lidar config with variants (Ouster OS0) and select a specific variant
+        usd_path = get_assets_root_path() + "/Isaac/Sensors/Ouster/OS0/OS0.usd"
+        variant = "OS0_REV6_128ch10hz1024res"
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/RtxLidar_UsdPathVariantSelection",
+            usd_path=usd_path,
+            variant=variant,
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        self.assertTrue(prim.IsA("OmniLidar"))
+
+        # Verify the variant was set correctly
+        root_prim = get_prim_at_path("/RtxLidar_UsdPathVariantSelection")
+        variant_set = root_prim.GetVariantSet(SUPPORTED_LIDAR_VARIANT_SET_NAME)
+        self.assertGreater(len(variant_set.GetVariantNames()), 0)
+        current_variant = variant_set.GetVariantSelection()
+        self.assertEqual(current_variant, variant)
+
+    async def test_rtx_lidar_config_and_usd_path_both_provided(self):
+        """Test that config takes precedence over usd_path when both are provided."""
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        # Provide both config and usd_path - config should take precedence
+        config = "OS1"
+        usd_path = get_assets_root_path() + "/Isaac/Sensors/NVIDIA/Example_Rotary.usda"
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path="/RtxLidar_BothConfigAndUsdPath",
+            config=config,
+            usd_path=usd_path,
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        self.assertTrue(prim.IsA("OmniLidar"))
+        # The prim should be from the config (OS1), not the usd_path
+
+    async def test_rtx_radar_usd_path(self):
+        """Test RTX Radar creation with usd_path."""
+        translation = Gf.Vec3d(0.0, 1.0, 2.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        # Note: There are no standard radar USD files in SUPPORTED configs,
+        # so this will fall back to replicator API
+        # We're testing that usd_path doesn't break the flow
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxRadar",
+            path="/RtxRadar_UsdPath",
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+        self.assertTrue(prim.IsA("OmniRadar"))
+
+    async def test_undo_deletes_prim(self):
+        """Test that undo properly deletes the created prim."""
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        path = "/RtxLidar_UndoTest"
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path=path,
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+
+        # Now undo the command
+        omni.kit.undo.undo()
+
+        # Verify the prim was deleted
+        deleted_prim = get_prim_at_path(path)
+        self.assertFalse(deleted_prim.IsValid())
+
+    async def test_undo_with_config(self):
+        """Test that undo properly deletes a prim created with config."""
+        translation = Gf.Vec3d(0.0, 0.0, 0.0)
+        orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+        path = "/RtxLidar_UndoConfigTest"
+
+        _, prim = omni.kit.commands.execute(
+            "IsaacSensorCreateRtxLidar",
+            path=path,
+            config="OS1",
+            translation=translation,
+            orientation=orientation,
+        )
+
+        self.assertIsNotNone(prim)
+        self.assertTrue(prim.IsValid())
+
+        # Now undo the command
+        omni.kit.undo.undo()
+
+        # Verify the prim was deleted
+        deleted_prim = get_prim_at_path(path)
+        self.assertFalse(deleted_prim.IsValid())
+
+    async def test_rtx_radar_motion_bvh_disabled(self):
+        """Test that RTX Radar creation fails when Motion BVH is disabled."""
+        settings = carb.settings.get_settings()
+        # Save the original setting
+        original_value = settings.get("/renderer/raytracingMotion/enabled")
+
+        try:
+            # Disable Motion BVH
+            settings.set("/renderer/raytracingMotion/enabled", False)
+
+            translation = Gf.Vec3d(0.0, 1.0, 2.0)
+            orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+
+            _, prim = omni.kit.commands.execute(
+                "IsaacSensorCreateRtxRadar",
+                path="/RtxRadar_MotionBVHDisabled",
+                translation=translation,
+                orientation=orientation,
+            )
+
+            # Prim should be None when Motion BVH is disabled
+            self.assertIsNone(prim)
+
+            # Verify no prim was created at the path
+            check_prim = get_prim_at_path("/RtxRadar_MotionBVHDisabled")
+            self.assertFalse(check_prim.IsValid())
+        finally:
+            # Restore the original setting
+            settings.set("/renderer/raytracingMotion/enabled", original_value)
+
+    async def test_rtx_radar_motion_bvh_enabled(self):
+        """Test that RTX Radar creation succeeds when Motion BVH is enabled."""
+        settings = carb.settings.get_settings()
+        # Save the original setting
+        original_value = settings.get("/renderer/raytracingMotion/enabled")
+
+        try:
+            # Enable Motion BVH
+            settings.set("/renderer/raytracingMotion/enabled", True)
+
+            translation = Gf.Vec3d(0.0, 1.0, 2.0)
+            orientation = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
+
+            _, prim = omni.kit.commands.execute(
+                "IsaacSensorCreateRtxRadar",
+                path="/RtxRadar_MotionBVHEnabled",
+                translation=translation,
+                orientation=orientation,
+            )
+
+            # Prim should be created successfully when Motion BVH is enabled
+            self.assertIsNotNone(prim)
+            self.assertTrue(prim.IsValid())
+            self.assertTrue(prim.IsA("OmniRadar"))
+        finally:
+            # Restore the original setting
+            settings.set("/renderer/raytracingMotion/enabled", original_value)

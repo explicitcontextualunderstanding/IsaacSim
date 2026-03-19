@@ -13,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides utilities and classes for camera sensors and computer vision data collection in Isaac Sim."""
+
+
 from .camera import *
 from .camera_view import CameraView
 from .extension import *
 from .single_view_depth_sensor import *
+
+__all__ = ["Camera", "CameraView"]

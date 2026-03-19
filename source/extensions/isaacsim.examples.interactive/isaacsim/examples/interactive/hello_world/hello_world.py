@@ -13,30 +13,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from isaacsim.examples.interactive.base_sample import BaseSample
+"""A basic Isaac Sim example module that demonstrates fundamental scene setup and lifecycle management."""
+
+
+import isaacsim.core.experimental.utils.stage as stage_utils
+from isaacsim.examples.base.base_sample_experimental import BaseSample
+from isaacsim.storage.native import get_assets_root_path
 
 # Note: checkout the required tutorials at https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
 
 
 class HelloWorld(BaseSample):
-    def __init__(self) -> None:
+    """A basic Isaac Sim example that demonstrates fundamental scene setup.
+
+    This class serves as an introductory example for users learning Isaac Sim development. It inherits from BaseSample
+    and implements the essential methods required for a complete Isaac Sim sample, including scene setup with a ground
+    plane environment.
+
+    The example creates a minimal physics-enabled scene with a grid-based ground plane, providing a foundation that
+    can be extended with additional objects, robots, or simulation elements. It demonstrates the standard lifecycle
+    methods used in Isaac Sim samples for initialization, loading, resetting, and cleanup operations.
+    """
+
+    def __init__(self):
         super().__init__()
-        return
 
     def setup_scene(self):
-
-        world = self.get_world()
-        world.scene.add_default_ground_plane()
-        return
+        """Set up the scene by adding a ground plane environment for physics simulation."""
+        # Add ground plane environment for physics simulation
+        ground_plane = stage_utils.add_reference_to_stage(
+            usd_path=get_assets_root_path() + "/Isaac/Environments/Grid/default_environment.usd",
+            path="/World/ground",
+        )
 
     async def setup_post_load(self):
-        return
+        """Set up operations to be performed after the world is loaded."""
+        pass
 
     async def setup_pre_reset(self):
-        return
+        """Set up operations to be performed before the world is reset."""
+        pass
 
     async def setup_post_reset(self):
-        return
+        """Set up operations to be performed after the world is reset."""
+        pass
 
     def world_cleanup(self):
-        return
+        """Clean up the world and release resources."""
+        pass

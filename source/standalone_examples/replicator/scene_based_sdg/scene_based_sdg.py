@@ -19,24 +19,27 @@ import argparse
 import json
 import math
 import os
-import random
 
+import numpy as np
 import yaml
 from isaacsim import SimulationApp
 
-# Default config (will be updated/extended by any other passed config arguments)
+# Default configuration
 config = {
     "launch_config": {
-        "renderer": "RaytracedLighting",
+        "renderer": "RealTimePathTracing",
         "headless": False,
     },
     "resolution": [512, 512],
-    "rt_subframes": 16,
-    "num_frames": 20,
+    "rt_subframes": 32,
+    "num_frames": 10,
     "env_url": "/Isaac/Environments/Simple_Warehouse/full_warehouse.usd",
     "writer": "BasicWriter",
-    "writer_config": {
+    "backend_type": "DiskBackend",
+    "backend_params": {
         "output_dir": "_out_scene_based_sdg",
+    },
+    "writer_config": {
         "rgb": True,
         "bounding_box_2d_tight": True,
         "semantic_segmentation": True,
@@ -66,10 +69,12 @@ config = {
 
 import carb
 
-# Check if there are any config files (yaml or json) are passed as arguments
+# Parse command line arguments for optional config file
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", required=False, help="Include specific config parameters (json or yaml))")
 args, unknown = parser.parse_known_args()
+
+# Load config file if provided
 args_config = {}
 if args.config and os.path.isfile(args.config):
     print("File exist")
@@ -83,202 +88,230 @@ if args.config and os.path.isfile(args.config):
 else:
     carb.log_warn(f"File {args.config} does not exist, will use default config")
 
-# If there are specific writer parameters in the input config file make sure they are not mixed with the default ones
+# Clear default writer_config if overridden in args
 if "writer_config" in args_config:
     config["writer_config"].clear()
 
-# Update the default config dictionay with any new parameters or values from the config file
+# Merge args config into default config
 config.update(args_config)
 
-# Create the simulation app with the given launch_config
+# Initialize simulation app
 simulation_app = SimulationApp(launch_config=config["launch_config"])
 
 import carb.settings
 
-# Late import of runtime modules (the SimulationApp needs to be created before loading the modules)
+# Runtime modules (must import after SimulationApp creation)
 import omni.replicator.core as rep
 import omni.usd
-
-# Custom util functions for the example
 import scene_based_sdg_utils
+from isaacsim.core.experimental.utils.semantics import remove_all_labels
 from isaacsim.core.utils import prims
 from isaacsim.core.utils.rotations import euler_angles_to_quat
 from isaacsim.core.utils.stage import get_current_stage, open_stage
 from isaacsim.storage.native import get_assets_root_path
 from pxr import Gf
 
-# Get server path
+# Get assets root path from nucleus server
 assets_root_path = get_assets_root_path()
 if assets_root_path is None:
     carb.log_error("Could not get nucleus server path, closing application..")
     simulation_app.close()
 
-# Open the given environment in a new stage
-print(f"[scene_based_sdg] Loading Stage {config['env_url']}")
+# Load environment stage
+print(f"[SDG] Loading Stage {config['env_url']}")
 if not open_stage(assets_root_path + config["env_url"]):
     carb.log_error(f"Could not open stage{config['env_url']}, closing application..")
     simulation_app.close()
 
-# Disable capture on play (data generation will be triggered manually)
+# Initialize randomization
+rep.set_global_seed(42)
+rng = np.random.default_rng(42)
+
+# Configure replicator for manual triggering
 rep.orchestrator.set_capture_on_play(False)
 
-# Set DLSS to Quality mode (2) for best SDG results , options: 0 (Performance), 1 (Balanced), 2 (Quality), 3 (Auto)
+# Set DLSS to Quality mode for best SDG results
 carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
-# Clear any previous semantic data in the loaded stage
+# Clear previous semantic labels
 if config["clear_previous_semantics"]:
-    stage = get_current_stage()
-    scene_based_sdg_utils.remove_previous_semantics(stage)
+    for prim in get_current_stage().Traverse():
+        remove_all_labels(prim, include_descendants=True)
 
-# Spawn a new forklift at a random pose
+# Create SDG scope for organizing all generated objects
+stage = get_current_stage()
+sdg_scope = stage.DefinePrim("/SDG", "Scope")
+
+# Spawn forklift at random pose
 forklift_prim = prims.create_prim(
-    prim_path="/World/Forklift",
-    position=(random.uniform(-20, -2), random.uniform(-1, 3), 0),
-    orientation=euler_angles_to_quat([0, 0, random.uniform(0, math.pi)]),
+    prim_path="/SDG/Forklift",
+    position=(rng.uniform(-20, -2), rng.uniform(-1, 3), 0),
+    orientation=euler_angles_to_quat([0, 0, rng.uniform(0, math.pi)]),
     usd_path=assets_root_path + config["forklift"]["url"],
     semantic_label=config["forklift"]["class"],
 )
 
-# Spawn the pallet in front of the forklift with a random offset on the Y (pallet's forward) axis
+# Spawn pallet in front of forklift with random offset
 forklift_tf = omni.usd.get_world_transform_matrix(forklift_prim)
-pallet_offset_tf = Gf.Matrix4d().SetTranslate(Gf.Vec3d(0, random.uniform(-1.2, -1.8), 0))
-pallet_pos_gf = (pallet_offset_tf * forklift_tf).ExtractTranslation()
-forklift_quat_gf = forklift_tf.ExtractRotationQuat()
-forklift_quat_xyzw = (forklift_quat_gf.GetReal(), *forklift_quat_gf.GetImaginary())
+pallet_offset_tf = Gf.Matrix4d().SetTranslate(Gf.Vec3d(0, rng.uniform(-1.8, -1.2), 0))
+pallet_pos = (pallet_offset_tf * forklift_tf).ExtractTranslation()
+forklift_quat = forklift_tf.ExtractRotationQuat()
+forklift_quat_xyzw = (forklift_quat.GetReal(), *forklift_quat.GetImaginary())
 
 pallet_prim = prims.create_prim(
-    prim_path="/World/Pallet",
-    position=pallet_pos_gf,
+    prim_path="/SDG/Pallet",
+    position=pallet_pos,
     orientation=forklift_quat_xyzw,
     usd_path=assets_root_path + config["pallet"]["url"],
     semantic_label=config["pallet"]["class"],
 )
 
-# Register randomization graphs
-scene_based_sdg_utils.register_scatter_boxes(pallet_prim, assets_root_path, config)
-scene_based_sdg_utils.register_cone_placement(forklift_prim, assets_root_path, config)
-scene_based_sdg_utils.register_lights_placement(forklift_prim, pallet_prim)
+# Create cardboxes for pallet scattering
+cardboxes = []
+for i in range(5):
+    cardbox = prims.create_prim(
+        prim_path=f"/SDG/CardBox_{i}",
+        usd_path=assets_root_path + config["cardbox"]["url"],
+        semantic_label=config["cardbox"]["class"],
+    )
+    cardboxes.append(cardbox)
 
-# Spawn a camera in the driver's location looking at the pallet
-foklift_pos_gf = forklift_tf.ExtractTranslation()
-driver_cam_pos_gf = foklift_pos_gf + Gf.Vec3d(0.0, 0.0, 1.9)
-
-driver_cam = rep.create.camera(
-    focus_distance=400.0, focal_length=24.0, clipping_range=(0.1, 10000000.0), name="DriverCam"
+# Create traffic cone for corner placement
+cone = prims.create_prim(
+    prim_path="/SDG/Cone",
+    usd_path=assets_root_path + config["cone"]["url"],
+    semantic_label=config["cone"]["class"],
 )
 
-# Camera looking at the pallet
-pallet_cam = rep.create.camera(name="PalletCam")
+# Create cameras
+rep.functional.create.scope(name="Cameras", parent="/SDG")
+driver_cam = rep.functional.create.camera(
+    focus_distance=400.0, focal_length=24.0, clipping_range=(0.1, 10000000.0), name="DriverCam", parent="/SDG/Cameras"
+)
+pallet_cam = rep.functional.create.camera(name="PalletCam", parent="/SDG/Cameras")
+top_view_cam = rep.functional.create.camera(clipping_range=(6.0, 1000000.0), name="TopCam", parent="/SDG/Cameras")
 
-# Camera looking at the forklift from a top view with large min clipping to see the scene through the ceiling
-top_view_cam = rep.create.camera(clipping_range=(6.0, 1000000.0), name="TopCam")
-
-# Create render products for the custom cameras and attach them to the writer
+# Setup render products
 resolution = config.get("resolution", (512, 512))
 forklift_rp = rep.create.render_product(top_view_cam, resolution, name="TopView")
 driver_rp = rep.create.render_product(driver_cam, resolution, name="DriverView")
 pallet_rp = rep.create.render_product(pallet_cam, resolution, name="PalletView")
-# Disable the render products until SDG to improve perf by avoiding unnecessary rendering
-rps = [forklift_rp, driver_rp, pallet_rp]
-for rp in rps:
-    rp.hydra_texture.set_updates_enabled(False)
 
-# If output directory is relative, set it relative to the current working directory
-if not os.path.isabs(config["writer_config"]["output_dir"]):
-    config["writer_config"]["output_dir"] = os.path.join(os.getcwd(), config["writer_config"]["output_dir"])
-print(f"[scene_based_sdg] Output directory={config['writer_config']['output_dir']}")
+render_products = [forklift_rp, driver_rp, pallet_rp]
+for render_product in render_products:
+    render_product.hydra_texture.set_updates_enabled(False)
 
-# Make sure the writer type is in the registry
-writer_type = config.get("writer", "BasicWriter")
-if writer_type not in rep.WriterRegistry.get_writers():
-    carb.log_error(f"Writer type {writer_type} not found in the registry, closing application..")
+# Initialize writer and attach to render products
+writer = scene_based_sdg_utils.setup_writer(config)
+if not writer:
+    carb.log_error("[SDG] Failed to setup writer, closing application.")
     simulation_app.close()
 
-# Get the writer from the registry and initialize it with the given config parameters
-writer = rep.WriterRegistry.get(writer_type)
-writer_kwargs = config["writer_config"]
-print(f"[scene_based_sdg] Initializing {writer_type} with: {writer_kwargs}")
-writer.initialize(**writer_kwargs)
+writer.attach(render_products)
 
-# Attach writer to the render products
-writer.attach(rps)
+for render_product in render_products:
+    render_product.hydra_texture.set_updates_enabled(True)
 
-# Setup the randomizations to be triggered every frame
-with rep.trigger.on_frame():
-    rep.randomizer.scatter_boxes()
-    rep.randomizer.randomize_lights()
-
-    # Randomize the camera position in the given area above the pallet and look at the pallet prim
-    pallet_cam_min = (pallet_pos_gf[0] - 2, pallet_pos_gf[1] - 2, 2)
-    pallet_cam_max = (pallet_pos_gf[0] + 2, pallet_pos_gf[1] + 2, 4)
-    with pallet_cam:
-        rep.modify.pose(
-            position=rep.distribution.uniform(pallet_cam_min, pallet_cam_max),
-            look_at=str(pallet_prim.GetPrimPath()),
-        )
-
-    # Randomize the camera position in the given height above the forklift driver's seat and look at the pallet prim
-    driver_cam_min = (driver_cam_pos_gf[0], driver_cam_pos_gf[1], driver_cam_pos_gf[2] - 0.25)
-    driver_cam_max = (driver_cam_pos_gf[0], driver_cam_pos_gf[1], driver_cam_pos_gf[2] + 0.25)
-    with driver_cam:
-        rep.modify.pose(
-            position=rep.distribution.uniform(driver_cam_min, driver_cam_max),
-            look_at=str(pallet_prim.GetPrimPath()),
-        )
-
-# Setup the randomizations to be triggered at every nth frame (interval)
-with rep.trigger.on_frame(interval=4):
-    top_view_cam_min = (foklift_pos_gf[0], foklift_pos_gf[1], 9)
-    top_view_cam_max = (foklift_pos_gf[0], foklift_pos_gf[1], 11)
-    with top_view_cam:
-        rep.modify.pose(
-            position=rep.distribution.uniform(top_view_cam_min, top_view_cam_max),
-            rotation=rep.distribution.uniform((0, -90, -30), (0, -90, 30)),
-        )
-
-# Setup the randomizations to be manually triggered at specific times
-with rep.trigger.on_custom_event("randomize_cones"):
-    rep.randomizer.place_cones()
-
-# Run a simulation by dropping randomly placed boxes on a pallet next to the forklift
-scene_based_sdg_utils.simulate_falling_objects(forklift_prim, assets_root_path, config)
-
-# Increase subframes if materials are not loaded on time, or ghosting artifacts appear on moving objects,
-# see: https://docs.omniverse.nvidia.com/extensions/latest/ext_replicator/subframes_examples.html
+# Configure raytracing subframes for material loading and motion artifacts
 rt_subframes = config.get("rt_subframes", -1)
 
-# Enable the render products for SDG
-for rp in rps:
-    rp.hydra_texture.set_updates_enabled(True)
 
-# Start the SDG
+# Calculate camera randomization bounds
+pallet_tf = omni.usd.get_world_transform_matrix(pallet_prim)
+camera_bounds = scene_based_sdg_utils.setup_camera_bounds(pallet_prim, forklift_prim, pallet_tf, forklift_tf)
+pallet_cam_bounds_min = camera_bounds["pallet_cam"]["min"]
+pallet_cam_bounds_max = camera_bounds["pallet_cam"]["max"]
+top_cam_bounds_min = camera_bounds["top_cam"]["min"]
+top_cam_bounds_max = camera_bounds["top_cam"]["max"]
+driver_cam_bounds_min = camera_bounds["driver_cam"]["min"]
+driver_cam_bounds_max = camera_bounds["driver_cam"]["max"]
+
+# Setup scatter plane and cone placement
+scatter_plane = scene_based_sdg_utils.create_scatter_plane_for_prim(
+    pallet_prim, pallet_tf, parent_path="/SDG", scale_factor=0.8
+)
+cone_placement_corners, forklift_rotation_deg = scene_based_sdg_utils.setup_cone_placement_corners(forklift_prim)
+
+# Register graph-based randomizers for lights and materials
+scene_based_sdg_utils.register_lights_graph_randomizer(forklift_prim, pallet_prim, event_name="randomize_lights")
+
+cardbox_material_urls = [
+    f"{assets_root_path}/Isaac/Environments/Simple_Warehouse/Materials/MI_PaperNotes_01.mdl",
+    f"{assets_root_path}/Isaac/Environments/Simple_Warehouse/Materials/MI_CardBoxB_05.mdl",
+]
+scene_based_sdg_utils.register_cardboxes_materials_graph_randomizer(
+    cardboxes, cardbox_material_urls, event_name="randomize_cardboxes_materials"
+)
+
+# Run physics simulation to settle boxes on pallet
+scene_based_sdg_utils.simulate_falling_objects(forklift_prim, assets_root_path, config, rng=rng)
+
+# SDG loop - generate frames with randomizations
 num_frames = config.get("num_frames", 0)
-print(f"[scene_based_sdg] Running SDG for {num_frames} frames")
+print(f"[SDG] Running SDG for {num_frames} frames")
 for i in range(num_frames):
-    print(f"[scene_based_sdg] \t Capturing frame {i}")
-    # Trigger the custom event to randomize the cones at specific frames
+    print(f"[SDG] Frame {i}/{num_frames}")
+
+    print(f"[SDG]  Randomizing boxes on pallet.")
+    rep.functional.randomizer.scatter_2d(
+        prims=cardboxes, surface_prims=scatter_plane, check_for_collisions=True, rng=rng
+    )
+
+    print(f"[SDG]  Randomizing boxes materials.")
+    rep.utils.send_og_event(event_name="randomize_cardboxes_materials")
+    print(f"[SDG]  Randomizing lights.")
+    rep.utils.send_og_event(event_name="randomize_lights")
+
+    print(f"[SDG]  Randomizing pallet camera.")
+    rep.functional.modify.pose(
+        pallet_cam,
+        position_value=rng.uniform(pallet_cam_bounds_min, pallet_cam_bounds_max),
+        look_at_value=pallet_prim,
+        look_at_up_axis=(0, 0, 1),
+    )
+
+    print(f"[SDG]  Randomizing driver camera.")
+    rep.functional.modify.pose(
+        driver_cam,
+        position_value=rng.uniform(driver_cam_bounds_min, driver_cam_bounds_max),
+        look_at_value=pallet_prim,
+        look_at_up_axis=(0, 0, 1),
+    )
+
     if i % 2 == 0:
-        rep.utils.send_og_event(event_name="randomize_cones")
-    # Trigger any on_frame registered randomizers and the writers (delta_time=0.0 to avoid advancing the timeline)
+        print(f"[SDG]  Randomizing cone position.")
+        selected_corner = cone_placement_corners[rng.integers(0, len(cone_placement_corners))]
+        rep.functional.modify.pose(
+            cone,
+            position_value=selected_corner,
+        )
+
+    if i % 4 == 0:
+        print(f"[SDG]  Randomizing top view camera.")
+        roll_angle = rng.uniform(0, 2 * np.pi)
+        rep.functional.modify.pose(
+            top_view_cam,
+            position_value=rng.uniform(top_cam_bounds_min, top_cam_bounds_max),
+            look_at_value=forklift_prim,
+            look_at_up_axis=(np.cos(roll_angle), np.sin(roll_angle), 0.0),
+        )
+
+    print(f"[SDG]  Capturing frame with rt_subframes={rt_subframes}")
     rep.orchestrator.step(delta_time=0.0, rt_subframes=rt_subframes)
 
-# Wait for the data to be written to disk
+# Cleanup
 rep.orchestrator.wait_until_complete()
-
-# Cleanup writer and render products
 writer.detach()
-for rp in rps:
-    rp.destroy()
+for render_product in render_products:
+    render_product.destroy()
 
-# Check if the application should keep running after the data generation (debug purposes)
+# Check if the application should keep running after data generation
 close_app_after_run = config.get("close_app_after_run", True)
 if config["launch_config"]["headless"]:
     if not close_app_after_run:
-        print(
-            "[scene_based_sdg] 'close_app_after_run' is ignored when running headless. The application will be closed."
-        )
+        print("[SDG] 'close_app_after_run' is ignored when running headless. The application will be closed.")
 elif not close_app_after_run:
-    print("[scene_based_sdg] The application will not be closed after the run. Make sure to close it manually.")
+    print("[SDG] The application will not be closed after the run. Make sure to close it manually.")
     while simulation_app.is_running():
         simulation_app.update()
 simulation_app.close()

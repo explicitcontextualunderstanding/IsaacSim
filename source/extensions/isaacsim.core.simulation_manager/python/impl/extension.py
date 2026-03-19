@@ -12,12 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import carb
+
+__all__ = [
+    "Extension",
+    "IsaacEvents",
+    "PhysicsScene",
+    "PhysxGpuCfg",
+    "PhysxScene",
+    "SimulationEvent",
+    "SimulationManager",
+]
+
 import omni.ext
 import omni.kit.app
 
 from .. import _simulation_manager
 from .isaac_events import IsaacEvents
+from .physics_scene import PhysicsScene
+from .physx_scene import PhysxGpuCfg, PhysxScene
+from .simulation_event import SimulationEvent
 from .simulation_manager import SimulationManager
 
 # expose pybind interface/API
@@ -34,11 +47,11 @@ class Extension(omni.ext.IExt):
         global _simulation_manager_interface
         _simulation_manager_interface = _simulation_manager.acquire_simulation_manager_interface()
         SimulationManager._simulation_manager_interface = _simulation_manager_interface
-        SimulationManager._initialize()
+        SimulationManager._startup()
 
     def on_shutdown(self):
         # release the pybind interface
         global _simulation_manager_interface
-        SimulationManager._clear()
+        SimulationManager._shutdown()
         _simulation_manager.release_simulation_manager_interface(_simulation_manager_interface)
         _simulation_manager_interface = None

@@ -113,7 +113,7 @@ def weighted_translational_distance(
     | - x is the vector difference between t1 and t2.
     | - W is a weight matrix.
 
-    Given the identity weight matrix, this is equivalent to the \|t1-t2\|.
+    Given the identity weight matrix, this is equivalent to the \\|t1-t2\\|.
 
     Usage:
         This formulation can be used to weight an arbitrary axis of the translation difference.
@@ -124,7 +124,7 @@ def weighted_translational_distance(
         | - I is the identity matrix.
         | - R is a rotation matrix of the form [b1,b2,b3].T
 
-        This is effectively equivalent to \|[2*e1,e2,e3] @ [b1,b2,b3].T @ x\| = sqrt(4*a1^2 + a2^2 + a3^2).
+        This is effectively equivalent to \\|[2*e1,e2,e3] @ [b1,b2,b3].T @ x\\| = sqrt(4*a1^2 + a2^2 + a3^2).
 
         | - e1,e2,e3 are the elementary basis vectors.
 
@@ -180,7 +180,7 @@ def rotational_distance_identity_matrix_deviation(
         r2 (typing.Union[np.ndarray, Gf.Matrix4d, Gf.Matrix3d]): rotation matrices or 4x4 transformation matrices
 
     Returns:
-        np.ndarray: the Frobenius norm \|I-r1*r2^T\|, where I is the identity matrix
+        np.ndarray: the Frobenius norm \\|I-r1*r2^T\\|, where I is the identity matrix
     """
 
     r1 = _standardize_rotation_matrix(r1)

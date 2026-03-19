@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for utility code snippets from Isaac Sim documentation."""
+
+
 import omni.kit.test
 
 ################################################################################
@@ -24,11 +27,15 @@ import omni.kit.test
 
 
 class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
+    """Tests for utility code snippets from Isaac Sim documentation."""
+
     async def setUp(self):
+        """Set up test environment with new stage."""
         await omni.usd.get_context().new_stage_async()
         await omni.kit.app.get_app().next_update_async()
 
     async def tearDown(self):
+        """Clean up test environment and wait for assets to load."""
         for _ in range(10):
             await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
@@ -38,6 +45,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
 
     # simple fastcache smoke test
     async def test_physics_scene(self):
+        """Test physics scene creation with gravity and PhysX settings."""
         ### Code Start
 
         import omni
@@ -78,6 +86,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_enable_physics_collision_convex(self):
+        """Test enabling physics collision with convex hull approximation."""
 
         ###
         import omni
@@ -95,6 +104,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         ###
 
     async def test_enable_physics_collision_decomp(self):
+        """Test enabling physics collision with convex decomposition."""
         ###
         import omni
         from omni.physx.scripts import utils
@@ -111,6 +121,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_mass_properties(self):
+        """Test setting mass and density properties on rigid bodies."""
         ###
         import omni
         from omni.physx.scripts import utils
@@ -130,6 +141,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_traverse_assign_collision(self):
+        """Test traversing stage and assigning collision to all meshes."""
         import omni
         from omni.physx.scripts import utils
         from pxr import Gf, Usd, UsdGeom
@@ -171,6 +183,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_material(self):
+        """Test creating and binding MDL material to a prim."""
         ###
         import omni
         from pxr import Gf, Sdf, UsdShade
@@ -201,6 +214,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_material_texture(self):
+        """Test creating material with texture and binding to a prim."""
         ###
         import carb
         import omni
@@ -237,6 +251,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_add_transform(self):
+        """Test adding transform operations to a prim."""
         ###
         import omni
         from pxr import Gf, UsdGeom
@@ -256,8 +271,10 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_align_prims(self):
+        """Test aligning one prim's pose to another."""
         ###
         import omni
+        from isaacsim.core.experimental.prims import XformPrim
         from pxr import Gf, UsdGeom
 
         stage = omni.usd.get_context().get_stage()
@@ -273,20 +290,19 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         transform.Set(mat)
         # Create a second cube
         result, path_b = omni.kit.commands.execute("CreateMeshPrimCommand", prim_type="Cube")
-        prim_b = stage.GetPrimAtPath(path_b)
-        # Get the transform of the first cube
-        pose = omni.usd.get_world_transform_matrix(prim_a)
-        # Clear the transform on the second cube
-        xform = UsdGeom.Xformable(prim_b)
-        xform.ClearXformOpOrder()
-        # Set the pose of prim_b to that of prim_b
-        xform_op = xform.AddXformOp(UsdGeom.XformOp.TypeTransform, UsdGeom.XformOp.PrecisionDouble, "")
-        xform_op.Set(pose)
+        # Get the transform of the first cube using experimental API
+        xform_prim_a = XformPrim(path_a)
+        positions, orientations = xform_prim_a.get_world_poses()
+        # Set the pose of prim_b to that of prim_a using experimental API
+        xform_prim_b = XformPrim(path_b, reset_xform_op_properties=True)
+        xform_prim_b.set_world_poses(positions, orientations)
         ###
 
     async def test_get_world_transform(self):
+        """Test getting world transform of selected prims."""
         ###
         import omni
+        from isaacsim.core.experimental.prims import XformPrim
         from pxr import Gf, UsdGeom
 
         usd_context = omni.usd.get_context()
@@ -308,36 +324,20 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
 
         # Get list of selected primitives
         selected_prims = usd_context.get_selection().get_selected_prim_paths()
-        # Get the current timecode
-        timeline = omni.timeline.get_timeline_interface()
-        timecode = timeline.get_current_time() * timeline.get_time_codes_per_seconds()
-        # Loop through all prims and print their transforms
+        # Loop through all prims and print their transforms using experimental API
         for s in selected_prims:
-            curr_prim = stage.GetPrimAtPath(s)
             print("Selected", s)
-            pose = omni.usd.get_world_transform_matrix(curr_prim, timecode)
-            print("Matrix Form:", pose)
-            print("Translation: ", pose.ExtractTranslation())
-            q = pose.ExtractRotation().GetQuaternion()
-            print(
-                "Rotation: ", q.GetReal(), ",", q.GetImaginary()[0], ",", q.GetImaginary()[1], ",", q.GetImaginary()[2]
-            )
+            xform_prim = XformPrim(s)
+            positions, orientations = xform_prim.get_world_poses()
+            pos = positions.numpy()[0]
+            quat = orientations.numpy()[0]  # wxyz format
+            print("Translation: ", pos)
+            print("Rotation (wxyz): ", quat[0], ",", quat[1], ",", quat[2], ",", quat[3])
         ###
         pass
 
-    # Test will not run with S3 assets
-    # async def test_save_to_file(self):
-    #     import carb
-    #     import omni
-    #     from isaacsim.storage.native import get_assets_root_path_async
-
-    #     assets_root = await get_assets_root_path_async()
-    #     # Create a prim
-    #     result, path = omni.kit.commands.execute("CreateMeshPrimCommand", prim_type="Cube")
-    #     # Change the path as needed
-    #     omni.usd.get_context().save_as_stage(assets_root + "/Users/test/saved.usd", None)
-
     async def test_async_task(self):
+        """Test using async tasks to pause simulation after a frame."""
         ###
         import asyncio
 
@@ -357,6 +357,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         ###
 
     async def test_camera_intrinsics(self):
+        """Test getting camera intrinsic parameters from viewport."""
         import math
 
         import omni
@@ -389,6 +390,7 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         center_y = width * 0.5
 
     async def test_get_mesh_size(self):
+        """Test getting bounding box size of a mesh prim."""
         import omni
         from pxr import Gf, Usd, UsdGeom
 
@@ -405,13 +407,14 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_apply_semantics_on_entire_stage(self):
+        """Test applying semantic labels to all meshes on the stage."""
         import omni.kit.commands
 
         omni.kit.commands.execute("CreateMeshPrimCommand", prim_type="Cone")
 
         ### Code Start
         import omni.usd
-        from isaacsim.core.utils.semantics import add_labels
+        from isaacsim.core.experimental.utils.semantics import add_labels
 
         def remove_prefix(name, prefix):
             if name.startswith(prefix):
@@ -434,4 +437,16 @@ class TestUtilitySnippets(omni.kit.test.AsyncTestCase):
                 label = remove_prefix(label, "SM_")
                 label = remove_numerical_suffix(label)
                 label = remove_underscores(label)
-                add_labels(prim, labels=[label], instance_name="class")
+                add_labels(prim, labels=[label], taxonomy="class")
+
+    # Test will not run with S3 assets
+    # async def test_save_to_file(self):
+    #     import carb
+    #     import omni
+    #     from isaacsim.storage.native import get_assets_root_path_async
+
+    #     assets_root = await get_assets_root_path_async()
+    #     # Create a prim
+    #     result, path = omni.kit.commands.execute("CreateMeshPrimCommand", prim_type="Cube")
+    #     # Change the path as needed
+    #     omni.usd.get_context().save_as_stage(assets_root + "/Users/test/saved.usd", None)

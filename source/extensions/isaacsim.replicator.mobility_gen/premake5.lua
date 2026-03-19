@@ -28,11 +28,14 @@ project_ext_bindings {
 
 add_files("bindings", "bindings/*.*")
 
-filter { "system:linux" }
+filter { "system:linux", "configurations:release" }
 links { "tbb", "pthread" }
 buildoptions { "-pthread" }
+filter { "system:linux", "configurations:debug" }
+links { "tbb_debug", "pthread" }
+buildoptions { "-pthread" }
 includedirs {
-    "%{root}/_build/target-deps/python/include/python3.11",
+    "%{root}/_build/target-deps/python/include/python3.12",
 }
 
 filter { "system:windows" }

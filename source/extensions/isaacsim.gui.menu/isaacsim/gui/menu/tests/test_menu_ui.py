@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""UI tests for menu behaviors and links."""
 
 import carb
 import omni.kit.test
@@ -22,7 +23,10 @@ from omni.ui.tests.test_base import OmniUiTest
 
 
 class TestMenuUI(OmniUiTest):
+    """UI tests for menu link validation."""
+
     async def setUp(self):
+        """Create a new stage before each test."""
         self._timeline = omni.timeline.get_timeline_interface()
         omni.usd.get_context().new_stage()
         # Make sure the stage loaded
@@ -31,6 +35,7 @@ class TestMenuUI(OmniUiTest):
     # After running each test
 
     async def tearDown(self):
+        """Wait for asset loads before teardown."""
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
@@ -38,6 +43,7 @@ class TestMenuUI(OmniUiTest):
         await super().tearDown()
 
     async def test_physics_reference_link(self):
+        """Verify the physics reference link resolves to a live URL."""
         # Allow the UI to update so that the main menu is populated
         from urllib.error import URLError
         from urllib.request import urlopen
@@ -48,7 +54,15 @@ class TestMenuUI(OmniUiTest):
 
         physics_ref_url = resolve_physics_ref_url()
 
-        def is_website_online(url):
+        def is_website_online(url: str) -> bool:
+            """Check whether a URL responds successfully.
+
+            Args:
+                url: URL to check.
+
+            Returns:
+                True if the response is successful, False otherwise.
+            """
             try:
                 res = urlopen(url, timeout=1.0)
                 print(f"testing link url", url)

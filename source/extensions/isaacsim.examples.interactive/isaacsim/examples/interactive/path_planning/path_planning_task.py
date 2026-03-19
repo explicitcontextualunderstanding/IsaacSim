@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides task implementations for robotic path planning scenarios with obstacle avoidance and target reaching capabilities."""
+
+
 from collections import OrderedDict
 from typing import List, Optional, Tuple
 
@@ -29,6 +32,25 @@ from isaacsim.robot.manipulators.examples.franka import Franka
 
 
 class PathPlanningTask(BaseTask):
+    """A robotic path planning task that manages a robot's movement to reach a target position.
+
+    This task sets up a scene with a robot and a target object, allowing the robot to navigate and reach
+    the target while avoiding obstacles. The target is visualized as a red cube that turns green when
+    reached by the robot's end effector. The task provides methods to add and remove obstacles, monitor
+    task progress, and retrieve observations about the robot and target states.
+
+    The task inherits from BaseTask and provides a complete framework for path planning scenarios,
+    including scene setup, parameter management, and real-time monitoring of goal achievement.
+
+    Args:
+        name: Name identifier for the task.
+        target_prim_path: USD path where the target object will be created.
+        target_name: Name for the target object in the scene.
+        target_position: 3D position coordinates for the target object.
+        target_orientation: Quaternion orientation for the target object.
+        offset: 3D offset applied to all task objects for coordinate frame adjustment.
+    """
+
     def __init__(
         self,
         name: str,
@@ -37,7 +59,7 @@ class PathPlanningTask(BaseTask):
         target_position: Optional[np.ndarray] = None,
         target_orientation: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+    ):
 
         BaseTask.__init__(self, name=name, offset=offset)
         self._robot = None
@@ -52,11 +74,11 @@ class PathPlanningTask(BaseTask):
             self._target_position = np.array([0.65, 0.3, 0.4]) / get_stage_units()
         return
 
-    def set_up_scene(self, scene: Scene) -> None:
-        """[summary]
+    def set_up_scene(self, scene: Scene):
+        """Set up the scene with target and robot.
 
         Args:
-            scene (Scene): [description]
+            scene: The scene to populate.
         """
         super().set_up_scene(scene)
         scene.add_default_ground_plane()
@@ -88,14 +110,14 @@ class PathPlanningTask(BaseTask):
         target_name: Optional[str] = None,
         target_position: Optional[np.ndarray] = None,
         target_orientation: Optional[np.ndarray] = None,
-    ) -> None:
-        """[summary]
+    ):
+        """Set task parameters including target pose.
 
         Args:
-            target_prim_path (Optional[str], optional): [description]. Defaults to None.
-            target_name (Optional[str], optional): [description]. Defaults to None.
-            target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-            target_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
+            target_prim_path: USD path for target.
+            target_name: Name for target object.
+            target_position: Target position.
+            target_orientation: Target orientation.
         """
         if target_prim_path is not None:
             if self._target is not None:
@@ -131,10 +153,10 @@ class PathPlanningTask(BaseTask):
         return
 
     def get_params(self) -> dict:
-        """[summary]
+        """Get task parameters.
 
         Returns:
-            dict: [description]
+            Dictionary of task parameters.
         """
         params_representation = dict()
         params_representation["target_prim_path"] = {"value": self._target.prim_path, "modifiable": True}
@@ -146,18 +168,18 @@ class PathPlanningTask(BaseTask):
         return params_representation
 
     def get_task_objects(self) -> dict:
-        """[summary]
+        """Get all objects registered with the task.
 
         Returns:
-            dict: [description]
+            Dictionary of task objects keyed by name.
         """
         return self._task_objects
 
     def get_observations(self) -> dict:
-        """[summary]
+        """Get current task observations.
 
         Returns:
-            dict: [description]
+            Dictionary with robot and target observations.
         """
         joints_state = self._robot.get_joints_state()
         target_position, target_orientation = self._target.get_local_pose()
@@ -170,10 +192,10 @@ class PathPlanningTask(BaseTask):
         }
 
     def target_reached(self) -> bool:
-        """[summary]
+        """Check if the end effector has reached the target.
 
         Returns:
-            bool: [description]
+            True if target is reached, False otherwise.
         """
         end_effector_position, _ = self._robot.end_effector.get_world_pose()
         target_position, _ = self._target.get_world_pose()
@@ -182,12 +204,12 @@ class PathPlanningTask(BaseTask):
         else:
             return False
 
-    def pre_step(self, time_step_index: int, simulation_time: float) -> None:
-        """[summary]
+    def pre_step(self, time_step_index: int, simulation_time: float):
+        """Called before each physics step to update target visual.
 
         Args:
-            time_step_index (int): [description]
-            simulation_time (float): [description]
+            time_step_index: Current simulation step index.
+            simulation_time: Current simulation time.
         """
         if self._target_visual_material is not None:
             if hasattr(self._target_visual_material, "set_color"):
@@ -199,10 +221,14 @@ class PathPlanningTask(BaseTask):
         return
 
     def add_obstacle(self, position: np.ndarray = None, orientation=None):
-        """[summary]
+        """Add an obstacle wall to the scene.
 
         Args:
-            position (np.ndarray, optional): [description]. Defaults to np.array([0.1, 0.1, 1.0]).
+            position: Position for the obstacle.
+            orientation: Orientation for the obstacle.
+
+        Returns:
+            The created obstacle cube object.
         """
         # TODO: move to task frame if there is one
         cube_prim_path = find_unique_string_name(
@@ -227,11 +253,11 @@ class PathPlanningTask(BaseTask):
         self._obstacle_walls[cube.name] = cube
         return cube
 
-    def remove_obstacle(self, name: Optional[str] = None) -> None:
-        """[summary]
+    def remove_obstacle(self, name: Optional[str] = None):
+        """Remove an obstacle from the scene.
 
         Args:
-            name (Optional[str], optional): [description]. Defaults to None.
+            name: Name of obstacle to remove. Defaults to last added.
         """
         if name is not None:
             self.scene.remove_object(name)
@@ -243,30 +269,35 @@ class PathPlanningTask(BaseTask):
         return
 
     def get_obstacles(self) -> List:
-        return list(self._obstacle_walls.values())
-
-    def get_obstacle_to_delete(self) -> None:
-        """[summary]
+        """List of all obstacle objects in the scene.
 
         Returns:
-            [type]: [description]
+            List of obstacle objects.
+        """
+        return list(self._obstacle_walls.values())
+
+    def get_obstacle_to_delete(self):
+        """Get the last obstacle that would be deleted.
+
+        Returns:
+            The obstacle object to be deleted.
         """
         obstacle_to_delete = list(self._obstacle_walls.keys())[-1]
         return self.scene.get_object(obstacle_to_delete)
 
     def obstacles_exist(self) -> bool:
-        """[summary]
+        """Check if any obstacles exist in the scene.
 
         Returns:
-            bool: [description]
+            True if obstacles exist, False otherwise.
         """
         if len(self._obstacle_walls) > 0:
             return True
         else:
             return False
 
-    def cleanup(self) -> None:
-        """[summary]"""
+    def cleanup(self):
+        """Remove all obstacles from the scene."""
         obstacles_to_delete = list(self._obstacle_walls.keys())
         for obstacle_to_delete in obstacles_to_delete:
             self.scene.remove_object(obstacle_to_delete)
@@ -274,10 +305,37 @@ class PathPlanningTask(BaseTask):
         return
 
     def get_custom_gains(self) -> Tuple[np.array, np.array]:
+        """Get custom gains for the task.
+
+        Returns:
+            A tuple of (position_gains, damping_gains). Returns (None, None) for base task.
+        """
         return None, None
 
 
 class FrankaPathPlanningTask(PathPlanningTask):
+    """A specialized path planning task implementation for the Franka Emika robotic arm.
+
+    This class extends PathPlanningTask to provide Franka-specific functionality for robotic path planning
+    scenarios. It manages the creation and configuration of a Franka robot within the simulation environment,
+    allowing users to define target positions for the robot's end effector to reach. The task includes support
+    for obstacle management, target visualization with color-coded feedback, and collision-aware path planning.
+
+    The robot's end effector changes the target cube color from red to green when it successfully reaches the
+    target position within a specified tolerance. Users can add and remove obstacle walls to create more complex
+    path planning scenarios that require the robot to navigate around barriers.
+
+    Args:
+        name: Unique identifier for the task instance.
+        target_prim_path: USD path where the target object will be created in the scene.
+        target_name: Display name for the target object.
+        target_position: 3D coordinates specifying where the robot should move its end effector.
+        target_orientation: Quaternion defining the desired orientation of the target.
+        offset: 3D translation offset applied to all task objects in the scene.
+        franka_prim_path: USD path where the Franka robot will be created in the scene.
+        franka_robot_name: Display name for the Franka robot instance.
+    """
+
     def __init__(
         self,
         name: str,
@@ -288,7 +346,7 @@ class FrankaPathPlanningTask(PathPlanningTask):
         offset: Optional[np.ndarray] = None,
         franka_prim_path: Optional[str] = None,
         franka_robot_name: Optional[str] = None,
-    ) -> None:
+    ):
         PathPlanningTask.__init__(
             self,
             name=name,
@@ -304,10 +362,10 @@ class FrankaPathPlanningTask(PathPlanningTask):
         return
 
     def set_robot(self) -> Franka:
-        """[summary]
+        """Create and configure the Franka robot.
 
         Returns:
-            Franka: [description]
+            Configured Franka robot instance.
         """
         if self._franka_prim_path is None:
             self._franka_prim_path = find_unique_string_name(
@@ -321,4 +379,9 @@ class FrankaPathPlanningTask(PathPlanningTask):
         return self._franka
 
     def get_custom_gains(self) -> Tuple[np.array, np.array]:
+        """Get custom position and velocity gains for the Franka robot.
+
+        Returns:
+            A tuple containing (position_gains, velocity_gains) for the robot's 9 degrees of freedom.
+        """
         return (1e15 * np.ones(9), 1e13 * np.ones(9))

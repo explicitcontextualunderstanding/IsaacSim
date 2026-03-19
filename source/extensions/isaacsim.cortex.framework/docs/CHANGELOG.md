@@ -1,4 +1,9 @@
 # Changelog
+
+## [1.0.13] - 2025-12-20
+### Changed
+- Add omni.isaac.ml_archive as a test dependency
+
 ## [1.0.12] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.0.11)
@@ -133,8 +138,8 @@
 ## [0.2.4] - 2022-12-04
 ### Changed
 - Updates to standalone examples as we prepare tutorials
-    - remove leonardo; use standard block stacking franka example (`simple_franka_examples` --> `franka_examples`)
-    - simplify follow example
+    - Remove leonardo; use standard block stacking franka example (`simple_franka_examples` --> `franka_examples`)
+    - Simplify follow example
 
 ## [0.2.3] - 2022-12-01
 ### Changed
@@ -145,8 +150,8 @@
 
 ## [0.2.2] - 2022-11-23
 ### Changed
-- commander API framework with explicit logical state monitoring, behavior stepping, and commander stepping.
-- suite of examples / demos in `standalone_examples/api/isaacsim.cortex.framework`. Includes Cortex versions of the Leonardo demo and UR10 bin stacking.
+- Commander API framework with explicit logical state monitoring, behavior stepping, and commander stepping.
+- Suite of examples / demos in `standalone_examples/api/isaacsim.cortex.framework`. Includes Cortex versions of the Leonardo demo and UR10 bin stacking.
 
 ## [0.2.1] - 2022-10-28
 ### Changed
@@ -170,13 +175,13 @@
 ## [0.1.11] - 2022-06-01
 ### Fixed
 
-- prevent cortex launch from ROS-sourced env (inc. removing spamming prints from cortex_sim when launched into belief-only mode with ROS enabled)
+- Prevent cortex launch from ROS-sourced env (inc. removing spamming prints from cortex_sim when launched into belief-only mode with ROS enabled)
 
 ## [0.1.10] - 2022-05-27
 ### Changed
-- update the readme files
-- remove <close_gripper> printout
-- ensure obstacles enabled when building block stacking behavior
+- Update the readme files
+- Remove <close_gripper> printout
+- Ensure obstacles enabled when building block stacking behavior
 
 ## [0.1.9] - 2022-05-26
 ### Changed
@@ -218,30 +223,30 @@
 ## [0.1.4] - 2022-05-16
 ### Changed
 
-- convert to default meters
-- bugfixes around setting up world as singleton and accessing in extensions, including creating robot objects from extensions.
-- includes a hack to handle world.reset bug where gains reset as well.
-- add comments to tools.py and math.py
-- updated READMEs to point to .../Isaac/Samples/Cortex/...
-- fix ur10 default config setting
-- generalize hiding of object property prims
+- Convert to default meters
+- Bugfixes around setting up world as singleton and accessing in extensions, including creating robot objects from extensions.
+- Includes a hack to handle world.reset bug where gains reset as well.
+- Add comments to tools.py and math.py
+- Updated READMEs to point to .../Isaac/Samples/Cortex/...
+- Fix ur10 default config setting
+- Generalize hiding of object property prims
 
 ## [0.1.3] - 2022-05-06
 ### Changed
 
-- converted all imports to full paths `import isaacsim.cortex.framework.<component>`.
-    - works uniformly between extensions and python app (loop runner); no need to augment the python path
-    - fixes a bug where the `df_behavior_module.py` change was noticed by `df_behavior_watcher.py`, but it couldn't be loaded.
-- updates READMEs (proofread and added some description).
+- Converted all imports to full paths `import isaacsim.cortex.framework.<component>`.
+    - Works uniformly between extensions and python app (loop runner); no need to augment the python path
+    - Fixes a bug where the `df_behavior_module.py` change was noticed by `df_behavior_watcher.py`, but it couldn't be loaded.
+- Updates READMEs (proofread and added some description).
 
 ## [0.1.2] - 2022-05-04
 ### Changed
 
 - Change USD path convention from `/cortex/world/...`  to `/cortex/belief/...` to match the cortex terminology.  Also, there are aspects of the core API that automatically add `/World` so that was overloaded.
 - Move behaviors to `standalone_examples/cortex`
-    - separate into robot independent and robot specific (franka) scripts
-    - fix robot independent behaviors to actually be robot independent, including generalized go_home to work with multiple robots
-    - add script for launching cortex, activating behaviors, and clearing the current behavior
+    - Separate into robot independent and robot specific (franka) scripts
+    - Fix robot independent behaviors to actually be robot independent, including generalized go_home to work with multiple robots
+    - Add script for launching cortex, activating behaviors, and clearing the current behavior
     - Update readmes
 
 ## [0.1.1] - 2022-05-02

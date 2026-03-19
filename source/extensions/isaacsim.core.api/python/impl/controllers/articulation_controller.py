@@ -32,24 +32,22 @@ class ArticulationController(object):
         return
 
     def initialize(self, articulation_view) -> None:
-        """[summary]
+        """Initialize the controller with an articulation view.
 
         Args:
-            articulation_view ([type]): [description]
+            articulation_view: The articulation view to control.
         """
         self._articulation_view = articulation_view
         return
 
     def apply_action(self, control_actions: ArticulationAction) -> None:
-        """[summary]
+        """Apply control actions to the articulation for the next physics step.
 
         Args:
-            control_actions (ArticulationAction): actions to be applied for next physics step.
-            indices (Optional[Union[list, np.ndarray]], optional): degree of freedom indices to apply actions to.
-                                                                   Defaults to all degrees of freedom.
+            control_actions: Actions to be applied for next physics step.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
         """
         applied_actions = self.get_applied_action()
         joint_positions = control_actions.joint_positions
@@ -101,14 +99,14 @@ class ArticulationController(object):
     def set_gains(
         self, kps: Optional[np.ndarray] = None, kds: Optional[np.ndarray] = None, save_to_usd: bool = False
     ) -> None:
-        """[summary]
+        """Set the PD controller gains.
 
         Args:
-            kps (Optional[np.ndarray], optional): [description]. Defaults to None.
-            kds (Optional[np.ndarray], optional): [description]. Defaults to None.
+            kps: Proportional gains for each DOF. Defaults to None.
+            kds: Derivative gains for each DOF. Defaults to None.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
         """
         if kps is not None:
             kps = self._articulation_view._backend_utils.expand_dims(kps, 0)
@@ -118,50 +116,50 @@ class ArticulationController(object):
         return
 
     def get_gains(self) -> Tuple[np.ndarray, np.ndarray]:
-        """[summary]
+        """Get the current PD controller gains.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: [description]
+            Tuple of (kps, kds) proportional and derivative gains.
         """
         kps, kds = self._articulation_view.get_gains()
         return kps[0], kds[0]
 
     def switch_control_mode(self, mode: str) -> None:
-        """[summary]
+        """Switch the control mode for all DOFs.
 
         Args:
-            mode (str): [description]
+            mode: The control mode ("position", "velocity", or "effort").
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
         """
         self._articulation_view.switch_control_mode(mode=mode)
         return
 
     def switch_dof_control_mode(self, dof_index: int, mode: str) -> None:
-        """[summary]
+        """Switch the control mode for a specific DOF.
 
         Args:
-            dof_index (int): [description]
-            mode (str): [description]
+            dof_index: Index of the DOF to switch control mode for.
+            mode: The control mode ("position", "velocity", or "effort").
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
         """
         self._articulation_view.switch_dof_control_mode(dof_index=dof_index, mode=mode)
 
     def set_max_efforts(self, values: np.ndarray, joint_indices: Optional[Union[np.ndarray, list]] = None) -> None:
-        """[summary]
+        """Set maximum efforts for specified joints.
 
         Args:
-            value (float, optional): [description]. Defaults to None.
-            indices (Optional[Union[np.ndarray, list]], optional): [description]. Defaults to None.
+            values: Maximum effort values to set.
+            joint_indices: Indices of joints to set. Defaults to all joints.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
         """
         values = self._articulation_view._backend_utils.create_tensor_from_list(
             [values], dtype="float32", device=self._articulation_view._device
@@ -170,13 +168,13 @@ class ArticulationController(object):
         return
 
     def get_max_efforts(self) -> np.ndarray:
-        """[summary]
+        """Get the maximum efforts for all joints.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
 
         Returns:
-            np.ndarray: [description]
+            Array of maximum effort values for each joint.
         """
         result = self._articulation_view.get_max_efforts()
         if result is not None:
@@ -185,27 +183,25 @@ class ArticulationController(object):
             return None
 
     def set_effort_modes(self, mode: str, joint_indices: Optional[Union[np.ndarray, list]] = None) -> None:
-        """[summary]
+        """Set effort modes for specified joints.
 
         Args:
-            mode (str): [description]
-            indices (Optional[Union[np.ndarray, list]], optional): [description]. Defaults to None.
+            mode: The effort mode to set.
+            joint_indices: Indices of joints to set. Defaults to all joints.
 
         Raises:
-            Exception: [description]
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
         """
         return self._articulation_view.set_effort_modes(mode=mode, joint_indices=joint_indices)
 
     def get_effort_modes(self) -> List[str]:
-        """[summary]
+        """Get the effort modes for all joints.
 
         Raises:
-            Exception: [description]
-            NotImplementedError: [description]
+            Exception: If the articulation view is not initialized.
 
         Returns:
-            np.ndarray: [description]
+            List of effort mode strings for each joint.
         """
         result = self._articulation_view.get_effort_modes()
         if result is not None:
@@ -214,13 +210,13 @@ class ArticulationController(object):
             return None
 
     def get_joint_limits(self) -> Tuple[np.ndarray, np.ndarray]:
-        """[summary]
+        """Get the joint limits for all DOFs.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: [description]
+            Tuple of (lower_limits, upper_limits) arrays.
         """
         result = self._articulation_view.get_dof_limits()
         if result is not None:
@@ -229,10 +225,10 @@ class ArticulationController(object):
             return None
 
     def get_applied_action(self) -> ArticulationAction:
-        """
+        """Get the last applied articulation action.
 
         Raises:
-            Exception: [description]
+            Exception: If the articulation view is not initialized.
 
         Returns:
             ArticulationAction: Gets last applied action.

@@ -18,27 +18,57 @@ import carb
 import carb.settings
 import numpy as np
 import omni.usd
-import torch
 import usdrt
 from isaacsim.core.cloner._isaac_cloner import _fabric_clone
 from isaacsim.core.simulation_manager import SimulationManager
-from omni.physx import get_physx_replicator_interface, get_physx_simulation_interface
+from omni.physx import get_physx_replicator_interface
 from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdUtils, Vt
 
 
 class Cloner:
     """This class provides a set of simple APIs to make duplication of objects simple.
+
     Objects can be cloned using this class to create copies of the same object,
     placed at user-specified locations in the scene.
 
     Note that the cloning process is performed in a for-loop, so performance should
     be expected to follow linear scaling with an increase of clones.
+
+    Example:
+
+    .. code-block:: python
+
+        >>> from isaacsim.core.cloner import Cloner
+        >>>
+        >>> cloner = Cloner()
+        >>> cloner.define_base_env("/World/envs")
+        >>> prim_paths = cloner.generate_paths("/World/envs/env", 4)
+        >>> cloner.clone(
+        ...     source_prim_path="/World/envs/env_0",
+        ...     prim_paths=prim_paths,
+        ... )
     """
 
     def __init__(self, stage: Usd.Stage = None):
-        """
+        """Initialize the Cloner instance.
+
         Args:
-            stage (Usd.Stage): Usd stage where source prim and clones are added to.
+            stage: USD stage where source prim and clones are added to.
+                Defaults to the current stage from the USD context.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>> import omni.usd
+            >>>
+            >>> # Use current stage
+            >>> cloner = Cloner()
+            >>>
+            >>> # Or provide a specific stage
+            >>> stage = omni.usd.get_context().get_stage()
+            >>> cloner = Cloner(stage=stage)
         """
         self._base_env_path = None
         self._root_path = None
@@ -47,24 +77,46 @@ class Cloner:
             self._stage = omni.usd.get_context().get_stage()
 
     def define_base_env(self, base_env_path: str):
-        """Creates a USD Scope at base_env_path. This is designed to be the parent that holds all clones.
+        """Create a USD Scope at base_env_path.
+
+        This is designed to be the parent that holds all clones.
 
         Args:
-            base_env_path (str): Path to create the USD Scope at.
+            base_env_path: Path to create the USD Scope at.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> cloner.define_base_env("/World/envs")
         """
 
         UsdGeom.Scope.Define(self._stage, base_env_path)
         self._base_env_path = base_env_path
 
     def generate_paths(self, root_path: str, num_paths: int):
-        """Generates a list of paths under the root path specified.
+        """Generate a list of paths under the root path specified.
 
         Args:
-            root_path (str): Base path where new paths will be created under.
-            num_paths (int): Number of paths to generate.
+            root_path: Base path where new paths will be created under.
+            num_paths: Number of paths to generate.
 
         Returns:
-            paths (List[str]): A list of paths
+            A list of paths in the format ``{root_path}_{i}`` where i ranges from 0 to num_paths - 1.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> paths = cloner.generate_paths("/World/envs/env", 4)
+            >>> paths
+            ['/World/envs/env_0', '/World/envs/env_1', '/World/envs/env_2', '/World/envs/env_3']
         """
 
         self._root_path = root_path + "_"
@@ -79,17 +131,39 @@ class Cloner:
         enable_env_ids: bool = False,
         clone_in_fabric: bool = False,
     ):
-        """Replicates physics properties directly in omni.physics to avoid performance bottlenecks when parsing physics.
+        """Replicate physics properties directly in omni.physics.
+
+        This avoids performance bottlenecks when parsing physics by using the
+        PhysX replicator interface to replicate physics properties directly.
 
         Args:
-            source_prim_path (str): Path of source object.
-            prim_paths (List[str]): List of destination paths.
-            base_env_path (str): Path to namespace for all environments.
-            root_path (str): Prefix path for each environment.
-            useEnvIds (bool): Whether to use envIDs functionality in physics to enable co-location of clones. Clones will be filtered automatically.
-        Raises:
-            Exception: Raises exception if base_env_path is None or root_path is None.
+            source_prim_path: Path of the source object.
+            prim_paths: List of destination paths.
+            base_env_path: Path to namespace for all environments.
+            root_path: Prefix path for each environment.
+            enable_env_ids: Whether to use envIDs functionality in physics to enable
+                co-location of clones. Clones will be filtered automatically.
+            clone_in_fabric: Whether to perform cloning in Fabric.
 
+        Raises:
+            ValueError: If base_env_path is None and define_base_env() was not called.
+            ValueError: If root_path is None and generate_paths() was not called.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> cloner.define_base_env("/World/envs")
+            >>> prim_paths = cloner.generate_paths("/World/envs/env", 4)
+            >>> cloner.replicate_physics(
+            ...     source_prim_path="/World/envs/env_0",
+            ...     prim_paths=prim_paths,
+            ...     base_env_path="/World/envs",
+            ...     root_path="/World/envs/env_",
+            ... )
         """
         if base_env_path is None and self._base_env_path is None:
             raise ValueError("base_env_path needs to be specified!")
@@ -134,7 +208,28 @@ class Cloner:
         )
 
     def disable_change_listener(self):
+        """Disable USD notice handlers to improve cloning performance.
 
+        This method temporarily disables various USD notice handlers including
+        the PhysX UI notice handler, Fabric USD notice handler, and SimulationManager
+        notice handler. This prevents expensive recomputation during batch cloning
+        operations.
+
+        Note:
+            Call :meth:`enable_change_listener` after cloning is complete to restore
+            the notice handlers.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> cloner.disable_change_listener()
+            >>> # Perform cloning operations...
+            >>> cloner.enable_change_listener()
+        """
         # first try to disable omni physx UI notice handler
         try:
             from omni.physxui import get_physxui_interface
@@ -155,6 +250,24 @@ class Cloner:
         SimulationManager.enable_usd_notice_handler(False)
 
     def enable_change_listener(self):
+        """Re-enable USD notice handlers after cloning operations.
+
+        This method restores the USD notice handlers that were disabled by
+        :meth:`disable_change_listener`. It re-enables the PhysX UI notice handler,
+        Fabric USD notice handler, and SimulationManager notice handler if they
+        were previously enabled.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> cloner.disable_change_listener()
+            >>> # Perform cloning operations...
+            >>> cloner.enable_change_listener()
+        """
         try:
             from omni.physxui import get_physxui_interface
 
@@ -173,8 +286,8 @@ class Cloner:
         self,
         source_prim_path: str,
         prim_paths: List[str],
-        positions: Union[np.ndarray, torch.Tensor] = None,
-        orientations: Union[np.ndarray, torch.Tensor] = None,
+        positions: Union[np.ndarray, "torch.Tensor"] = None,
+        orientations: Union[np.ndarray, "torch.Tensor"] = None,
         replicate_physics: bool = False,
         base_env_path: str = None,
         root_path: str = None,
@@ -183,26 +296,61 @@ class Cloner:
         enable_env_ids: bool = False,
         clone_in_fabric: bool = False,
     ):
-        """Clones a source prim at user-specified destination paths.
-            Clones will be placed at user-specified positions and orientations.
+        """Clone a source prim at user-specified destination paths.
+
+        Clones will be placed at user-specified positions and orientations.
 
         Args:
-            source_prim_path (str): Path of source object.
-            prim_paths (List[str]): List of destination paths.
-            positions (Union[np.ndarray, torch.Tensor]): An array containing target positions of clones. Dimension must equal length of prim_paths.
-                                    Defaults to None. Clones will be placed at (0, 0, 0) if not specified.
-            orientations (Union[np.ndarray, torch.Tensor]): An array containing target orientations of clones. Dimension must equal length of prim_paths.
-                                    Defaults to None. Clones will have identity orientation (1, 0, 0, 0) if not specified.
-            replicate_physics (bool): Uses omni.physics replication. This will replicate physics properties directly for paths beginning with root_path and skip physics parsing for anything under the base_env_path.
-            base_env_path (str): Path to namespace for all environments. Required if replicate_physics=True and define_base_env() not called.
-            root_path (str): Prefix path for each environment. Required if replicate_physics=True and generate_paths() not called.
-            copy_from_source: (bool): Setting this to False will inherit all clones from the source prim; any changes made to the source prim will be reflected in the clones.
-                         Setting this to True will make copies of the source prim when creating new clones; changes to the source prim will not be reflected in clones. Defaults to False. Note that setting this to True will take longer to execute.
-            unregister_physics_replication (bool): Setting this to True will unregister the physics replicator on the current stage.
-            enable_env_ids (bool): Setting this enables co-location of clones in physics with automatic filtering of collisions between clones.
-        Raises:
-            Exception: Raises exception if source prim path is not valid.
+            source_prim_path: Path of the source object.
+            prim_paths: List of destination paths.
+            positions: An array containing target positions of clones. Dimension must
+                equal the length of prim_paths. Defaults to None, in which case clones
+                will be placed at (0, 0, 0).
+            orientations: An array containing target orientations of clones as quaternions
+                (w, x, y, z). Dimension must equal the length of prim_paths. Defaults to None,
+                in which case clones will have identity orientation (1, 0, 0, 0).
+            replicate_physics: Uses omni.physics replication. This will replicate physics
+                properties directly for paths beginning with root_path and skip physics
+                parsing for anything under the base_env_path.
+            base_env_path: Path to namespace for all environments. Required if
+                replicate_physics=True and define_base_env() was not called.
+            root_path: Prefix path for each environment. Required if replicate_physics=True
+                and generate_paths() was not called.
+            copy_from_source: Setting this to False will inherit all clones from the source
+                prim; any changes made to the source prim will be reflected in the clones.
+                Setting this to True will make copies of the source prim when creating new
+                clones; changes to the source prim will not be reflected in clones.
+                Defaults to False. Note that setting this to True will take longer to execute.
+            unregister_physics_replication: Setting this to True will unregister the physics
+                replicator on the current stage.
+            enable_env_ids: Setting this enables co-location of clones in physics with
+                automatic filtering of collisions between clones.
+            clone_in_fabric: Whether to perform cloning operations in Fabric for improved
+                performance.
 
+        Raises:
+            ValueError: If the dimension of positions does not match the number of prim_paths.
+            ValueError: If the dimension of orientations does not match the number of prim_paths.
+            Exception: If the source prim does not exist.
+
+        Example:
+
+        .. code-block:: python
+
+            >>> import numpy as np
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> cloner.define_base_env("/World/envs")
+            >>> prim_paths = cloner.generate_paths("/World/envs/env", 4)
+            >>>
+            >>> # Clone with positions
+            >>> positions = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]])
+            >>> cloner.clone(
+            ...     source_prim_path="/World/envs/env_0",
+            ...     prim_paths=prim_paths,
+            ...     positions=positions,
+            ... )
         """
         self.disable_change_listener()
 
@@ -211,9 +359,13 @@ class Cloner:
             if len(positions) != len(prim_paths):
                 raise ValueError("Dimension mismatch between positions and prim_paths!")
             # convert to numpy array
-            if isinstance(positions, torch.Tensor):
+            # - convert from torch (without explicit importing it)
+            try:
                 positions = positions.detach().cpu().numpy()
-            elif not isinstance(positions, np.ndarray):
+            except:
+                pass
+            # - convert from other types
+            if not isinstance(positions, np.ndarray):
                 positions = np.asarray(positions)
             # convert to pxr gf
             positions = Vt.Vec3fArray.FromNumpy(positions)
@@ -221,9 +373,13 @@ class Cloner:
             if len(orientations) != len(prim_paths):
                 raise ValueError("Dimension mismatch between orientations and prim_paths!")
             # convert to numpy array
-            if isinstance(orientations, torch.Tensor):
+            # - convert from torch (without explicit importing it)
+            try:
                 orientations = orientations.detach().cpu().numpy()
-            elif not isinstance(orientations, np.ndarray):
+            except:
+                pass
+            # - convert from other types
+            if not isinstance(orientations, np.ndarray):
                 orientations = np.asarray(orientations)
             # convert to pxr gf -- wxyz to xyzw
             orientations = np.roll(orientations, -1, -1)
@@ -430,14 +586,38 @@ class Cloner:
     def filter_collisions(
         self, physicsscene_path: str, collision_root_path: str, prim_paths: List[str], global_paths: List[str] = []
     ):
-        """Filters collisions between clones. Clones will not collide with each other, but can collide with objects specified in global_paths.
+        """Filter collisions between clones.
+
+        Clones will not collide with each other, but can collide with objects
+        specified in global_paths. This method uses inverted collision group
+        filtering for more efficient collision filtering across environments.
 
         Args:
-            physicsscene_path (str): Path to PhysicsScene object in stage.
-            collision_root_path (str): Path to place collision groups under.
-            prim_paths (List[str]): Paths of objects to filter out collision.
-            global_paths (List[str]): Paths of objects to generate collision (e.g. ground plane).
+            physicsscene_path: Path to PhysicsScene object in stage.
+            collision_root_path: Path to place collision groups under.
+            prim_paths: Paths of objects to filter out collision.
+            global_paths: Paths of objects to generate collision with all clones
+                (e.g. ground plane).
 
+        Example:
+
+        .. code-block:: python
+
+            >>> from isaacsim.core.cloner import Cloner
+            >>>
+            >>> cloner = Cloner()
+            >>> cloner.define_base_env("/World/envs")
+            >>> prim_paths = cloner.generate_paths("/World/envs/env", 4)
+            >>> cloner.clone(
+            ...     source_prim_path="/World/envs/env_0",
+            ...     prim_paths=prim_paths,
+            ... )
+            >>> cloner.filter_collisions(
+            ...     physicsscene_path="/World/PhysicsScene",
+            ...     collision_root_path="/World/collisions",
+            ...     prim_paths=prim_paths,
+            ...     global_paths=["/World/ground_plane"],
+            ... )
         """
 
         physx_scene = PhysxSchema.PhysxSceneAPI(self._stage.GetPrimAtPath(physicsscene_path))

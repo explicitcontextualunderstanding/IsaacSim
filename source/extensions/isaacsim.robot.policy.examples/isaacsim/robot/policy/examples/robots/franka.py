@@ -13,41 +13,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+"""Example implementations of policies for Franka robots."""
 
-import numpy as np
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.prims import get_prim_at_path
-from isaacsim.core.utils.transformations import get_world_pose_from_relative
-from isaacsim.core.utils.types import ArticulationAction
+
+import isaacsim.core.experimental.utils.transform as transform_utils
+import warp as wp
+from isaacsim.core.deprecation_manager import import_module
+from isaacsim.core.experimental.prims import Articulation, XformPrim
+from isaacsim.core.experimental.utils.backend import use_backend
+
+# from isaacsim.core.utils.transformations import get_world_pose_from_relative
 from isaacsim.robot.policy.examples.controllers import PolicyController
 from isaacsim.storage.native import get_assets_root_path
 
+torch = import_module("torch")
+
 
 class FrankaOpenDrawerPolicy(PolicyController):
-    """The Franka Open Drawer Policy. In this policy, the robot will open the top drawer of the cabinet and hold it open"""
+    """The Franka Open Drawer Policy. In this policy, the robot will open the top drawer of the cabinet and hold it open.
+
+    Args:
+        prim_path: The prim path of the robot on the stage.
+        cabinet: The cabinet articulation.
+        root_path: The path to the articulation root of the robot.
+        usd_path: The robot usd filepath in the directory.
+        position: The position of the robot.
+        orientation: The orientation of the robot.
+    """
 
     def __init__(
         self,
         prim_path: str,
-        cabinet: SingleArticulation,
-        root_path: Optional[str] = None,
-        name: str = "franka",
-        usd_path: Optional[str] = None,
-        position: Optional[np.ndarray] = None,
-        orientation: Optional[np.ndarray] = None,
-    ) -> None:
+        cabinet: Articulation,
+        root_path: str | None = None,
+        usd_path: str | None = None,
+        position: list[float] | None = None,
+        orientation: list[float] | None = None,
+    ):
         """
         Initialize franka robot and import flat terrain policy.
 
         Args:
-            prim_path (str) -- prim path of the robot on the stage
-            root_path (Optional[str]): The path to the articulation root of the robot
-            name (str) -- name of the quadruped
-            usd_path (str) -- robot usd filepath in the directory
-            position (np.ndarray) -- position of the robot
-            orientation (np.ndarray) -- orientation of the robot
-
+            prim_path: The prim path of the robot on the stage
+            cabinet: The cabinet articulation
+            root_path: The path to the articulation root of the robot
+            usd_path: The robot usd filepath in the directory
+            position: The position of the robot
+            orientation: The orientation of the robot
         """
         assets_root_path = get_assets_root_path()
 
@@ -55,7 +67,7 @@ class FrankaOpenDrawerPolicy(PolicyController):
         if usd_path == None:
             usd_path = assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
 
-        super().__init__(name, prim_path, root_path, usd_path, position, orientation)
+        super().__init__(prim_path, root_path, usd_path, position, orientation)
 
         self.load_policy(
             policy_path + "policy.pt",
@@ -63,21 +75,32 @@ class FrankaOpenDrawerPolicy(PolicyController):
         )
 
         self._action_scale = 1.0
-        self._previous_action = np.zeros(9)
+        self._previous_action = torch.zeros(8)
+        self._indices = wp.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=wp.int32)  # index 8 is a mimic joint
         self._policy_counter = 0
 
         self.cabinet = cabinet
 
-        self.franka_hand_prim = get_prim_at_path(self.robot.prim_path + "/panda_hand")
-        self.drawer_handle_top_prim = get_prim_at_path(self.cabinet.prim_path + "/drawer_handle_top")
+        self.franka_hand_prim = XformPrim(self.robot.link_paths[0][8])
+        self.drawer_handle_top_prim = XformPrim(self.cabinet.link_paths[0][6])
+        print(self.franka_hand_prim.paths)
+        print(self.drawer_handle_top_prim.paths)
 
     def _compute_observation(self):
-        """
-        Compute the observation vector for the policy.
+        """Compute the observation vector for the policy.
+
+        The observation includes robot joint states, drawer state, relative positioning
+        between end-effector and drawer handle (with their respective offsets), and previous actions.
+        End-effector offset is [0, 0, 0.1034]m and drawer handle offset is [0.305, 0, 0.01]m.
 
         Returns:
-        np.ndarray -- The observation vector.
-
+            A 31-dimensional observation vector containing:
+            - [0:9]: Robot joint positions (difference from default pose)
+            - [9:18]: Robot joint velocities (difference from default velocities)
+            - [18:19]: Drawer joint position
+            - [19:20]: Drawer joint velocity
+            - [20:23]: Relative position between drawer handle and robot end-effector
+            - [23:31]: Previous action
         """
         # relative transform from the drawer handle to the drawer handle link
         """
@@ -90,11 +113,6 @@ class FrankaOpenDrawerPolicy(PolicyController):
                 - 0.0
                 - 0.01
         """
-        drawer_world_pos, _ = get_world_pose_from_relative(
-            self.drawer_handle_top_prim, np.array([0.305, 0, 0.01]), np.array([1, 0, 0, 0])
-        )
-
-        # relative transform from the tool cneter to the hands
         """
         From env.yaml
         - prim_path: /World/envs/env_.*/Robot/panda_hand
@@ -105,64 +123,86 @@ class FrankaOpenDrawerPolicy(PolicyController):
                 - 0.0
                 - 0.1034
         """
-        robot_world_pos, _ = get_world_pose_from_relative(
-            self.franka_hand_prim, np.array([0, 0, 0.1034]), np.array([1, 0, 0, 0])
-        )
 
-        obs = np.zeros(31)
+        with use_backend("usdrt"):
+            # Get world poses of the links
+            drawer_world_pos, drawer_world_orient = self.drawer_handle_top_prim.get_world_poses()
+            robot_world_pos, robot_world_orient = self.franka_hand_prim.get_world_poses()
+
+            # Get rotation matrices directly from quaternions using warp function
+            R_drawer = transform_utils.quaternion_to_rotation_matrix(drawer_world_orient).reshape((3, 3))
+            R_robot = transform_utils.quaternion_to_rotation_matrix(robot_world_orient).reshape((3, 3))
+
+            # Reshape positions from (1,3) to (3,)
+            drawer_world_pos = drawer_world_pos.reshape((3,))
+            robot_world_pos = robot_world_pos.reshape((3,))
+
+            # Create offset vectors as warp arrays on same device
+            drawer_offset = wp.array([0.305, 0.0, 0.01], dtype=wp.float32, device=drawer_world_pos.device)
+            robot_offset = wp.array([0.0, 0.0, 0.1034], dtype=wp.float32, device=robot_world_pos.device)
+
+            # Convert to torch for matrix multiplication
+            drawer_world_pos_torch = wp.to_torch(drawer_world_pos)
+            robot_world_pos_torch = wp.to_torch(robot_world_pos)
+            R_drawer_torch = wp.to_torch(R_drawer)
+            R_robot_torch = wp.to_torch(R_robot)
+            drawer_offset_torch = wp.to_torch(drawer_offset)
+            robot_offset_torch = wp.to_torch(robot_offset)
+
+            # Apply offsets in world frame using torch matmul
+            drawer_world_pos = drawer_world_pos_torch + torch.matmul(R_drawer_torch, drawer_offset_torch)
+            robot_world_pos = robot_world_pos_torch + torch.matmul(R_robot_torch, robot_offset_torch)
+
+        obs = torch.zeros(31, device=torch.device(str(self.robot._device)))
         # Base lin pos
-        obs[:9] = self.robot.get_joint_positions() - self.default_pos
+        obs[:9] = wp.to_torch(self.robot.get_dof_positions()) - self.default_pos
 
         # Base ang vel
-        obs[9:18] = self.robot.get_joint_velocities() - self.default_vel
+        obs[9:18] = wp.to_torch(self.robot.get_dof_velocities()) - self.default_vel
 
         # Joint states
-        obs[18:19] = self.cabinet.get_joint_positions()[self.drawer_link_idx]
-        obs[19:20] = self.cabinet.get_joint_velocities()[self.drawer_link_idx]
+        obs[18:19] = wp.to_torch(self.cabinet.get_dof_positions(indices=[0], dof_indices=self.drawer_link_idx))
+        obs[19:20] = wp.to_torch(self.cabinet.get_dof_velocities(indices=[0], dof_indices=self.drawer_link_idx))
 
         # relative distance between drawer and robot
         obs[20:23] = drawer_world_pos - robot_world_pos
 
         # Previous Action
-        obs[23:31] = self._previous_action[0:8]
+        obs[23:31] = self._previous_action
 
         return obs
 
     def forward(self, dt):
-        """
-        Compute the desired articulation action and apply them to the robot articulation.
+        """Computes and applies joint position targets for the Franka arm to execute the drawer opening task.
+        The control runs at a decimated rate and applies position control to the first 8 joints
+        (excluding the mimic joint). Actions are scaled and added to the default pose.
 
-        Argument:
-        dt (float) -- Timestep update in the world.
-
+        Args:
+            dt: Physics timestep in seconds
         """
         if self._policy_counter % self._decimation == 0:
             obs = self._compute_observation()
             self.action = self._compute_action(obs)
-            self._previous_action = self.action.copy()
+            self._previous_action = self.action.clone()
 
-        # articulation space
-        # copy last item for two fingers in order to increase action size from 8 to 9
-        # finger positions are absolute positions, not relative to the default position
-        self.action[0:8] = self.action[0:8] + self.default_pos[0:8]
-        action_input = np.append(self.action, self.action[-1])
-        action = ArticulationAction(joint_positions=(action_input * self._action_scale))
-        # here action is size 9
-        self.robot.apply_action(action)
+        self.robot.set_dof_position_targets(
+            positions=wp.from_torch(self.default_pos[:8] + (self.action * self._action_scale)),
+            dof_indices=self._indices,
+        )
 
         self._policy_counter += 1
 
-    def initialize(self, physics_sim_view=None) -> None:
+    def initialize(self, physics_sim_view=None):
+        """Initializes the Franka arm articulation with position control mode and configures solver parameters.
+        Sets up drawer link indices and specific physics solver settings for stable manipulation.
+
+        Args:
+            physics_sim_view: The physics simulation view
         """
-        Initialize the articulation interface, set up drive mode
-        """
-        super().initialize(physics_sim_view=physics_sim_view, control_mode="force", set_articulation_props=True)
+        super().initialize(physics_sim_view=physics_sim_view, control_mode="position", set_articulation_props=False)
 
-        self.cabinet.initialize(physics_sim_view=physics_sim_view)
+        self.drawer_link_idx = self.cabinet.get_dof_indices("drawer_top_joint")
 
-        self.drawer_link_idx = self.cabinet.get_dof_index("drawer_top_joint")
-
-        self.robot.set_solver_position_iteration_count(32)
-        self.robot.set_solver_velocity_iteration_count(4)
-        self.robot.set_stabilization_threshold(0)
-        self.robot.set_sleep_threshold(0)
+        self.robot.set_solver_iteration_counts(position_counts=[32], velocity_counts=[4])
+        self.robot.set_stabilization_thresholds([0])
+        self.robot.set_sleep_thresholds([0])

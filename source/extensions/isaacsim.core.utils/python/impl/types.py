@@ -15,17 +15,19 @@
 from typing import List, Optional, Union
 
 import numpy as np
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from pxr import Usd
+
+torch = import_module("torch")
 
 
 class DataFrame(object):
-    """[summary]
+    """Container for simulation data at a specific time step.
 
     Args:
-        current_time_step (int): [description]
-        current_time (float): [description]
-        data (dict): [description]
+        current_time_step: The current simulation time step index.
+        current_time: The current simulation time in seconds.
+        data: Dictionary containing the simulation data.
     """
 
     def __init__(self, current_time_step: int, current_time: float, data: dict) -> None:
@@ -34,10 +36,10 @@ class DataFrame(object):
         self.data = data
 
     def get_dict(self) -> dict:
-        """[summary]
+        """Convert the DataFrame to a dictionary representation.
 
         Returns:
-            dict: [description]
+            Dictionary with time step, time, and data fields.
         """
         return {"current_time": self.current_time, "current_time_step": self.current_time_step, "data": self.data}
 
@@ -46,13 +48,13 @@ class DataFrame(object):
 
     @classmethod
     def init_from_dict(cls, dict_representation: dict):
-        """[summary]
+        """Create a DataFrame instance from a dictionary.
 
         Args:
-            dict_representation (dict): [description]
+            dict_representation: Dictionary containing time_step, time, and data.
 
         Returns:
-            DataFrame: [description]
+            A new DataFrame instance initialized from the dictionary.
         """
         frame = object.__new__(cls)
         frame.current_time_step = dict_representation["current_time_step"]
@@ -62,13 +64,13 @@ class DataFrame(object):
 
 
 class DOFInfo(object):
-    """[summary]
+    """Information about a degree of freedom in an articulation.
 
     Args:
-        prim_path (str): [description]
-        handle (int): [description]
-        prim (Usd.Prim): [description]
-        index (int): [description]
+        prim_path: The USD prim path for this DOF.
+        handle: The physics handle for this DOF.
+        prim: The USD prim object for this DOF.
+        index: The index of this DOF in the articulation.
     """
 
     def __init__(self, prim_path: str, handle: int, prim: Usd.Prim, index: int) -> None:
@@ -80,11 +82,11 @@ class DOFInfo(object):
 
 
 class XFormPrimState(object):
-    """[summary]
+    """State of an XFormPrim containing position and orientation.
 
     Args:
-        position (np.ndarray): [description]
-        orientation (np.ndarray): [description]
+        position: The position as a numpy array of shape (3,).
+        orientation: The orientation quaternion (w, x, y, z) as a numpy array of shape (4,).
     """
 
     def __init__(self, position: np.ndarray, orientation: np.ndarray) -> None:
@@ -93,11 +95,11 @@ class XFormPrimState(object):
 
 
 class XFormPrimViewState(object):
-    """[summary]
+    """State of multiple XFormPrims containing positions and orientations.
 
     Args:
-        positions (Union[np.ndarray, torch.Tensor]): positions with shape of (N, 3).
-        orientations (Union[np.ndarray, torch.Tensor]): quaternion representation of orientation (scalar first) with shape (N, 4).
+        positions: Positions with shape (N, 3).
+        orientations: Quaternion orientations (scalar first) with shape (N, 4).
     """
 
     def __init__(
@@ -108,11 +110,13 @@ class XFormPrimViewState(object):
 
 
 class DynamicState(object):
-    """[summary]
+    """State of a dynamic rigid body including pose and velocities.
 
     Args:
-        position (np.ndarray): [description]
-        orientation (np.ndarray): [description]
+        position: The position as a numpy array of shape (3,).
+        orientation: The orientation quaternion (w, x, y, z) as a numpy array of shape (4,).
+        linear_velocity: The linear velocity as a numpy array of shape (3,).
+        angular_velocity: The angular velocity as a numpy array of shape (3,).
     """
 
     def __init__(
@@ -125,11 +129,13 @@ class DynamicState(object):
 
 
 class DynamicsViewState(object):
-    """[summary]
+    """State of multiple dynamic rigid bodies including poses and velocities.
 
     Args:
-        position (np.ndarray): [description]
-        orientation (np.ndarray): [description]
+        positions: Positions with shape (N, 3).
+        orientations: Quaternion orientations (scalar first) with shape (N, 4).
+        linear_velocities: Linear velocities with shape (N, 3).
+        angular_velocities: Angular velocities with shape (N, 3).
     """
 
     def __init__(
@@ -146,12 +152,12 @@ class DynamicsViewState(object):
 
 
 class JointsState(object):
-    """[summary]
+    """State of articulation joints including positions, velocities, and efforts.
 
     Args:
-        positions (np.ndarray): [description]
-        velocities (np.ndarray): [description]
-        efforts (np.ndarray): [description]
+        positions: Joint positions array.
+        velocities: Joint velocities array.
+        efforts: Joint efforts (torques/forces) array.
     """
 
     def __init__(self, positions: np.ndarray, velocities: np.ndarray, efforts: np.ndarray) -> None:
@@ -161,12 +167,12 @@ class JointsState(object):
 
 
 class ArticulationAction(object):
-    """[summary]
+    """Action to apply to an articulation's joints.
 
     Args:
-        joint_positions (Optional[Union[List, np.ndarray]], optional): [description]. Defaults to None.
-        joint_velocities (Optional[Union[List, np.ndarray]], optional): [description]. Defaults to None.
-        joint_efforts (Optional[Union[List, np.ndarray]], optional): [description]. Defaults to None.
+        joint_positions: Target joint positions. Defaults to None.
+        joint_velocities: Target joint velocities. Defaults to None.
+        joint_efforts: Target joint efforts (torques/forces). Defaults to None.
     """
 
     def __init__(
@@ -182,13 +188,13 @@ class ArticulationAction(object):
         self.joint_indices = joint_indices
 
     def get_dof_action(self, index: int) -> dict:
-        """[summary]
+        """Get the action for a specific DOF as a dictionary.
 
         Args:
-            index (int): [description]
+            index: The index of the DOF to get the action for.
 
         Returns:
-            dict: [description]
+            Dictionary containing the position, velocity, or effort for this DOF.
         """
         if self.joint_efforts is not None and self.joint_efforts[index] is not None:
             return {"effort": self.joint_efforts[index]}
@@ -201,10 +207,10 @@ class ArticulationAction(object):
             return dof_action
 
     def get_dict(self) -> dict:
-        """[summary]
+        """Convert the ArticulationAction to a dictionary representation.
 
         Returns:
-            dict: [description]
+            Dictionary with joint_positions, joint_velocities, and joint_efforts.
         """
         result = dict()
         if self.joint_positions is not None:
@@ -234,10 +240,10 @@ class ArticulationAction(object):
         return str(self.get_dict())
 
     def get_length(self) -> Optional[int]:
-        """[summary]
+        """Get the number of joints this action applies to.
 
         Returns:
-            Optional[int]: [description]
+            The length of the action arrays, or None if all arrays are None.
         """
         size = None
         if self.joint_positions is not None:
@@ -265,19 +271,17 @@ class ArticulationAction(object):
 
 
 class ArticulationActions(object):
-    """[summary]
+    """Actions to apply to multiple articulations' joints.
 
     Args:
-        joint_positions (Optional[Union[List, np.ndarray]], optional): [description]. Defaults to None.
-        joint_velocities (Optional[Union[List, np.ndarray]], optional): [description]. Defaults to None.
-        joint_efforts (Optional[Union[List, np.ndarray]], optional): [description]. Defaults to None.
-        joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
-                                                                                 to manipulate. Shape (K,).
-                                                                                 Where K <= num of dofs.
-                                                                                 Defaults to None (i.e: all dofs).
-        joint_names (Optional[List[str]]): joint names to specify which joints to manipulate
-                                            (can't be sppecified together with joint_indices). Shape (K,).
-                                            Where K <= num of dofs. Defaults to None (i.e: all dofs).
+        joint_positions: Target joint positions. Defaults to None.
+        joint_velocities: Target joint velocities. Defaults to None.
+        joint_efforts: Target joint efforts (torques/forces). Defaults to None.
+        joint_indices: Joint indices to specify which joints to manipulate. Shape (K,).
+            Where K <= num of dofs. Defaults to None (i.e: all dofs).
+        joint_names: Joint names to specify which joints to manipulate
+            (cannot be specified together with joint_indices). Shape (K,).
+            Where K <= num of dofs. Defaults to None (i.e: all dofs).
     """
 
     def __init__(

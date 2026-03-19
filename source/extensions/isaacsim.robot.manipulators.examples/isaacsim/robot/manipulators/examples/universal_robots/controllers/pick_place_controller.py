@@ -24,13 +24,13 @@ from isaacsim.robot.manipulators.grippers.surface_gripper import SurfaceGripper
 
 
 class PickPlaceController(manipulators_controllers.PickPlaceController):
-    """[summary]
+    """Pick and place controller for the UR10 robot.
 
     Args:
-        name (str): [description]
-        surface_gripper (SurfaceGripper): [description]
-        robot_articulation(SingleArticulation): [description]
-        events_dt (Optional[List[float]], optional): [description]. Defaults to None.
+        name: Name identifier for the controller.
+        gripper: The surface gripper to use.
+        robot_articulation: The robot articulation to control.
+        events_dt: Timesteps for pick/place events.
     """
 
     def __init__(
@@ -39,7 +39,7 @@ class PickPlaceController(manipulators_controllers.PickPlaceController):
         gripper: SurfaceGripper,
         robot_articulation: SingleArticulation,
         events_dt: Optional[List[float]] = None,
-    ) -> None:
+    ):
         if events_dt is None:
             events_dt = [0.01, 0.0035, 0.01, 1.0, 0.008, 0.005, 0.005, 1, 0.01, 0.08]
         manipulators_controllers.PickPlaceController.__init__(
@@ -61,17 +61,17 @@ class PickPlaceController(manipulators_controllers.PickPlaceController):
         end_effector_offset: Optional[np.ndarray] = None,
         end_effector_orientation: Optional[np.ndarray] = None,
     ) -> ArticulationAction:
-        """[summary]
+        """Execute one step of the pick and place controller.
 
         Args:
-            picking_position (np.ndarray): [description]
-            placing_position (np.ndarray): [description]
-            current_joint_positions (np.ndarray): [description]
-            end_effector_offset (Optional[np.ndarray], optional): [description]. Defaults to None.
-            end_effector_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
+            picking_position: Position to pick from.
+            placing_position: Position to place at.
+            current_joint_positions: Current robot joint positions.
+            end_effector_offset: Offset for end effector.
+            end_effector_orientation: Orientation for end effector.
 
         Returns:
-            ArticulationAction: [description]
+            The articulation action to execute.
         """
         if end_effector_orientation is None:
             end_effector_orientation = euler_angles_to_quat(np.array([0, np.pi / 2.0, 0]))

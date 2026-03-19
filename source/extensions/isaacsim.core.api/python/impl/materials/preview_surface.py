@@ -23,15 +23,15 @@ from pxr import Gf, Sdf, UsdShade
 
 
 class PreviewSurface(VisualMaterial):
-    """[summary]
+    """USD PreviewSurface material for basic rendering.
 
     Args:
-        prim_path (str): [description]
-        name (str, optional): [description]. Defaults to "preview_surface".
-        shader (Optional[UsdShade.Shader], optional): [description]. Defaults to None.
-        color (Optional[np.ndarray], optional): [description]. Defaults to None.
-        roughness (Optional[float], optional): [description]. Defaults to None.
-        metallic (Optional[float], optional): [description]. Defaults to None.
+        prim_path: USD prim path for the material.
+        name: Name identifier. Defaults to "preview_surface".
+        shader: Existing shader to use. Defaults to None.
+        color: Diffuse color RGB. Defaults to None.
+        roughness: Surface roughness (0-1). Defaults to None.
+        metallic: Metallic value (0-1). Defaults to None.
     """
 
     def __init__(
@@ -78,10 +78,10 @@ class PreviewSurface(VisualMaterial):
         return
 
     def set_color(self, color: np.ndarray) -> None:
-        """[summary]
+        """Set the diffuse color.
 
         Args:
-            color (np.ndarray): [description]
+            color: RGB color array.
         """
         if self.shaders_list[0].GetInput("diffuseColor").Get() is None:
             self.shaders_list[0].CreateInput("diffuseColor", Sdf.ValueTypeNames.Float3).Set(Gf.Vec3f(*color.tolist()))
@@ -90,10 +90,10 @@ class PreviewSurface(VisualMaterial):
         return
 
     def get_color(self) -> np.ndarray:
-        """[summary]
+        """Get the diffuse color.
 
         Returns:
-            np.ndarray: [description]
+            RGB color array or None if not set.
         """
         if self.shaders_list[0].GetInput("diffuseColor").Get() is None:
             carb.log_warn("A color attribute is not set yet")
@@ -102,10 +102,10 @@ class PreviewSurface(VisualMaterial):
             return np.array(self.shaders_list[0].GetInput("diffuseColor").Get())
 
     def set_roughness(self, roughness: float) -> None:
-        """[summary]
+        """Set the surface roughness.
 
         Args:
-            roughness (float): [description]
+            roughness: Roughness value (0-1).
         """
         if self.shaders_list[0].GetInput("roughness").Get() is None:
             self.shaders_list[0].CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(roughness)
@@ -114,10 +114,10 @@ class PreviewSurface(VisualMaterial):
         return
 
     def get_roughness(self) -> float:
-        """[summary]
+        """Get the surface roughness.
 
         Returns:
-            float: [description]
+            Roughness value or None if not set.
         """
         if self.shaders_list[0].GetInput("roughness").Get() is None:
             carb.log_warn("A roughness attribute is not set yet")
@@ -126,10 +126,10 @@ class PreviewSurface(VisualMaterial):
             return self.shaders_list[0].GetInput("roughness").Get()
 
     def set_metallic(self, metallic: float) -> None:
-        """[summary]
+        """Set the metallic value.
 
         Args:
-            metallic (float): [description]
+            metallic: Metallic value (0-1).
         """
         if self.shaders_list[0].GetInput("metallic").Get() is None:
             self.shaders_list[0].CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(metallic)
@@ -138,10 +138,10 @@ class PreviewSurface(VisualMaterial):
         return
 
     def get_metallic(self) -> float:
-        """[summary]
+        """Get the metallic value.
 
         Returns:
-            float: [description]
+            Metallic value or None if not set.
         """
         if self.shaders_list[0].GetInput("metallic").Get() is None:
             carb.log_warn("A metallic attribute is not set yet")

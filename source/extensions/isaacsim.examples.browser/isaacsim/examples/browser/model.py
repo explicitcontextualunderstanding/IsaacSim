@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Browser model implementation for organizing and managing examples in the Isaac Sim Examples Browser."""
+
+
 import os
 from typing import List, Optional
 
@@ -27,6 +30,20 @@ SETTING_FOLDER = "/exts/isaacsim.examples.browser/folders"
 
 
 class Example:
+    """Represents an example that can be registered and displayed in the Isaac Sim Examples Browser.
+
+    This class encapsulates the metadata and functionality for an individual example, including its display
+    name, execution logic, UI customization, categorization, and visual representation. Examples are
+    organized by category and can be executed through the browser interface.
+
+    Args:
+        name: Display name of the example.
+        execute_entrypoint: Callable function that executes the example's main logic.
+        ui_hook: Callable function for custom UI behavior or modifications.
+        category: Category path for organizing the example in the browser hierarchy.
+        thumbnail: File path to the example's thumbnail image for visual identification.
+    """
+
     def __init__(
         self,
         name: str = "",
@@ -43,10 +60,31 @@ class Example:
 
 
 class ExampleCategoryItem(CategoryItem):
+    """A category item for organizing examples in the Isaac Sim examples browser.
+
+    This class represents a hierarchical category node that can contain child categories and examples.
+    It extends the browser core CategoryItem to provide example-specific functionality for managing
+    hierarchical category structures in the examples browser interface.
+
+    Args:
+        name: The name of the category.
+    """
+
     def __init__(self, name: str):
         super().__init__(name)
 
     def add_child(self, child_name: str):
+        """Adds a child category item to the current category.
+
+        Creates a new child category with the specified name if it doesn't already exist,
+        or returns the existing child category if it does.
+
+        Args:
+            child_name: Name of the child category to add.
+
+        Returns:
+            The child category item that was created or already existed.
+        """
         if child_name not in [c.name for c in self.children]:
             child_category = ExampleCategoryItem(child_name)
             self.children.append(child_category)
@@ -59,6 +97,16 @@ class ExampleCategoryItem(CategoryItem):
 
 
 class ExampleDetailItem(DetailItem):
+    """A detail item representing an individual example in the Isaac Sim examples browser.
+
+    This class extends the browser framework's DetailItem to display example-specific information including
+    name, thumbnail, and UI hooks. It serves as the visual representation of an Example object within the
+    browser's detail view, enabling users to interact with and execute individual examples.
+
+    Args:
+        example: The Example object containing the example's metadata and execution details.
+    """
+
     def __init__(self, example: Example):
         super().__init__(example.name, "", example.thumbnail)
         self.example = example
@@ -66,8 +114,11 @@ class ExampleDetailItem(DetailItem):
 
 
 class ExampleBrowserModel(TreeFolderBrowserModel):
-    """
-    Represent asset browser model
+    """Represent asset browser model
+
+    Args:
+        *args: Variable length argument list passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
     """
 
     def __init__(self, *args, **kwargs):
@@ -83,6 +134,11 @@ class ExampleBrowserModel(TreeFolderBrowserModel):
         )
 
     def register_example(self, **kwargs):
+        """Registers a new example in the browser.
+
+        Args:
+            **kwargs: Example properties including name, execute_entrypoint, ui_hook, category, and thumbnail.
+        """
         example = Example(**kwargs)
         if not example.name:
             return
@@ -97,7 +153,14 @@ class ExampleBrowserModel(TreeFolderBrowserModel):
         return
 
     def get_category_items(self, item: CollectionItem) -> List[CategoryItem]:
-        """Override to get list of category items"""
+        """Override to get list of category items
+
+        Args:
+            item: Collection item to get categories for.
+
+        Returns:
+            List of category items organized hierarchically.
+        """
         category_items = []
         for category in self._examples:
             categories = category.split("/")
@@ -122,7 +185,14 @@ class ExampleBrowserModel(TreeFolderBrowserModel):
         return category_items
 
     def get_detail_items(self, item: ExampleCategoryItem) -> List[ExampleDetailItem]:
-        """Override to get list of detail items"""
+        """Override to get list of detail items
+
+        Args:
+            item: Category item to get examples for.
+
+        Returns:
+            List of example detail items in the category.
+        """
         detail_items = []
 
         def lookup_category_name(item):
@@ -144,13 +214,24 @@ class ExampleBrowserModel(TreeFolderBrowserModel):
         self.sort_items(detail_items)
         return detail_items
 
-    def execute(self, item: ExampleDetailItem) -> None:
+    def execute(self, item: ExampleDetailItem):
+        """Executes the selected example.
+
+        Args:
+            item: Example detail item to execute.
+        """
         # Create a Reference or payload of the Props in the stage
         example = item.example
         if example.execute_entrypoint:
             example.execute_entrypoint()
 
     def deregister_example(self, name: str, category: str):
+        """Removes an example from the browser.
+
+        Args:
+            name: Name of the example to remove.
+            category: Category containing the example.
+        """
         if category in self._examples:
             self._examples[category] = [e for e in self._examples[category] if e.name != name]
             if len(self._examples[category]) == 0:
@@ -158,6 +239,7 @@ class ExampleBrowserModel(TreeFolderBrowserModel):
         self.refresh_browser()
 
     def refresh_browser(self):
+        """Refreshes the browser display to reflect current examples."""
         collections = self.get_item_children(None)
         if collections:
             self._item_changed(collections[0])

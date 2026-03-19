@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension for creating a UI-based grasp editor interface in Isaac Sim."""
+
+
 import asyncio
 import gc
 
+import carb.eventdispatcher
 import omni
 import omni.kit.commands
-import omni.physx as _physx
+import omni.physics.core
 import omni.timeline
 import omni.ui as ui
 import omni.usd
@@ -50,8 +54,30 @@ This class sets up standard useful callback functions in UIBuilder:
 
 
 class Extension(omni.ext.IExt):
+    """Extension class for the isaacsim.robot_setup.grasp_editor extension.
+
+    This extension provides a UI-based interface for editing robot grasp configurations in Isaac Sim.
+    It creates a dockable window in the Tools menu under Robotics that allows users to interact
+    with grasp editing functionality through a scrollable interface.
+
+    The extension automatically handles standard UI extension operations including:
+    - Menu registration and window management
+    - Timeline and physics event subscriptions
+    - Stage event handling for opened, closed, and assets loaded states
+    - Physics step callbacks during simulation
+    - Automatic window docking to the left side of the viewport
+
+    The actual UI functionality is delegated to a UIBuilder instance, which can be customized
+    to provide specific grasp editing controls and workflows. The extension serves as a template
+    for UI-based extensions with standard boilerplate operations for toolbar integration.
+    """
+
     def on_startup(self, ext_id: str):
-        """Initialize extension and UI elements"""
+        """Initialize extension and UI elements.
+
+        Args:
+            ext_id: Extension identifier string.
+        """
 
         self.ext_id = ext_id
         self._usd_context = omni.usd.get_context()
@@ -81,12 +107,13 @@ class Extension(omni.ext.IExt):
 
         # Events
         self._usd_context = omni.usd.get_context()
-        self._physxIFace = _physx.get_physx_interface()
-        self._physx_subscription = None
+        self._physics_simulation_interface = omni.physics.core.get_physics_simulation_interface()
+        self._physics_subscription = None
         self._stage_event_sub = None
         self._timeline = omni.timeline.get_timeline_interface()
 
     def on_shutdown(self):
+        """Cleanup extension resources and remove UI elements."""
         self._models = {}
         remove_menu_items(self._menu_items, "Tools")
 
@@ -99,22 +126,58 @@ class Extension(omni.ext.IExt):
         gc.collect()
 
     def _on_window(self, visible):
+        """Handle window visibility changes and manage event subscriptions.
+
+        Args:
+            visible: Whether the window is visible.
+        """
         if self._window.visible:
             # Subscribe to Stage and Timeline Events
             self._usd_context = omni.usd.get_context()
-            events = self._usd_context.get_stage_event_stream()
-            self._stage_event_sub = events.create_subscription_to_pop(self._on_stage_event)
-            stream = self._timeline.get_timeline_event_stream()
-            self._timeline_event_sub = stream.create_subscription_to_pop(self._on_timeline_event)
+            self._stage_event_sub_opened = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.OPENED),
+                on_event=self._on_stage_opened,
+                observer_name="isaacsim.robot_setup.grasp_editor.Extension._on_stage_opened",
+            )
+            self._stage_event_sub_closed = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.CLOSED),
+                on_event=self._on_stage_closed,
+                observer_name="isaacsim.robot_setup.grasp_editor.Extension._on_stage_closed",
+            )
+            self._stage_event_sub_assets_loaded = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.ASSETS_LOADED),
+                on_event=self._on_assets_loaded,
+                observer_name="isaacsim.robot_setup.grasp_editor.Extension._on_assets_loaded",
+            )
+            self._stage_event_sub_sim_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=self._usd_context.stage_event_name(omni.usd.StageEventType.SIMULATION_STOP_PLAY),
+                on_event=self._on_simulation_stop_play,
+                observer_name="isaacsim.robot_setup.grasp_editor.Extension._on_simulation_stop_play",
+            )
+            self._timeline_event_sub_play = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.timeline.GLOBAL_EVENT_PLAY,
+                on_event=self._on_timeline_play,
+                observer_name="isaacsim.robot_setup.grasp_editor.Extension._on_timeline_play",
+            )
+            self._timeline_event_sub_stop = carb.eventdispatcher.get_eventdispatcher().observe_event(
+                event_name=omni.timeline.GLOBAL_EVENT_STOP,
+                on_event=self._on_timeline_stop,
+                observer_name="isaacsim.robot_setup.grasp_editor.Extension._on_timeline_stop",
+            )
 
             self._build_ui()
         else:
             self._usd_context = None
-            self._stage_event_sub = None
-            self._timeline_event_sub = None
+            self._stage_event_sub_opened = None
+            self._stage_event_sub_closed = None
+            self._stage_event_sub_assets_loaded = None
+            self._stage_event_sub_sim_stop = None
+            self._timeline_event_sub_play = None
+            self._timeline_event_sub_stop = None
             self.ui_builder.cleanup()
 
     def _build_ui(self):
+        """Build the extension's UI components and dock the window."""
         with self._window.frame:
             with ui.VStack(spacing=5, height=0):
                 self._build_extension_ui()
@@ -139,29 +202,84 @@ class Extension(omni.ext.IExt):
     #################################################################
 
     def _menu_callback(self):
+        """Handle menu item selection to toggle window visibility."""
         self._window.visible = not self._window.visible
         self.ui_builder.on_menu_callback()
 
-    def _on_timeline_event(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.PLAY):
-            if not self._physx_subscription:
-                self._physx_subscription = self._physxIFace.subscribe_physics_step_events(self._on_physics_step)
-        elif event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physx_subscription = None
+    def _on_timeline_play(self, event):
+        """Handle timeline play events and subscribe to physics step updates.
 
+        Args:
+            event: Timeline play event data.
+        """
+        if not self._physics_subscription:
+            self._physics_subscription = self._physics_simulation_interface.subscribe_physics_on_step_events(
+                pre_step=False, order=0, on_update=self._on_physics_step
+            )
         self.ui_builder.on_timeline_event(event)
 
-    def _on_physics_step(self, step):
+    def _on_timeline_stop(self, event):
+        """Handle timeline stop events and cleanup physics subscriptions.
+
+        Args:
+            event: Timeline stop event data.
+        """
+        self._physics_subscription = None
+        self.ui_builder.on_timeline_event(event)
+
+    def _on_physics_step(self, step, context):
+        """Handle physics simulation step events.
+
+        Args:
+            step: Physics step data.
+            context: Physics simulation context.
+        """
         self.ui_builder.on_physics_step(step)
 
-    def _on_stage_event(self, event):
-        if event.type == int(StageEventType.OPENED) or event.type == int(StageEventType.CLOSED):
-            # stage was opened or closed, cleanup
-            self._physx_subscription = None
-            self.ui_builder.cleanup()
+    def _on_stage_opened(self, event):
+        """Handle stage opened events and cleanup previous state.
 
-        self.ui_builder.on_stage_event(event)
+        Args:
+            event: Stage opened event data.
+        """
+        # stage was opened, cleanup
+        self._physics_subscription = None
+        self.ui_builder.cleanup()
+
+    def _on_stage_closed(self, event):
+        """Handle stage closed events and cleanup resources.
+
+        Args:
+            event: Stage closed event data.
+        """
+        # stage was closed, cleanup
+        self._physics_subscription = None
+        self.ui_builder.cleanup()
+
+    def _on_assets_loaded(self, event):
+        """Handles the stage assets loaded event.
+
+        Called when all assets in the stage have finished loading.
+
+        Args:
+            event: The stage assets loaded event.
+        """
+        self.ui_builder.on_assets_loaded()
+
+    def _on_simulation_stop_play(self, event):
+        """Handles the simulation stop play event.
+
+        Called when the simulation transitions from play to stop state.
+
+        Args:
+            event: The simulation stop play event.
+        """
+        self.ui_builder.on_simulation_stop_play()
 
     def _build_extension_ui(self):
+        """Builds the extension's user interface.
+
+        Delegates UI construction to the UIBuilder instance by calling its build_ui method.
+        """
         # Call user function for building UI
         self.ui_builder.build_ui()

@@ -24,7 +24,7 @@ from isaacsim.asset.gen.omap.bindings import _omap
 from isaacsim.asset.gen.omap.utils import compute_coordinates, generate_image, update_location
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
-from isaacsim.core.utils.stage import open_stage_async
+from isaacsim.core.experimental.utils.stage import open_stage_async
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics
 
@@ -86,9 +86,7 @@ class TestOccupancyMapGenerator(omni.kit.test.AsyncTestCase):
 
     # Actual test, notice it is "async" function, so "await" can be used if needed
     async def test_simple_room(self):
-        (result, error) = await open_stage_async(
-            self._assets_root_path + "/Isaac/Environments/Simple_Room/simple_room.usd"
-        )
+        (result, _) = await open_stage_async(self._assets_root_path + "/Isaac/Environments/Simple_Room/simple_room.usd")
         # Make sure the stage loaded
         self.assertTrue(result)
         stage = omni.usd.get_context().get_stage()

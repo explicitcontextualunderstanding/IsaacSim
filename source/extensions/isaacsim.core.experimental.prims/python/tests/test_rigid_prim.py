@@ -17,10 +17,14 @@ from typing import Literal
 
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
+import omni.kit.app
 import omni.kit.test
 import warp as wp
-from isaacsim.core.experimental.prims import RigidPrim
+from isaacsim.core.experimental.objects import Cube, GroundPlane
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim, XformPrim
 from isaacsim.core.experimental.utils.backend import use_backend
+from isaacsim.core.simulation_manager import SimulationManager
+from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics
 
 from .common import check_allclose, check_array, cprint, draw_indices, draw_sample, parametrize
 
@@ -33,8 +37,17 @@ async def populate_stage(max_num_prims: int, operation: Literal["wrap", "create"
     stage_utils.define_prim(f"/World", "Xform")
     stage_utils.define_prim(f"/World/PhysicsScene", "PhysicsScene")
     for i in range(max_num_prims):
-        stage_utils.define_prim(f"/World/A_{i}", "Xform")
-        stage_utils.define_prim(f"/World/A_{i}/B", "Cube")
+        xform_prim = stage_utils.define_prim(f"/World/A_{i}", "Xform")
+        cube_prim = stage_utils.define_prim(f"/World/A_{i}/B", "Cube")
+        # apply mass API with proper inertia to the xform
+        UsdPhysics.RigidBodyAPI.Apply(xform_prim)
+        mass_api = UsdPhysics.MassAPI.Apply(xform_prim)
+        mass_api.GetMassAttr().Set(1.0)
+        # set diagonal inertia tensor (for a 1m cube with mass 1kg)
+        mass_api.GetDiagonalInertiaAttr().Set(Gf.Vec3f(0.167, 0.167, 0.167))
+        mass_api.GetCenterOfMassAttr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
+        # apply collision API to the cube geometry
+        UsdPhysics.CollisionAPI.Apply(cube_prim)
 
 
 class TestRigidPrim(omni.kit.test.AsyncTestCase):
@@ -57,6 +70,18 @@ class TestRigidPrim(omni.kit.test.AsyncTestCase):
             raise ValueError(f"Invalid backend: {backend}")
 
     # --------------------------------------------------------------------
+
+    @parametrize(
+        devices=["cpu"],  # runtime instance creation is not currently supported on GPU
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        max_num_prims=1,
+    )
+    async def test_runtime_instance_creation(self, prim, num_prims, device, backend):
+        RigidPrim("/World/A_0")
 
     @parametrize(
         backends=["tensor", "usd"],
@@ -171,6 +196,7 @@ class TestRigidPrim(omni.kit.test.AsyncTestCase):
     @parametrize(
         backends=["tensor", "usd"],
         operations=["wrap"],
+        supported_engines=["physx"],
         prim_class=RigidPrim,
         prim_class_kwargs={"masses": [1.0]},
         populate_stage_func=populate_stage,
@@ -191,6 +217,7 @@ class TestRigidPrim(omni.kit.test.AsyncTestCase):
     @parametrize(
         backends=["tensor", "usd"],
         operations=["wrap"],
+        supported_engines=["physx"],
         prim_class=RigidPrim,
         prim_class_kwargs={"masses": [1.0]},
         populate_stage_func=populate_stage,
@@ -363,3 +390,343 @@ class TestRigidPrim(omni.kit.test.AsyncTestCase):
                         prim.apply_forces_and_torques_at_pos(
                             v0, v1, positions=positions, indices=indices, local_frame=local_frame
                         )
+
+
+async def populate_stage_with_ground(max_num_prims: int, operation: Literal["wrap", "create"], **kwargs) -> None:
+    """Populate stage with ground plane for contact testing."""
+    assert operation == "wrap", "Other operations except 'wrap' are not supported"
+    # create new stage
+    await stage_utils.create_new_stage_async()
+    # define prims
+    stage_utils.define_prim(f"/World", "Xform")
+    stage_utils.define_prim(f"/World/PhysicsScene", "PhysicsScene")
+    # create ground plane
+    GroundPlane("/World/GroundPlane", positions=[[0, 0, 0]])
+    # create rigid bodies
+    cube_paths = [f"/World/A_{i}" for i in range(max_num_prims)]
+    Cube(cube_paths)
+    XformPrim(cube_paths, reset_xform_op_properties=True).set_local_poses(
+        translations=[[i * 3, 0, 2.0] for i in range(max_num_prims)]
+    )
+    GeomPrim(cube_paths, apply_collision_apis=True)
+    rigid_prims = RigidPrim(cube_paths, masses=[1.0])
+    # ensure contact reporting is enabled on cubes and ground filter prim
+    RigidPrim.ensure_api(rigid_prims.prims, PhysxSchema.PhysxContactReportAPI)
+    stage = stage_utils.get_current_stage()
+    filter_prim = stage.GetPrimAtPath("/World/GroundPlane/collisionPlane")
+    if filter_prim.IsValid():
+        GeomPrim.ensure_api([filter_prim], PhysxSchema.PhysxContactReportAPI)
+
+
+def _assert_single_cube_contact_data(
+    test_case: omni.kit.test.AsyncTestCase,
+    *,
+    prim: RigidPrim,
+    cube_path: str,
+    forces: wp.array,
+    points: wp.array,
+    normals: wp.array,
+    distances: wp.array,
+    pair_counts: wp.array,
+    start_indices: wp.array,
+    net_forces: wp.array | None = None,
+    contact_force_matrix: wp.array | None = None,
+    cube_index: int = 0,
+    expected_contacts: int = 4,
+) -> tuple[int, int]:
+    check_array(forces, shape=(prim._max_contact_count, 1), dtype=wp.float32, device=prim._device)
+    check_array(points, shape=(prim._max_contact_count, 3), dtype=wp.float32, device=prim._device)
+    check_array(normals, shape=(prim._max_contact_count, 3), dtype=wp.float32, device=prim._device)
+    check_array(distances, shape=(prim._max_contact_count, 1), dtype=wp.float32, device=prim._device)
+    check_array(pair_counts, shape=(len(prim), prim.num_contact_filters), dtype=wp.uint32, device=prim._device)
+    check_array(start_indices, shape=(len(prim), prim.num_contact_filters), dtype=wp.uint32, device=prim._device)
+
+    pair_count = int(pair_counts.numpy()[cube_index, 0])
+    start_index = int(start_indices.numpy()[cube_index, 0])
+    test_case.assertEqual(
+        pair_count,
+        expected_contacts,
+        f"Expected {expected_contacts} contact points for cube index {cube_index}",
+    )
+    forces_slice = forces.numpy()[start_index : start_index + pair_count]
+    points_slice = points.numpy()[start_index : start_index + pair_count]
+    normals_slice = normals.numpy()[start_index : start_index + pair_count]
+    distances_slice = distances.numpy()[start_index : start_index + pair_count]
+    test_case.assertTrue(np.isfinite(forces_slice).all(), "Expected finite contact forces")
+    test_case.assertTrue(np.isfinite(points_slice).all(), "Expected finite contact points")
+    test_case.assertTrue(np.isfinite(normals_slice).all(), "Expected finite contact normals")
+    test_case.assertTrue(np.isfinite(distances_slice).all(), "Expected finite contact distances")
+    test_case.assertTrue(np.any(np.abs(forces_slice) > 0.0), "Expected non-zero contact forces")
+    test_case.assertTrue(np.any(np.linalg.norm(points_slice, axis=-1) > 0.0), "Expected non-zero contact points")
+    test_case.assertTrue(np.any(np.linalg.norm(normals_slice, axis=-1) > 0.0), "Expected non-zero contact normals")
+    dt = SimulationManager.get_physics_dt()
+    total_force = float(np.sum(forces_slice) / dt)
+    test_case.assertAlmostEqual(total_force, 9.81, delta=0.1, msg="Expected total contact force ~9.81N")
+    test_case.assertTrue(np.all(normals_slice[:, 2] > 0.999), "Expected contact normals to point +Z")
+    test_case.assertTrue(
+        np.all(np.abs(normals_slice[:, :2]) < 0.0001),
+        "Expected contact normals to be mostly aligned with +Z",
+    )
+    stage = stage_utils.get_current_stage()
+    cube = UsdGeom.Cube(stage.GetPrimAtPath(cube_path))
+    cube_size = float(cube.GetSizeAttr().Get())
+    half_size = cube_size / 2.0
+    positions, _ = prim.get_world_poses(indices=[cube_index])
+    cube_center = positions.numpy()[0]
+    expected_z = cube_center[2] - half_size
+    test_case.assertTrue(
+        np.allclose(points_slice[:, 2], expected_z, atol=1e-2),
+        "Expected contact points to lie on cube bottom face",
+    )
+    test_case.assertTrue(
+        np.all(np.abs(points_slice[:, 0] - cube_center[0]) <= half_size + 1e-2),
+        "Expected contact point X to be within cube footprint",
+    )
+    test_case.assertTrue(
+        np.all(np.abs(points_slice[:, 1] - cube_center[1]) <= half_size + 1e-2),
+        "Expected contact point Y to be within cube footprint",
+    )
+    if net_forces is not None:
+        check_array(net_forces, shape=(len(prim), 3), dtype=wp.float32, device=prim._device)
+        test_case.assertTrue(np.isfinite(net_forces.numpy()).all(), "Expected finite net contact forces")
+        test_case.assertTrue(
+            np.any(np.linalg.norm(net_forces.numpy(), axis=-1) > 0.0),
+            "Expected non-zero contact forces",
+        )
+        dt = SimulationManager.get_physics_dt()
+        z_force = float(net_forces.numpy()[cube_index, 2] / dt)
+        test_case.assertAlmostEqual(
+            z_force,
+            9.81,
+            delta=0.1,
+            msg="Expected net Z force ~9.81N for cube",
+        )
+    if contact_force_matrix is not None:
+        check_array(
+            contact_force_matrix,
+            shape=(len(prim), prim.num_contact_filters, 3),
+            dtype=wp.float32,
+            device=prim._device,
+        )
+        test_case.assertTrue(
+            np.isfinite(contact_force_matrix.numpy()).all(),
+            "Expected finite contact force matrix values",
+        )
+        test_case.assertTrue(
+            np.any(np.linalg.norm(contact_force_matrix.numpy()[cube_index], axis=-1) > 0.0),
+            "Expected non-zero contact forces",
+        )
+    return pair_count, start_index
+
+
+async def _wait_for_contact_data(
+    get_data,
+    *,
+    backend: str,
+    max_steps: int = 120,
+    settle_frames: int = 5,
+    expected_total_contacts: int | None = None,
+    expected_pair_count: int | None = None,
+    cube_index: int = 0,
+) -> tuple[wp.array, ...]:
+    data = None
+    frames_after = None
+    for _ in range(max_steps):
+        await omni.kit.app.get_app().next_update_async()
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            data = get_data()
+        pair_counts = data[-2]
+        total_contacts = int(np.sum(pair_counts.numpy()))
+        ready_total = (
+            total_contacts > 0 if expected_total_contacts is None else total_contacts == expected_total_contacts
+        )
+        ready_pair = (
+            int(pair_counts.numpy()[cube_index, 0]) > 0
+            if expected_pair_count is None
+            else int(pair_counts.numpy()[cube_index, 0]) == expected_pair_count
+        )
+        if ready_total and ready_pair:
+            frames_after = 0 if frames_after is None else frames_after + 1
+            if frames_after >= settle_frames:
+                break
+    return data
+
+
+class TestRigidPrimContactTracking(omni.kit.test.AsyncTestCase):
+    async def setUp(self):
+        """Method called to prepare the test fixture"""
+        super().setUp()
+
+    async def tearDown(self):
+        """Method called immediately after the test method has been called"""
+        super().tearDown()
+
+    def check_backend(self, backend, prim):
+        if backend == "tensor":
+            self.assertTrue(prim.is_physics_tensor_entity_valid(), f"Tensor API should be enabled ({backend})")
+        elif backend in ["usd", "usdrt", "fabric"]:
+            self.assertFalse(prim.is_physics_tensor_entity_valid(), f"Tensor API should be disabled ({backend})")
+        else:
+            raise ValueError(f"Invalid backend: {backend}")
+
+    @parametrize(
+        backends=["tensor"],
+        operations=["wrap"],
+        instances=["many"],
+        supported_engines=["physx"],
+        prim_class=RigidPrim,
+        prim_class_kwargs={
+            "masses": [1.0],
+            "contact_filter_paths": ["/World/GroundPlane/collisionPlane"],
+            "max_contact_count": 25,
+        },
+        populate_stage_func=populate_stage_with_ground,
+    )
+    async def test_contact_tracking_many(self, prim, num_prims, device, backend):
+        # check backend
+        self.check_backend(backend, prim)
+        # enabled contact tracking (usd backend)
+        with use_backend("usd", raise_on_unsupported=True, raise_on_fallback=True):
+            prim.set_enabled_contact_tracking([True])
+            output = prim.get_enabled_contact_tracking()
+        check_array(output, shape=(num_prims, 1), dtype=wp.bool, device=device)
+        expected_contacts = 4 * num_prims
+        forces, points, normals, distances, pair_counts, start_indices = await _wait_for_contact_data(
+            lambda: prim.get_contact_force_data(),
+            backend=backend,
+            expected_total_contacts=expected_contacts,
+            expected_pair_count=4,
+        )
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            net_forces = prim.get_net_contact_forces()
+        total_contacts = int(np.sum(pair_counts.numpy()))
+        self.assertEqual(total_contacts, expected_contacts, f"Expected {expected_contacts} total contacts (4 per cube)")
+        self.assertTrue(np.all(pair_counts.numpy() == 4), "Expected 4 contact points per cube")
+        # contact force matrix
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            contact_force_matrix = prim.get_contact_force_matrix()
+        for cube_index in range(num_prims):
+            _assert_single_cube_contact_data(
+                self,
+                prim=prim,
+                cube_path=f"/World/A_{cube_index}",
+                forces=forces,
+                points=points,
+                normals=normals,
+                distances=distances,
+                pair_counts=pair_counts,
+                start_indices=start_indices,
+                net_forces=net_forces,
+                contact_force_matrix=contact_force_matrix,
+                cube_index=cube_index,
+                expected_contacts=4,
+            )
+        # per-prim filter list
+        cube_paths = [f"/World/A_{i}" for i in range(num_prims)]
+        per_prim_filters = ["/World/GroundPlane/collisionPlane"] * num_prims
+        prim_per_filter = RigidPrim(
+            cube_paths,
+            masses=[1.0],
+            contact_filter_paths=per_prim_filters,
+            max_contact_count=25,
+        )
+        await _wait_for_contact_data(
+            lambda: prim_per_filter.get_contact_force_data(),
+            backend=backend,
+            expected_total_contacts=expected_contacts,
+            expected_pair_count=4,
+        )
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            forces = prim_per_filter.get_contact_force_matrix()
+        check_array(forces, shape=(num_prims, prim_per_filter.num_contact_filters, 3), dtype=wp.float32, device=device)
+        self.assertTrue(np.isfinite(forces.numpy()).all(), "Expected finite contact force matrix values")
+        # friction data
+        await _wait_for_contact_data(
+            lambda: prim.get_contact_force_data(),
+            backend=backend,
+            expected_total_contacts=expected_contacts,
+            expected_pair_count=4,
+        )
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            forces, points, pair_counts, start_indices = prim.get_friction_data()
+        check_array(forces, shape=(prim._max_contact_count, 3), dtype=wp.float32, device=device)
+        check_array(points, shape=(prim._max_contact_count, 3), dtype=wp.float32, device=device)
+        check_array(pair_counts, shape=(num_prims, prim.num_contact_filters), dtype=wp.uint32, device=device)
+        check_array(start_indices, shape=(num_prims, prim.num_contact_filters), dtype=wp.uint32, device=device)
+        self.assertGreater(int(np.sum(pair_counts.numpy())), 0, "Expected at least one contact pair")
+        self.assertTrue(np.isfinite(forces.numpy()).all(), "Expected finite friction forces")
+        self.assertTrue(np.isfinite(points.numpy()).all(), "Expected finite friction points")
+        self.assertTrue(np.any(np.abs(forces.numpy()) > 0.0), "Expected non-zero friction forces")
+        self.assertTrue(np.any(np.linalg.norm(points.numpy(), axis=-1) > 0.0), "Expected non-zero friction points")
+
+    @parametrize(
+        backends=["tensor"],
+        operations=["wrap"],
+        instances=["one"],
+        supported_engines=["physx"],
+        prim_class=RigidPrim,
+        prim_class_kwargs={
+            "masses": [1.0],
+            "contact_filter_paths": ["/World/GroundPlane/collisionPlane"],
+            "max_contact_count": 4,
+        },
+        populate_stage_func=populate_stage_with_ground,
+        max_num_prims=1,
+    )
+    async def test_contact_tracking_single(self, prim, num_prims, device, backend):
+        # check backend
+        self.check_backend(backend, prim)
+        # enabled contact tracking (usd backend)
+        with use_backend("usd", raise_on_unsupported=True, raise_on_fallback=True):
+            prim.set_enabled_contact_tracking([True])
+            output = prim.get_enabled_contact_tracking()
+        check_array(output, shape=(num_prims, 1), dtype=wp.bool, device=device)
+        # net contact forces
+        await _wait_for_contact_data(
+            lambda: prim.get_contact_force_data(),
+            backend=backend,
+            expected_pair_count=4,
+        )
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            net_forces = prim.get_net_contact_forces()
+        # contact force matrix
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            contact_force_matrix = prim.get_contact_force_matrix()
+        # contact force data
+        forces, points, normals, distances, pair_counts, start_indices = await _wait_for_contact_data(
+            lambda: prim.get_contact_force_data(),
+            backend=backend,
+            expected_pair_count=4,
+        )
+        _assert_single_cube_contact_data(
+            self,
+            prim=prim,
+            cube_path="/World/A_0",
+            forces=forces,
+            points=points,
+            normals=normals,
+            distances=distances,
+            pair_counts=pair_counts,
+            start_indices=start_indices,
+            net_forces=net_forces,
+            contact_force_matrix=contact_force_matrix,
+            cube_index=0,
+            expected_contacts=4,
+        )
+        # friction data
+        await _wait_for_contact_data(
+            lambda: prim.get_contact_force_data(),
+            backend=backend,
+            expected_pair_count=4,
+        )
+        with use_backend(backend, raise_on_unsupported=True, raise_on_fallback=True):
+            forces, points, pair_counts, start_indices = prim.get_friction_data()
+        check_array(forces, shape=(prim._max_contact_count, 3), dtype=wp.float32, device=device)
+        check_array(points, shape=(prim._max_contact_count, 3), dtype=wp.float32, device=device)
+        check_array(pair_counts, shape=(num_prims, prim.num_contact_filters), dtype=wp.uint32, device=device)
+        check_array(start_indices, shape=(num_prims, prim.num_contact_filters), dtype=wp.uint32, device=device)
+        self.assertGreater(int(np.sum(pair_counts.numpy())), 0, "Expected at least one contact pair")
+        self.assertTrue(np.isfinite(forces.numpy()).all(), "Expected finite friction forces")
+        self.assertTrue(np.isfinite(points.numpy()).all(), "Expected finite friction points")
+        self.assertTrue(np.any(np.abs(forces.numpy()) > 0.0), "Expected non-zero friction forces")
+        self.assertTrue(np.any(np.linalg.norm(points.numpy(), axis=-1) > 0.0), "Expected non-zero friction points")

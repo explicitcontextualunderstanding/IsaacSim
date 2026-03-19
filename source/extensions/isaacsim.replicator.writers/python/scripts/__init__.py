@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Module providing specialized writers for Isaac Sim Replicator synthetic data generation workflows."""
+
+
 from .writers.data_visualization_writer import DataVisualizationWriter
 from .writers.dope_writer import DOPEWriter
 from .writers.pose_writer import PoseWriter

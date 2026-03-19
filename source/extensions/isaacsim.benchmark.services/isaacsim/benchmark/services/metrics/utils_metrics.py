@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Utility helpers for building benchmark metrics payloads."""
+
 import calendar
 import copy
 import hashlib
@@ -27,13 +29,16 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from getpass import getuser
 from socket import gethostname
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import carb
 import omni.kit
 import psutil
-import yaml
-from isaacsim.benchmark.services import execution
+import yaml  # type: ignore[import-untyped]
+
+from .. import utils
+
+logger = utils.set_up_logging(__name__)
 from isaacsim.benchmark.services.metrics.schemas import (
     GPU,
     Application,
@@ -52,8 +57,18 @@ from isaacsim.benchmark.services.metrics.schemas import (
 from .. import utils
 
 
-def get_execution_environment() -> Tuple[str, str]:
-    """Creates a source and a build id for metrics api"""
+def get_execution_environment() -> tuple[str, str]:
+    """Create a source and build id for the metrics API.
+
+    Returns:
+        Tuple of (source, build_id).
+
+    Example:
+
+    .. code-block:: python
+
+        source, build_id = get_execution_environment()
+    """
     nvm_task_id = os.getenv("NVM_TASK_ID")
     if nvm_task_id is None:
         return "Other", datetime.utcnow().isoformat()
@@ -61,28 +76,34 @@ def get_execution_environment() -> Tuple[str, str]:
 
 
 def get_execution_purpose() -> str:
-    """Why are we executing  this run? Bisect, production, local test etc?"""
-    env_type = ""
-    exec_env = execution.TestExecutionEnvironment.get_instance()
-    if isinstance(exec_env, execution.LocalExecutionEnvironment):
-        env_type = "local"
-    elif isinstance(exec_env, execution.ETMExecutionEnvironment):
-        env_type = os.getenv("KB2_PURPOSE", "")
-        # backward compatibility
-        if not env_type:
-            env_type = os.getenv("ETM_PURPOSE", "")
-    elif isinstance(exec_env, execution.TeamCityExecutionEnvironment):
-        env_type = os.getenv("KB2_PURPOSE", "")
-    return env_type
+    """Get the execution purpose for this run.
+
+    Returns:
+        Execution purpose string.
+
+    Example:
+
+    .. code-block:: python
+
+        purpose = get_execution_purpose()
+    """
+    # Check for CI environment variables
+    if bool(os.getenv("TEAMCITY_VERSION")) or bool(os.getenv("ETM_ACTIVE")):
+        return os.getenv("KB2_PURPOSE", "ci")
+    return "local"
 
 
-def get_kit_info() -> Tuple[str, str, str]:
+def get_kit_info() -> tuple[str, str, str]:
     """Get Kit information.
 
-    # Example:
-    # full_branch = 103.1-release-Windows-10 or 103.1-release-Linux-20
-    # kit_build_version = 103.1+release.1979.086b7ede.tc
-    # kit_build_number = 1979
+    Returns:
+        Tuple of (full_branch, kit_build_version, kit_build_number).
+
+    Example:
+
+    .. code-block:: python
+
+        full_branch, kit_build_version, kit_build_number = get_kit_info()
     """
     kit_build_version = omni.kit.app.get_app().get_build_version()
     kit_build_number = kit_build_version.rsplit(".", 3)[1]
@@ -105,13 +126,17 @@ def get_kit_info() -> Tuple[str, str, str]:
     return full_branch, kit_build_version, kit_build_number
 
 
-def get_app_info() -> Tuple[str, str, str]:
+def get_app_info() -> tuple[str, str, str]:
     """Get App name and version.
 
-    # Example:
-    # app_name = kit or Create.Next
-    # app_version = 104.0+master or 2022.3.0-alpha.62+daily
-    # app_build = 4336.9b7f4dfd.tc
+    Returns:
+        Tuple of (app_name, app_version, app_build).
+
+    Example:
+
+    .. code-block:: python
+
+        app_name, app_version, app_build = get_app_info()
     """
     settings = carb.settings.get_settings()
     app_name = settings.get("/app/name")
@@ -122,45 +147,63 @@ def get_app_info() -> Tuple[str, str, str]:
         app_build = ".".join(ci_build_number.rsplit(".", 3)[1:4])
         return app_name, app_version, app_build
     except Exception as e:
-        carb.log_warn(f"Unable to find app_version and/or app_build. {str(e)}")
+        logger.warning(f"Unable to find app_version and/or app_build. {str(e)}")
         return app_name, "Unknown", "Unknown"
 
 
-def get_kit_build_date() -> Optional[int]:
-    """Get the Kit build date from PACKAGE-INFO.yaml or Kit executable if not found."""
+def get_kit_build_date() -> int | None:
+    """Get the Kit build date from PACKAGE-INFO.yaml or Kit executable if not found.
+
+    Returns:
+        Build date as milliseconds since epoch, or None if unavailable.
+
+    Example:
+
+    .. code-block:: python
+
+        build_date = get_kit_build_date()
+    """
     yaml_contents = get_package_info_yaml()
     try:
         time = yaml_contents["Time"]
-        carb.log_info(f"PACKAGE-INFO.yaml Time = {time}")
+        logger.info(f"PACKAGE-INFO.yaml Time = {time}")
         # Convert time from "Wed May 25 13:38:50 2022" to UNIX epoch time in millisecond.
         epoch_time_ms = int(calendar.timegm(datetime.strptime(time, "%a %b %d %H:%M:%S %Y").timetuple()) * 1000)
-        carb.log_info(f"PACKAGE-INFO.yaml Epoch Time (ms) = {epoch_time_ms}")
+        logger.info(f"PACKAGE-INFO.yaml Epoch Time (ms) = {epoch_time_ms}")
         return epoch_time_ms
     except Exception as e:
-        carb.log_warn(f"Unable to find Time with PACKAGE-INFO.yaml. {str(e)}")
+        logger.warning(f"Unable to find Time with PACKAGE-INFO.yaml. {str(e)}")
         return None
 
 
-def get_package_info_yaml(yaml_path=None) -> dict:
-    """Get PACKAGE-INFO.yaml contents."""
-    etm_active = isinstance(execution.TestExecutionEnvironment.get_instance(), execution.ETMExecutionEnvironment)
+def get_package_info_yaml(yaml_path: str | None = None) -> dict:
+    """Get PACKAGE-INFO.yaml contents.
 
+    Args:
+        yaml_path: Explicit path to PACKAGE-INFO.yaml.
+
+    Returns:
+        Parsed YAML contents.
+
+    Example:
+
+    .. code-block:: python
+
+        info = get_package_info_yaml()
+    """
     if yaml_path is None:
-        if etm_active:
-            yaml_path = str(pathlib.Path().resolve() / "PACKAGE-INFO.yaml")
-        else:
-            import carb.tokens
+        import carb.tokens
 
-            yaml_path = str(pathlib.Path(carb.tokens.get_tokens_interface().resolve("${kit}")) / "PACKAGE-INFO.yaml")
+        yaml_path = str(pathlib.Path(carb.tokens.get_tokens_interface().resolve("${kit}")) / "PACKAGE-INFO.yaml")
 
     yaml_contents = {}
     try:
-        carb.log_info(f"PACKAGE-INFO.yaml path = {yaml_path}")
+        logger.info(f"PACKAGE-INFO.yaml path = {yaml_path}")
         with open(yaml_path, "r") as f:
             yaml_contents = yaml.safe_load(f)
-            carb.log_info(f"PACKAGE-INFO.yaml contents: {yaml_contents}")
+            logger.info(f"PACKAGE-INFO.yaml contents: {yaml_contents}")
     except Exception as e:
-        carb.log_warn(f"Unable to find PACKAGE-INFO.yaml. {str(e)}")
+        logger.warning(f"Unable to find PACKAGE-INFO.yaml. {str(e)}")
 
     return yaml_contents
 
@@ -168,16 +211,40 @@ def get_package_info_yaml(yaml_path=None) -> dict:
 _run_uuid = uuid.uuid4().hex
 
 
-def get_run_uuid():
-    """
-    If we're in a test subproc, then run_uuid was already set in parent proc.
+def get_run_uuid() -> str:
+    """Get the benchmark run UUID.
 
-    If we're the parent kit proc, we set the global run uuid here
+    If running in a test subprocess, the UUID is pulled from settings. Otherwise
+    a process-global UUID is returned.
+
+    Returns:
+        Run UUID string.
+
+    Example:
+
+    .. code-block:: python
+
+        run_id = get_run_uuid()
     """
     settings = carb.settings.get_settings()
     run_uuid = settings.get("/exts/omni.kit.tests.benchmark/metrics/run_uuid")
     return run_uuid or _run_uuid
 
 
-def get_telem_logdir(metrics_output_dir, test_name):
+def get_telem_logdir(metrics_output_dir: str, test_name: str) -> str:
+    """Get the telemetry log directory for a test.
+
+    Args:
+        metrics_output_dir: Output directory for metrics.
+        test_name: Test name to namespace logs.
+
+    Returns:
+        Telemetry log directory path.
+
+    Example:
+
+    .. code-block:: python
+
+        path = get_telem_logdir("/tmp/metrics", "benchmark_a")
+    """
     return os.path.join(metrics_output_dir, "telem_logs", test_name)

@@ -31,7 +31,7 @@ namespace kit
  */
 struct IRunLoopRunnerImpl
 {
-    CARB_PLUGIN_INTERFACE("omni::kit::IRunLoopRunnerImpl", 1, 1);
+    CARB_PLUGIN_INTERFACE("omni::kit::IRunLoopRunnerImpl", 1, 2);
 
     /**
      * @brief Enables or disables manual stepping mode
@@ -58,6 +58,13 @@ struct IRunLoopRunnerImpl
      * @return Manual step size in seconds
      */
     double(CARB_ABI* getManualStepSize)(const std::string& name);
+
+    /**
+     * @brief Explicitly set the simulation time to be used in the next runLoop iteration
+     * @param[in] simulationTime The simulation time in seconds
+     * @param[in] name Identifier for the run loop instance
+     */
+    void(CARB_ABI* setNextSimulationTime)(const double simulationTime, const std::string& name);
 };
 }
 }

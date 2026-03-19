@@ -1,4 +1,21 @@
 # Changelog
+
+## [2.0.1] - 2026-03-06
+### Changed
+- Use `find_widget_with_retry` and `find_enabled_widget_with_retry` from `isaacsim.test.utils` in tests instead of raw `ui_test.find` calls
+
+## [2.0.0] - 2026-02-07
+### Changed
+- Updated isaacssim.ros2.urdf to use URDF importer 3.x
+
+## [1.1.22] - 2026-01-09
+### Changed
+- Make isaacsim.asset.importer.urdf.ui a dependency since this extension heavily depends on and modifies the default urdf importer ui
+
+## [1.1.21] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [1.1.20] - 2025-10-06
 ### Fixed
 - Fix cleanup of the ObserverGuard object when using omni.kit.command in script

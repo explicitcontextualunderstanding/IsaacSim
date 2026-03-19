@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Provides robot implementations and utilities for the Mobility Generation replicator module."""
+
+
 import math
 import os
 from typing import Tuple, Type
@@ -54,6 +57,11 @@ class MobilityGenRobot(Module):
     The two main abstract methods subclasses must define are the build() and write_action()
     methods.
 
+    Args:
+        prim_path: The USD path where the robot is located.
+        robot: The Isaac Sim robot instance.
+        articulation_view: The articulation view for the robot.
+        front_camera: The front camera module attached to the robot.
     """
 
     physics_dt: float
@@ -158,7 +166,18 @@ class MobilityGenRobot(Module):
         self.front_camera = front_camera
 
     @classmethod
-    def build_front_camera(cls, prim_path):
+    def build_front_camera(cls, prim_path: str):
+        """Builds and configures the front camera for the robot.
+
+        Creates a camera at the specified prim path with the configured rotation and translation offsets.
+        The camera is positioned and oriented according to the class-defined front camera parameters.
+
+        Args:
+            prim_path: The USD prim path where the camera should be built.
+
+        Returns:
+            The built front camera module instance.
+        """
 
         # Add camera
         camera_path = join_sdf_paths(prim_path, cls.front_camera_base_path)
@@ -174,6 +193,14 @@ class MobilityGenRobot(Module):
         return cls.front_camera_type.build(prim_path=camera_path)
 
     def build_chase_camera(self) -> str:
+        """Builds and configures the third-person chase camera for the robot.
+
+        Creates a camera with specified focal length and aperture settings, positioned behind and above
+        the robot with the configured offset and tilt angle.
+
+        Returns:
+            The USD prim path of the created chase camera.
+        """
 
         stage = get_current_stage()
 
@@ -190,12 +217,42 @@ class MobilityGenRobot(Module):
 
     @classmethod
     def build(cls, prim_path: str) -> "Robot":
+        """Builds a robot instance at the specified prim path.
+
+        This is an abstract method that must be implemented by robot subclasses to define
+        how the robot is constructed and configured.
+
+        Args:
+            prim_path: The USD prim path where the robot should be built.
+
+        Returns:
+            The built robot instance.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
         raise NotImplementedError
 
     def write_action(self, step_size: float):
+        """Writes the robot's action to the simulation.
+
+        This is an abstract method that must be implemented by robot subclasses to define
+        how the robot's action buffer is applied to the simulation.
+
+        Args:
+            step_size: The timestep size for the action execution.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+        """
         raise NotImplementedError
 
     def update_state(self):
+        """Updates the robot's state buffers with current simulation data.
+
+        Retrieves and stores the robot's current world pose, joint positions, joint velocities,
+        linear velocity, and angular velocity in the respective buffers.
+        """
         pos, ori = self.robot.get_world_pose()
         self.position.set_value(pos)
         self.orientation.set_value(ori)
@@ -206,11 +263,24 @@ class MobilityGenRobot(Module):
         super().update_state()
 
     def write_replay_data(self):
+        """Writes buffered state data to the robot for replay purposes.
+
+        Applies the stored position, orientation, and joint positions from the buffers
+        to the robot's current state in the simulation.
+        """
         self.robot.set_local_pose(self.position.get_value(), self.orientation.get_value())
         self.articulation_view.set_joint_positions(self.joint_positions.get_value())
         super().write_replay_data()
 
     def set_pose_2d(self, pose: Pose2d):
+        """Sets the robot's 2D pose in the world.
+
+        Initializes the articulation, stops all motion, and positions the robot at the specified
+        2D pose with the configured Z-axis offset.
+
+        Args:
+            pose: The 2D pose containing x, y coordinates and theta orientation.
+        """
         self.articulation_view.initialize()
         self.robot.set_world_velocity(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
         self.robot.post_reset()
@@ -222,6 +292,13 @@ class MobilityGenRobot(Module):
         self.robot.set_local_pose(position, orientation)
 
     def get_pose_2d(self) -> Pose2d:
+        """Current 2D pose of the robot.
+
+        Extracts the x, y coordinates and theta orientation from the robot's world pose.
+
+        Returns:
+            The robot's current 2D pose containing x, y coordinates and theta orientation.
+        """
         position, orientation = self.robot.get_world_pose()
         theta = rot_utils.quats_to_euler_angles(orientation)[2]
         return Pose2d(x=position[0], y=position[1], theta=theta)

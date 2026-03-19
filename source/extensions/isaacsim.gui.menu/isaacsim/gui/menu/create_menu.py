@@ -12,16 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Create menu helpers for Isaac Sim assets and tools."""
 import asyncio
-import weakref
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
 import carb
+import omni.ext
+import omni.kit.actions.core
 import omni.kit.menu.utils
-import usd.schema.isaac.robot_schema
 from isaacsim.core.utils.viewports import set_camera_view
-from isaacsim.gui.components.menu import make_menu_item_description
+from isaacsim.gui.components.menu import create_submenu, open_content_browser_to_path
 from isaacsim.storage.native.nucleus import get_assets_root_path
 from omni.kit.menu.utils import MenuItemDescription, MenuLayout, add_menu_items, remove_menu_items
 
@@ -29,7 +31,25 @@ from omni.kit.menu.utils import MenuItemDescription, MenuLayout, add_menu_items,
 # -----------------------------------------------------------------------------
 # Global create_asset function
 # -----------------------------------------------------------------------------
-def create_asset(usd_path, stage_path, camera_position=None, camera_target=None):
+def create_asset(
+    usd_path: str,
+    stage_path: str,
+    camera_position: Sequence[float] | None = None,
+    camera_target: Sequence[float] | None = None,
+):
+    """Create a reference to an Isaac Sim asset in the stage.
+
+    Args:
+        usd_path: Relative USD asset path under the Isaac Sim assets root.
+        stage_path: Target prim path to create in the stage.
+        camera_position: Optional camera position to frame the asset.
+        camera_target: Optional camera target to frame the asset.
+
+    Example:
+        .. code-block:: python
+
+            create_asset("/Isaac/Robots/IsaacSim/Ant/ant_instanceable.usd", "/Ant")
+    """
     assets_root_path = get_assets_root_path()
     if assets_root_path is None:
         carb.log_error("Could not find Isaac Sim assets folder")
@@ -52,7 +72,25 @@ def create_asset(usd_path, stage_path, camera_position=None, camera_target=None)
 # -----------------------------------------------------------------------------
 # Global create_apriltag function
 # -----------------------------------------------------------------------------
-def create_apriltag(usd_path, shader_name, stage_path, tag_path):
+def create_apriltag(usd_path: str, shader_name: str, stage_path: str, tag_path: str):
+    """Create an AprilTag material with a selected tag texture.
+
+    Args:
+        usd_path: Relative MDL asset path under the Isaac Sim assets root.
+        shader_name: Name to assign to the created shader.
+        stage_path: Target prim path for the material.
+        tag_path: Relative texture path for the tag mosaic.
+
+    Example:
+        .. code-block:: python
+
+            create_apriltag(
+                "/Isaac/Materials/AprilTag/AprilTag.mdl",
+                "AprilTag",
+                "/Looks/AprilTag",
+                "/Isaac/Materials/AprilTag/Textures/tag36h11.png",
+            )
+    """
     from pxr import Sdf
 
     assets_root_path = get_assets_root_path()
@@ -82,9 +120,17 @@ def create_apriltag(usd_path, shader_name, stage_path, tag_path):
 # Class CreateMenuExtension
 # -----------------------------------------------------------------------------
 class CreateMenuExtension:
-    def __init__(self, ext_id):
+    """Build and manage the Create menu for Isaac Sim.
+
+    Args:
+        ext_id: Extension identifier provided by the extension manager.
+    """
+
+    def __init__(self, ext_id: str):
         self._ext_id = ext_id
+        self._ext_name = omni.ext.get_extension_name(ext_id)
         self._menu_categories = []
+        self._registered_actions = []
 
         self.__menu_layout = [
             MenuLayout.Menu(
@@ -141,120 +187,140 @@ class CreateMenuExtension:
 
         omni.kit.menu.utils.add_layout(self.__menu_layout)
 
-        # turn dictionary into menu items
-        def create_submenu(menu_dict):
-            # Handle non-nested menu items
-            if "name" in menu_dict and isinstance(menu_dict["name"], str):
-                return [
-                    MenuItemDescription(
-                        name=menu_dict["name"],
-                        onclick_fn=menu_dict.get("onclick_fn"),
-                        onclick_action=menu_dict.get("onclick_action"),
-                        glyph=menu_dict.get("glyph"),
-                    )
-                ]
-
-            # Handle nested submenus recursively
-            submenu_name = next(iter(menu_dict["name"]))
-            items = menu_dict["name"][submenu_name]
-            sub_menu_items = []
-            for item in items:
-                if isinstance(item.get("name"), dict):
-                    # Recursively handle nested submenu
-                    sub_menu_items.append(create_submenu(item))
-                else:
-                    # Handle leaf menu item
-                    sub_menu_items.append(
-                        MenuItemDescription(
-                            name=item["name"],
-                            onclick_fn=item.get("onclick_fn"),
-                            onclick_action=item.get("onclick_action"),
-                        )
-                    )
-
-            return [MenuItemDescription(name=submenu_name, sub_menu=sub_menu_items, glyph=menu_dict.get("glyph"))]
-
         icon_dir = omni.kit.app.get_app().get_extension_manager().get_extension_path_by_module(__name__)
         robot_icon_path = str(Path(icon_dir).joinpath("data/robot.svg"))
 
+        action_registry = omni.kit.actions.core.get_action_registry()
+
+        # Register robot asset actions
+        robot_assets = [
+            ("create_robot_ant", "Ant", "/Isaac/Robots/IsaacSim/Ant/ant_instanceable.usd", "/Ant"),
+            ("create_robot_spot", "Boston Dynamics Spot", "/Isaac/Robots/BostonDynamics/spot/spot.usd", "/spot"),
+            (
+                "create_robot_franka",
+                "Franka Emika Panda Arm",
+                "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd",
+                "/Franka",
+            ),
+            (
+                "create_robot_humanoid",
+                "Humanoid",
+                "/Isaac/Robots/IsaacSim/Humanoid/humanoid_instanceable.usd",
+                "/Humanoid",
+            ),
+            (
+                "create_robot_nova_carter",
+                "Nova Carter with Sensors",
+                "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd",
+                "/Nova_Carter",
+            ),
+            (
+                "create_robot_quadcopter",
+                "Quadcopter",
+                "/Isaac/Robots/IsaacSim/Quadcopter/quadcopter.usd",
+                "/Quadcopter",
+            ),
+        ]
+
+        for action_id, display_name, usd_path, stage_path in robot_assets:
+            action_registry.register_action(
+                self._ext_name,
+                action_id,
+                partial(create_asset, usd_path, stage_path),
+                display_name=f"Create {display_name}",
+                description=f"Create a {display_name} robot",
+            )
+            self._registered_actions.append(action_id)
+
+        action_registry.register_action(
+            self._ext_name,
+            "open_content_browser_robots",
+            partial(open_content_browser_to_path, "/Isaac/Robots"),
+            display_name="Open Content Browser (Robots)",
+            description="Open the Content Browser to the Robots folder",
+        )
+        self._registered_actions.append("open_content_browser_robots")
+
+        # Robot asset items shared between Create menu and right-click context menu
+        robot_items = [
+            {"name": "Ant", "onclick_action": (self._ext_name, "create_robot_ant")},
+            {"name": "Boston Dynamics Spot (Quadruped)", "onclick_action": (self._ext_name, "create_robot_spot")},
+            {"name": "Franka Emika Panda Arm", "onclick_action": (self._ext_name, "create_robot_franka")},
+            {"name": "Humanoid", "onclick_action": (self._ext_name, "create_robot_humanoid")},
+            {"name": "Nova Carter with Sensors", "onclick_action": (self._ext_name, "create_robot_nova_carter")},
+            {"name": "Quadcopter", "onclick_action": (self._ext_name, "create_robot_quadcopter")},
+        ]
+
+        # Create menu includes an Asset Browser link; context menu does not
         robot_menu_dict = {
             "name": {
-                "Robots": [
-                    {
-                        "name": "Ant",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Robots/IsaacSim/Ant/ant_instanceable.usd", "/Ant"
-                        ),
-                    },
-                    {
-                        "name": "Boston Dynamics Spot (Quadruped)",
-                        "onclick_fn": lambda *_: create_asset("/Isaac/Robots/BostonDynamics/spot/spot.usd", "/spot"),
-                    },
-                    {
-                        "name": "Franka Emika Panda Arm",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd", "/Franka"
-                        ),
-                    },
-                    {
-                        "name": "Humanoid",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Robots/IsaacSim/Humanoid/humanoid_instanceable.usd", "/Humanoid"
-                        ),
-                    },
-                    {
-                        "name": "Nova Carter with Sensors",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd", "/Nova_Carter"
-                        ),
-                    },
-                    {
-                        "name": "Quadcopter",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Robots/IsaacSim/Quadcopter/quadcopter.usd", "/Quadcopter"
-                        ),
-                    },
-                    {
-                        "name": "Asset Browser",
-                        "onclick_action": ("isaacsim.asset.browser", "open_isaac_sim_asset_browser"),
-                    },
-                ]
+                "Robots": robot_items
+                + [{"name": "Asset Browser", "onclick_action": (self._ext_name, "open_content_browser_robots")}]
             },
             "glyph": robot_icon_path,
         }
 
         self._menu_categories.append(add_menu_items(create_submenu(robot_menu_dict), "Create"))
 
+        # Register environment asset actions
+        env_assets = [
+            (
+                "create_env_black_grid",
+                "Black Grid",
+                "/Isaac/Environments/Grid/gridroom_black.usd",
+                "/BlackGrid",
+                None,
+                None,
+            ),
+            (
+                "create_env_flat_grid",
+                "Flat Grid",
+                "/Isaac/Environments/Grid/default_environment.usd",
+                "/FlatGrid",
+                None,
+                None,
+            ),
+            (
+                "create_env_simple_room",
+                "Simple Room",
+                "/Isaac/Environments/Simple_Room/simple_room.usd",
+                "/SimpleRoom",
+                [3.15, 3.15, 2.0],
+                [0, 0, 0],
+            ),
+        ]
+
+        for action_id, display_name, usd_path, stage_path, cam_pos, cam_target in env_assets:
+            action_registry.register_action(
+                self._ext_name,
+                action_id,
+                partial(create_asset, usd_path, stage_path, cam_pos, cam_target),
+                display_name=f"Create {display_name}",
+                description=f"Create a {display_name} environment",
+            )
+            self._registered_actions.append(action_id)
+
         ## Environments
+        action_registry.register_action(
+            self._ext_name,
+            "open_content_browser_environments",
+            partial(open_content_browser_to_path, "/Isaac/Environments"),
+            display_name="Open Content Browser (Environments)",
+            description="Open the Content Browser to the Environments folder",
+        )
+        self._registered_actions.append("open_content_browser_environments")
+
+        # Environment asset items shared between Create menu and right-click context menu
+        env_items = [
+            {"name": "Black Grid", "onclick_action": (self._ext_name, "create_env_black_grid")},
+            {"name": "Flat Grid", "onclick_action": (self._ext_name, "create_env_flat_grid")},
+            {"name": "Simple Room", "onclick_action": (self._ext_name, "create_env_simple_room")},
+        ]
+
         environment_menu_dict = {
             "name": {
-                "Environments": [
-                    {
-                        "name": "Black Grid",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Environments/Grid/gridroom_black.usd", "/BlackGrid"
-                        ),
-                    },
-                    {
-                        "name": "Flat Grid",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Environments/Grid/default_environment.usd", "/FlatGrid"
-                        ),
-                    },
-                    {
-                        "name": "Simple Room",
-                        "onclick_fn": lambda *_: create_asset(
-                            "/Isaac/Environments/Simple_Room/simple_room.usd",
-                            "/SimpleRoom",
-                            [3.15, 3.15, 2.0],
-                            [0, 0, 0],
-                        ),
-                    },
-                    {
-                        "name": "Asset Browser",
-                        "onclick_action": ("isaacsim.asset.browser", "open_isaac_sim_asset_browser"),
-                    },
-                ]
+                "Environments": env_items
+                + [{"name": "Asset Browser", "onclick_action": (self._ext_name, "open_content_browser_environments")}]
             },
             "glyph": str(Path(icon_dir).joinpath("data/environment.svg")),
         }
@@ -262,10 +328,17 @@ class CreateMenuExtension:
         self._menu_categories.append(add_menu_items(create_submenu(environment_menu_dict), "Create"))
 
         ## Sensor
+        action_registry.register_action(
+            self._ext_name,
+            "open_content_browser_sensors",
+            partial(open_content_browser_to_path, "/Isaac/Sensors"),
+            display_name="Open Content Browser (Sensors)",
+            description="Open the Content Browser to the Sensors folder",
+        )
+        self._registered_actions.append("open_content_browser_sensors")
+
         sensor_sub_menu = [
-            MenuItemDescription(
-                name="Asset Browser", onclick_action=("isaacsim.asset.browser", "open_isaac_sim_asset_browser")
-            ),
+            MenuItemDescription(name="Asset Browser", onclick_action=(self._ext_name, "open_content_browser_sensors")),
         ]
         sensor_icon_path = str(Path(icon_dir).joinpath("data/sensor.svg"))
         sensor_menu = [MenuItemDescription(name="Sensors", glyph=sensor_icon_path, sub_menu=sensor_sub_menu)]
@@ -295,27 +368,16 @@ class CreateMenuExtension:
             tag="Create AprilTag",
         )
 
-        # Matching the Create in Context Menus (Viewport and Stage)
-        def remove_asset_browser(menu_dict):
-            new_dict = {}
-            for key, value in menu_dict.items():
-                if isinstance(value, dict):
-                    new_dict[key] = remove_asset_browser(value)
-                elif isinstance(value, list):
-                    new_dict[key] = [x for x in value if x.get("name") != "Asset Browser"]
-                elif value != "Asset Browser":
-                    new_dict[key] = value
-            return new_dict
-
-        # Remove the Asset Browser from robot, environment
-        robot_context_menu_dict = remove_asset_browser(robot_menu_dict)
-        environment_context_menu_dict = remove_asset_browser(environment_menu_dict)
-
+        # Right-click context menu (Viewport and Stage) uses the shared item lists
+        # without the Asset Browser link
         isaac_create_menu_dict = {
             "name": {
                 "Isaac": [
-                    robot_context_menu_dict,
-                    environment_context_menu_dict,
+                    {"name": {"Robots": robot_items}, "glyph": robot_icon_path},
+                    {
+                        "name": {"Environments": env_items},
+                        "glyph": str(Path(icon_dir).joinpath("data/environment.svg")),
+                    },
                     apriltag_menu_dict,
                 ]
             },
@@ -328,6 +390,14 @@ class CreateMenuExtension:
         )
 
     def shutdown(self):
+        """Remove menu layouts and deregister actions.
+
+        Example:
+            .. code-block:: python
+
+                menu = CreateMenuExtension("ext.id")
+                menu.shutdown()
+        """
         omni.kit.menu.utils.remove_layout(self.__menu_layout)
         for menu_item in self._menu_categories:
             remove_menu_items(menu_item, "Create")
@@ -337,5 +407,11 @@ class CreateMenuExtension:
             self._ext_id,
             "isaac_create_apriltag",
         )
+
+        # Deregister all registered actions
+        for action_id in self._registered_actions:
+            action_registry.deregister_action(self._ext_name, action_id)
+        self._registered_actions = []
+
         # remove_context_menus
         self._viewport_create_menu = None

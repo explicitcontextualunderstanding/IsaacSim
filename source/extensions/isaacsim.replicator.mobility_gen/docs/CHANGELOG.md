@@ -1,4 +1,29 @@
 # Changelog
+
+## [0.3.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [0.2.0] - 2026-02-06
+### Added
+- Support loading usdz asset
+
+## [0.1.14] - 2025-12-07
+### Changed
+- Fix clang tidy issues in cpp code
+
+## [0.1.13] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [0.1.12] - 2025-10-31
+### Changed
+- Update deprecated python unittest methods
+
+## [0.1.11] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [0.1.10] - 2025-09-30
 ### Fixed
 - Add documentation to robot.py parameters.

@@ -1,4 +1,9 @@
 # Changelog
+
+## [2.0.15] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.0.14] - 2025-09-09
 ### Changed
 - Tweaked bin picking behavior to avoid jumping target orientation

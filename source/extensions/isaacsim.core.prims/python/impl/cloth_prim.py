@@ -16,12 +16,16 @@
 from typing import Optional, Union
 
 import carb
+import carb.eventdispatcher
 import numpy as np
 import omni.kit.app
-import torch
+import omni.timeline
+from isaacsim.core.deprecation_manager import import_module
 from pxr import PhysxSchema, UsdPhysics, Vt
 
 from .xform_prim import XFormPrim
+
+torch = import_module("torch")
 
 
 class ClothPrim(XFormPrim):
@@ -55,6 +59,7 @@ class ClothPrim(XFormPrim):
         This object wraps all matching Cloth Prims found at the regex provided at the prim_paths_expr.
 
         Note: - if the prim does not already have a rigid body api applied to it before init, it will apply it.
+
         Args:
             prim_paths_expr(str): Prim paths regex to encapsulate all prims that match it.
             name(str): Shortname to be used as a key by Scene class.
@@ -147,9 +152,18 @@ class ClothPrim(XFormPrim):
                 self.set_spring_dampings(spring_dampings)
 
         timeline = omni.timeline.get_timeline_interface()
-        self._invalidate_physics_handle_event = timeline.get_timeline_event_stream().create_subscription_to_pop(
-            self._invalidate_physics_handle_callback
+        self._invalidate_physics_handle_event = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=self._invalidate_physics_handle_callback,
+            observer_name="isaacsim.core.prims.ClothPrim.initialize._invalidate_physics_handle_callback",
         )
+
+    def __del__(self):
+        XFormPrim.__del__(self)
+        if hasattr(self, "_physics_view"):
+            del self._physics_view
+        self._invalidate_physics_handle_event = None
+        return
 
     """
     Properties.
@@ -210,8 +224,7 @@ class ClothPrim(XFormPrim):
         return
 
     def _invalidate_physics_handle_callback(self, event):
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
-            self._physics_view = None
+        self._physics_view = None
         return
 
     def _apply_cloth_auto_api(self, index):

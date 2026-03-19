@@ -46,10 +46,28 @@ void selectRequiredValidPoints(
 
 // Fused function for optional outputs (timestamp, IDs, normals, velocities)
 void selectOptionalValidPoints(
-    const uint64_t* timestampSrc, const uint32_t* emitterIdSrc, const uint32_t* materialIdSrc, const uint8_t* objectIdSrc,
-    const float3* normalSrc, const float3* velocitySrc,
-    uint64_t* timestampDst, uint32_t* emitterIdDst, uint32_t* materialIdDst, uint8_t* objectIdDst,
-    float3* normalDst, float3* velocityDst,
+    const uint64_t* timestampSrc,
+    const uint32_t* emitterIdSrc,
+    const uint32_t* channelIdSrc,
+    const uint32_t* materialIdSrc,
+    const uint32_t* tickIdSrc,
+    const float3* normalSrc,
+    const float3* velocitySrc,
+    const uint8_t* objectIdSrc,
+    const uint8_t* echoIdSrc,
+    const uint8_t* tickStateSrc,
+    const float* radialVelocityMSSrc,
+    uint64_t* timestampDst,
+    uint32_t* emitterIdDst,
+    uint32_t* channelIdDst,
+    uint32_t* materialIdDst,
+    uint32_t* tickIdDst,
+    float3* normalDst,
+    float3* velocityDst,
+    uint8_t* objectIdDst,
+    uint8_t* echoIdDst,
+    uint8_t* tickStateDst,
+    float* radialVelocityMSDst,
     const size_t* validIndices, int* numValidPoints, size_t maxPoints,
     uint32_t enableMask, int maxThreadsPerBlock, int cudaDeviceIndex, cudaStream_t stream);
 

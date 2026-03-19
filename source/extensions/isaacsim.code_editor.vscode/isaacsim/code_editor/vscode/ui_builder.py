@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""UI builder for Visual Studio Code integration extension."""
+
+
 import os
 import subprocess
 import sys
@@ -21,7 +25,14 @@ import carb
 
 
 class UIBuilder:
-    """Manage extension UI"""
+    """Manage extension UI.
+
+    Args:
+        menu_name: Name of the menu where the item will be added.
+        menu_item_name: Display name for the menu item.
+        host: Host address for the server.
+        port: Port number for the server.
+    """
 
     def __init__(self, menu_name, menu_item_name, host, port):
         self._menu_items = []
@@ -63,12 +74,15 @@ class UIBuilder:
         self._menu_items = []
 
     def _launch(self, *args, **kwargs):
-        """Launch a new VS Code window on the application path"""
+        """Launch a new VS Code window on the application path
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Additional keyword arguments.
+        """
         command = ["code", "-n", self._app_folder]
-        if sys.platform.startswith("linux"):
-            command = [" ".join(command)]
         carb.log_info(f"Launching VS Code: {command}")
-        result = subprocess.run(command, shell=True, close_fds=True)
+        result = subprocess.run(command, shell=(sys.platform == "win32"), close_fds=True)
         # check process execution
         notification = f"Serving at {self._host}:{self._port}"
         if result.returncode:

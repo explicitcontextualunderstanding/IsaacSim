@@ -16,13 +16,13 @@
 # This import is included for visualization of UI elements as demonstrated in testXYPlotWrapper
 import asyncio
 
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
+import omni.kit.app
 import omni.kit.test
 import omni.kit.ui_test as ui_test
 import omni.timeline
 import omni.ui as ui
-from isaacsim.core.utils.prims import delete_prim
-from isaacsim.core.utils.stage import add_reference_to_stage, create_new_stage, update_stage_async
 from isaacsim.gui.components.element_wrappers import (
     Button,
     CheckBox,
@@ -40,6 +40,10 @@ from isaacsim.gui.components.element_wrappers import (
     XYPlot,
 )
 from isaacsim.storage.native import get_assets_root_path
+
+
+async def update_stage_async():
+    await omni.kit.app.get_app().next_update_async()
 
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
@@ -219,7 +223,7 @@ class TestUI(omni.kit.test.AsyncTestCase):
 
         self._robot_path = "/ur10"
         self._root_path = "/ur10/root_joint"
-        create_new_stage()
+        stage_utils.create_new_stage()
 
         def on_articulation_selected(articulation_path):
             if articulation_path is None:
@@ -240,7 +244,9 @@ class TestUI(omni.kit.test.AsyncTestCase):
 
         self._timeline = omni.timeline.get_timeline_interface()
 
-        add_reference_to_stage(get_assets_root_path() + "/Isaac/Robots/UniversalRobots/ur10/ur10.usd", self._robot_path)
+        stage_utils.add_reference_to_stage(
+            get_assets_root_path() + "/Isaac/Robots/UniversalRobots/ur10/ur10.usd", self._robot_path
+        )
         # Test that articulations are found both when the timeline is stopped and playing
         dropdown.repopulate()
         self.assertTrue(self._valid_path_ct == 1)
@@ -251,7 +257,7 @@ class TestUI(omni.kit.test.AsyncTestCase):
         dropdown.trigger_on_selection_fn_with_current_selection()
         self.assertTrue(self._valid_path_ct == 2)
 
-        delete_prim(self._robot_path)
+        stage_utils.delete_prim(self._robot_path)
         dropdown.repopulate()
         self.assertTrue(self._no_path_ct == 2)
 
@@ -479,18 +485,12 @@ class TestUI(omni.kit.test.AsyncTestCase):
 
         self.physics_step_count = 0
 
-        def physics_step_count(step_size):
+        def physics_step_count(step_size, context):
             self.physics_step_count += 1
 
         timeline = omni.timeline.get_timeline_interface()
 
         state_button.set_physics_callback_fn(physics_step_count)
-
-        from isaacsim.core.api.world import World
-
-        world = World()
-
-        await world.initialize_simulation_context_async()
 
         timeline.play()
         await update_stage_async()
@@ -499,7 +499,7 @@ class TestUI(omni.kit.test.AsyncTestCase):
         for i in range(6):
             await update_stage_async()
 
-        self.assertTrue(self.physics_step_count == 9, "An unexpected number of physics step counts occured")
+        self.assertEqual(self.physics_step_count, 9, "An unexpected number of physics step counts occured")
         self.assertTrue(self.btn_clicks == [2, 1])
 
         self.assertTrue(state_button.get_current_text() == "B")

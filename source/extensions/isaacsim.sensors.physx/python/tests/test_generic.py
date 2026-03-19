@@ -47,11 +47,6 @@ class TestGeneric(omni.kit.test.AsyncTestCase):
         scene.CreateGravityDirectionAttr().Set(Gf.Vec3f(0.0, 0.0, -1.0))
         scene.CreateGravityMagnitudeAttr().Set(9.81)
 
-        rendering_hz = 60.0
-        carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", True)
-        carb.settings.get_settings().set_float("/app/runLoops/main/rateLimitFrequency", rendering_hz)
-        self._timeline.set_target_framerate(rendering_hz)
-
     # After running each test
     async def tearDown(self):
         self._timeline.stop()

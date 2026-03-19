@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Import section marker functions if we are in CI
+if [[ "${CI}" == "true" && -f ./tools/ci/gitlab/section_marker.sh ]]; then
+    source ./tools/ci/gitlab/section_marker.sh
+else
+    section_start() { :; }
+    section_end()   { :; }
+fi
+
 
 # Parse command line arguments
 SKIP_DEDUPE=false
@@ -30,7 +38,6 @@ build_function() {
         echo "Error: build.sh -r failed" >&2
         return 1
     fi
-
 
     echo "Build sequence completed successfully!"
 }
@@ -70,6 +77,11 @@ done
 # Run build sequence if --build was specified
 if [[ "$RUN_BUILD" == "true" ]]; then
     echo ""
+    # Remove stale Docker context before rebuild
+    if [[ -d "_container_temp" ]]; then
+        echo "Removing existing _container_temp for fresh Docker context..."
+        rm -rf _container_temp
+    fi
     build_function
     if [[ $? -ne 0 ]]; then
         echo "Build sequence failed, exiting with error code 1" >&2
@@ -86,19 +98,25 @@ fi
 
 
 # Goes a bit faster if you have used PM_PATH_TO_SANDBOX="_"
-if ! python3 -m pip install -r tools/docker/requirements.txt; then
+section_start "installing_python_requirements" "Installing Python requirements"
+if ! tools/packman/python.sh -m pip install -r tools/docker/requirements.txt; then
     echo "Failed to install Python requirements" >&2
     exit 1
 fi
+section_end "installing_python_requirements"
 
 
-if ! python3 tools/docker/generate_rsync_script.py --platform ${CONTAINER_PLATFORM} --target isaac-sim-docker --output-folder _container_temp; then
+section_start "generating_rsync_script" "Generating rsync script"
+if ! tools/packman/python.sh tools/docker/generate_rsync_script.py --platform ${CONTAINER_PLATFORM} --target isaac-sim-docker --output-folder _container_temp; then
     echo "Failed to generate rsync script" >&2
     exit 1
 fi
+section_end "generating_rsync_script"
 
 
+section_start "running_rsync_script" "Running rsync script"
 ./generated_rsync_package.sh
+section_end "running_rsync_script"
 
 
 
@@ -169,7 +187,9 @@ dedupe_folder(){
 # Run deduplication unless --skip-dedupe was specified
 if [[ "$SKIP_DEDUPE" != "true" ]]; then
     echo "Running deduplication (use --skip-dedupe to skip this step)"
+    section_start "deduplicating_files" "Deduplicating files"
     dedupe_folder _container_temp
+    section_end "deduplicating_files"
 else
     echo "Skipping deduplication as requested"
 fi

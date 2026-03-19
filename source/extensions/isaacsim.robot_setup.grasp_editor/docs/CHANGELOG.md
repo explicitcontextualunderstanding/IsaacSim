@@ -1,4 +1,24 @@
 # Changelog
+## [2.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [2.1.3] - 2025-12-10
+### Fixed
+- Fixed Events 2.0 assets loaded and timeline play / stop events
+
+## [2.1.2] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [2.1.1] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [2.1.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
+
 ## [2.0.20] - 2025-10-08
 ### Fixed
 - Fix issue where rigid body was re-scaled
@@ -37,7 +57,7 @@
 
 ## [2.0.11] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [2.0.10] - 2025-04-09
 ### Changed

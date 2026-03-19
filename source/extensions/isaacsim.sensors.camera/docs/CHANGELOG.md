@@ -1,4 +1,84 @@
 # Changelog
+
+## [1.7.0] - 2026-03-04
+### Changed
+- Added Overview.md and python_api.md and updated docstrings
+
+## [1.6.6] - 2026-02-13
+### Changed
+- OMPE-78945: Split tests into two groups to avoid MMUFault|SMError|||imgui.pixel on Windows-Vk
+
+## [1.6.5] - 2026-02-06
+### Changed
+- Update deprecated Warp API calls to their updated names
+
+## [1.6.4] - 2026-02-06
+### Changed
+- omni:rtx:post:depthSensor:outlierRemovalEnabled is now a bool
+
+## [1.6.3] - 2026-02-03
+### Changed
+- Camera sensor: updated test camera orientation to use experimental rotation utils for euler angles to quaternion
+
+## [1.6.2] - 2026-01-20
+### Changed
+- Moved to experimental APIs in tests for visual objects and rotation utils
+
+### Fixed
+- TestSingleViewDepthSensor.test_getter_setter_methods uses correct initial value for confidenceThreshold.
+
+## [1.6.1] - 2026-01-14
+### Fixed
+- Cleanup annotators and state properly when the camera is destroyed
+
+## [1.6.0] - 2026-01-13
+### Changed
+- Camera sensor: switched to use "_fast" version of the annotators where available ("bounding_box_2d_tight_fast", "bounding_box_2d_loose_fast", "instance_segmentation_fast", "instance_id_segmentation_fast")
+- Tests: removed `World` from tests, using `timeline.play()` and `timeline.stop()` to provide sensors with data
+- Tests: changed to use `SimulationManager` for backend tests
+- Tests: changed to use `isaacsim.test.utils.image_comparison` for golden image comparison
+- Tests: changed the default environment from loading a USD to creating a simple plane and dome light for tests
+- Tests: updated and re-organized golden image data
+- Tests: kept debug pointcloud images for future reference
+
+## [1.5.5] - 2026-01-09
+### Fixed
+- Fixed camera_view.get_data() resolution order issue (height, width) -> (width, height)
+
+## [1.5.4] - 2026-01-06
+### Changed
+- Migrate more events to Events 2.0.
+
+## [1.5.3] - 2025-12-10
+### Fixed
+- Removed `do_array_copy=True` workaround in tiled sensor (fixed upstream in replicator.core 1.12.32 by changing strides type from int32 to int64 to avoid warp array arithemtic when getting annotator data)
+
+## [1.5.2] - 2025-12-06
+### Changed
+- Added validation checks and warmup warnings to camera sensor data methods to handle unavailable data
+- Added warmup tests for camera sensor checking for warnings and data availability
+
+## [1.5.1] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [1.5.0] - 2025-11-26
+### Added
+- Unit test for get_view_matrix_ros
+
+## [1.4.1] - 2025-11-25
+### Fixed
+- Fixed issue with tiled sensor data slicing by copying the data from the annotator (do_array_copy=True)
+
+## [1.4.0] - 2025-10-27
+### Changed
+- Replace import statements with the deprecation function when importing PyTorch
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [1.3.7] - 2025-10-22
+### Changed
+- Remove deprecated time related APIs from CoreNodes interface
+
 ## [1.3.6] - 2025-09-23
 ### Fixed
 - SingleViewDepthSensorAsset correctly sets position, orientation, translation on __init__.
@@ -125,7 +205,7 @@
 
 ## [1.0.1] - 2025-04-17
 ### Changed
-- changed add_update_semantics to add_labels
+- Changed add_update_semantics to add_labels
 
 ## [1.0.0] - 2025-04-09
 ### Changed
@@ -165,7 +245,7 @@
 - Camera get_pointcloud method uses the 'pointcloud' annotator if set, otherwise it falls back to a depth-based calculation
 
 ### Fixed
-- centered the pointcloud points by adding a half-pixel offset for the depth-based calculation
+- Centered the pointcloud points by adding a half-pixel offset for the depth-based calculation
 
 ### Added
 - Camera sensor pointcloud specific tests
@@ -185,8 +265,8 @@
 
 ## [0.2.6] - 2025-01-06
 ### Fixed
-- use indexed cuda:{idx} input for warp kernels in camera view class
-- use indexed cuda device to pre-allocate out buffers
+- Use indexed cuda:{idx} input for warp kernels in camera view class
+- Use indexed cuda device to pre-allocate out buffers
 
 ## [0.2.5] - 2024-12-31
 ### Fixed
@@ -197,8 +277,8 @@
 - Isaac Util menu to Tools->Robotics menu
 
 ### Fixed
-- camera view sensor test warp.types.int32 -> warp.types.uint32
-- decreased image comparison threshold with 0.95->0.94
+- Camera view sensor test warp.types.int32 -> warp.types.uint32
+- Decreased image comparison threshold with 0.95->0.94
 
 ## [0.2.3] - 2024-11-26
 ### Fixed

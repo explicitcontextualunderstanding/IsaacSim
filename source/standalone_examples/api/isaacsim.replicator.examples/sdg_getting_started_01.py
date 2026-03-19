@@ -22,8 +22,6 @@ simulation_app = SimulationApp(launch_config={"headless": False})
 import carb.settings
 import omni.replicator.core as rep
 import omni.usd
-from isaacsim.core.utils.semantics import add_labels
-from pxr import Sdf
 
 
 def run_example():
@@ -35,20 +33,22 @@ def run_example():
     carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
     # Setup the stage with a dome light and a cube
-    stage = omni.usd.get_context().get_stage()
-    dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
-    dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(500.0)
-    cube = stage.DefinePrim("/World/Cube", "Cube")
-    add_labels(cube, labels=["MyCube"], instance_name="class")
+    rep.functional.create.xform(name="World")
+    rep.functional.create.dome_light(intensity=500, parent="/World", name="DomeLight")
+    cube = rep.functional.create.cube(parent="/World", name="Cube")
+    rep.functional.modify.semantics(cube, {"class": "my_cube"}, mode="add")
 
     # Create a render product using the viewport perspective camera
-    rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512))
+    cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+    rp = rep.create.render_product(cam, (512, 512), name="MyRenderProduct")
 
     # Write data using the basic writer with the rgb and bounding box annotators
-    writer = rep.writers.get("BasicWriter")
+    backend = rep.backends.get("DiskBackend")
     out_dir = os.path.join(os.getcwd(), "_out_basic_writer")
+    backend.initialize(output_dir=out_dir)
     print(f"Output directory: {out_dir}")
-    writer.initialize(output_dir=out_dir, rgb=True, bounding_box_2d_tight=True)
+    writer = rep.writers.get("BasicWriter")
+    writer.initialize(backend=backend, rgb=True, bounding_box_2d_tight=True)
     writer.attach(rp)
 
     # Trigger a data capture request (data will be written to disk by the writer)
@@ -56,12 +56,10 @@ def run_example():
         print(f"Step {i}")
         rep.orchestrator.step()
 
-    # Destroy the render product to release resources by detaching it from the writer first
+    # Wait for the data to be written to disk and clean up resources
+    rep.orchestrator.wait_until_complete()
     writer.detach()
     rp.destroy()
-
-    # Wait for the data to be written to disk
-    rep.orchestrator.wait_until_complete()
 
 
 # Run the example

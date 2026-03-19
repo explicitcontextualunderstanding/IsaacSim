@@ -67,8 +67,10 @@ def run_cosmos_example(num_frames, segmentation_mapping=None):
     rp = rep.create.render_product(camera, (1280, 720))
     out_dir = os.path.join(os.getcwd(), "_out_cosmos_simple")
     print(f"Output directory: {out_dir}")
+    backend = rep.backends.get("DiskBackend")
+    backend.initialize(output_dir=out_dir)
     cosmos_writer = rep.WriterRegistry.get("CosmosWriter")
-    cosmos_writer.initialize(output_dir=out_dir, segmentation_mapping=segmentation_mapping)
+    cosmos_writer.initialize(backend=backend, segmentation_mapping=segmentation_mapping)
     cosmos_writer.attach(rp)
 
     # Start the simulation

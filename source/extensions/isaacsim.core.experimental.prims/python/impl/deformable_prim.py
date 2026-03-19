@@ -19,12 +19,14 @@ import weakref
 from typing import Literal
 
 import carb
+import carb.eventdispatcher
 import isaacsim.core.experimental.utils.backend as backend_utils
 import isaacsim.core.experimental.utils.ops as ops_utils
 import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.physics.tensors
+import omni.timeline
 import warp as wp
 from isaacsim.core.simulation_manager import SimulationManager
 from omni.physx import get_physx_cooking_interface
@@ -154,12 +156,6 @@ class DeformablePrim(XformPrim):
 
     .. warning::
 
-        The deformable prims require the Deformable feature (beta) to be enabled.
-        Deformable feature (beta) can be enabled in *apps/.kit* experience files by setting
-        ``physics.enableDeformableBeta = true`` under the ``[settings.persistent]`` section.
-
-    .. warning::
-
         The current ``omni.physics.tensors`` implementation does not support ``list[str]``
         as input for deformable body paths. This limitation will be fixed in the future releases.
         An error message will be logged if a list of paths is provided.
@@ -189,7 +185,6 @@ class DeformablePrim(XformPrim):
             If not defined, the type will be inferred from the prims.
 
     Raises:
-        RuntimeError: If the Deformable feature (beta) is disabled.
         ValueError: If no prims are found matching the specified path(s).
         AssertionError: If both positions and translations are specified.
 
@@ -226,16 +221,7 @@ class DeformablePrim(XformPrim):
         # DeformablePrim
         deformable_type: Literal["surface", "volume"] | None = None,
     ) -> None:
-        # check for deformable feature (beta)
-        setting_name = physx_bindings.SETTING_ENABLE_DEFORMABLE_BETA
-        enabled = carb.settings.get_settings().get(setting_name)
-        if not enabled:
-            setting_name = (setting_name[1:] if setting_name.startswith("/") else setting_name).replace("/", ".")
-            raise RuntimeError(
-                "Deformable bodies require Deformable feature (beta) to be enabled. "
-                f"Enable it in .kit experience settings ('{setting_name} = true') to use them."
-            )
-        # get  prims
+        # get prims
         stage = stage_utils.get_current_stage(backend="usd")
         existent_paths, nonexistent_paths = self.resolve_paths(paths)
         assert (
@@ -279,16 +265,23 @@ class DeformablePrim(XformPrim):
             scales=scales,
             reset_xform_op_properties=reset_xform_op_properties,
         )
+
         # setup subscriptions
-        self._subscription_to_timeline_stop_event = (
-            SimulationManager._timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
-                int(omni.timeline.TimelineEventType.STOP),
-                lambda event, obj=weakref.proxy(self): obj._on_timeline_stop(event),
-            )
+        def safe_timeline_stop_callback(event, obj=weakref.proxy(self)):
+            try:
+                obj._on_timeline_stop(event)
+            except ReferenceError:
+                # Object has been garbage collected, ignore the event
+                pass
+
+        self._subscription_to_timeline_stop_event = carb.eventdispatcher.get_eventdispatcher().observe_event(
+            event_name=omni.timeline.GLOBAL_EVENT_STOP,
+            on_event=safe_timeline_stop_callback,
+            observer_name="isaacsim.core.experimental.prims.DeformablePrim._on_timeline_stop",
         )
         # setup physics-related configuration if simulation is running
         if SimulationManager._physics_sim_view__warp is not None:
-            SimulationManager._physx_sim_interface.flush_changes()
+            SimulationManager._physics_sim_interface.flush_changes()
             self._on_physics_ready(None)
 
     def __del__(self):
@@ -1061,10 +1054,12 @@ class DeformablePrim(XformPrim):
         # - get material properties
         E = np.empty((0, 1))
         nu = np.empty((0, 1))
-        for material in self.get_applied_physics_materials():
-            if material is not None:
-                E = np.append(E, material.get_youngs_moduli().numpy(), axis=0)
-                nu = np.append(nu, material.get_poissons_ratios().numpy(), axis=0)
+        with backend_utils.use_backend("usd"):
+            applied_physics_materials = self.get_applied_physics_materials()
+        for physics_material in applied_physics_materials:
+            if physics_material is not None:
+                E = np.append(E, physics_material.get_youngs_moduli().numpy(), axis=0)
+                nu = np.append(nu, physics_material.get_poissons_ratios().numpy(), axis=0)
             else:
                 E = np.append(E, np.zeros((1, 1)), axis=0)
                 nu = np.append(nu, np.zeros((1, 1)), axis=0)
@@ -1365,10 +1360,10 @@ def _wf_compute_deformation_matrix(
     inverse: bool,
 ) -> wp.mat33:
     tetrahedron_indices = indices[body_index][tetrahedron_index]
-    v0 = positions[body_index][tetrahedron_indices[0]]
-    v1 = positions[body_index][tetrahedron_indices[1]]
-    v2 = positions[body_index][tetrahedron_indices[2]]
-    v3 = positions[body_index][tetrahedron_indices[3]]
+    v0 = positions[body_index][wp.int32(tetrahedron_indices[0])]
+    v1 = positions[body_index][wp.int32(tetrahedron_indices[1])]
+    v2 = positions[body_index][wp.int32(tetrahedron_indices[2])]
+    v3 = positions[body_index][wp.int32(tetrahedron_indices[3])]
     # compute displacement field
     u1 = wp.vec3(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2])
     u2 = wp.vec3(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2])
@@ -1379,7 +1374,7 @@ def _wf_compute_deformation_matrix(
         det = wp.determinant(m)
         volume = det / 6.0
         if volume < 1e-9:
-            m = wp.mat33(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
+            m = wp.matrix_from_rows(wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0), wp.vec3(0.0, 0.0, 0.0))
         else:
             m = wp.inverse(m)
     return m
@@ -1416,7 +1411,7 @@ def _wf_extract_rotation(A: wp.mat33, q: wp.quat, max_iterations: int, eps: floa
     return q
 
 
-@wp.kernel
+@wp.kernel(enable_backward=False)
 def _wk_compute_deformable_rotation(
     simulation_indices: wp.array3d(dtype=wp.uint32),
     simulation_positions: wp.array3d(dtype=wp.float32),
@@ -1449,7 +1444,7 @@ def _wk_compute_deformable_rotation(
     simulation_rotations[body_index][tetrahedron_index][3] = quaternion.w
 
 
-@wp.kernel
+@wp.kernel(enable_backward=False)
 def _wk_compute_deformable_gradient(
     simulation_indices: wp.array3d(dtype=wp.uint32),
     simulation_positions: wp.array3d(dtype=wp.float32),
@@ -1467,7 +1462,7 @@ def _wk_compute_deformable_gradient(
     )
 
 
-@wp.kernel
+@wp.kernel(enable_backward=False)
 def _wk_compute_deformable_stress(
     simulation_indices: wp.array3d(dtype=wp.uint32),
     simulation_positions: wp.array3d(dtype=wp.float32),

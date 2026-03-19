@@ -22,7 +22,7 @@ parser.add_argument("--test", action="store_true")
 args, unknown = parser.parse_known_args()
 
 # Example ROS2 bridge sample showing manual control over messages
-simulation_app = SimulationApp({"renderer": "RaytracedLighting", "headless": False})
+simulation_app = SimulationApp({"renderer": "RealTimePathTracing", "headless": False})
 import carb
 import omni
 import omni.graph.core as og

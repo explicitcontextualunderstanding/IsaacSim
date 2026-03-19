@@ -23,23 +23,8 @@ import carb.settings
 import omni.replicator.core as rep
 import omni.timeline
 import omni.usd
-from isaacsim.core.utils.semantics import add_labels
-from pxr import Sdf, UsdGeom, UsdPhysics
-
-
-def add_colliders_and_rigid_body_dynamics(prim):
-    # Add colliders
-    if not prim.HasAPI(UsdPhysics.CollisionAPI):
-        collision_api = UsdPhysics.CollisionAPI.Apply(prim)
-    else:
-        collision_api = UsdPhysics.CollisionAPI(prim)
-    collision_api.CreateCollisionEnabledAttr(True)
-    # Add rigid body dynamics
-    if not prim.HasAPI(UsdPhysics.RigidBodyAPI):
-        rigid_body_api = UsdPhysics.RigidBodyAPI.Apply(prim)
-    else:
-        rigid_body_api = UsdPhysics.RigidBodyAPI(prim)
-    rigid_body_api.CreateRigidBodyEnabledAttr(True)
+from isaacsim.core.experimental.prims import RigidPrim
+from pxr import UsdGeom
 
 
 def run_example():
@@ -51,80 +36,86 @@ def run_example():
     carb.settings.get_settings().set("rtx/post/dlss/execMode", 2)
 
     # Add a light
-    stage = omni.usd.get_context().get_stage()
-    dome_light = stage.DefinePrim("/World/DomeLight", "DomeLight")
-    dome_light.CreateAttribute("inputs:intensity", Sdf.ValueTypeNames.Float).Set(500.0)
+    rep.functional.create.xform(name="World")
+    rep.functional.create.dome_light(intensity=500, parent="/World", name="DomeLight")
 
     # Create a cube with colliders and rigid body dynamics at a specific location
-    cube = stage.DefinePrim("/World/Cube", "Cube")
-    add_colliders_and_rigid_body_dynamics(cube)
-    if not cube.GetAttribute("xformOp:translate"):
-        UsdGeom.Xformable(cube).AddTranslateOp()
-    cube.GetAttribute("xformOp:translate").Set((0, 0, 2))
-    add_labels(cube, labels=["MyCube"], instance_name="class")
+    cube = rep.functional.create.cube(name="Cube", parent="/World")
+    rep.functional.modify.position(cube, (0, 0, 2))
+    rep.functional.modify.semantics(cube, {"class": "my_cube"}, mode="add")
+    rep.functional.physics.apply_rigid_body(cube, with_collider=True)
 
     # Createa a sphere with colliders and rigid body dynamics next to the cube
-    sphere = stage.DefinePrim("/World/Sphere", "Sphere")
-    add_colliders_and_rigid_body_dynamics(sphere)
-    if not sphere.GetAttribute("xformOp:translate"):
-        UsdGeom.Xformable(sphere).AddTranslateOp()
-    sphere.GetAttribute("xformOp:translate").Set((-1, -1, 2))
-    add_labels(sphere, labels=["MySphere"], instance_name="class")
+    sphere = rep.functional.create.sphere(name="Sphere", parent="/World")
+    rep.functional.modify.position(sphere, (-1, -1, 2))
+    rep.functional.modify.semantics(sphere, {"class": "my_sphere"}, mode="add")
+    rep.functional.physics.apply_rigid_body(sphere, with_collider=True)
 
     # Create a render product using the viewport perspective camera
-    rp = rep.create.render_product("/OmniverseKit_Persp", (512, 512))
+    cam = rep.functional.create.camera(position=(5, 5, 5), look_at=(0, 0, 0), parent="/World", name="Camera")
+    rp = rep.create.render_product(cam, (512, 512))
 
     # Write data using the basic writer with the rgb and bounding box annotators
-    writer = rep.writers.get("BasicWriter")
+    backend = rep.backends.get("DiskBackend")
     out_dir = os.path.join(os.getcwd(), "_out_basic_writer_sim")
+    backend.initialize(output_dir=out_dir)
     print(f"Output directory: {out_dir}")
-    writer.initialize(output_dir=out_dir, rgb=True, semantic_segmentation=True, colorize_semantic_segmentation=True)
+    writer = rep.writers.get("BasicWriter")
+    writer.initialize(backend=backend, rgb=True, semantic_segmentation=True, colorize_semantic_segmentation=True)
     writer.attach(rp)
 
     # Start the timeline (will only advance with app update)
     timeline = omni.timeline.get_timeline_interface()
     timeline.play()
 
-    # Update the app and implicitly advance the simulation
-    drop_delta = 0.5
-    last_capture_height = cube.GetAttribute("xformOp:translate").Get()[2]
+    # Wrap the cube with as a RigidPrim for easy access to its world poses and velocities
+    cube_rigid = RigidPrim(str(cube.GetPrimPath()))
+
+    # Wrap the cube as an Imageable object to toggle visibility during capture
+    cube_imageable = UsdGeom.Imageable(cube)
+
+    # Define the capture interval in meters
+    capture_interval_meters = 0.5
+    cube_pos = cube_rigid.get_world_poses(indices=[0])[0].numpy()
+    previous_capture_height = cube_pos[0, 2]
+
+    # Update the app which will advance the timeline (and implicitly the simulation)
     for i in range(100):
-        # Get the current height of the cube and the distance it dropped since the last capture
         simulation_app.update()
-        current_height = cube.GetAttribute("xformOp:translate").Get()[2]
-        drop_since_last_capture = last_capture_height - current_height
-        print(f"Step {i}; cube height: {current_height:.3f}; drop since last capture: {drop_since_last_capture:.3f}")
+        cube_pos = cube_rigid.get_world_poses(indices=[0])[0].numpy()
+        current_height = cube_pos[0, 2]
+        distance_dropped = previous_capture_height - current_height
+        print(f"Step {i}; cube height: {current_height:.3f}; drop since last capture: {distance_dropped:.3f}")
 
         # Stop the simulation if the cube falls below the ground
         if current_height < 0:
             print(f"\t Cube fell below the ground at height {current_height:.3f}, stopping simulation..")
-            timeline.pause()
             break
 
         # Capture every time the cube drops by the threshold distance
-        if drop_since_last_capture >= drop_delta:
+        if distance_dropped >= capture_interval_meters:
             print(f"\t Capturing at height {current_height:.3f}")
-            last_capture_height = current_height
-            # Pause the timeline to capture multiple frames of the same simulation state
-            timeline.pause()
+            previous_capture_height = current_height
 
-            # Setting delta_time to 0.0 will make sure the step function will not advance the simulation during capture
+            # Setting delta_time to 0.0 will make sure the timeline is not advanced during capture
             rep.orchestrator.step(delta_time=0.0)
 
             # Capture again with the cube hidden
-            UsdGeom.Imageable(cube).MakeInvisible()
+            print("\t Capturing with cube hidden")
+            cube_imageable.MakeInvisible()
             rep.orchestrator.step(delta_time=0.0)
-            UsdGeom.Imageable(cube).MakeVisible()
+            cube_imageable.MakeVisible()
 
             # Resume the timeline to continue the simulation
             timeline.play()
 
-    # Destroy the render product to release resources by detaching it from the writer first
+    # Pause the simulation
+    timeline.pause()
+
+    # Wait for the data to be written to disk and clean up resources
+    rep.orchestrator.wait_until_complete()
     writer.detach()
     rp.destroy()
-
-    # Wait for the data to be written to disk
-    rep.orchestrator.wait_until_complete()
 
 
 # Run the example

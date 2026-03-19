@@ -23,7 +23,7 @@ import omni.kit
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-from isaacsim.core.utils.stage import create_new_stage_async, is_stage_loading, update_stage_async
+from isaacsim.core.utils.stage import is_stage_loading, update_stage_async
 
 # Import extension python module we are testing with absolute import path, as if we are external user (other extension)
 from isaacsim.examples.interactive.bin_filling import BinFilling
@@ -33,8 +33,6 @@ class TestBinFillingExampleExtension(omni.kit.test.AsyncTestCase):
 
     # Before running each test
     async def setUp(self):
-        await create_new_stage_async()
-        await update_stage_async()
         self._sample = BinFilling()
         self._sample.set_world_settings(physics_dt=1.0 / 60.0, stage_units_in_meters=1.0)
         await self._sample.load_world_async()

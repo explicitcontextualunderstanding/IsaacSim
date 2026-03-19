@@ -71,7 +71,7 @@ def advance_timeline_by_duration(duration: float, max_updates: int = 1000):
 
         if current_time <= prev_time:
             print(f"Warning: Timeline did not advance at update {step_count} (time: {current_time:.4f}s).")
-    print(f"Finished advancing timeline to {timeline.get_end_time():.4f}s in {step_count} steps")
+    print(f"Finished advancing timeline to {current_time:.4f}s (target {target_time:.4f}s) in {step_count} steps")
 
 
 def run_sdg_pipeline(

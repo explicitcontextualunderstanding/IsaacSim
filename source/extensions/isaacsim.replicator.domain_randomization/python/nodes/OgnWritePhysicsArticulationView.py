@@ -16,11 +16,13 @@
 import carb
 import numpy as np
 import omni.graph.core as og
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.utils.numpy.rotations import euler_angles_to_quats as euler_angles_to_quats_numpy
 from isaacsim.core.utils.torch.rotations import euler_angles_to_quats as euler_angles_to_quats_torch
 from isaacsim.replicator.domain_randomization import ARTICULATION_ATTRIBUTES, TENDON_ATTRIBUTES
 from isaacsim.replicator.domain_randomization import physics_view as physics
+
+torch = import_module("torch")
 
 OPERATION_TYPES = ["direct", "additive", "scaling"]
 

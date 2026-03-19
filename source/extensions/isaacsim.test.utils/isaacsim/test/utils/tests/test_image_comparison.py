@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for image comparison functionality in Isaac Sim testing utilities."""
+
+
 import io
 import os
 import tempfile
@@ -20,7 +23,11 @@ from unittest.mock import patch
 
 import numpy as np
 import omni.kit.app
-from isaacsim.test.utils.image_comparison import compare_arrays_within_tolerances, compare_images_within_tolerances
+from isaacsim.test.utils.image_comparison import (
+    compare_arrays_within_tolerances,
+    compare_images_in_directories,
+    compare_images_within_tolerances,
+)
 from isaacsim.test.utils.timed_async_test import TimedAsyncTestCase
 from PIL import Image
 
@@ -42,30 +49,39 @@ class TestImageComparison(TimedAsyncTestCase):
             shutil.rmtree(self.test_dir)
         await super().tearDown()
 
-    def get_image_comparison_golden_dir(self):
+    def get_image_comparison_golden_dir(self) -> str:
+        """Resolve path to golden assets for image comparison tests.
+
+        Returns:
+            Path to the golden image comparison directory.
+        """
         # Resolve path to golden assets for image comparison tests.
         ext_manager = omni.kit.app.get_app().get_extension_manager()
         ext_id = ext_manager.get_enabled_extension_id("isaacsim.test.utils")
         extension_path = ext_manager.get_extension_path(ext_id)
         return os.path.join(extension_path, "data", "golden", "image_comparison")
 
-    async def _test_golden_pair(self, img1_name, img2_name, mean_tol, abs_tol, perc, description):
+    async def _test_golden_pair(
+        self,
+        img1_name: str,
+        img2_name: str,
+        mean_tol: float,
+        abs_tol: float,
+        perc: tuple[float, float],
+        description: str,
+    ):
         """Helper to test golden image pairs with given tolerances.
 
         Args:
-            param img1_name: File name of the first image under the golden directory.
-            param img2_name: File name of the second image under the golden directory.
-            param mean_tol: Mean difference threshold.
-            param abs_tol: Absolute difference threshold.
-            param perc: Percentile threshold tuple as (percentile, tolerance).
-            param description: Human-readable description of the pair.
-
-        Returns:
-            None.
+            img1_name: File name of the first image under the golden directory.
+            img2_name: File name of the second image under the golden directory.
+            mean_tol: Mean difference threshold.
+            abs_tol: Absolute difference threshold.
+            perc: Percentile threshold tuple as (percentile, tolerance).
+            description: Human-readable description of the pair.
 
         Raises:
             AssertionError: If the similarity check fails or images are missing.
-
         """
         golden_dir = self.get_image_comparison_golden_dir()
         img1 = os.path.join(golden_dir, img1_name)
@@ -513,3 +529,298 @@ class TestImageComparison(TimedAsyncTestCase):
             perc=(95, 60.0),
             description="Semantic segmentation pair",
         )
+
+    async def test_compare_images_in_directories_identical_files(self):
+        """Test comparing identical files in two directories."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        for i in range(3):
+            image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+            golden_path = os.path.join(golden_dir, f"image_{i:03d}.png")
+            test_path = os.path.join(test_dir, f"image_{i:03d}.png")
+            Image.fromarray(image_data).save(golden_path)
+            Image.fromarray(image_data).save(test_path)
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=True
+            )
+
+        self.assertTrue(result["all_passed"], "Identical files in both directories should pass")
+        self.assertEqual(result["passed_count"], 3, "All 3 files should pass")
+        self.assertEqual(result["failed_count"], 0, "No files should fail")
+        self.assertTrue(result["file_list_match"], "File lists should match")
+        self.assertEqual(len(result["golden_only_files"]), 0, "No golden-only files")
+        self.assertEqual(len(result["test_only_files"]), 0, "No test-only files")
+
+    async def test_compare_images_in_directories_with_pattern(self):
+        """Test comparing files with regex pattern matching."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        for i in range(2):
+            image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+            Image.fromarray(image_data).save(os.path.join(golden_dir, f"rgb_{i:03d}.png"))
+            Image.fromarray(image_data).save(os.path.join(test_dir, f"rgb_{i:03d}.png"))
+            Image.fromarray(image_data).save(os.path.join(golden_dir, f"depth_{i:03d}.png"))
+            Image.fromarray(image_data).save(os.path.join(test_dir, f"depth_{i:03d}.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=test_dir,
+                path_pattern=r"^rgb_.*\.png$",
+                print_per_file_results=True,
+            )
+
+        self.assertTrue(result["all_passed"], "RGB files should pass")
+        self.assertEqual(result["passed_count"], 2, "Only 2 RGB files should be compared")
+        self.assertEqual(len(result["file_results"]), 2, "Should have 2 file results")
+        self.assertIn("rgb_000.png", result["file_results"])
+        self.assertIn("rgb_001.png", result["file_results"])
+        self.assertNotIn("depth_000.png", result["file_results"])
+
+    async def test_compare_images_in_directories_golden_has_extra_files(self):
+        """Test when golden directory has more files than test directory."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_000.png"))
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_001.png"))
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_002.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_000.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_001.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=True
+            )
+
+        captured_output = stdout_capture.getvalue()
+        self.assertFalse(result["all_passed"], "Should fail when file lists don't match")
+        self.assertFalse(result["file_list_match"], "File lists should not match")
+        self.assertEqual(result["passed_count"], 2, "Common files should pass")
+        self.assertEqual(len(result["golden_only_files"]), 1, "Should have 1 golden-only file")
+        self.assertEqual(len(result["test_only_files"]), 0, "Should have 0 test-only files")
+        self.assertIn("image_002.png", result["golden_only_files"])
+        self.assertIn("WARNING", captured_output)
+
+    async def test_compare_images_in_directories_test_has_extra_files(self):
+        """Test when test directory has more files than golden directory."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_000.png"))
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_001.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_000.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_001.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_002.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=True
+            )
+
+        captured_output = stdout_capture.getvalue()
+        self.assertFalse(result["all_passed"], "Should fail when file lists don't match")
+        self.assertFalse(result["file_list_match"], "File lists should not match")
+        self.assertEqual(result["passed_count"], 2, "Common files should pass")
+        self.assertEqual(len(result["golden_only_files"]), 0, "Should have 0 golden-only files")
+        self.assertEqual(len(result["test_only_files"]), 1, "Should have 1 test-only file")
+        self.assertIn("image_002.png", result["test_only_files"])
+        self.assertIn("WARNING", captured_output)
+
+    async def test_compare_images_in_directories_no_common_files(self):
+        """Test when directories have no common files."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "golden_image.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "test_image.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=True
+            )
+
+        captured_output = stdout_capture.getvalue()
+        self.assertFalse(result["all_passed"], "Should fail when no common files")
+        self.assertFalse(result["file_list_match"], "File lists should not match")
+        self.assertEqual(result["passed_count"], 0, "No files should pass")
+        self.assertEqual(result["failed_count"], 0, "No files should fail")
+        self.assertEqual(len(result["file_results"]), 0, "Should have no file results")
+        self.assertIn("No common files", captured_output)
+
+    async def test_compare_images_in_directories_with_differences(self):
+        """Test comparing files with differences using mean tolerance."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        diff_value = 5
+
+        for i in range(2):
+            golden_data = np.ones(resolution, dtype=np.uint8) * 100
+            test_data = np.ones(resolution, dtype=np.uint8) * (100 + diff_value)
+            Image.fromarray(golden_data).save(os.path.join(golden_dir, f"image_{i}.png"))
+            Image.fromarray(test_data).save(os.path.join(test_dir, f"image_{i}.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=test_dir,
+                path_pattern=None,
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=10.0,
+                print_per_file_results=True,
+            )
+
+        self.assertTrue(result["all_passed"], f"Files with mean diff {diff_value} should pass with tolerance 10.0")
+        self.assertEqual(result["passed_count"], 2, "Both files should pass")
+        self.assertEqual(result["failed_count"], 0, "No files should fail")
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=test_dir,
+                path_pattern=None,
+                allclose_rtol=None,
+                allclose_atol=None,
+                mean_tolerance=2.0,
+                print_per_file_results=True,
+            )
+
+        self.assertFalse(result["all_passed"], f"Files with mean diff {diff_value} should fail with tolerance 2.0")
+        self.assertEqual(result["passed_count"], 0, "No files should pass")
+        self.assertEqual(result["failed_count"], 2, "Both files should fail")
+
+    async def test_compare_images_in_directories_missing_directory(self):
+        """Test when one of the directories doesn't exist."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "nonexistent")
+
+        os.makedirs(golden_dir)
+
+        with self.assertRaises(FileNotFoundError) as context:
+            compare_images_in_directories(golden_dir=golden_dir, test_dir=test_dir, path_pattern=None)
+
+        self.assertIn("test directory not found", str(context.exception).lower())
+
+    async def test_compare_images_in_directories_pattern_none_matches_all(self):
+        """Test that pattern=None matches all files including different extensions."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_001.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_001.png"))
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image_002.jpg"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image_002.jpg"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=True
+            )
+
+        self.assertTrue(result["all_passed"], "Both PNG and JPG files should be compared")
+        self.assertEqual(result["passed_count"], 2, "Both files should pass")
+        self.assertIn("image_001.png", result["file_results"])
+        self.assertIn("image_002.jpg", result["file_results"])
+
+    async def test_compare_images_in_directories_complex_pattern(self):
+        """Test with complex regex pattern matching specific frame numbers."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "frame_000000.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "frame_000000.png"))
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "frame_000001.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "frame_000001.png"))
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "other_file.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "other_file.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir,
+                test_dir=test_dir,
+                path_pattern=r"^frame_\d{6}\.png$",
+                print_per_file_results=True,
+            )
+
+        self.assertTrue(result["all_passed"], "Frame files should pass")
+        self.assertEqual(result["passed_count"], 2, "Only 2 frame files should be compared")
+        self.assertIn("frame_000000.png", result["file_results"])
+        self.assertIn("frame_000001.png", result["file_results"])
+        self.assertNotIn("other_file.png", result["file_results"])
+
+    async def test_compare_images_in_directories_print_options(self):
+        """Test different printing options."""
+        golden_dir = os.path.join(self.test_dir, "golden")
+        test_dir = os.path.join(self.test_dir, "test")
+        os.makedirs(golden_dir)
+        os.makedirs(test_dir)
+
+        resolution = (100, 100, 3)
+        image_data = np.random.randint(0, 255, resolution, dtype=np.uint8)
+        Image.fromarray(image_data).save(os.path.join(golden_dir, "image.png"))
+        Image.fromarray(image_data).save(os.path.join(test_dir, "image.png"))
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=False
+            )
+        captured_no_per_file = stdout_capture.getvalue()
+
+        stdout_capture = io.StringIO()
+        with patch("sys.stdout", stdout_capture):
+            result = compare_images_in_directories(
+                golden_dir=golden_dir, test_dir=test_dir, path_pattern=None, print_per_file_results=True
+            )
+        captured_with_per_file = stdout_capture.getvalue()
+
+        self.assertLess(len(captured_no_per_file), len(captured_with_per_file), "Per-file results should add output")
+        self.assertIn("PASSED", captured_with_per_file)

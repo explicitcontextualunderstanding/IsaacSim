@@ -29,18 +29,28 @@ class FrankaPickPlace:
 
     No complex inheritance, no RL concepts, no task wrappers.
     Just straightforward robot control that's easy to understand and modify.
+
+    Args:
+        events_dt: List of step counts for each phase. If None, uses default values.
+        robot_name: Optional name/identifier for this robot (e.g. "Robot 0"). Used in phase log messages.
     """
 
-    def __init__(self, events_dt: Optional[List[float]] = None):
+    def __init__(
+        self,
+        events_dt: Optional[List[float]] = None,
+        robot_name: str = "",
+    ):
         """Initialize the FrankaPickPlace controller.
 
         Sets up initial state variables for the state machine.
 
         Args:
             events_dt: List of step counts for each phase. If None, uses default values.
+            robot_name: Optional name/identifier for this robot (e.g. "Robot 0"). Used in phase log messages.
         """
         self.cube = None
         self.robot = None
+        self.robot_name = robot_name
 
         # Define step counts for each phase
         self.events_dt = events_dt
@@ -65,18 +75,22 @@ class FrankaPickPlace:
         cube_size: Optional[np.ndarray] = None,
         target_position: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
-    ) -> None:
+        robot_path: str = "/World/robot",
+        cube_path: str = "/World/Cube",
+    ):
         """Set up the scene with robot and cube.
 
         Creates and adds a Franka robot and a dynamic cube to the simulation world.
         Sets default values for positions and sizes if not provided.
 
         Args:
-            cube_initial_position: Initial cube position [x, y, z]. Defaults to [0.5, 0.0, 0.0258].
-            cube_initial_orientation: Initial cube orientation as quaternion [w, x, y, z]. Defaults to [1, 0, 0, 0].
-            cube_size: Cube dimensions [w, h, d]. Defaults to [0.0515, 0.0515, 0.0515].
-            target_position: Target position for placing [x, y, z]. Defaults to [-0.3, -0.3, cube_height/2].
-            offset: Additional offset to apply to target position [x, y, z]. Defaults to [0, 0, 0].
+            cube_initial_position: Initial cube position [x, y, z].
+            cube_initial_orientation: Initial cube orientation as quaternion [w, x, y, z].
+            cube_size: Cube dimensions [w, h, d].
+            target_position: Target position for placing [x, y, z].
+            offset: Additional offset to apply to target position and cube position [x, y, z].
+            robot_path: USD path for the robot prim. Use unique paths for multiple robots.
+            cube_path: USD path for the cube prim. Use unique paths for multiple cubes.
         """
         self.cube_initial_position = cube_initial_position
         self.cube_initial_orientation = cube_initial_orientation
@@ -94,32 +108,37 @@ class FrankaPickPlace:
             self.target_position = np.array([-0.3, -0.3, 0.12])
         if self.offset is None:
             self.offset = np.array([0.0, 0.0, 0.0])
+        self.cube_initial_position = self.cube_initial_position + self.offset
         self.target_position = self.target_position + self.offset
 
-        # Create a new USD stage with default sunlight lighting
-        stage_utils.create_new_stage(template="sunlight")
-
         # Create the Franka robot controller (inherits from Articulation)
-        self.robot = FrankaExperimental(robot_path="/World/robot", create_robot=True)
+        self.robot = FrankaExperimental(robot_path=robot_path, create_robot=True)
         self.end_effector_link = self.robot.end_effector_link
 
-        # Add ground plane environment for physics simulation
-        ground_plane = stage_utils.add_reference_to_stage(
-            usd_path=get_assets_root_path() + "/Isaac/Environments/Grid/default_environment.usd",
-            path="/World/ground",
-        )
+        # Position robot base at offset (for multiple-robot scenarios)
+        robot_position = [self.offset[0], self.offset[1], 0.0]
+        robot_orientation = [1.0, 0.0, 0.0, 0.0]  # Identity quaternion (w, x, y, z)
+        self.robot.set_world_poses(positions=robot_position, orientations=robot_orientation)
 
-        # Create blue visual material for the cube
-        visual_material = PreviewSurfaceMaterial("/Visual_materials/blue")
+        # Add ground plane only once (shared across multiple tasks)
+        stage = stage_utils.get_current_stage()
+        if not stage.GetPrimAtPath("/World/ground"):
+            stage_utils.add_reference_to_stage(
+                usd_path=get_assets_root_path() + "/Isaac/Environments/Grid/default_environment.usd",
+                path="/World/ground",
+            )
+
+        # Create blue visual material for the cube (use unique material path per cube to avoid conflicts)
+        material_path = f"/Visual_materials/blue_{cube_path.replace('/', '_')}"
+        visual_material = PreviewSurfaceMaterial(material_path)
         visual_material.set_input_values("diffuseColor", [0.0, 0.0, 1.0])
 
         cube_shape = Cube(
-            paths="/World/Cube",
+            paths=cube_path,
             positions=self.cube_initial_position,
             orientations=self.cube_initial_orientation,
-            sizes=[1.0],
+            sizes=1.0,
             scales=self.cube_size,
-            reset_xform_op_properties=True,
         )
 
         GeomPrim(paths=cube_shape.paths, apply_collision_apis=True)
@@ -130,7 +149,7 @@ class FrankaPickPlace:
         """Execute one step of the pick-and-place operation using the specified IK method.
 
         Args:
-            ik_method: The inverse kinematics method to use. Defaults to "damped-least-squares".
+            ik_method: The inverse kinematics method to use.
 
         Returns:
             True if a step was executed, False if the sequence is complete.
@@ -144,7 +163,8 @@ class FrankaPickPlace:
         # Phase 0: Move to x,y position above cube
         if self._event == 0:
             if self._step == 0:
-                print("Phase 0: Moving to x,y position above cube...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 0: Moving to x,y position above cube...")
 
             # Goal is above the cube at a safe height, matching x,y position
             cube_pos = self.cube.get_world_poses()[0].numpy()
@@ -161,7 +181,8 @@ class FrankaPickPlace:
         # Phase 1: Approach down to the cube
         elif self._event == 1:
             if self._step == 0:
-                print("Phase 1: Approaching cube...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 1: Approaching cube...")
 
             # Goal is above and slightly behind the cube for proper approach
             cube_pos = self.cube.get_world_poses()[0].numpy()
@@ -178,7 +199,8 @@ class FrankaPickPlace:
         # Phase 2: Close gripper to grasp the cube
         elif self._event == 2:
             if self._step == 0:
-                print("Phase 2: Closing gripper...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 2: Closing gripper...")
 
             # Close gripper
             self.robot.close_gripper()
@@ -191,7 +213,8 @@ class FrankaPickPlace:
         # Phase 3: Lift the cube
         elif self._event == 3:
             if self._step == 0:
-                print("Phase 3: Lifting cube...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 3: Lifting cube...")
 
             # Get current end effector position and lift up
             _, current_position, _ = self.robot.get_current_state()
@@ -208,7 +231,8 @@ class FrankaPickPlace:
         # Phase 4: Move cube to target location
         elif self._event == 4:
             if self._step == 0:
-                print("Phase 4: Moving cube...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 4: Moving cube...")
 
             # Move to position using the controller
             self.robot.set_end_effector_pose(
@@ -223,7 +247,8 @@ class FrankaPickPlace:
         # Phase 5: Open gripper to release cube
         elif self._event == 5:
             if self._step == 0:
-                print("Phase 5: Opening gripper...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 5: Opening gripper...")
 
             # Open gripper
             self.robot.open_gripper()
@@ -236,7 +261,8 @@ class FrankaPickPlace:
         # Phase 6: Move up
         elif self._event == 6:
             if self._step == 0:
-                print("Phase 6: Moving up...")
+                prefix = f"{self.robot_name}: " if self.robot_name else ""
+                print(f"{prefix}Phase 6: Moving up...")
 
             # Goal is to lift up
             cube_pos = self.cube.get_world_poses()[0].numpy()
@@ -309,9 +335,7 @@ class FrankaPickPlace:
             reset_orientation = orientation if orientation is not None else self.cube_initial_orientation
 
             # Reset cube position and orientation
-            self.cube.set_world_poses(
-                positions=reset_position.reshape(1, -1), orientations=reset_orientation.reshape(1, -1)
-            )
+            self.cube.set_world_poses(positions=reset_position, orientations=reset_orientation)
 
             print(f"Cube reset to position: {reset_position}")
         else:

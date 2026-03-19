@@ -23,19 +23,9 @@
 #include <isaacsim/core/includes/Math.h>
 #include <isaacsim/core/includes/Transforms.h>
 #include <isaacsim/core/utils/PrimUtils.h>
-#include <omni/isaac/dynamic_control/DynamicControlTypes.h>
 
 CARB_BINDINGS("isaacsim.core.utils.python")
 
-namespace isaacsim
-{
-namespace core
-{
-namespace utils
-{
-}
-}
-}
 
 namespace
 {
@@ -44,7 +34,6 @@ PYBIND11_MODULE(_isaac_utils, m)
     using namespace carb;
     using namespace isaacsim::core::includes::math;
     using namespace isaacsim::core::utils;
-    using namespace omni::isaac::dynamic_control;
     // We use carb data types, must import bindings for them
     auto carbModule = py::module::import("carb");
 

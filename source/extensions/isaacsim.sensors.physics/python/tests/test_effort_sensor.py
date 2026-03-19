@@ -21,12 +21,14 @@ import asyncio
 from typing import List
 
 import carb.tokens
+import isaacsim.core.experimental.utils.prim as prim_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.kit.test
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.api.objects.ground_plane import GroundPlane
-from isaacsim.core.utils.prims import get_prim_at_path
+import omni.timeline
+from isaacsim.core.experimental.objects import Cube
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.sensors.physics.impl.effort_sensor import EffortSensor, EsSensorReading
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import UsdPhysics
@@ -39,7 +41,7 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         if self._assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
-        self.my_world = None
+        self._timeline = omni.timeline.get_timeline_interface()
 
     async def createSimpleArticulation(
         self, physics_rate=60, include_cube=False, cube_path="/new_cube", cube_position=np.array([1, 0, 0.1])
@@ -49,30 +51,25 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         self.arm_path = "/Articulation/Arm"
 
         # load nucleus asset
-        await omni.usd.get_context().open_stage_async(
+        await stage_utils.open_stage_async(
             self._assets_root_path + "/Isaac/Robots/IsaacSim/SimpleArticulation/simple_articulation.usd"
         )
 
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
-        self._stage = omni.usd.get_context().get_stage()
-        self.my_world = World(stage_units_in_meters=1.0, physics_dt=1.0 / physics_rate, rendering_dt=1.0 / physics_rate)
-        await self.my_world.initialize_simulation_context_async()
+        self._stage = stage_utils.get_current_stage()
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        SimulationManager.setup_simulation(dt=1.0 / physics_rate)
 
-        prim = get_prim_at_path("/Articulation/Arm/RevoluteJoint")
+        prim = prim_utils.get_prim_at_path("/Articulation/Arm/RevoluteJoint")
         self.assertTrue(prim.IsValid())
         joint = UsdPhysics.RevoluteJoint(prim)
         joint.CreateAxisAttr("Y")
 
         if include_cube:
-            DynamicCuboid(
-                prim_path=cube_path,
-                name="cube_1",
-                position=cube_position,
-                color=np.array([255, 0, 0]),
-                size=0.1,
-                mass=1,
-            )
+            Cube(cube_path, sizes=0.1, positions=cube_position)
+            GeomPrim(cube_path, apply_collision_apis=True)
+            RigidPrim(cube_path, masses=[1.0])
 
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
@@ -80,9 +77,9 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
 
     # After running each test
     async def tearDown(self):
-        if self.my_world:
-            self.my_world.stop()
-            self.my_world.clear_instance()
+        if self._timeline.is_playing():
+            self._timeline.stop()
+        SimulationManager.invalidate_physics()
         if self.effort_sensor is not None:
             self.effort_sensor._stage_open_callback_fn()
             self.effort_sensor = None
@@ -97,7 +94,7 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         await self.createSimpleArticulation()
 
         self.effort_sensor = EffortSensor("/Articulation/Arm/RevoluteJoint")
-        self.my_world.play()
+        self._timeline.play()
         # let physics warm up
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
@@ -114,14 +111,9 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         await omni.kit.app.get_app().next_update_async()
 
         # spawn a 1kg cube 1.5m away from the joint
-        DynamicCuboid(
-            prim_path="/new_cube",
-            name="cube_1",
-            position=np.array([1.5, 0, 0.1]),
-            color=np.array([255, 0, 0]),
-            size=0.1,
-            mass=1,
-        )
+        Cube("/new_cube", sizes=0.1, positions=[1.5, 0.0, 0.1])
+        GeomPrim("/new_cube", apply_collision_apis=True)
+        RigidPrim("/new_cube", masses=[1.0])
 
         await omni.kit.app.get_app().next_update_async()
         await omni.kit.app.get_app().next_update_async()
@@ -142,7 +134,7 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         await self.createSimpleArticulation()
 
         self.effort_sensor = EffortSensor("/Articulation/Arm/RevoluteJoint", 1 / 10)  # 10 hz
-        self.my_world.play()
+        self._timeline.play()
         # # print(self.effort_sensor.sensor_period)
 
         # let physics warm up
@@ -178,7 +170,7 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         await self.createSimpleArticulation()
 
         self.effort_sensor = EffortSensor("/Articulation/Arm/RevoluteJoint", 1 / 30)  # running at 30 Hz
-        self.my_world.play()
+        self._timeline.play()
         # # print(self.effort_sensor.sensor_period)
 
         # let physics warm up
@@ -202,7 +194,7 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         await self.createSimpleArticulation()
 
         self.effort_sensor = EffortSensor("/Articulation/Arm/RevoluteJoint")
-        self.my_world.play()
+        self._timeline.play()
         # # print(self.effort_sensor.sensor_period)
 
         # let physics warm up
@@ -247,7 +239,7 @@ class TestEffortSensor(omni.kit.test.AsyncTestCase):
         await self.createSimpleArticulation()
 
         self.effort_sensor = EffortSensor("/Articulation/Arm/RevoluteJoint", sensor_period=1)
-        self.my_world.play()
+        self._timeline.play()
         # # print(self.effort_sensor.sensor_period)
 
         # let physics warm up

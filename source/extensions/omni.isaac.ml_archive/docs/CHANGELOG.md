@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md
+
+## [3.1.0] - 2026-01-26
+### Changed
+- Update to pytorch 2.10.0+cu128, torchaudio 2.10.0+cu128, torchvision 0.25.0+cu128 and update dependencies
+
 ## [3.0.4] - 2025-08-22
 ### Changed
 - Version bump to fix extension publishing issues
@@ -64,9 +72,9 @@
 
 ## [2.0.0] - 2024-04-19
 ### Changed
-- removed omni.pip.torch dependency, torch is now directly part of this archive
-- added torch==2.2.2+cu118, torchvision==0.17.2+cu118, torchaudio==2.2.2+cu118, filelock==3.13.4, fsspec==2024.3.1, mpmath==1.3.0, networkx==3.3, sympy==1.12
-- added nvidia lib pip packages
+- Removed omni.pip.torch dependency, torch is now directly part of this archive
+- Added torch==2.2.2+cu118, torchvision==0.17.2+cu118, torchaudio==2.2.2+cu118, filelock==3.13.4, fsspec==2024.3.1, mpmath==1.3.0, networkx==3.3, sympy==1.12
+- Added nvidia lib pip packages
 
 ## [1.1.3] - 2023-08-10
 ### Changed
@@ -78,12 +86,12 @@
 
 ## [1.1.1] - 2023-06-12
 ### Changed
-- no longer depend on omni.pip.torch
+- No longer depend on omni.pip.torch
 
 ## [1.1.0] - 2022-07-11
 ### Changed
 - Use pip_torch extension instead of packaging torch directly.
-- make extension kit sdk version specific
+- Make extension kit sdk version specific
 
 ## [1.0.0] - 2022-07-01
 ### Changed

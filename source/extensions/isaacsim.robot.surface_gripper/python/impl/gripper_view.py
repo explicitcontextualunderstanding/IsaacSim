@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Provides high level functions to deal with batched data from surface gripper views in Isaac Sim."""
+
+
 from __future__ import annotations
 
 import isaacsim.core.experimental.utils.ops as ops_utils
@@ -79,9 +82,23 @@ class GripperView(XformPrim):
         )
         self.count = len(self)
         self.surface_gripper_interface = surface_gripper.acquire_surface_gripper_interface()
+        # Cache prim paths to avoid repeated USD path queries per step
+        self._prim_paths: list[str] = [p.GetPath().pathString for p in self.prims]
+        # Cache frequently accessed attribute handles per prim
+        self._attr_max_grip_distance = [
+            p.GetAttribute(robot_schema.Attributes.MAX_GRIP_DISTANCE.name) for p in self.prims
+        ]
+        self._attr_coaxial_force_limit = [
+            p.GetAttribute(robot_schema.Attributes.COAXIAL_FORCE_LIMIT.name) for p in self.prims
+        ]
+        self._attr_shear_force_limit = [
+            p.GetAttribute(robot_schema.Attributes.SHEAR_FORCE_LIMIT.name) for p in self.prims
+        ]
+        self._attr_retry_interval = [p.GetAttribute(robot_schema.Attributes.RETRY_INTERVAL.name) for p in self.prims]
         self.set_surface_gripper_properties(max_grip_distance, coaxial_force_limit, shear_force_limit, retry_interval)
 
     def __del__(self):
+        """Clean up the gripper view resources."""
         XformPrim.__del__(self)
 
     def get_surface_gripper_status(self, indices: list | np.ndarray | wp.array | None = None) -> list[str]:
@@ -89,13 +106,12 @@ class GripperView(XformPrim):
 
         Args:
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[str]: Status of the surface grippers ("Open", "Closing", or "Closed"). Shape (M,).
+            Status of the surface grippers ("Open", "Closing", or "Closed"). Shape (M,).
         """
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
-        prim_paths = [self.prims[i].GetPath().pathString for i in indices]
+        prim_paths = [self._prim_paths[i] for i in indices]
         return self.surface_gripper_interface.get_gripper_status_batch(prim_paths)
 
     def get_gripped_objects(self, indices: list | np.ndarray | wp.array | None = None) -> list[str]:
@@ -103,15 +119,13 @@ class GripperView(XformPrim):
 
         Args:
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Returns:
-            list[str]: List of gripped object paths for each gripper. Shape (M,).
-
+            List of gripped object paths for each gripper. Shape (M,).
         """
 
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
-        prim_paths = [self.prims[i].GetPath().pathString for i in indices]
+        prim_paths = [self._prim_paths[i] for i in indices]
         return self.surface_gripper_interface.get_gripped_objects_batch(prim_paths)
 
     def get_surface_gripper_properties(
@@ -121,13 +135,12 @@ class GripperView(XformPrim):
 
         Args:
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Returns:
-            tuple[list[float], list[float], list[float], list[float]]: First index is maximum grip distance. Shape (M,).
-                                                                       Second index is coaxial force limit. Shape (M,).
-                                                                       Third index is shear force limit. Shape (M,).
-                                                                       Fourth index is the retry interval. Shape (M,).
+            A tuple of (max_grip_distance, coaxial_force_limit, shear_force_limit, retry_interval) where
+            max_grip_distance is the maximum grip distance (shape (M,)), coaxial_force_limit is the coaxial force
+            limit (shape (M,)), shear_force_limit is the shear force limit (shape (M,)), and retry_interval is the
+            retry interval (shape (M,)).
         """
         max_grip_distance = []
         coaxial_force_limit = []
@@ -136,12 +149,10 @@ class GripperView(XformPrim):
 
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
         for i in indices:
-            max_grip_distance.append(self.prims[i].GetAttribute(robot_schema.Attributes.MAX_GRIP_DISTANCE.name).Get())
-            coaxial_force_limit.append(
-                self.prims[i].GetAttribute(robot_schema.Attributes.COAXIAL_FORCE_LIMIT.name).Get()
-            )
-            shear_force_limit.append(self.prims[i].GetAttribute(robot_schema.Attributes.SHEAR_FORCE_LIMIT.name).Get())
-            retry_interval.append(self.prims[i].GetAttribute(robot_schema.Attributes.RETRY_INTERVAL.name).Get())
+            max_grip_distance.append(self._attr_max_grip_distance[i].Get())
+            coaxial_force_limit.append(self._attr_coaxial_force_limit[i].Get())
+            shear_force_limit.append(self._attr_shear_force_limit[i].Get())
+            retry_interval.append(self._attr_retry_interval[i].Get())
 
         return max_grip_distance, coaxial_force_limit, shear_force_limit, retry_interval
 
@@ -149,34 +160,26 @@ class GripperView(XformPrim):
         self,
         values: list[float],
         indices: list | np.ndarray | wp.array | None = None,
-    ) -> None:
+    ):
         """Set up the status for the surface grippers.
 
         Args:
             values: New status of the surface gripper. Shape (N,). Where N is the number of encapsulated prims in the view.
             indices: Specific surface gripper to update. Shape (M,). Where M <= size of the encapsulated prims in the view.
-                     Defaults to None (i.e: all prims in the view).
 
         Raises:
-            Exception: If the length of values does not match the number of encapsulated prims in the view.
-            Exception: If a value in indices is larger then the number of encapsulated prims in the view.
+            ValueError: If the length of values does not match the number of encapsulated prims in the view.
+            ValueError: If a value in indices is larger then the number of encapsulated prims in the view.
         """
         # Ensure length of values matches number of gripper
         if self.count != len(values):
             raise ValueError("Length of values must match number of grippers")
 
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
-        prim_paths: list[str] = []
-        actions: list[float] = []
-        for i in indices:
-            # Ensure indice has a matching values
-            if i >= len(values):
-                raise ValueError("Indices should be compatible with length of values")
-            prim_paths.append(self.prims[i].GetPath().pathString)
-            actions.append(values[i])
-
+        prim_paths = [self._prim_paths[i] for i in indices]
+        change_values = [values[i] for i in indices]
         if len(prim_paths) > 0:
-            self.surface_gripper_interface.set_gripper_action_batch(prim_paths, actions)
+            self.surface_gripper_interface.set_gripper_action_batch(prim_paths, change_values)
 
         return
 
@@ -187,7 +190,7 @@ class GripperView(XformPrim):
         shear_force_limit: list[float] | None = None,
         retry_interval: list[float] | None = None,
         indices: list | np.ndarray | wp.array | None = None,
-    ) -> None:
+    ):
         """Set up the properties for the surface grippers.
 
         Args:
@@ -203,8 +206,8 @@ class GripperView(XformPrim):
                      Defaults to None (i.e: all prims in the view).
 
         Raises:
-            Exception: If the length of any properties does not match the number of encapsulated prims in the view.
-            Exception: If a value in indices is larger then the number of encapsulated prims in the view.
+            ValueError: If the length of any properties does not match the number of encapsulated prims in the view.
+            ValueError: If a value in indices is larger then the number of encapsulated prims in the view.
         """
         indices = ops_utils.resolve_indices(indices, count=self.count, device="cpu").numpy()
         # Setup max grip distance if provided
@@ -217,8 +220,7 @@ class GripperView(XformPrim):
                 # Ensure indice has a matching values
                 if i >= len(max_grip_distance):
                     raise ValueError("Indices should be compatible with length of max_grip_distance")
-
-                self.prims[i].GetAttribute(robot_schema.Attributes.MAX_GRIP_DISTANCE.name).Set(max_grip_distance[i])
+                self._attr_max_grip_distance[i].Set(max_grip_distance[i])
 
         # Setup coaxial force limit if provided
         if coaxial_force_limit is not None:
@@ -230,8 +232,7 @@ class GripperView(XformPrim):
                 # Ensure indice has a matching values
                 if i >= len(coaxial_force_limit):
                     raise ValueError("Indices should be compatible with length of coaxial_force_limit")
-
-                self.prims[i].GetAttribute(robot_schema.Attributes.COAXIAL_FORCE_LIMIT.name).Set(coaxial_force_limit[i])
+                self._attr_coaxial_force_limit[i].Set(coaxial_force_limit[i])
 
         # Setup shear force limit if provided
         if shear_force_limit is not None:
@@ -243,8 +244,7 @@ class GripperView(XformPrim):
                 # Ensure indice has a matching values
                 if i >= len(shear_force_limit):
                     raise ValueError("Indices should be compatible with length of shear_force_limit")
-
-                self.prims[i].GetAttribute(robot_schema.Attributes.SHEAR_FORCE_LIMIT.name).Set(shear_force_limit[i])
+                self._attr_shear_force_limit[i].Set(shear_force_limit[i])
 
         # Setup retry interval if provided
         if retry_interval is not None:
@@ -256,7 +256,6 @@ class GripperView(XformPrim):
                 # Ensure indice has a matching values
                 if i >= len(retry_interval):
                     raise ValueError("Indices should be compatible with length of retry_interval")
-
-                self.prims[i].GetAttribute(robot_schema.Attributes.RETRY_INTERVAL.name).Set(retry_interval[i])
+                self._attr_retry_interval[i].Set(retry_interval[i])
 
         return

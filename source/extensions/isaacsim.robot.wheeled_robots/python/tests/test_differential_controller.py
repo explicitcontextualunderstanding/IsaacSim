@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Unit tests for the DifferentialController and DifferentialController node functionality in wheeled robots."""
+
+
 from re import I
 
 import carb
@@ -29,16 +32,35 @@ from isaacsim.storage.native import get_assets_root_path_async
 
 
 class TestDifferentialController(omni.kit.test.AsyncTestCase):
+    """Test class for the DifferentialController.
+
+    This class contains unit tests for validating the functionality of the DifferentialController class,
+    including differential drive calculations, wheel speed limits, and controller behavior with various
+    configurations.
+
+    The test cases cover:
+    - Basic differential drive kinematics calculations
+    - Wheel speed limiting functionality
+    - Controller response to linear and angular velocity commands
+    """
+
     async def setUp(self):
+        """Set up test environment for differential controller tests."""
         pass
 
     # ----------------------------------------------------------------------
     async def tearDown(self):
+        """Clean up test environment after differential controller tests."""
         pass
 
     # ----------------------------------------------------------------------
 
     async def test_differential_drive(self):
+        """Test differential drive calculations and wheel speed limits.
+
+        Validates that the DifferentialController correctly computes joint velocities from linear and angular speed
+        commands, and properly enforces maximum wheel speed constraints.
+        """
         # test the actual calculation of differential drive
         wheel_radius = 0.03
         wheel_base = 0.1125
@@ -48,28 +70,42 @@ class TestDifferentialController(omni.kit.test.AsyncTestCase):
         angular_speed = 1.0
         command = [linear_speed, angular_speed]
         actions = controller.forward(command)
-        self.assertEquals(actions.joint_velocities.tolist(), [8.125, 11.875])
+        self.assertEqual(actions.joint_velocities.tolist(), [8.125, 11.875])
 
         ## test setting wheel limits
         controller.max_wheel_speed = 9
         actions = controller.forward(command)
-        self.assertEquals(actions.joint_velocities.tolist(), [8.125, 9])
+        self.assertEqual(actions.joint_velocities.tolist(), [8.125, 9])
 
 
 class TestDifferentialControllerNode(ogts.OmniGraphTestCase):
+    """Test class for the differential controller node in Omni Graph.
+
+    This test class validates the behavior and functionality of the DifferentialController node
+    within the Omni Graph framework. It tests the node's ability to convert linear and angular
+    velocity commands into individual wheel velocity commands for differential drive robots.
+
+    The tests cover various scenarios including basic differential drive calculations,
+    acceleration limits, reset functionality, and integration with robot articulations.
+    Each test creates an action graph with the DifferentialController node and verifies
+    the output velocity commands match expected values based on input parameters like
+    wheel radius, wheel distance, and desired velocities.
+    """
+
     async def setUp(self):
-        """Set up  test environment, to be torn down when done"""
+        """Set up test environment, to be torn down when done."""
         await omni.usd.get_context().new_stage_async()
         self._timeline = omni.timeline.get_timeline_interface()
 
     # ----------------------------------------------------------------------
     async def tearDown(self):
-        """Get rid of temporary data used by the test"""
+        """Get rid of temporary data used by the test."""
         await omni.kit.stage_templates.new_stage_async()
         self._timeline = None
 
     # ----------------------------------------------------------------------
     async def test_differential_controller_node(self):
+        """Test basic differential controller node functionality with velocity commands."""
         (test_diff_graph, [play_node, diff_node], _, _) = og.Controller.edit(
             {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
             {
@@ -96,6 +132,7 @@ class TestDifferentialControllerNode(ogts.OmniGraphTestCase):
         self.assertEqual(og.Controller(og.Controller.attribute("outputs:velocityCommand", diff_node)).get()[1], 11.875)
 
     async def test_differential_controller_node_acceleration_limits(self):
+        """Test differential controller node with acceleration and deceleration limits applied."""
         (test_diff_graph, [play_node, diff_node], _, _) = og.Controller.edit(
             {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
             {
@@ -128,6 +165,7 @@ class TestDifferentialControllerNode(ogts.OmniGraphTestCase):
         self.assertLess(og.Controller(og.Controller.attribute("outputs:velocityCommand", diff_node)).get()[1], 11.875)
 
     async def test_differential_controller_node_reset(self):
+        """Test differential controller node reset behavior when timeline is stopped and restarted."""
         (test_diff_graph, [play_node, diff_node], _, _) = og.Controller.edit(
             {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
             {
@@ -166,6 +204,7 @@ class TestDifferentialControllerNode(ogts.OmniGraphTestCase):
         self.assertEqual(og.Controller(og.Controller.attribute("inputs:angularVelocity", diff_node)).get(), 0.0)
 
     async def test_differential_controller_reset_with_robot(self):
+        """Test differential controller reset functionality with a Jetbot robot integration."""
         # import a differential robot
         await omni.usd.get_context().new_stage_async()
         self._timeline = omni.timeline.get_timeline_interface()

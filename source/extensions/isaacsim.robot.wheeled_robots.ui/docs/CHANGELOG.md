@@ -1,4 +1,16 @@
 # Changelog
+## [2.2.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [2.1.25] - 2026-01-24
+### Changed
+- Fix issues with menu click and context menu tests being flaky
+
+## [2.1.24] - 2025-10-27
+### Changed
+- Make omni.isaac.ml_archive an explicit test dependency
+
 ## [2.1.23] - 2025-07-07
 ### Fixed
 - Correctly enable omni.kit.loop-isaac in test dependency (fixes issue from 1.4.8)
@@ -25,7 +37,7 @@
 
 ## [2.1.17] - 2025-06-06
 ### Changed
-- increase timeout for UI tests
+- Increase timeout for UI tests
 
 ## [2.1.16] - 2025-05-31
 ### Changed
@@ -94,7 +106,7 @@
 
 ## [2.1.0] - 2024-11-01
 ### Changed
-- menu location and name
+- Menu location and name
 
 ## [2.0.1] - 2024-10-24
 ### Changed
@@ -102,19 +114,19 @@
 
 ## [2.0.0] - 2024-10-02
 ### Changed
-- extension renamed to isaacsim.robot.wheeled_robots.ui
+- Extension renamed to isaacsim.robot.wheeled_robots.ui
 
 ## [1.1.2] - 2024-09-13
 ### Fixed
-- changed pxr.OmniGraphSchema import to OmniGraphSchema
+- Changed pxr.OmniGraphSchema import to OmniGraphSchema
 
 ## [1.1.1] - 2024-05-22
 ### Changed
-- docs link changed from internal to external
+- Docs link changed from internal to external
 
 ## [1.1.0] - 2024-05-09
 ### Changed
-- only ask for robot parent prim, automatically search for Articulation Root API under the hood
+- Only ask for robot parent prim, automatically search for Articulation Root API under the hood
 
 ## [1.0.3] - 2024-04-19
 ### Added
@@ -122,11 +134,11 @@
 
 ## [1.0.2] - 2024-04-14
 ### Added
-- button to documentation for omnigraph shortcut
+- Button to documentation for omnigraph shortcut
 
 ## [1.0.1] - 2024-03-25
 ### Changed
-- option to add to a existing graph for omnigraph controller shortcuts
+- Option to add to a existing graph for omnigraph controller shortcuts
 
 ## [1.0.0] - 2024-02-28
 ### Added

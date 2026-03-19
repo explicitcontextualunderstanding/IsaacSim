@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension providing an interactive UI for the UR10 Palletizing example using Cortex behaviors."""
+
+
 import asyncio
 import os
 
@@ -26,7 +29,27 @@ from isaacsim.gui.components.ui_utils import btn_builder, cb_builder, get_style,
 
 
 class BinStackingExtension(omni.ext.IExt):
+    """Extension providing an interactive UI for the UR10 Palletizing example using Cortex behaviors.
+
+    This extension demonstrates robotic palletizing operations using a UR10 robot arm with Cortex framework
+    behaviors. It creates an interactive window with task controls for starting palletizing operations and
+    diagnostic tools for monitoring the robot's decision stack, bin selection, grasp status, and attachment
+    state during execution.
+
+    The extension integrates with the Isaac Sim examples browser and provides a complete UI interface for
+    controlling and observing the palletizing workflow, including real-time feedback on the robot's current
+    actions and status.
+    """
+
     def on_startup(self, ext_id: str):
+        """Initializes the UR10 Palletizing extension and registers it with the examples browser.
+
+        Sets up the UI template, creates the BinStacking sample instance, and registers the example
+        in the examples browser under the "Cortex" category.
+
+        Args:
+            ext_id: The extension identifier.
+        """
 
         self.example_name = "UR10 Palletizing"
         self.category = "Cortex"
@@ -52,16 +75,37 @@ class BinStackingExtension(omni.ext.IExt):
         return
 
     def on_shutdown(self):
+        """Cleans up the extension by deregistering the UR10 Palletizing example from the examples browser."""
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
         return
 
 
 class BinStackingUI(BaseSampleUITemplate):
+    """User interface for the UR10 Palletizing example.
+
+    Provides interactive controls and real-time diagnostics for the bin stacking task using a UR10 robot
+    and Cortex behaviors. The UI includes task control buttons to start palletizing operations and diagnostic
+    panels that display the decision stack, selected bin information, grasp status, attachment state, and
+    flip requirements.
+
+    The interface automatically updates diagnostic information during task execution, showing the current
+    bin being processed, the robot's grasp state, and whether objects need to be flipped. Task controls
+    are enabled or disabled based on the current simulation state.
+
+    Args:
+        *args: Variable length argument list passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.decision_stack = ""
 
     def build_extra_frames(self):
+        """Builds additional UI frames for task control and diagnostics.
+
+        Creates two collapsible frames: Task Control and Diagnostic frames with their respective UI elements.
+        """
         extra_stacks = self.get_extra_frames_handle()
         self.task_ui_elements = {}
 
@@ -92,6 +136,14 @@ class BinStackingUI(BaseSampleUITemplate):
                 self.build_diagnostic_ui()
 
     def on_diagnostics(self, diagnostic, decision_stack):
+        """Handles diagnostic updates from the bin stacking task.
+
+        Updates the UI with current bin selection, decision stack, and various diagnostic states including grasp status and attachment information.
+
+        Args:
+            diagnostic: Diagnostic information containing bin details and current states.
+            decision_stack: String representation of the current decision making stack.
+        """
         if self.decision_stack != decision_stack:
             self.decision_stack = decision_stack
             if decision_stack:
@@ -116,26 +168,51 @@ class BinStackingUI(BaseSampleUITemplate):
             self.needs_flip.set_value(False)
 
     def get_world(self):
+        """The Cortex World instance.
+
+        Returns:
+            The current CortexWorld singleton instance.
+        """
         return CortexWorld.instance()
 
     def _on_start_button_event(self):
+        """Handles the start button click event.
+
+        Starts the palletizing task asynchronously and disables the start button to prevent multiple starts.
+        """
         asyncio.ensure_future(self.sample.on_event_async())
         self.task_ui_elements["Start Palletizing"].enabled = False
         return
 
     def post_reset_button_event(self):
+        """Handles the post-reset button event.
+
+        Re-enables the start palletizing button after the scene has been reset.
+        """
         self.task_ui_elements["Start Palletizing"].enabled = True
         return
 
     def post_load_button_event(self):
+        """Handles the post-load button event.
+
+        Re-enables the start palletizing button after the scene has been loaded.
+        """
         self.task_ui_elements["Start Palletizing"].enabled = True
         return
 
     def post_clear_button_event(self):
+        """Handles the post-clear button event.
+
+        Disables the start palletizing button after the scene has been cleared.
+        """
         self.task_ui_elements["Start Palletizing"].enabled = False
         return
 
     def build_task_controls_ui(self):
+        """Builds the task controls UI elements.
+
+        Creates the start palletizing button within a vertical stack layout. The button is initially disabled.
+        """
         with ui.VStack(spacing=5):
 
             dict = {
@@ -150,6 +227,10 @@ class BinStackingUI(BaseSampleUITemplate):
             self.task_ui_elements["Start Palletizing"].enabled = False
 
     def build_diagnostic_ui(self):
+        """Builds the diagnostic UI elements.
+
+        Creates UI components to display decision stack, selected bin information, bin base path, and various boolean states like grasp reached, attachment status, and flip requirement.
+        """
         with ui.VStack(spacing=5):
             ui.Label("Decision Stack", height=20)
             self.state_model = ui.SimpleStringModel()

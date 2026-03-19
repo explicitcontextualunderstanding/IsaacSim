@@ -38,8 +38,6 @@ from isaacsim import SimulationApp
 simulation_app = SimulationApp({"headless": True, "max_gpu_count": n_gpu})
 
 import carb
-import isaacsim.core.utils.prims as prims_utils
-import isaacsim.core.utils.stage as stage_utils
 import omni
 import omni.kit.test
 from isaacsim.core.api import PhysicsContext
@@ -113,8 +111,6 @@ for num_robot in n_robot:
 
     benchmark.store_measurements()
     timeline.stop()
-    predicate = lambda path: prims_utils.get_prim_type_name(path) == "Robots"
-    stage_utils.clear_stage(predicate)
 
 benchmark.stop()
 simulation_app.close()

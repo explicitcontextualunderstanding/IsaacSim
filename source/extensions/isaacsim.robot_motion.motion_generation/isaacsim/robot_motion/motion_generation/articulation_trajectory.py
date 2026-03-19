@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides utilities for converting trajectory objects into discrete articulation actions for robot control."""
+
+
 from typing import List
 
 import carb
@@ -27,12 +31,12 @@ class ArticulationTrajectory:
     """Wrapper class which takes in a Trajectory object and converts the output to discrete ArticulationActions that may be sent to the provided robot Articulation.
 
     Args:
-        robot_articulation (SingleArticulation): Initialized robot Articulation object representing the simulated USD robot
-        trajectory (Trajectory): An instance of a class that implements the Trajectory interface.
-        physics_dt (float): Duration of a physics step in Isaac Sim (typically 1/60 s).
+        robot_articulation: Initialized robot Articulation object representing the simulated USD robot.
+        trajectory: An instance of a class that implements the Trajectory interface.
+        physics_dt: Duration of a physics step in Isaac Sim (typically 1/60 s).
     """
 
-    def __init__(self, robot_articulation: SingleArticulation, trajectory: Trajectory, physics_dt: float) -> None:
+    def __init__(self, robot_articulation: SingleArticulation, trajectory: Trajectory, physics_dt: float):
         self._articulation = robot_articulation
         self._trajectory = trajectory
         self._physics_dt = physics_dt
@@ -43,10 +47,10 @@ class ArticulationTrajectory:
         """Get an ArticulationAction that will send the robot to the desired position/velocity at a given time in the provided Trajectory.
 
         Args:
-            time (float): Time between the start and end times in the provided Trajectory.  If the time is out of bounds, an error will be thrown.
+            time: Time between the start and end times in the provided Trajectory. If the time is out of bounds, an error will be thrown.
 
         Returns:
-            ArticulationAction: ArticulationAction that may be passed directly to the robot Articulation to send it to the desired position/velocity at the given time.
+            ArticulationAction that may be passed directly to the robot Articulation to send it to the desired position/velocity at the given time.
         """
         if time < self._trajectory.start_time:
             carb.log_error(
@@ -64,13 +68,13 @@ class ArticulationTrajectory:
         """Get a sequence of ArticulationActions which sample the entire Trajectory according to the provided timestep.
 
         Args:
-            timestep (float, optional): Timestep used for sampling the provided Trajectory.
+            timestep: Timestep used for sampling the provided Trajectory.
                 A vlue of 1/60, for example, returns ArticulationActions that represent the desired position/velocity of
-                the robot at 1/60 second intervals.  I.e. a one second trajectory with timestep=1/60 would result in 60 ArticulationActions.
-                When not provided, the framerate of Isaac Sim is used. Defaults to None.
+                the robot at 1/60 second intervals. I.e. a one second trajectory with timestep=1/60 would result in 60 ArticulationActions.
+                When not provided, the framerate of Isaac Sim is used.
 
         Returns:
-            List[ArticulationAction]: Sequence of ArticulationActions that may be passed to the robot Articulation to produce the desired trajectory.
+            Sequence of ArticulationActions that may be passed to the robot Articulation to produce the desired trajectory.
         """
         if timestep is None:
             timestep = self._physics_dt
@@ -83,7 +87,7 @@ class ArticulationTrajectory:
         """Returns the duration of the provided Trajectory
 
         Returns:
-            float: Duration of the provided trajectory
+            Duration of the provided trajectory.
         """
         return self._trajectory.end_time - self._trajectory.start_time
 
@@ -91,7 +95,7 @@ class ArticulationTrajectory:
         """Get view into active joints
 
         Returns:
-            ArticulationSubset: Returns robot states for active joints in an order compatible with the TrajectoryGenerator
+            Robot states for active joints in an order compatible with the TrajectoryGenerator.
         """
         return self._active_joints_view
 
@@ -99,9 +103,14 @@ class ArticulationTrajectory:
         """Get the robot Articulation
 
         Returns:
-            SingleArticulation: Articulation object describing the robot.
+            Articulation object describing the robot.
         """
         return self._articulation
 
     def get_trajectory(self) -> Trajectory:
+        """Trajectory object used by this ArticulationTrajectory.
+
+        Returns:
+            The underlying Trajectory object.
+        """
         return self._trajectory

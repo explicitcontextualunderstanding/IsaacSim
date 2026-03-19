@@ -22,17 +22,17 @@ from isaacsim.robot.manipulators.examples.franka import Franka
 
 
 class FollowTarget(tasks.FollowTarget):
-    """[summary]
+    """Franka robot follow target task.
 
     Args:
-        name (str, optional): [description]. Defaults to "franka_follow_target".
-        target_prim_path (Optional[str], optional): [description]. Defaults to None.
-        target_name (Optional[str], optional): [description]. Defaults to None.
-        target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        target_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
-        franka_prim_path (Optional[str], optional): [description]. Defaults to None.
-        franka_robot_name (Optional[str], optional): [description]. Defaults to None.
+        name: Task name.
+        target_prim_path: USD path for target.
+        target_name: Target name.
+        target_position: Initial target position.
+        target_orientation: Initial target orientation.
+        offset: Task offset.
+        franka_prim_path: USD path for Franka robot.
+        franka_robot_name: Robot name.
     """
 
     def __init__(
@@ -45,7 +45,7 @@ class FollowTarget(tasks.FollowTarget):
         offset: Optional[np.ndarray] = None,
         franka_prim_path: Optional[str] = None,
         franka_robot_name: Optional[str] = None,
-    ) -> None:
+    ):
         tasks.FollowTarget.__init__(
             self,
             name=name,
@@ -60,10 +60,10 @@ class FollowTarget(tasks.FollowTarget):
         return
 
     def set_robot(self) -> Franka:
-        """[summary]
+        """Create and configure the Franka robot.
 
         Returns:
-            Franka: [description]
+            Configured Franka robot instance.
         """
         if self._franka_prim_path is None:
             self._franka_prim_path = find_unique_string_name(

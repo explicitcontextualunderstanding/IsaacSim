@@ -13,46 +13,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains the base PolicyController class for loading and executing robot control policies."""
+
+
 import io
-from typing import Optional
+from abc import ABC
+from typing import Literal
 
 import carb
-import numpy as np
 import omni
-import torch
-from isaacsim.core.api.controllers.base_controller import BaseController
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.prims import define_prim, get_prim_at_path
-from omni.physx import get_physx_simulation_interface
+from isaacsim.core.deprecation_manager import import_module
+from isaacsim.core.experimental.prims import Articulation
+from isaacsim.core.experimental.utils.prim import get_prim_at_path
+from isaacsim.core.experimental.utils.stage import define_prim
+from omni.physics.core import get_physics_simulation_interface
 
 from .config_loader import get_articulation_props, get_physics_properties, get_robot_joint_properties, parse_env_config
 
+torch = import_module("torch")
 
-class PolicyController(BaseController):
-    """
-    A controller that loads and executes a policy from a file.
+
+class PolicyController(ABC):
+    """A controller that loads and executes a policy from a file.
 
     Args:
-        name (str): The name of the controller.
-        prim_path (str): The path to the prim in the stage.
-        root_path (Optional[str], None): The path to the articulation root of the robot
-        usd_path (Optional[str], optional): The path to the USD file. Defaults to None.
-        position (Optional[np.ndarray], optional): The initial position of the robot. Defaults to None.
-        orientation (Optional[np.ndarray], optional): The initial orientation of the robot. Defaults to None.
-
-    Attributes:
-        robot (SingleArticulation): The robot articulation.
+        prim_path: The path to the prim in the stage
+        root_path: The path to the articulation root of the robot
+        usd_path: The path to the USD file
+        position: The initial position of the robot
+        orientation: The initial orientation of the robot
     """
 
     def __init__(
         self,
-        name: str,
         prim_path: str,
-        root_path: Optional[str] = None,
-        usd_path: Optional[str] = None,
-        position: Optional[np.ndarray] = None,
-        orientation: Optional[np.ndarray] = None,
-    ) -> None:
+        root_path: str | None = None,
+        usd_path: str | None = None,
+        position: list[float] | None = None,
+        orientation: list[float] | None = None,
+    ):
         prim = get_prim_at_path(prim_path)
 
         if not prim.IsValid():
@@ -63,73 +62,75 @@ class PolicyController(BaseController):
                 carb.log_error("unable to add robot usd, usd_path not provided")
 
         if root_path == None:
-            self.robot = SingleArticulation(prim_path=prim_path, name=name, position=position, orientation=orientation)
+            self.robot = Articulation(paths=prim_path, positions=position, orientations=orientation)
         else:
-            self.robot = SingleArticulation(prim_path=root_path, name=name, position=position, orientation=orientation)
+            self.robot = Articulation(paths=root_path, positions=position, orientations=orientation)
 
-    def load_policy(self, policy_file_path, policy_env_path) -> None:
-        """
-        Loads a policy from a file.
+    def load_policy(self, policy_file_path, policy_env_path):
+        """Loads a policy from a file.
 
         Args:
-            policy_file_path (str): The path to the policy file.
-            policy_env_path (str): The path to the environment configuration file.
+            policy_file_path: The path to the policy file
+            policy_env_path: The path to the environment configuration file
         """
         file_content = omni.client.read_file(policy_file_path)[2]
         file = io.BytesIO(memoryview(file_content).tobytes())
-        self.policy = torch.jit.load(file)
+        self.policy = torch.jit.load(file).to(torch.device(str(self.robot._device)))
         self.policy_env_params = parse_env_config(policy_env_path)
 
         self._decimation, self._dt, self.render_interval = get_physics_properties(self.policy_env_params)
 
     def initialize(
         self,
-        physics_sim_view: omni.physics.tensors.SimulationView = None,
-        effort_modes: str = "force",
-        control_mode: str = "position",
+        physics_sim_view: omni.physics.tensors.SimulationView | None = None,
+        effort_modes: Literal["force", "acceleration"] = "force",
+        control_mode: Literal["position", "velocity", "effort"] = "position",
         set_gains: bool = True,
         set_limits: bool = True,
         set_articulation_props: bool = True,
-    ) -> None:
-        """
-        Initializes the robot and sets up the controller.
+    ):
+        """Initializes the robot and sets up the controller.
 
         Args:
-            physics_sim_view (optional): The physics simulation view.
-            effort_modes (str, optional): The effort modes. Defaults to "force".
-            control_mode (str, optional): The control mode. Defaults to "position".
-            set_gains (bool, optional): Whether to set the joint gains. Defaults to True.
-            set_limits (bool, optional): Whether to set the limits. Defaults to True.
-            set_articulation_props (bool, optional): Whether to set the articulation properties. Defaults to True.
+            physics_sim_view: The physics simulation view
+            effort_modes: The effort modes ("force" or "acceleration")
+            control_mode: The control mode ("position", "velocity", or "effort")
+            set_gains: Whether to set the joint gains
+            set_limits: Whether to set the limits
+            set_articulation_props: Whether to set the articulation properties
         """
-        self.robot.initialize(physics_sim_view=physics_sim_view)
-        self.robot.get_articulation_controller().set_effort_modes(effort_modes)
+        self.robot.set_dof_drive_types(effort_modes)
 
-        # TODO: Must flush when FSD is enabled.
-        # Otherwise the delayed FSD handling next frame will overwrite set_max_efforts below
-        get_physx_simulation_interface().flush_changes()
+        get_physics_simulation_interface().flush_changes()
 
-        self.robot.get_articulation_controller().switch_control_mode(control_mode)
-        max_effort, max_vel, stiffness, damping, self.default_pos, self.default_vel = get_robot_joint_properties(
+        self.robot.switch_dof_control_mode(control_mode)
+        max_effort, max_vel, stiffness, damping, default_pos, default_vel = get_robot_joint_properties(
             self.policy_env_params, self.robot.dof_names
         )
+        self.robot.set_dof_positions(default_pos)
+        self.robot.set_dof_velocities(default_vel)
+
+        self.robot.set_default_state(
+            dof_positions=default_pos,
+            dof_velocities=default_vel,
+        )
+
+        self.default_pos = torch.tensor(default_pos, device=torch.device(str(self.robot._device)))
+        self.default_vel = torch.tensor(default_vel, device=torch.device(str(self.robot._device)))
+
         if set_gains:
-            self.robot._articulation_view.set_gains(stiffness, damping)
+            self.robot.set_dof_gains(stiffness, damping)
         if set_limits:
-            self.robot._articulation_view.set_max_efforts(max_effort)
+            self.robot.set_dof_max_efforts(max_effort)
 
-            # TODO: Must flush when FSD is enabled.
-            # Otherwise the delayed FSD handling next frame will overwrite set_max_efforts below
-            get_physx_simulation_interface().flush_changes()
+            get_physics_simulation_interface().flush_changes()
 
-            self.robot._articulation_view.set_max_joint_velocities(max_vel)
+            self.robot.set_dof_max_velocities(max_vel)
         if set_articulation_props:
             self._set_articulation_props()
 
-    def _set_articulation_props(self) -> None:
-        """
-        Sets the articulation root properties from the policy environment parameters.
-        """
+    def _set_articulation_props(self):
+        """Sets the articulation root properties from the policy environment parameters."""
         articulation_prop = get_articulation_props(self.policy_env_params)
 
         solver_position_iteration_count = articulation_prop.get("solver_position_iteration_count")
@@ -138,51 +139,70 @@ class PolicyController(BaseController):
         enabled_self_collisions = articulation_prop.get("enabled_self_collisions")
         sleep_threshold = articulation_prop.get("sleep_threshold")
 
-        if solver_position_iteration_count not in [None, float("inf")]:
-            self.robot.set_solver_position_iteration_count(solver_position_iteration_count)
-        if solver_velocity_iteration_count not in [None, float("inf")]:
-            self.robot.set_solver_velocity_iteration_count(solver_velocity_iteration_count)
+        if solver_position_iteration_count not in [None, float("inf")] and solver_velocity_iteration_count not in [
+            None,
+            float("inf"),
+        ]:
+            self.robot.set_solver_iteration_counts(
+                position_counts=[solver_position_iteration_count],
+                velocity_counts=[solver_velocity_iteration_count],
+            )
         if stabilization_threshold not in [None, float("inf")]:
-            self.robot.set_stabilization_threshold(stabilization_threshold)
+            self.robot.set_stabilization_thresholds([stabilization_threshold])
         if isinstance(enabled_self_collisions, bool):
-            self.robot.set_enabled_self_collisions(enabled_self_collisions)
+            self.robot.set_enabled_self_collisions([enabled_self_collisions])
         if sleep_threshold not in [None, float("inf")]:
-            self.robot.set_sleep_threshold(sleep_threshold)
+            self.robot.set_sleep_thresholds([sleep_threshold])
 
-    def _compute_action(self, obs: np.ndarray) -> np.ndarray:
-        """
-        Computes the action from the observation using the loaded policy.
+    def _compute_action(self, obs: torch.Tensor) -> torch.Tensor:
+        """Compute the action from the observation using the loaded policy.
+
+        This method runs the policy network in inference mode to convert
+        the current observation into an action command.
 
         Args:
-            obs (np.ndarray): The observation.
+            obs: The observation tensor matching the format specified in env.yaml
 
         Returns:
-            np.ndarray: The action.
+            The action tensor matching the format expected by the robot controller
         """
         with torch.no_grad():
-            obs = torch.from_numpy(obs).view(1, -1).float()
-            action = self.policy(obs).detach().view(-1).numpy()
+            action = self.policy(obs).detach().view(-1)
         return action
 
     def _compute_observation(self) -> NotImplementedError:
-        """
-        Computes the observation. Not implemented.
-        """
+        """Compute the current observation vector for the policy.
 
+        This method must be implemented by derived classes to construct
+        the observation vector in the format specified by env.yaml.
+        The observation typically includes robot state like joint positions,
+        velocities, base pose, etc.
+
+        Raises:
+            NotImplementedError: This base method must be overridden
+        """
         raise NotImplementedError(
-            "Compute observation need to be implemented, expects np.ndarray in the structure specified by env yaml"
+            "Compute observation needs to be implemented, expects observation tensor in the structure specified by env.yaml"
         )
 
     def forward(self) -> NotImplementedError:
-        """
-        Forwards the controller. Not implemented.
+        r"""Execute one step of the policy controller.
+
+        This method must be implemented by derived classes to\:
+        1. Compute the current observation
+        2. Run the policy to get an action
+        3. Apply the action to the robot
+
+        The specific implementation depends on the robot and control mode
+        (position, velocity, torque, etc.).
+
+        Raises:
+            NotImplementedError: This base method must be overridden
         """
         raise NotImplementedError(
             "Forward needs to be implemented to compute and apply robot control from observations"
         )
 
-    def post_reset(self) -> None:
-        """
-        Called after the controller is reset.
-        """
-        self.robot.post_reset()
+    def post_reset(self):
+        """Called after the controller is reset."""
+        self.robot.reset_to_default_state()

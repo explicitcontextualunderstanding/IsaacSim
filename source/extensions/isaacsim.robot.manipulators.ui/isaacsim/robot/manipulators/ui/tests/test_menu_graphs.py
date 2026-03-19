@@ -16,36 +16,30 @@ import asyncio
 import os
 import tempfile
 
+import carb
 import numpy as np
 import omni.graph.core as og
+import omni.kit.app
 import omni.kit.test
 import omni.kit.ui_test as ui_test
-import omni.timeline
 import omni.usd
 from isaacsim.core.prims import Articulation
 from isaacsim.core.utils.physics import simulate_async
 from isaacsim.core.utils.stage import update_stage_async
 from isaacsim.storage.native import get_assets_root_path_async
-from omni.kit.ui_test.menu import *
-from omni.kit.ui_test.query import *
+from isaacsim.test.utils import MenuUITestCase
 from omni.physx.scripts.physicsUtils import add_ground_plane
-from omni.ui.tests.test_base import OmniUiTest
 from pxr import Gf, Usd
 
 
-class TestArticulationGraphs(OmniUiTest):
+class TestArticulationGraphs(MenuUITestCase):
     async def setUp(self):
-        await omni.usd.get_context().new_stage_async()
-        await update_stage_async()
-        self._stage = omni.usd.get_context().get_stage()
-        self._timeline = omni.timeline.get_timeline_interface()
+        await super().setUp()
 
     async def tearDown(self):
         self._timeline.stop()
-        while omni.usd.get_context().get_stage_loading_status()[2] > 0:
-            print("tearDown, assets still loading, waiting to finish...")
-            await asyncio.sleep(1.0)
-        await update_stage_async()
+        await self.wait_for_stage_loading()
+        await super().tearDown()
 
     async def test_position_graph_creation(self):
         """Test creation of articulation position controller graph"""
@@ -63,16 +57,15 @@ class TestArticulationGraphs(OmniUiTest):
         await update_stage_async()
 
         # Create position controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Joint Position")
-        await update_stage_async()
-
         window_name = "Articulation Position Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Joint Position", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         root_widget_path = f"{window_name}//Frame/VStack[0]"
-        robot_prim = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
-        robot_prim.model.set_value(robot_path)
+        robot_prim_field = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
+        robot_prim_field.model.set_value(robot_path)
 
         await update_stage_async()
 
@@ -119,11 +112,10 @@ class TestArticulationGraphs(OmniUiTest):
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
 
         # Create position controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Joint Position")
-        await update_stage_async()
-
         window_name = "Articulation Position Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Joint Position", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         # Enable "Add to existing graph"
@@ -132,8 +124,8 @@ class TestArticulationGraphs(OmniUiTest):
         await add_to_graph_checkbox.click()
 
         # Set robot prim
-        robot_prim = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
-        robot_prim.model.set_value(robot_path)
+        robot_prim_field = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
+        robot_prim_field.model.set_value(robot_path)
         # Set the existing graph path
         graph_field = ui_test.find(root_widget_path + "/HStack[2]/StringField[0]")
         graph_field.model.set_value(graph_path)
@@ -220,11 +212,10 @@ class TestArticulationGraphs(OmniUiTest):
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
 
         # Create position controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Joint Position")
-        await update_stage_async()
-
         window_name = "Articulation Position Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Joint Position", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         # Enable "Add to existing graph"
@@ -233,8 +224,8 @@ class TestArticulationGraphs(OmniUiTest):
         await add_to_graph_checkbox.click()
 
         # Set robot prim
-        robot_prim = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
-        robot_prim.model.set_value(robot_path)
+        robot_prim_field = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
+        robot_prim_field.model.set_value(robot_path)
         # Set the existing graph path
         graph_field = ui_test.find(root_widget_path + "/HStack[2]/StringField[0]")
         graph_field.model.set_value(graph_path)
@@ -336,16 +327,15 @@ class TestArticulationGraphs(OmniUiTest):
         await update_stage_async()
 
         # Create velocity controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Joint Velocity")
-        await update_stage_async()
-
         window_name = "Articulation Velocity Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Joint Velocity", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         root_widget_path = f"{window_name}//Frame/VStack[0]"
-        robot_prim = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
-        robot_prim.model.set_value(robot_path)
+        robot_prim_field = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
+        robot_prim_field.model.set_value(robot_path)
 
         await update_stage_async()
 
@@ -393,11 +383,10 @@ class TestArticulationGraphs(OmniUiTest):
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
 
         # Create velocity controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Joint Velocity")
-        await update_stage_async()
-
         window_name = "Articulation Velocity Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Joint Velocity", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         # Enable "Add to existing graph"
@@ -406,8 +395,8 @@ class TestArticulationGraphs(OmniUiTest):
         await add_to_graph_checkbox.click()
 
         # Set robot prim
-        robot_prim = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
-        robot_prim.model.set_value(robot_path)
+        robot_prim_field = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
+        robot_prim_field.model.set_value(robot_path)
         # Set the existing graph path
         graph_field = ui_test.find(root_widget_path + "/HStack[2]/StringField[0]")
         graph_field.model.set_value(graph_path)
@@ -467,11 +456,10 @@ class TestArticulationGraphs(OmniUiTest):
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
 
         # Create velocity controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Joint Velocity")
-        await update_stage_async()
-
         window_name = "Articulation Velocity Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Joint Velocity", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         # Enable "Add to existing graph"
@@ -480,8 +468,8 @@ class TestArticulationGraphs(OmniUiTest):
         await add_to_graph_checkbox.click()
 
         # Set robot prim
-        robot_prim = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
-        robot_prim.model.set_value(robot_path)
+        robot_prim_field = ui_test.find(root_widget_path + "/HStack[1]/StringField[0]")
+        robot_prim_field.model.set_value(robot_path)
         # Set the existing graph path
         graph_field = ui_test.find(root_widget_path + "/HStack[2]/StringField[0]")
         graph_field.model.set_value(graph_path)
@@ -549,12 +537,12 @@ class TestArticulationGraphs(OmniUiTest):
             assets_root_path + "/Isaac/Robots/FrankaRobotics/FrankaPanda/franka.usd"
         )
         await update_stage_async()
-        # Create gripper controller graph
-        await menu_click("Tools/Robotics/OmniGraph Controllers/Open Loop Gripper")
-        await update_stage_async()
 
+        # Create gripper controller graph
         window_name = "Gripper Controller"
-        param_window = ui_test.find(window_name)
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Open Loop Gripper", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         root_widget_path = f"{window_name}//Frame/VStack[0]"
@@ -571,8 +559,8 @@ class TestArticulationGraphs(OmniUiTest):
         speed_input.model.set_value(0.005)
 
         # Set joint names for gripper
-        joint_names = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
-        joint_names.model.set_value("panda_finger_joint1, panda_finger_joint2")
+        joint_names_field = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
+        joint_names_field.model.set_value("panda_finger_joint1, panda_finger_joint2")
 
         # Enable keyboard control
         keyboard_checkbox = ui_test.find(root_widget_path + "/HStack[8]/HStack[0]/VStack[0]/ToolButton[0]")
@@ -624,25 +612,13 @@ class TestArticulationGraphs(OmniUiTest):
         graph = og.Controller.create_graph({"graph_path": graph_path, "evaluator_name": "execution"})
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
 
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
 
-        # Create gripper controller graph. Check for parameter window before continuing.
-        # If the parameter window is not found, retry with increasing delays
+        # Create gripper controller graph
         window_name = "Gripper Controller"
-        delays = [5, 50, 100]
-        for delay in delays:
-            try:
-                await menu_click("Tools/Robotics/OmniGraph Controllers/Open Loop Gripper", human_delay_speed=delay)
-                if (param_window := ui_test.find(window_name)) is not None:
-                    break
-            except AttributeError as e:
-                if "NoneType' object has no attribute 'center'" in str(e) and delay != delays[-1]:
-                    continue
-                raise
-        for _ in range(10):
-            await update_stage_async()
-
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Open Loop Gripper", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         # Enable "Add to existing graph"
@@ -650,8 +626,8 @@ class TestArticulationGraphs(OmniUiTest):
         add_to_graph_checkbox = ui_test.find(root_widget_path + "/HStack[0]/HStack[0]/VStack[0]/ToolButton[0]")
         self.assertIsNotNone(add_to_graph_checkbox, "Add to existing graph checkbox not found")
         await add_to_graph_checkbox.click()
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
+
         # Set the existing graph path
         graph_field = ui_test.find(root_widget_path + "/HStack[3]/StringField[0]")
         graph_field.model.set_value(graph_path)
@@ -668,18 +644,16 @@ class TestArticulationGraphs(OmniUiTest):
         speed_input.model.set_value(0.005)
 
         # Set joint names for gripper
-        joint_names = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
-        joint_names.model.set_value("panda_finger_joint1, panda_finger_joint2")
+        joint_names_field = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
+        joint_names_field.model.set_value("panda_finger_joint1, panda_finger_joint2")
 
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
 
         ok_button = ui_test.find(root_widget_path + "/HStack[9]/Button[0]")
         self.assertIsNotNone(ok_button, "OK button not found")
         await ok_button.click()
 
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
 
         # get the gripper controller node
         gripper_controller = og.get_node_by_path(f"{graph_path}/GripperController")
@@ -742,25 +716,13 @@ class TestArticulationGraphs(OmniUiTest):
         graph = og.Controller.create_graph({"graph_path": graph_path, "evaluator_name": "execution"})
         og.Controller.create_node(graph_path + "/OnPlaybackTick", "omni.graph.action.OnPlaybackTick")
 
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
 
-        # Create gripper controller graph. Check for parameter window before continuing.
-        # If the parameter window is not found, retry with increasing delays
+        # Create gripper controller graph
         window_name = "Gripper Controller"
-        delays = [5, 50, 100]
-        for delay in delays:
-            try:
-                await menu_click("Tools/Robotics/OmniGraph Controllers/Open Loop Gripper", human_delay_speed=delay)
-                if (param_window := ui_test.find(window_name)) is not None:
-                    break
-            except AttributeError as e:
-                if "NoneType' object has no attribute 'center'" in str(e) and delay != delays[-1]:
-                    continue
-                raise
-        for _ in range(10):
-            await update_stage_async()
-
+        param_window = await self.menu_click_with_retry(
+            "Tools/Robotics/OmniGraph Controllers/Open Loop Gripper", window_name=window_name
+        )
         self.assertIsNotNone(param_window, "Parameter window not found")
 
         # Enable "Add to existing graph"
@@ -768,8 +730,8 @@ class TestArticulationGraphs(OmniUiTest):
         add_to_graph_checkbox = ui_test.find(root_widget_path + "/HStack[0]/HStack[0]/VStack[0]/ToolButton[0]")
         self.assertIsNotNone(add_to_graph_checkbox, "Add to existing graph checkbox not found")
         await add_to_graph_checkbox.click()
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
+
         # Set the existing graph path
         graph_field = ui_test.find(root_widget_path + "/HStack[3]/StringField[0]")
         graph_field.model.set_value(graph_path)
@@ -786,11 +748,10 @@ class TestArticulationGraphs(OmniUiTest):
         speed_input.model.set_value(0.005)
 
         # Set joint names for gripper
-        joint_names = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
-        joint_names.model.set_value("panda_finger_joint1, panda_finger_joint2")
+        joint_names_field = ui_test.find(root_widget_path + "/HStack[5]/StringField[0]")
+        joint_names_field.model.set_value("panda_finger_joint1, panda_finger_joint2")
 
-        for _ in range(10):
-            await update_stage_async()
+        await self.wait_n_frames(10)
 
         ok_button = ui_test.find(root_widget_path + "/HStack[9]/Button[0]")
         self.assertIsNotNone(ok_button, "OK button not found")

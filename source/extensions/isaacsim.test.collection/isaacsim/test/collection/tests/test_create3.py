@@ -13,11 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for iRobot Create3 robot simulation including loading, movement, acceleration, braking, spinning, and circular motion behaviors."""
+
+
 import math
 import time
 
 import carb
 import carb.tokens
+import isaacsim.core.experimental.utils.app as app_utils
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni.graph.core as og
 
@@ -25,19 +30,21 @@ import omni.graph.core as og
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-from isaacsim.core.api import World
-from isaacsim.core.prims import SingleArticulation
-from isaacsim.core.utils.nucleus import get_assets_root_path
-from isaacsim.core.utils.prims import delete_prim
-from isaacsim.core.utils.stage import open_stage_async
+import omni.timeline
+from isaacsim.core.experimental.prims import Articulation
+from isaacsim.storage.native import get_assets_root_path
 
-from .robot_helpers import init_robot_sim, setup_robot_og
+from .robot_helpers import init_robot_sim, open_stage_async, setup_robot_og
 
 
 # Class derived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 class TestCreate3(omni.kit.test.AsyncTestCase):
+    """Tests for the iRobot Create3 robot simulation."""
+
     # Before running each test
     async def setUp(self):
+        """Set up test environment with Create3 robot."""
+        self._timeline = omni.timeline.get_timeline_interface()
 
         self._assets_root_path = get_assets_root_path()
         if self._assets_root_path is None:
@@ -52,8 +59,9 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
 
         await omni.kit.app.get_app().next_update_async()
 
-        self.my_world = World(stage_units_in_meters=1.0)
-        await self.my_world.initialize_simulation_context_async()
+        # Set stage units
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        await app_utils.update_app_async()
 
         # setup omnigraph
         self.graph_path = "/ActionGraph"
@@ -64,8 +72,8 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
 
     # After running each test
     async def tearDown(self):
-        self.my_world.stop()
-        self.my_world.clear_instance()
+        """Clean up test environment and stop timeline."""
+        self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
         # In some cases the test will end before the asset is loaded, in this case wait for assets to load
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
@@ -75,27 +83,28 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
 
     # Actual test, notice it is "async" function, so "await" can be used if needed
     async def test_loading(self):
+        """Test that the Create3 robot loads and can move forward."""
 
-        delete_prim("/ActionGraph")
+        stage_utils.delete_prim("/ActionGraph")
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         # get the create3
-        self.ar = SingleArticulation("/create3")
-        self.ar._articulation_view.initialize()
-        self.starting_pos, _ = self.ar.get_world_pose()
+        self.ar = Articulation("/create3")
+        # Wait for physics to be ready
+        await omni.kit.app.get_app().next_update_async()
+        starting_pos, _ = self.ar.get_world_poses()
+        self.starting_pos = starting_pos.numpy()[0]
 
-        left_wheel_joint_idx = self.ar._articulation_view.get_dof_index("left_wheel_joint")
-        right_wheel_joint_idx = self.ar._articulation_view.get_dof_index("right_wheel_joint")
-        self.ar._articulation_view.set_joint_velocity_targets(
-            velocities=np.array([1.0, 1.0]), joint_indices=[left_wheel_joint_idx, right_wheel_joint_idx]
-        )
+        dof_indices = self.ar.get_dof_indices(["left_wheel_joint", "right_wheel_joint"])
+        self.ar.set_dof_velocity_targets(velocities=np.array([[1.0, 1.0]]), dof_indices=dof_indices)
 
         for i in range(60):
             await omni.kit.app.get_app().next_update_async()
 
-        self.current_pos, _ = self.ar.get_world_pose()
+        current_pos, _ = self.ar.get_world_poses()
+        self.current_pos = current_pos.numpy()[0]
 
         delta = np.linalg.norm(self.current_pos - self.starting_pos)
         self.assertTrue(delta > 0.02)
@@ -104,12 +113,13 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
 
     # Building up speed tests
     async def test_accel(self):
+        """Test acceleration behavior with gradually increasing velocities."""
 
         odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
 
         # Start sim and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         await init_robot_sim("/create3")
@@ -123,28 +133,29 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
                 await omni.kit.app.get_app().next_update_async()
             if og.DataView.get(odom_ang_vel)[2] > 0.8:
                 print("spinning out of control, linear velocity: " + str(forward_velocity))
-                self.my_world.stop()
+                self._timeline.stop()
             else:
                 self.assertAlmostEqual(og.DataView.get(odom_velocity)[0], forward_velocity, delta=1e-1)
             await omni.kit.app.get_app().next_update_async()
 
-        self.my_world.stop()
+        self._timeline.stop()
 
         pass
 
     # braking from different init speeds
     async def test_brake(self):
+        """Test braking behavior from various initial velocities."""
 
         odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
 
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         await init_robot_sim("/create3")
         for x in range(1, 5):
-            self.my_world.play()
+            self._timeline.play()
             await omni.kit.app.get_app().next_update_async()
             forward_velocity = x * 0.15
             angular_velocity = x * 0.15
@@ -163,16 +174,17 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
             self.assertAlmostEqual(og.DataView.get(odom_velocity)[0], 0.0, delta=5e-1)
             self.assertAlmostEqual(og.DataView.get(odom_ang_vel)[2], 0.0, delta=5e-1)
 
-            self.my_world.stop()
+            self._timeline.stop()
             await omni.kit.app.get_app().next_update_async()
         pass
 
     async def test_spin(self):
+        """Test spinning behavior at different angular velocities."""
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
 
         for x in range(1, 6):
             # Start Simulation and wait
-            self.my_world.play()
+            self._timeline.play()
             await omni.kit.app.get_app().next_update_async()
 
             await init_robot_sim("/create3")
@@ -189,18 +201,19 @@ class TestCreate3(omni.kit.test.AsyncTestCase):
             curr_ang_vel = float(og.DataView.get(odom_ang_vel)[2])
             self.assertAlmostEqual(curr_ang_vel, angular_velocity, delta=2e-1)
 
-            self.my_world.stop()
+            self._timeline.stop()
 
         pass
 
     # go in circle
     async def test_circle(self):
+        """Test circular motion and verify return to starting position."""
         odom_velocity = og.Controller.attribute("outputs:linearVelocity", self.odom_node)
         odom_ang_vel = og.Controller.attribute("outputs:angularVelocity", self.odom_node)
         odom_position = og.Controller.attribute("outputs:position", self.odom_node)
 
         # Start Simulation and wait
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()
 
         await init_robot_sim("/create3")

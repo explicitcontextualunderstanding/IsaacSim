@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utility functions for robot setup wizard operations including USD stage manipulation and file management."""
+
+
 import os
 
 import omni.usd
@@ -19,7 +23,14 @@ from pxr import Sdf, UsdGeom, UsdLux
 
 
 def Singleton(class_):
-    """A singleton decorator"""
+    """A singleton decorator that ensures only one instance of a class is created.
+
+    Args:
+        class_: The class to be made into a singleton.
+
+    Returns:
+        A function that returns the singleton instance of the class.
+    """
     instances = {}
 
     def getinstance(*args, **kwargs):
@@ -31,8 +42,13 @@ def Singleton(class_):
 
 
 def get_stage_default_prim_path(stage):
-    """
-    Helper function used for getting default prim path for any given stage.
+    """Helper function used for getting default prim path for any given stage.
+
+    Args:
+        stage: The USD stage to get the default prim path from.
+
+    Returns:
+        The path of the default prim, or absolute root path if no default prim exists.
     """
     if stage.HasDefaultPrim():
         return stage.GetDefaultPrim().GetPath()
@@ -43,8 +59,13 @@ def get_stage_default_prim_path(stage):
 
 
 def copy_prim_hierarchy(src_prim, dst_stage, dst_path, filter_fn=None):
-    """
-    Recursively copy only the hierarchy of src_prim to dst_stage at the specified dst_path.
+    """Recursively copy only the hierarchy of src_prim to dst_stage at the specified dst_path.
+
+    Args:
+        src_prim: The source USD prim whose hierarchy to copy.
+        dst_stage: The destination USD stage.
+        dst_path: The destination path for the copied hierarchy.
+        filter_fn: Optional filter function to determine which prims to include.
     """
     # new_prim =dst_stage.DefinePrim(dst_path, src_prim.GetTypeName())
     dst_prim = dst_stage.DefinePrim(dst_path.pathString, src_prim.GetTypeName())
@@ -61,9 +82,13 @@ def copy_prim_hierarchy(src_prim, dst_stage, dst_path, filter_fn=None):
 
 
 def copy_prim(src_prim, dst_stage, dst_path):
-    """
-    Recursively copy src_prim along with its attributes, relationships, and children
+    """Recursively copy src_prim along with its attributes, relationships, and children
     to dst_stage at the specified dst_path.
+
+    Args:
+        src_prim: The source USD prim to copy.
+        dst_stage: The destination USD stage.
+        dst_path: The destination path for the copied prim.
     """
     # Ensure dst_path is an Sdf.Path object
     if isinstance(dst_path, str):
@@ -91,8 +116,13 @@ def copy_prim(src_prim, dst_stage, dst_path):
 
 
 def find_unique_filename(filename):
-    """
-    Find a unique filename by adding incrementing numbers to the end of the filename.
+    """Find a unique filename by adding incrementing numbers to the end of the filename.
+
+    Args:
+        filename: The original filename to make unique.
+
+    Returns:
+        A unique filename that doesn't exist on the filesystem.
     """
     base_name, ext = os.path.splitext(filename)
     counter = 1
@@ -103,6 +133,11 @@ def find_unique_filename(filename):
 
 
 def apply_standard_stage_settings(stage):
+    """Apply standard settings to a USD stage including Z-up axis, meters unit, and default lighting.
+
+    Args:
+        stage: The USD stage to configure with standard settings.
+    """
     # Z-up, meters, default lighting
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
     UsdGeom.SetStageMetersPerUnit(stage, 1.0)
@@ -112,10 +147,16 @@ def apply_standard_stage_settings(stage):
 
 
 def can_create_dir(path: str) -> bool:
-    """
-    Return True if we can write into `path` if it existed:
-      - If `path` exists and is a directory: test write permission on it.
-      - Otherwise: walk upward to find the nearest existing parent and test write there.
+    """Return True if we can write into `path` if it existed.
+
+    - If `path` exists and is a directory: test write permission on it.
+    - Otherwise: walk upward to find the nearest existing parent and test write there.
+
+    Args:
+        path: The directory path to test for write permissions.
+
+    Returns:
+        True if the directory can be created or written to.
     """
     # Normalize
     path = os.path.abspath(path)
@@ -142,6 +183,14 @@ def can_create_dir(path: str) -> bool:
 
 
 def stage_is_dirty(stage):
+    """Check if any layer in the USD stage has unsaved changes.
+
+    Args:
+        stage: The USD stage to check for dirty layers.
+
+    Returns:
+        True if any layer in the stage stack is dirty.
+    """
     # Iterate through every layer in the stack (root + all sublayers + session)
     for layer in stage.GetLayerStack():
         if layer.IsDirty():

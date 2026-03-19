@@ -1,4 +1,7 @@
 # Changelog
+## [1.0.24] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
 
 ## [1.0.23] - 2025-08-28
 ### Changed
@@ -49,7 +52,7 @@
 
 ## [1.0.11] - 2025-05-07
 ### Changed
-- switch to omni.physics interface
+- Switch to omni.physics interface
 
 ## [1.0.10] - 2025-04-04
 ### Changed
@@ -92,7 +95,7 @@
 - Updated dependencies and imports after renaming
 
 ### Removed
-- removed unecessary dependencies
+- Removed unecessary dependencies
 
 ## [1.0.0] - 2024-09-27
 ### Changed
@@ -121,7 +124,7 @@
 
 ## [0.3.12] - 2023-08-28
 ### Changed
-- added standard out fail pattern for the expected no prim found edge case for the ogn test
+- Added standard out fail pattern for the expected no prim found edge case for the ogn test
 
 ## [0.3.11] - 2023-08-10
 ### Changed
@@ -147,7 +150,7 @@
 
 ## [0.3.6] - 2023-01-25
 ### Fixed
-- remove un-needed cpp ogn files from extension
+- Remove un-needed cpp ogn files from extension
 
 ## [0.3.5] - 2023-01-06
 ### Fixed

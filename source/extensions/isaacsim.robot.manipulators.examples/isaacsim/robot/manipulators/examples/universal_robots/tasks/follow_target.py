@@ -23,18 +23,18 @@ from isaacsim.robot.manipulators.examples.universal_robots import UR10
 
 
 class FollowTarget(tasks.FollowTarget):
-    """[summary]
+    """UR10 robot follow target task.
 
     Args:
-        name (str, optional): [description]. Defaults to "ur10_follow_target".
-        target_prim_path (Optional[str], optional): [description]. Defaults to None.
-        target_name (Optional[str], optional): [description]. Defaults to None.
-        target_position (Optional[np.ndarray], optional): [description]. Defaults to None.
-        target_orientation (Optional[np.ndarray], optional): [description]. Defaults to None.
-        offset (Optional[np.ndarray], optional): [description]. Defaults to None.
-        ur10_prim_path (Optional[str], optional): [description]. Defaults to None.
-        ur10_robot_name (Optional[str], optional): [description]. Defaults to None.
-        attach_gripper (bool, optional): [description]. Defaults to False.
+        name: Task name.
+        target_prim_path: USD path for target.
+        target_name: Target name.
+        target_position: Initial target position.
+        target_orientation: Initial target orientation.
+        offset: Task offset.
+        ur10_prim_path: USD path for UR10 robot.
+        ur10_robot_name: Robot name.
+        attach_gripper: Whether to attach gripper.
     """
 
     def __init__(
@@ -48,7 +48,7 @@ class FollowTarget(tasks.FollowTarget):
         ur10_prim_path: Optional[str] = None,
         ur10_robot_name: Optional[str] = None,
         attach_gripper: bool = False,
-    ) -> None:
+    ):
         if target_orientation is None:
             target_orientation = euler_angles_to_quat(np.array([0, np.pi / 2.0, 0]))
         tasks.FollowTarget.__init__(
@@ -66,10 +66,10 @@ class FollowTarget(tasks.FollowTarget):
         return
 
     def set_robot(self) -> UR10:
-        """[summary]
+        """Create and configure the UR10 robot.
 
         Returns:
-            UR10: [description]
+            Configured UR10 robot instance.
         """
         if self._ur10_prim_path is None:
             self._ur10_prim_path = find_unique_string_name(

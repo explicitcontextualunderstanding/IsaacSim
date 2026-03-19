@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Main UI builder class for the Gain Tuner extension interface that manages robot selection, gain parameter adjustment, testing functionality, and results visualization."""
+
+
 import math
 import traceback
 from functools import partial
 
 import carb
 import numpy as np
-import omni.physics.tensors as physics_tensors
 import omni.timeline
 import omni.ui as ui
 import pxr
-from isaacsim.core.utils.types import ArticulationAction
 from isaacsim.gui.components.element_wrappers import (
     Button,
     CheckBox,
@@ -35,6 +36,7 @@ from isaacsim.gui.components.element_wrappers import (
     XYPlot,
 )
 from omni.kit.window.file import StageSaveDialog
+from omni.physics.tensors import DofType
 from omni.usd import StageEventType
 from pxr import Sdf, Usd
 from usd.schema.isaac.robot_schema import Classes
@@ -60,6 +62,22 @@ from .test_table_widget import TestJointWidget
 
 
 class UIBuilder:
+    """Main UI builder class for the Gain Tuner extension interface.
+
+    This class manages the complete user interface for robot joint gain tuning, including robot selection,
+    gain parameter adjustment, testing functionality, and results visualization through charts. It handles
+    UI lifecycle events such as timeline play/pause/stop, stage changes, physics steps, and render updates
+    to maintain synchronization between the simulation state and the interface.
+
+    The interface is organized into three main collapsible frames:
+    - Tune Gains: Interactive table for adjusting stiffness/damping or natural frequency parameters
+    - Test Gains Settings: Configuration and execution of gain validation tests
+    - Charts: Visualization of test results with position and velocity plots
+
+    The class integrates with the GainTuner backend to perform actual gain calculations and test execution,
+    while managing UI state transitions and user interactions through various callback functions.
+    """
+
     def __init__(self):
         # Frames are sub-windows that can contain multiple UI elements
         self.frames = []
@@ -89,12 +107,14 @@ class UIBuilder:
         self.force_query_mass = True
         self._save_stage_prompt = None
         self._initial_table_height = 150
+        self._articulation_menu_model = None
 
     ###################################################################################
     #           The Functions Below Are Called Automatically By extension.py
     ###################################################################################
 
     def on_menu_callback(self):
+        """Callback for when the UI is opened from the toolbar menu."""
         #     """Callback for when the UI is opened from the toolbar.
         #     This is called directly after build_ui().
         #     """
@@ -111,16 +131,16 @@ class UIBuilder:
         """Callback for Timeline events (Play, Pause, Stop)
 
         Args:
-            event (omni.timeline.TimelineEventType): Event Type
+            event: Event Type
         """
         if not self._articulation_menu_model or not self._articulation_menu_model.has_item():
             return
-        if event.type == int(omni.timeline.TimelineEventType.PLAY):
+        if event.event_name == omni.timeline.GLOBAL_EVENT_PLAY:
             self._gains_tuning_frame.collapsed = True
             self._test_gains_frame.collapsed = False
             if self._test_button:
                 self._test_button.enabled = True
-        if event.type == int(omni.timeline.TimelineEventType.STOP):
+        if event.event_name == omni.timeline.GLOBAL_EVENT_STOP:
             self._gains_tuning_frame.collapsed = False
             self._test_gains_frame.collapsed = True
             if self._test_button:
@@ -131,7 +151,7 @@ class UIBuilder:
         Physics steps only occur when the timeline is playing
 
         Args:
-            step (float): Size of physics step
+            step: Size of physics step
         """
         pass
 
@@ -139,7 +159,7 @@ class UIBuilder:
         """Render event set up to cancel physics subscriptions that run the gains test.
 
         Args:
-            e (carb.events.IEvent): _description_
+            e: Event object
         """
 
         if not self._articulation_menu_model or not self._articulation_menu_model.has_item():
@@ -161,20 +181,25 @@ class UIBuilder:
         """Callback for Stage Events
 
         Args:
-            event (omni.usd.StageEventType): Event Type
+            event: Event Type
         """
-        if event.type == int(omni.usd.StageEventType.ASSETS_LOADED):  # Any asset added or removed
+        if event.event_name == omni.usd.get_context().stage_event_name(
+            omni.usd.StageEventType.ASSETS_LOADED
+        ):  # Any asset added or removed
             items = self._populate_robot_menu()
             if self._articulation_menu_model:
                 self._articulation_menu_model.refresh_list(items)
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_START_PLAY):  # Timeline played
+        elif event.event_name == omni.usd.get_context().stage_event_name(
+            omni.usd.StageEventType.SIMULATION_START_PLAY
+        ):  # Timeline played
             pass
-        elif event.type == int(omni.usd.StageEventType.SIMULATION_STOP_PLAY):  # Timeline stopped
+        elif event.event_name == omni.usd.get_context().stage_event_name(
+            omni.usd.StageEventType.SIMULATION_STOP_PLAY
+        ):  # Timeline stopped
             self._reset_ui_next_frame = True
 
     def reset(self):
-        """
-        Called when the stage is closed or the extension is hot reloaded.
+        """Called when the stage is closed or the extension is hot reloaded.
         Perform any necessary cleanup such as removing active callback functions
         Buttons imported from isaacsim.gui.components.element_wrappers implement a cleanup function that should be called
         """
@@ -183,8 +208,7 @@ class UIBuilder:
         self._gains_tuner.reset()
 
     def cleanup(self):
-        """
-        Called when the extension is closed.
+        """Called when the extension is closed.
         Perform any necessary cleanup such as removing active callback functions
         Buttons imported from isaacsim.gui.components.element_wrappers implement a cleanup function that should be called
         """
@@ -197,7 +221,11 @@ class UIBuilder:
         self._test_table_widget = None
 
     def _on_help_click(self, b):
-        """Opens an extension's documentation in a Web Browser"""
+        """Opens an extension's documentation in a Web Browser
+
+        Args:
+            b: Button event parameter
+        """
         import webbrowser
 
         doc_link = (
@@ -208,7 +236,12 @@ class UIBuilder:
         except Exception as e:
             carb.log_warn(f"Could not open browswer with url: {doc_link}, {e}")
 
-    def _populate_robot_menu(self):
+    def _populate_robot_menu(self) -> list:
+        """Populates the robot selection menu with available robot prims from the stage.
+
+        Returns:
+            List of robot prim paths found on the stage.
+        """
         items = []
         stage = omni.usd.get_context().get_stage()
         if stage:
@@ -220,6 +253,11 @@ class UIBuilder:
         return items
 
     def build_ui(self):
+        """Builds the complete user interface for the gains tuner extension.
+
+        Creates the robot selection dropdown, gains tuning frame, test gains frame,
+        and charts frame with all necessary UI components and event handlers.
+        """
         with ui.VStack(style=get_style(), spacing=5, height=0):
             with ui.HStack(height=34):
                 ui.Label("Robot Selection", name="robot_header")
@@ -254,7 +292,15 @@ class UIBuilder:
 
         self._charts_frame = CollapsableFrame("Charts", collapsed=True, enabled=True, build_fn=self._build_charts_frame)
 
+        items = self._populate_robot_menu()
+
     def _build_gains_tuning_frame(self):
+        """Builds the UI frame for tuning gains.
+
+        Constructs the gains tuning interface including joint selection controls, stiffness/natural frequency mode
+        switching, gains table widget, and save functionality. The frame displays joint entries from the gains tuner
+        and provides controls for editing gain values.
+        """
         with self._gains_tuning_frame:
             if self._gains_tuner._robot_prim_path is None:
                 ui.Spacer(height=10)
@@ -295,8 +341,10 @@ class UIBuilder:
 
                     with ui.ZStack(height=self._initial_table_height):
                         with ui.VStack():
+                            joint_entries = self._gains_tuner.get_joint_entries()
                             self._gains_table_widget = JointWidget(
-                                self._gains_tuner._joints.values(), self._gains_tuner._joint_acumulated_inertia
+                                joint_entries,
+                                lambda joint: self._gains_tuner._joint_accumulated_inertia.get(joint, 0.0),
                             )
 
                         self._gains_splitter = ui.Placer(
@@ -350,10 +398,26 @@ class UIBuilder:
                     ui.Spacer(height=5)
 
     def _on_gains_splitter_dragged(self, position_y: int):
+        """Handles dragging of the gains frame splitter.
+
+        Ensures the splitter position does not go below the initial table height.
+
+        Args:
+            position_y: The new Y position of the splitter.
+        """
         if self._gains_splitter.offset_y.value < self._initial_table_height:
             self._gains_splitter.offset_y = ui.Pixel(self._initial_table_height)
 
     def _on_save_gains_to_physics_layer(self, *args):
+        """Saves gain values to the physics layer.
+
+        Collects joint gain data from the table widget and attempts to save the values to the appropriate USD
+        layers. Shows the stage save dialog for layers with edit permissions or displays a warning for layers
+        without permissions.
+
+        Args:
+            *args: Variable arguments passed from the UI callback.
+        """
         joint_gains = self._gains_table_widget.model.get_item_children()
         edits = {}
         self._no_permision_frame.visible = False
@@ -363,7 +427,11 @@ class UIBuilder:
             if is_joint_mimic(joint):
                 attrs = [get_mimic_natural_frequency_attr(joint), get_mimic_damping_ratio_attr(joint)]
             else:
-                attrs = [get_stiffness_attr(joint), get_damping_attr(joint), get_joint_drive_type_attr(joint)]
+                attrs = [
+                    get_stiffness_attr(joint, joint_gain.drive_axis),
+                    get_damping_attr(joint, joint_gain.drive_axis),
+                    get_joint_drive_type_attr(joint, joint_gain.drive_axis),
+                ]
             for attr in attrs:
                 if attr is None:
                     continue
@@ -404,6 +472,14 @@ class UIBuilder:
             self._no_permision_frame.visible = True
 
     def _on_save_file(self, *args):
+        """Handles saving the USD stage file.
+
+        Identifies writable layers in the stage and shows the stage save dialog. Displays a warning if no
+        layers have edit permissions.
+
+        Args:
+            *args: Variable arguments passed from the UI callback.
+        """
         writable_layers = []
         stage = omni.usd.get_context().get_stage()
         layers = stage.GetLayerStack()
@@ -422,13 +498,32 @@ class UIBuilder:
         self._save_stage_prompt.show(writable_layers)
 
     def _switch_tuning_mode(self, switch):
+        """Switches the tuning mode between stiffness and natural frequency.
+
+        Updates the gains table widget to display the appropriate tuning parameters based on the selected mode.
+
+        Args:
+            switch: The radio button model containing the selected mode value.
+        """
         if self._gains_table_widget:
             self._gains_table_widget.switch_mode(JointSettingMode(switch.get_value_as_int()))
 
     def _on_test_duration_changed(self, model):
+        """Handles changes to the test duration field.
+
+        Updates the gains tuner's test duration when the user modifies the duration field value.
+
+        Args:
+            model: The float field model containing the new duration value.
+        """
         self._gains_tuner.test_duration = model.get_value_as_float()
 
     def _build_test_gains_frame(self):
+        """Builds the UI frame for testing gains settings.
+
+        Constructs the test gains interface including test duration controls, test mode selection (sinewave or step
+        function), test table widget, and test execution buttons. Requires the gains tuner to be initialized.
+        """
         if not self._gains_tuner.initialized:
             if self._articulation_menu_model.has_item():
                 self._gains_tuner.initialize()
@@ -554,22 +649,43 @@ class UIBuilder:
                 self._test_button.enabled = self._timeline.is_playing()
 
     def _on_test_splitter_dragged(self, position_y: int):
+        """Handles dragging of the test frame splitter.
+
+        Ensures the splitter position does not go below the initial table height.
+
+        Args:
+            position_y: The new Y position of the splitter.
+        """
         if self._test_splitter.offset_y.value < self._initial_table_height:
             self._test_splitter.offset_y = ui.Pixel(self._initial_table_height)
 
     def _on_select_all(self):
+        """Selects all joints in the test table widget.
+
+        Enables testing for all available joints in the test gains interface.
+        """
         self._test_table_widget.select_all()
 
     def _on_clear_all(self):
+        """Clears all joint selections in the test table widget.
+
+        Disables testing for all joints in the test gains interface.
+        """
         self._test_table_widget.clear_all()
 
     def _on_cancel_gains_test(self):
+        """Cancels the running gains test and resets the test UI state."""
         self._test_running = False
         if self._test_button:
             self._test_button.reset()
         self._gains_tuner.stop_test()
 
     def _switch_test_mode(self, switch):
+        """Switches the test mode between different gain testing options.
+
+        Args:
+            switch: The switch object containing the selected test mode value.
+        """
         self._gains_tuner.test_mode = switch.get_value_as_int()
         if self._test_table_widget:
             self._test_table_widget.switch_mode(self._gains_tuner.test_mode)
@@ -580,6 +696,7 @@ class UIBuilder:
     #         self._test_table_widget.switch_radian_degree(radian_degree_mode)
 
     def _build_charts_frame(self):
+        """Builds the charts frame UI with joint color selection and position/velocity plots."""
         if not self._gains_tuner.initialized:
             return
         with ui.HStack(style=get_style(), spacing=5, height=0):
@@ -598,6 +715,11 @@ class UIBuilder:
                 self._velocity_frame.set_build_fn(self._build_velocity_plot)
 
     def _on_color_joint_selection(self, selection):
+        """Handles joint selection changes for plotting and updates the chart colors.
+
+        Args:
+            selection: List of selected joint items with associated colors and indices.
+        """
         self._plotting_indices = [item.joint_index for item in selection]
         group_colors = [item.colors for item in selection]
         self._plotting_colors = []
@@ -610,6 +732,7 @@ class UIBuilder:
             self._velocity_frame.rebuild()
 
     def _build_position_plot(self):
+        """Builds the position plot chart with command and observed position data from the gains test."""
         if len(self._plotting_indices) == 0:
             return
         joint_indices = self._plotting_indices
@@ -620,7 +743,7 @@ class UIBuilder:
         cmd_times_list = []
         scale = [1.0] * len(joint_indices)
         for i, joint_index in enumerate(joint_indices):
-            if self._gains_tuner._articulation.dof_types[joint_index] == physics_tensors.DofType.Rotation:
+            if self._gains_tuner._articulation.dof_types[joint_index] == DofType.Rotation:
                 scale[i] = 180.0 / np.pi
         for i, joint_index in enumerate(joint_indices):
             (cmd_pos, cmd_vel, obs_pos, obs_vel, cmd_times) = self._gains_tuner.get_joint_states_from_gains_test(
@@ -645,6 +768,7 @@ class UIBuilder:
         plot.set_data_colors(self._plotting_colors)
 
     def _build_velocity_plot(self):
+        """Builds the velocity plot chart with command and observed velocity data from the gains test."""
         if len(self._plotting_indices) == 0:
             return
         joint_indices = self._plotting_indices
@@ -675,8 +799,7 @@ class UIBuilder:
         plot.set_data_colors(self._plotting_colors)
 
     def _invalidate_articulation(self):
-        """
-        This function handles the event that the existing articulation becomes invalid and there is
+        """This function handles the event that the existing articulation becomes invalid and there is
         not a new articulation to select.  It is called explicitly in the code when the timeline is
         stopped and when the DropDown menu finds no articulations on the stage.
         """
@@ -684,6 +807,11 @@ class UIBuilder:
         self._gains_tuning_frame.rebuild()
 
     def _on_articulation_selection(self, articulation_path):
+        """Handles articulation selection changes and updates the gains tuner with the new robot.
+
+        Args:
+            articulation_path: USD path to the selected articulation prim.
+        """
         if articulation_path is None:
             self._invalidate_articulation()
             return
@@ -700,7 +828,13 @@ class UIBuilder:
 
             self._reset_ui_next_frame = True
 
-    def _update_gains_test(self, step: float):
+    def _update_gains_test(self, step: float, context):
+        """Updates the running gains test and handles test completion.
+
+        Args:
+            step: Physics step size.
+            context: Physics step context.
+        """
         if not self._test_running:
             return
         done = self._gains_tuner.update_gains_test(step)
@@ -713,6 +847,11 @@ class UIBuilder:
                 self._test_button.reset()
 
     def _on_run_gains_test(self, gains_test_mode):
+        """Starts the gains test with the configured parameters from the test table.
+
+        Args:
+            gains_test_mode: The test mode to run for the gains test.
+        """
         if not self._gains_tuner.initialized:
             self._gains_tuner.initialize()
         """Disable all buttons until the gains test has finished."""

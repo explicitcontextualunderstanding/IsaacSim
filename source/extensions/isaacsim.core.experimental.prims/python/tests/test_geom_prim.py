@@ -62,6 +62,17 @@ class TestGeomPrim(omni.kit.test.AsyncTestCase):
 
     # --------------------------------------------------------------------
 
+    @parametrize(
+        backends=["tensor"],  # "tensor" backend plays the simulation
+        instances=["one"],
+        operations=["wrap"],
+        prim_class=lambda *args, **kwargs: None,
+        populate_stage_func=populate_stage,
+        max_num_prims=1,
+    )
+    async def test_runtime_instance_creation(self, prim, num_prims, device, backend):
+        GeomPrim("/World/A_0")
+
     @parametrize(backends=["usd"], operations=["wrap"], prim_class=GeomPrim, populate_stage_func=populate_stage)
     async def test_len(self, prim, num_prims, device, backend):
         self.assertEqual(len(prim), num_prims, f"Invalid GeomPrim ({num_prims} prims) len")

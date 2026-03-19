@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for single manipulator robots with various gripper configurations in Isaac Sim."""
+
+
 import numpy as np
 import omni.kit.test
 from isaacsim.core.api import World
@@ -25,7 +28,15 @@ from isaacsim.storage.native import get_assets_root_path_async
 
 
 class TestSingleManipulators(omni.kit.test.AsyncTestCase):
+    """Test suite for SingleManipulator functionality with various gripper configurations.
+
+    This test class validates the behavior of SingleManipulator robots with different gripper types,
+    including surface grippers and parallel grippers. It tests initialization, configuration,
+    and basic operations of manipulator systems in Isaac Sim.
+    """
+
     async def setUp(self):
+        """Set up the test environment by creating a new world, stage, and timeline interface."""
         World.clear_instance()
         await create_new_stage_async()
         self._my_world = World()
@@ -35,6 +46,7 @@ class TestSingleManipulators(omni.kit.test.AsyncTestCase):
         self._timeline = omni.timeline.get_timeline_interface()
 
     async def test_single_manipulators(self):
+        """Test SingleManipulator creation and initialization with a UR10 robot and SurfaceGripper."""
         asset_path = self._assets_root_path + "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
         robot = add_reference_to_stage(usd_path=asset_path, prim_path="/World/UR10")
         robot.GetVariantSet("Gripper").SetVariantSelection("Short_Suction")
@@ -55,6 +67,7 @@ class TestSingleManipulators(omni.kit.test.AsyncTestCase):
         pass
 
     async def test_parallel_gripper(self):
+        """Test ParallelGripper functionality with a UR10e robot and Robotiq gripper."""
         asset_path = self._assets_root_path + "/Isaac/Robots/UniversalRobots/ur10e/ur10e.usd"
         robot = add_reference_to_stage(usd_path=asset_path, prim_path="/World/ur10e")
         robot.GetVariantSet("Gripper").SetVariantSelection("Robotiq_2f_140")
@@ -94,6 +107,7 @@ class TestSingleManipulators(omni.kit.test.AsyncTestCase):
         self.assertAlmostEqual(ur10.gripper.get_joint_positions()[0], 45 / 180 * np.pi, delta=1e-2)
 
     async def tearDown(self):
+        """Clean up the test environment by stopping the timeline."""
         await omni.kit.app.get_app().next_update_async()
         self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()

@@ -36,7 +36,6 @@ device = args.device
 visual = args.visual
 
 import numpy as np
-import torch
 from isaacsim import SimulationApp
 
 simulation_app = SimulationApp({"headless": not visual, "max_gpu_count": n_gpu})
@@ -44,18 +43,20 @@ simulation_app = SimulationApp({"headless": not visual, "max_gpu_count": n_gpu})
 from functools import partial
 
 import carb
-import isaacsim.core.utils.stage as stage_utils
-import omni.physx as _physx
+import isaacsim.core.experimental.utils.stage as stage_utils
+import omni.physics.core
 import omni.timeline
 from isaacsim.core.api import PhysicsContext, World
-from isaacsim.core.prims import Articulation
+from isaacsim.core.deprecation_manager import import_module
+from isaacsim.core.experimental.prims import Articulation
 from isaacsim.core.utils.extensions import enable_extension
-from isaacsim.core.utils.types import ArticulationActions
 from isaacsim.storage.native import get_assets_root_path
 from omni.kit.viewport.utility import get_active_viewport
 
 enable_extension("isaacsim.benchmark.services")
 from isaacsim.benchmark.services import BaseIsaacBenchmark
+
+torch = import_module("torch")
 
 # Create the benchmark
 benchmark = BaseIsaacBenchmark(
@@ -89,9 +90,10 @@ robot_path = "/ur10"
 
 def get_clipped_joint_ranges(articulation_view):
 
-    limits = articulation_view.get_dof_limits()
-    lower_limit = limits[..., 0]
-    upper_limit = limits[..., 1]
+    lower_limit, upper_limit = articulation_view.get_dof_limits()
+    # convert to numpy
+    lower_limit = torch.from_numpy(lower_limit.numpy())
+    upper_limit = torch.from_numpy(upper_limit.numpy())
 
     l = lower_limit.clone()
     u = upper_limit.clone()
@@ -108,8 +110,11 @@ def get_clipped_joint_ranges(articulation_view):
 def get_joint_commands(articulation_view, v_max, T, joint_indices):
     lower_joint_limits, upper_joint_limits = get_clipped_joint_ranges(articulation_view)
 
-    lower_joint_limits = lower_joint_limits[:, joint_indices]
-    upper_joint_limits = upper_joint_limits[:, joint_indices]
+    # Convert joint_indices to numpy if it's a torch tensor
+    joint_indices_np = joint_indices.cpu().numpy() if torch.is_tensor(joint_indices) else joint_indices
+
+    lower_joint_limits = lower_joint_limits[:, joint_indices_np]
+    upper_joint_limits = upper_joint_limits[:, joint_indices_np]
 
     p_0 = lower_joint_limits + (upper_joint_limits - lower_joint_limits) / 2
 
@@ -119,24 +124,33 @@ def get_joint_commands(articulation_view, v_max, T, joint_indices):
     return position, velocity
 
 
-def on_physics_step(articulation_view, position_commands, velocity_commands, step):
+def on_physics_step(articulation_view, position_commands, velocity_commands, step, context):
     if position_commands is None:
         return
     timestep[0] += step
     if timestep[0] > 5:
         return
 
-    observed_positions.append(articulation_view.get_joint_positions(joint_indices=joint_indices))
-    observed_velocities.append(articulation_view.get_joint_velocities(joint_indices=joint_indices))
+    dof_indices_np = joint_indices.cpu().numpy() if torch.is_tensor(joint_indices) else joint_indices
+
+    # convert to numpy
+    dof_positions = articulation_view.get_dof_positions(dof_indices=dof_indices_np).numpy()
+    dof_velocities = articulation_view.get_dof_velocities(dof_indices=dof_indices_np).numpy()
+
+    observed_positions.append(dof_positions)
+    observed_velocities.append(dof_velocities)
 
     position_command = position_commands(timestep[0])
     velocity_command = velocity_commands(timestep[0])
 
-    commanded_positions.append(position_command)
-    commanded_velocities.append(velocity_command)
+    position_command_np = position_command.cpu().numpy() if torch.is_tensor(position_command) else position_command
+    velocity_command_np = velocity_command.cpu().numpy() if torch.is_tensor(velocity_command) else velocity_command
 
-    action = ArticulationActions(position_command, velocity_command, joint_indices=joint_indices)
-    articulation_view.apply_action(action)
+    commanded_positions.append(position_command_np)
+    commanded_velocities.append(velocity_command_np)
+
+    articulation_view.set_dof_position_targets(positions=position_command_np, dof_indices=dof_indices_np)
+    articulation_view.set_dof_velocity_targets(velocities=velocity_command_np, dof_indices=dof_indices_np)
 
 
 benchmark.set_phase("loading", start_recording_frametime=False, start_recording_runtime=True)
@@ -148,40 +162,42 @@ robot_usd_path = get_assets_root_path() + "/Isaac/Robots/UniversalRobots/ur10/ur
 my_world = World(backend="torch", device=device)
 PhysicsContext(physics_dt=1.0 / 60.0)
 MAX_IN_LINE = 10
-positions = torch.zeros((n_robot, 3))
+positions = np.zeros((n_robot, 3))
+robot_prim_paths = []
 for i in range(n_robot):
     robot_prim_path = "/Robots/Robot_" + str(i)
+    robot_prim_paths.append(robot_prim_path)
     # position the robot
-    robot_position = torch.tensor([-2 * (i % MAX_IN_LINE), -2 * np.floor(i / MAX_IN_LINE), 0])
+    robot_position = np.array([-2 * (i % MAX_IN_LINE), -2 * np.floor(i / MAX_IN_LINE), 0])
     positions[i, :] = robot_position
-    stage_utils.add_reference_to_stage(robot_usd_path, robot_prim_path)
+    stage_utils.add_reference_to_stage(robot_usd_path, path=robot_prim_path)
 
 
 omni.kit.app.get_app().update()
 my_world.scene.add_default_ground_plane(z_position=-1)
 
-robot_view = Articulation("/Robots/Robot_*", positions=positions)
+robot_view = Articulation(robot_prim_paths, positions=positions, reset_xform_op_properties=True)
 
 timeline = omni.timeline.get_timeline_interface()
 timeline.play()
 omni.kit.app.get_app().update()
 
-robot_view.initialize()
-omni.kit.app.get_app().update()
-
 position_commands, velocity_commands = get_joint_commands(robot_view, v_max, T, joint_indices)
-_physxIFace = _physx.get_physx_interface()
-physx_subscription = _physxIFace.subscribe_physics_step_events(
-    partial(on_physics_step, robot_view, position_commands, velocity_commands)
+physics_subscription = omni.physics.core.get_physics_simulation_interface().subscribe_physics_on_step_events(
+    pre_step=False, order=0, on_update=partial(on_physics_step, robot_view, position_commands, velocity_commands)
 )
 
 position_command = position_commands(0)
 velocity_command = velocity_commands(0)
 
-robot_view.set_joint_positions(position_command, joint_indices=joint_indices)
+position_command_np = position_command.cpu().numpy() if torch.is_tensor(position_command) else position_command
+velocity_command_np = velocity_command.cpu().numpy() if torch.is_tensor(velocity_command) else velocity_command
+dof_indices_np = joint_indices.cpu().numpy() if torch.is_tensor(joint_indices) else joint_indices
 
-commanded_positions.append(position_command)
-commanded_velocities.append(velocity_command)
+robot_view.set_dof_positions(positions=position_command_np, dof_indices=dof_indices_np)
+
+commanded_positions.append(position_command_np)
+commanded_velocities.append(velocity_command_np)
 
 omni.kit.app.get_app().update()
 omni.kit.app.get_app().update()

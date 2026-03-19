@@ -1,5 +1,81 @@
 # Changelog
 
+## [5.1.0] - 2026-03-04
+### Changed
+- Added Overview.md, python_api.md and updated docstrings
+
+## [5.0.0] - 2026-02-23
+### Added
+- `KinematicChain` class for building and caching joint chains between arbitrary start/end prims on a robot
+- Forward Kinematics computation (`compute_fk`) with per-joint intermediate transforms
+- Fused FK + spatial Jacobian computation (`compute_fk_and_jacobian`) in a single pass
+- `IKSolver` abstract interface and `IKSolverRegistry` for pluggable IK solver implementations
+- Levenberg-Marquardt IK solver (`IKSolverLM`) registered as the default solver, with adaptive damping, null-space bias toward joint centers, step clamping, and joint-limit clipping
+- `pose_error` function computing 6-DOF orientation + position error between two transforms
+- Math module (`math.py`): `Transform` (SE(3) composition and inversion), `Joint` (screw-axis exponential map for revolute and prismatic joints), quaternion operations (`quat_mul`, `quat_conj`, `quat_rotate`, `axis_angle_to_quat`, `quat_to_matrix`), `skew`, and `adjoint`
+- Teleport functionality on `KinematicChain`: `teleport` propagates FK through the kinematic tree and writes USD body transforms; `teleport_anchored` applies joints while keeping a specified link fixed via rigid correction
+- Zero-configuration pose computation (`_compute_zero_config_poses`) using static joint local frames
+- Joint chain path finding via LCA algorithm (`_collect_chain_joints`) returning ordered joints with forward/backward traversal direction
+- Named pose query utilities: `GetAllNamedPoses`, `GetNamedPoseStartLink`, `GetNamedPoseEndLink`, `GetNamedPoseJoints`, `GetNamedPoseJointValues`, `GetNamedPoseJointFixed`, `GetNamedPoseValid`
+- `CreateNamedPose` for creating `IsaacNamedPose` prims with relationships and attributes
+- Loop detection in articulation traversal (`_discover_articulation_prims`, `PopulateRobotSchemaFromArticulation`, `RecalculateRobotSchema`) using visited-set guards to prevent infinite loops in cyclic joint graphs
+- `DetectAndApplySites` and `AddSitesToRobotLinks` for automatic site detection on link child Xforms and registration in the robot schema
+- `ApplySiteAPI` function; `ApplyReferencePointAPI` deprecated and redirected to `ApplySiteAPI`
+- `ValidateRobotSchemaRelationships` returning valid/invalid link and joint lists
+- `RecalculateRobotSchema` that preserves existing relationship order while appending newly discovered items and removing invalid ones
+- `RebuildRelationshipAsPrepend` and `EnsurePrependListForRobotRelationships` for proper USD layering of robot relationships
+
+### Changed
+- `UpdateDeprecatedSchemas` migrates `ReferencePointAPI` to `SiteAPI` and deprecated DOF offset attributes to `DofOffsetOpOrder` token array
+- `UpdateDeprecatedJointDofOrder` collects deprecated per-axis attributes, builds token array, and removes old attributes
+
+## [4.0.6] - 2026-02-23
+### Added
+- Schema diagram generation script
+- Extended test coverage for schema enums, internal helpers, and parsing utilities
+
+## [4.0.5] - 2026-01-28
+### Added
+- Loop detector on parsing of joints
+- Missing SiteAPI functions
+- Verify if all found links and joints are added to the schema
+- Detect and Create SiteAPIs when applying robot schema
+- Update Robot Schema relationships with missing links and joints
+
+### Changed
+- Updated deprecated schema checker and fixer
+
+## [4.0.4] - 2025-12-18
+### Changed
+- Update parsing of all robot joints and links
+
+## [4.0.3] - 2025-12-16
+### Changed
+- Add source link in compute backwards bodies from joint
+
+## [4.0.2] - 2025-12-07
+### Changed
+- Add missing docstrings
+
+## [4.0.1] - 2025-11-26
+### Changed
+- Fixed parsing of robot tree to ignore bodies in joints that are not rigid bodies
+
+## [4.0.0] - 2025-11-14
+### Changed
+- Updated Robot Schema definitions:
+   - Removed Attributes for DofOrder
+   - Created DofOrderOP list to be used with DofType tokens
+- Updated Add RobotAPI util such that it automatically scans the robot prim for Links and joints and populates it in the traversal order
+
+## [3.6.2] - 2025-11-07
+### Changed
+- Update to Kit 109 and Python 3.12
+
+## [3.6.1] - 2025-10-30
+### Changed
+- Fixed issue in `__init__.py` with running with `coverage.py`
+
 ## [3.6.0] - 2025-07-10
 ### Added
 - Added `robot_type`, `license`, `version`, `source`, and `changelog` to the Isaac Robot API.
@@ -22,7 +98,7 @@
 
 ## [3.4.0] - 2025-05-09
 ### Changed
-- fixed minor errors on Applying surface gripper API types
+- Fixed minor errors on Applying surface gripper API types
 
 ### Added
 - Added Robot Parsing Utils to generate  Robot Kinematic tree based on the joints available on the schema and their parent-child relationships.
@@ -76,12 +152,12 @@
 
 ## [3.1.1] - 2024-11-12
 ### Changed
-- minor update to Robot Schema
+- Minor update to Robot Schema
 
 ## [3.1.0] - 2024-10-31
 ### Added
 - First Version of Robot schema as a codeless implementation
-- a few utilities in a c header and python utils fashion to deal with the codeless schema
+- A few utilities in a c header and python utils fashion to deal with the codeless schema
 
 ## [3.0.1] - 2024-10-24
 ### Changed
@@ -111,7 +187,7 @@
 
 ## [1.1.0] - 2023-01-21
 ### Added
-- named Override Attribute
+- Named Override Attribute
 
 ## [1.0.0] - 2022-09-29
 ### Removed

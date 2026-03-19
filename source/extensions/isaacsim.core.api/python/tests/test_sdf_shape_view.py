@@ -18,10 +18,10 @@ import asyncio
 import carb
 import numpy as np
 import omni.kit.test
-import torch
 import warp as wp
 from isaacsim.core.api import World
 from isaacsim.core.api.objects import DynamicCuboid
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import SdfShapePrim
 from isaacsim.core.utils.stage import create_new_stage_async, update_stage_async
 from isaacsim.core.utils.torch.rotations import euler_angles_to_quats as euler_angles_to_quats_torch
@@ -29,6 +29,8 @@ from isaacsim.core.utils.warp.rotations import euler_angles_to_quats as euler_an
 from omni.physx.scripts import physicsUtils
 
 from .common import CoreTestCase
+
+torch = import_module("torch")
 
 default_sim_params = {
     ### Per-scene settings

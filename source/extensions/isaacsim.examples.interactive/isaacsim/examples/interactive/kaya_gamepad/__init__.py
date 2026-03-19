@@ -13,5 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Interactive example demonstrating gamepad control of a NVIDIA Kaya robot in Isaac Sim."""
+
+
 from isaacsim.examples.interactive.kaya_gamepad.kaya_gamepad import KayaGamepad
 from isaacsim.examples.interactive.kaya_gamepad.kaya_gamepad_extension import KayaGamepadExtension
+
+__all__ = ["KayaGamepad"]

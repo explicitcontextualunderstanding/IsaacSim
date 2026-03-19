@@ -14,6 +14,9 @@
 # limitations under the License.
 
 
+"""Extension that provides a user interface for grasping functionality within Isaac Sim."""
+
+
 import omni.ext
 from omni.kit.menu.utils import MenuHelperExtensionFull
 
@@ -21,10 +24,26 @@ from .grasping_window import GraspingWindow
 
 
 class GraspingUIExtension(omni.ext.IExt, MenuHelperExtensionFull):
+    """Extension that provides a user interface for grasping functionality within Isaac Sim.
+
+    This extension creates a dedicated window accessible through the Tools/Replicator menu that enables
+    users to interact with grasping-related features and workflows. The extension integrates with the
+    Omniverse Kit SDK menu system to provide seamless access to grasping tools and configurations.
+    """
+
     WINDOW_NAME = "Grasping"
+    """Name of the grasping window."""
     MENU_GROUP = "Tools/Replicator"
+    """Menu group path where the grasping window appears in the interface."""
 
     def on_startup(self, ext_id: str):
+        """Initialize the Grasping extension UI.
+
+        Sets up the menu item and window for the Grasping tool in the Tools/Replicator menu group.
+
+        Args:
+            ext_id: The extension ID provided by the extension system.
+        """
         self.menu_startup(
             lambda: GraspingWindow(title=self.WINDOW_NAME),
             self.WINDOW_NAME,
@@ -33,4 +52,8 @@ class GraspingUIExtension(omni.ext.IExt, MenuHelperExtensionFull):
         )
 
     def on_shutdown(self):
+        """Clean up the Grasping extension UI.
+
+        Removes the menu item and closes any open Grasping windows.
+        """
         self.menu_shutdown()

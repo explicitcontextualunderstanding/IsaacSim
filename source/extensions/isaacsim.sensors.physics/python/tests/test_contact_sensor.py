@@ -14,13 +14,11 @@
 # limitations under the License.
 
 import asyncio
-import sys
 
 import carb.tokens
+import isaacsim.core.experimental.utils.stage as stage_utils
 import numpy as np
 import omni
-import omni.graph.action
-import omni.graph.core as og
 import omni.isaac.IsaacSensorSchema as sensorSchema
 import omni.kit.commands
 
@@ -28,17 +26,16 @@ import omni.kit.commands
 #   omni.kit.test - std python's unittest module with additional wrapping to add suport for async/await tests
 #   For most things refer to unittest docs: https://docs.python.org/3/library/unittest.html
 import omni.kit.test
-import usdrt.Sdf
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid
-from isaacsim.core.api.objects.ground_plane import GroundPlane
-from isaacsim.core.api.physics_context import PhysicsContext
-from isaacsim.core.prims import RigidPrim, SingleRigidPrim, SingleXFormPrim
-from isaacsim.core.utils.physics import simulate_async
-from isaacsim.core.utils.prims import add_reference_to_stage, delete_prim
+import omni.timeline
+from isaacsim.core.experimental.objects import Cube, GroundPlane
+from isaacsim.core.experimental.prims import GeomPrim, RigidPrim, XformPrim
+from isaacsim.core.experimental.utils.stage import add_reference_to_stage
+from isaacsim.core.simulation_manager import SimulationManager
 from isaacsim.sensors.physics import ContactSensor, _sensor
 from isaacsim.storage.native import get_assets_root_path_async
 from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
+
+from .common import AntConfig, reset_timeline, setup_ant_scene, step_simulation
 
 # Having a test class dervived from omni.kit.test.AsyncTestCase declared on the root of module will make it auto-discoverable by omni.kit.test
 
@@ -69,52 +66,46 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
     async def setUp(self):
         # This needs to be set so that kit updates match physics updates
         self._physics_rate = 60
-
         self._cs = _sensor.acquire_contact_sensor_interface()
-
-        self.leg_paths = ["/Ant/Arm_{:02d}/Lower_Arm".format(i + 1) for i in range(4)]
-
-        # sensor offset from the center of the leg, have to consider parent scaling.
-        self.sensor_offsets = [Gf.Vec3d(40, 0, 0), Gf.Vec3d(40, 0, 0), Gf.Vec3d(40, 0, 0), Gf.Vec3d(40, 0, 0)]
-
-        # colors for the sensor visualization (r,g,b,a)
-        self.color = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1), (1, 1, 0, 1)]
-
-        self.shoulder_joints = ["/Ant/Arm_{:02d}/Upper_Arm/shoulder_joint".format(i + 1) for i in range(4)]
-
-        self.lower_joints = ["{}/lower_arm_joint".format(i) for i in self.leg_paths]
-        self._sensor_handles = [0 for i in range(4)]
+        self._timeline = omni.timeline.get_timeline_interface()
+        self._ant_config = None
 
         self._assets_root_path = await get_assets_root_path_async()
         if self._assets_root_path is None:
             carb.log_error("Could not find Isaac Sim assets folder")
             return
 
-        await omni.usd.get_context().open_stage_async(
-            self._assets_root_path + "/Isaac/Robots/IsaacSim/Ant/ant_colored.usd"
-        )
+    async def _setup_ant(self):
+        """Load the ant scene and configure ant-specific test data."""
+        self._ant_config = await setup_ant_scene(self._physics_rate)
+        self._stage = stage_utils.get_current_stage()
 
-        self._stage = omni.usd.get_context().get_stage()
-        await omni.kit.app.get_app().next_update_async()
+    # Convenience properties for ant configuration
+    @property
+    def leg_paths(self):
+        return self._ant_config.leg_paths
 
-        self.my_world = World(
-            stage_units_in_meters=1.0, physics_dt=1.0 / self._physics_rate, rendering_dt=1.0 / self._physics_rate
-        )
-        await self.my_world.initialize_simulation_context_async()
-        pass
+    @property
+    def sensor_offsets(self):
+        return self._ant_config.sensor_offsets
+
+    @property
+    def color(self):
+        return self._ant_config.colors
 
     # After running each test
     async def tearDown(self):
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.stop()
-        self.my_world.clear_instance()
+        if self._timeline.is_playing():
+            self._timeline.stop()
+        SimulationManager.invalidate_physics()
         while omni.usd.get_context().get_stage_loading_status()[2] > 0:
             carb.log_warn("tearDown, assets still loading, waiting to finish...")
             await asyncio.sleep(1.0)
         await omni.kit.app.get_app().next_update_async()
-        pass
 
-    async def test_add_sensor_prim(self):
+    async def _add_sensor_prims(self):
+        """Helper to add contact sensors to ant legs. Requires ant to be loaded."""
         self.sensorGeoms = []
         for i in range(4):
             result, sensor = omni.kit.commands.execute(
@@ -131,7 +122,11 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             self.sensorGeoms.append(sensor)
             self.assertTrue(result)
             self.assertIsNotNone(sensor)
-        pass
+
+    async def test_add_sensor_prim(self):
+        """Ensure contact sensors can be created on ant legs."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
 
     # test plan:
     # move the ground to -10, simulate 10 steps, test for no contact
@@ -139,13 +134,15 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
     # test raw contact value, z-normal ~ 1.0
     # move teh ground to -15, simulate 30 steps, test for no contact
     async def test_lost_contacts(self):
-        await self.test_add_sensor_prim()
+        """Validate contact detection when ground moves in/out of reach."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
         xform = UsdGeom.Xformable(self._stage.GetPrimAtPath("/World/GroundPlane"))
         xform_op = xform.GetOrderedXformOps()[0]
         xform_op.Set(Gf.Vec3d(0, 0, -10))
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
         await omni.kit.app.get_app().next_update_async()  # ant should be in the air and have no contact
         contacts_raw = self._cs.get_contact_sensor_raw_data(self.leg_paths[0] + "/sensor")
         self.assertEqual(len(contacts_raw), 0)
@@ -153,7 +150,7 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         xform = UsdGeom.Xformable(self._stage.GetPrimAtPath("/World/GroundPlane"))
         xform_op = xform.GetOrderedXformOps()[0]
         xform_op.Set(Gf.Vec3d(0, 0, -0.78))
-        await simulate_async(1)  # simulate 60 steps, ant should touch ground
+        await step_simulation(1)  # simulate 60 steps, ant should touch ground
         contacts_raw = self._cs.get_contact_sensor_raw_data(self.leg_paths[0] + "/sensor")
         self.assertEqual(len(contacts_raw), 1)
 
@@ -162,48 +159,54 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         body1 = self._cs.decode_body_name(c["body1"])
         if self.leg_paths[0] not in [body0, body1]:
             self.fail("Raw contact does not contain queried body {} ({},{})".format(self.leg_paths[0], body0, body1))
-        self.assertAlmostEqual(1.0, c["normal"]["z"], delta=6)
+        self.assertAlmostEqual(1.0, c["normal"]["z"], delta=0.1)
         # # print(c)
 
         # move the ground to lose the contacts
         xform = UsdGeom.Xformable(self._stage.GetPrimAtPath("/World/GroundPlane"))
         xform_op = xform.GetOrderedXformOps()[0]
         xform_op.Set(Gf.Vec3d(0, 0, -15))
-        await simulate_async(0.5)
+        await step_simulation(0.5)
         contacts_raw = self._cs.get_contact_sensor_raw_data(self.leg_paths[0] + "/sensor")
         self.assertEqual(len(contacts_raw), 0)
 
     async def test_get_body_raw_data(self):
+        """Test raw contact data retrieval between rigid bodies without using ant."""
+        await stage_utils.create_new_stage_async()
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        SimulationManager.setup_simulation(dt=1.0 / self._physics_rate)
 
-        delete_prim("/Ant")
+        # Create ground plane for the blocks to land on
+        GroundPlane("/World/GroundPlane", sizes=10.0)
+
         block_0_prim = add_reference_to_stage(
-            prim_path="/World/block_0", usd_path=self._assets_root_path + "/Isaac/Props/Blocks/basic_block.usd"
+            usd_path=self._assets_root_path + "/Isaac/Props/Blocks/basic_block.usd", path="/World/block_0"
         )
-        block_0 = SingleRigidPrim(
-            prim_path="/World/block_0/Cube", name="block_0", position=np.array([10, 0, 5.0]), scale=np.ones(3) * 1.0
+        block_0 = RigidPrim(
+            "/World/block_0/Cube", positions=[10, 0, 5.0], scales=np.ones(3) * 1.0, reset_xform_op_properties=True
         )
-        PhysxSchema.PhysxContactReportAPI.Apply(block_0.prim)
+        PhysxSchema.PhysxContactReportAPI.Apply(block_0.prims[0])
 
         block_1_prim = add_reference_to_stage(
-            prim_path="/World/block_1", usd_path=self._assets_root_path + "/Isaac/Props/Blocks/basic_block.usd"
+            usd_path=self._assets_root_path + "/Isaac/Props/Blocks/basic_block.usd", path="/World/block_1"
         )
-        block_1 = SingleRigidPrim(
-            prim_path="/World/block_1/Cube", name="block_1", position=np.array([10, 0, 10.0]), scale=np.ones(3) * 1.0
+        block_1 = RigidPrim(
+            "/World/block_1/Cube", positions=[10, 0, 10.0], scales=np.ones(3) * 1.0, reset_xform_op_properties=True
         )
-        PhysxSchema.PhysxContactReportAPI.Apply(block_1.prim)
+        PhysxSchema.PhysxContactReportAPI.Apply(block_1.prims[0])
 
         def block_1_is_contacting_block_0():
-            raw_data = self._cs.get_rigid_body_raw_data(block_1.prim_path)
+            raw_data = self._cs.get_rigid_body_raw_data(block_1.paths[0])
             in_contact = False
             for c in raw_data:
-                if block_0.prim_path in {self._cs.decode_body_name(c["body0"]), self._cs.decode_body_name(c["body1"])}:
+                if block_0.paths[0] in {self._cs.decode_body_name(c["body0"]), self._cs.decode_body_name(c["body1"])}:
                     in_contact = True
                     break
 
             return in_contact
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
 
         count = 0
 
@@ -214,10 +217,12 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         self.assertTrue(count < 500)
 
     async def test_get_raw_data(self):
-        await self.test_add_sensor_prim()
+        """Validate raw contact data from a sensor when the ant contacts ground."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
-        await simulate_async(1)  # simulate 60 steps, ant should touch ground
+        self._timeline.play()
+        await step_simulation(1)  # simulate 60 steps, ant should touch ground
         contacts_raw = self._cs.get_contact_sensor_raw_data(self.leg_paths[0] + "/sensor")
         self.assertEqual(len(contacts_raw), 1)
 
@@ -226,13 +231,15 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         body1 = self._cs.decode_body_name(c["body1"])
         if self.leg_paths[0] not in [body0, body1]:
             self.fail("Raw contact does not contain queried body {} ({},{})".format(self.leg_paths[0], body0, body1))
-        self.assertAlmostEqual(1.0, c["normal"]["z"], delta=6)
+        self.assertAlmostEqual(1.0, c["normal"]["z"], delta=0.1)
         ## print(c)
 
     async def test_persistent_raw_data(self):
-        await self.test_add_sensor_prim()
-        self.my_world.play()
-        await simulate_async(2.0)  # simulate long enough that physx stops sending persistent contact raw data
+        """Ensure raw contact data remains available during persistent contacts."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
+        self._timeline.play()
+        await step_simulation(2.0)  # simulate long enough that physx stops sending persistent contact raw data
         contacts_raw = self._cs.get_contact_sensor_raw_data(self.leg_paths[0] + "/sensor")
         self.assertEqual(len(contacts_raw), 1)
 
@@ -245,10 +252,12 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         ## print(c)
 
     async def test_delayed_get_sensor_reading(self):
-        await self.test_add_sensor_prim()
+        """Compare delayed sensor readings against raw impulse-derived force."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
-        await simulate_async(1.0)
+        self._timeline.play()
+        await step_simulation(1.0)
 
         for i in range(120):
             await omni.kit.app.get_app().next_update_async()
@@ -269,37 +278,10 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         else:
             # No contact, reading should be zero
             self.assertEqual(sensor_reading.value, 0)
-        pass
-
-    # async def test_compare_sensor_force_to_mass(self):
-    #     cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 0), physics=True, mass = 10)
-
-    #     # create fully body sensor (radius -1)
-    #     _, (result, sensor) =  omni.kit.commands.execute(
-    #         "IsaacSensorCreateContactSensor",
-    #         path="/sensor",
-    #         parent="/cube",
-    #         min_threshold=0,
-    #         max_threshold=10000000,
-    #         color=(1, 1, 1, 1),
-    #         radius=-1,
-    #         sensor_period=-1,
-    #     )
-    #     self.assertTrue(result)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-    #     await simulate_async(1.5)
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #     self.assertEqual(len(sensor_reading), 1)
-    #     sensor_reading = sensor_reading[0]
-    #     self.assertAlmostEqual(sensor_reading["value"], mass * 9.81, 1)
-    #     pass
 
     async def test_contact_outside_range(self):
+        """Ensure sensors out of contact range report zero readings."""
+        await self._setup_ant()
         self.sensorGeoms = []
 
         # create 4 sensors at the center of the leg
@@ -320,17 +302,18 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             self.assertIsNotNone(sensor)
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
-        await simulate_async(1)
+        self._timeline.play()
+        await step_simulation(1)
 
         for i in range(40):
             await omni.kit.app.get_app().next_update_async()
             sensor_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/sensor")
             self.assertTrue(sensor_reading.is_valid)
             self.assertEqual(sensor_reading.value, 0)
-        pass
 
     async def test_sensor_period(self):
+        """Verify sensor outputs update at the configured frequency."""
+        await self._setup_ant()
         # create four sensors that run at 30hz
         for i in range(4):
             result, sensor = omni.kit.commands.execute(
@@ -348,9 +331,9 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             self.assertIsNotNone(sensor)
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
         # give it some time to reach the ground first
-        await simulate_async(1.5)
+        await step_simulation(1.5)
         await omni.kit.app.get_app().next_update_async()
         readings = []
 
@@ -369,458 +352,34 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         # tolerance +-1 reading (29, 30, 31 will be accepted)
         # print(len(readings))
         self.assertTrue(abs(len(readings) - 30) <= 1)
-        pass
 
     async def test_stop_start(self):
-        await self.test_add_sensor_prim()
+        """Verify sensor readings are consistent across timeline stop/start."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
 
         await omni.kit.app.get_app().next_update_async()
 
-        self.my_world.play()
+        self._timeline.play()
+        await step_simulation(0.5)
 
-        first = True
-        for i in range(200):
-            await omni.kit.app.get_app().next_update_async()
-            sensor_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/sensor")
-            # print(
-            #     "sensor_reading: "
-            #     + str(sensor_reading.in_contact)
-            #     + " "
-            #     + str(sensor_reading.value)
-            #     + " "
-            #     + str(sensor_reading.time)
-            # )
+        init_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/sensor")
 
-            if first:
-                init_reading = sensor_reading
-                # print(
-                #     "init_reading: "
-                #     + str(init_reading.in_contact)
-                #     + " "
-                #     + str(init_reading.value)
-                #     + " "
-                #     + str(init_reading.time)
-                # )
-                first = False
-
-        self.my_world.stop()
+        self._timeline.stop()
         await omni.kit.app.get_app().next_update_async()
 
-        self.my_world.play()
-        await omni.kit.app.get_app().next_update_async()
+        self._timeline.play()
+        await step_simulation(0.5)
 
         sensor_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/sensor")
-
-        # print(
-        #     "sensor_reading: "
-        #     + str(sensor_reading.in_contact)
-        #     + " "
-        #     + str(sensor_reading.value)
-        #     + " "
-        #     + str(sensor_reading.time)
-        # )
 
         self.assertEqual(init_reading.in_contact, sensor_reading.in_contact)
         self.assertEqual(init_reading.value, sensor_reading.value)
         self.assertEqual(init_reading.time, sensor_reading.time)
 
-    pass
-
-    # number of readings aggregated from node is same as number output from sensor
-
-    # if time permits, add currently in contact with functionality to contact sensor node
-
-    async def test_node_outputs_reset(self):
-        # add a single contact sensor
-        result, sensor = omni.kit.commands.execute(
-            "IsaacSensorCreateContactSensor",
-            path="/sensor",
-            parent=self.leg_paths[0],
-            min_threshold=0,
-            max_threshold=10000000,
-            color=self.color[0],
-            radius=0.12,
-            sensor_period=-1,
-            translation=self.sensor_offsets[0],
-        )
-        self.assertTrue(result)
-        self.assertIsNotNone(sensor)
-
-        await omni.kit.app.get_app().next_update_async()
-
-        (graph, (tick_node, test_node), _, _) = og.Controller.edit(
-            {"graph_path": "/controller_graph", "evaluator_name": "execution"},
-            {
-                og.Controller.Keys.CREATE_NODES: [
-                    ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
-                    ("IsaacReadContactSensor", "isaacsim.sensors.physics.IsaacReadContactSensor"),
-                ],
-                og.Controller.Keys.SET_VALUES: [
-                    ("IsaacReadContactSensor.inputs:csPrim", [usdrt.Sdf.Path(self.leg_paths[0] + "/sensor")]),
-                ],
-                og.Controller.Keys.CONNECT: [("OnPlaybackTick.outputs:tick", "IsaacReadContactSensor.inputs:execIn")],
-            },
-        )
-
-        await omni.kit.app.get_app().next_update_async()
-
-        out_in_contact = og.Controller.attribute("outputs:inContact", test_node)
-        out_value = og.Controller.attribute("outputs:value", test_node)
-
-        first = True
-        for i in range(5):
-            self.my_world.play()
-
-            await omni.kit.app.get_app().next_update_async()
-
-            curr_in_contact = og.DataView.get(out_in_contact)
-            curr_value = og.DataView.get(out_value)
-
-            await omni.kit.app.get_app().next_update_async()
-
-            # print(curr_in_contact)
-            # print(curr_value)
-
-            if first:
-                init_in_contact = curr_in_contact
-                init_value = curr_value
-
-            await simulate_async(1.0)
-
-            self.my_world.stop()
-            await omni.kit.app.get_app().next_update_async()
-
-            if not first:
-                self.assertEqual(init_in_contact, curr_in_contact)
-                self.assertEqual(init_value, curr_value)
-            first = False
-
-        self.my_world.stop()
-
-        pass
-
-    async def test_node_nonzero_outputs(self):
-        await self.test_add_sensor_prim()
-        await omni.kit.app.get_app().next_update_async()
-
-        (graph, (tick_node, test_node), _, _) = og.Controller.edit(
-            {"graph_path": "/controller_graph", "evaluator_name": "execution"},
-            {
-                og.Controller.Keys.CREATE_NODES: [
-                    ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
-                    ("IsaacReadContactSensor", "isaacsim.sensors.physics.IsaacReadContactSensor"),
-                ],
-                og.Controller.Keys.SET_VALUES: [
-                    ("IsaacReadContactSensor.inputs:csPrim", [usdrt.Sdf.Path(self.leg_paths[0] + "/sensor")]),
-                ],
-                og.Controller.Keys.CONNECT: [("OnPlaybackTick.outputs:tick", "IsaacReadContactSensor.inputs:execIn")],
-            },
-        )
-
-        await omni.kit.app.get_app().next_update_async()
-
-        out_in_contact = og.Controller.attribute("outputs:inContact", test_node)
-        out_value = og.Controller.attribute("outputs:value", test_node)
-
-        self.my_world.play()
-
-        await simulate_async(1.0)
-
-        for i in range(10):
-            await omni.kit.app.get_app().next_update_async()
-            # # print(og.DataView.get(out_in_contact))
-            # # print(og.DataView.get(out_value))
-            self.assertNotEqual(og.DataView.get(out_in_contact), 0)
-            self.assertNotEqual(og.DataView.get(out_value), 0)
-
-        self.my_world.stop()
-
-        pass
-
-    # async def test_ant_not_touching_restart(self):
-    #     await self.test_add_sensor_prim()
-
-    #     # cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 10), physics=True, mass=10)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-
-    #     for i in range(10):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         pre_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/sensor")
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-
-    #     for i in range(10):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         post_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/sensor")
-
-    #     self.assertEqual(pre_reading.in_contact, 0)
-    #     self.assertEqual(post_reading.in_contact, 0)
-
-    #     pass
-
-    # async def test_cubes_not_touching_restart(self):
-    #     # TODO: not working on windows:
-    #     if sys.platform == "win32":
-    #         return
-    #     # print("before cube add")
-
-    #     cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 10), physics=True, mass=10)
-    #     cube_prim2 = await add_cube(self._stage, "/cube2", 1, (5, 2, 10), physics=True, mass=10)
-
-    #     # print("before contact sensor create")
-    #     await omni.kit.app.get_app().next_update_async()
-    #     # create fully body sensor (radius -1)
-    #     result, sensor = omni.kit.commands.execute(
-    #         "IsaacSensorCreateContactSensor",
-    #         path="/sensor",
-    #         parent="/cube",
-    #         min_threshold=0,
-    #         max_threshold=10000000,
-    #         color=(1, 1, 1, 1),
-    #         radius=-1,
-    #         sensor_period=-1,
-    #     )
-    #     self.assertTrue(result)
-    #     self.assertIsNotNone(sensor)
-
-    #     # print("before refresh")
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     # print("before play")
-    #     self.my_world.play()
-
-    #     # print("before loop")
-    #     for i in range(30):  # Simulate for one second
-    #         await omni.kit.app.get_app().next_update_async()
-    #         # print("before reading")
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-    #     # print("TIMELINE RESTARTED")
-
-    #     for i in range(30):  # Simulate for one second
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     pass
-
-    # async def test_ant_not_touching_then_touching_restart(self):
-    #     await self.test_add_sensor_prim()
-
-    #     # the cubes may cause the ant to bounce
-    #     # cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 10), physics=True, mass=10)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-
-    #     for i in range(10):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         pre_reading = self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     # cube_prim3 = await add_cube(self._stage, "/cube3", 1, (0, 0, 2), physics=True, mass=10)
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-
-    #     for i in range(30):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         post_reading = self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]
-
-    #     self.assertEqual(pre_reading["inContact"], 0)
-    #     self.assertEqual(post_reading["inContact"], 1)
-    #     self.my_world.stop()
-
-    #     pass
-
-    # async def test_cubes_not_touching_then_touching_restart(self):
-    #     # TODO: not working on windows:
-    #     if sys.platform == "win32":
-    #         return
-    #     cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 10), physics=True, mass=10)
-    #     cube_prim2 = await add_cube(self._stage, "/cube2", 1, (5, 2, 10), physics=True, mass=10)
-
-    #     # create fully body sensor (radius -1)
-    #     result, sensor = omni.kit.commands.execute(
-    #         "IsaacSensorCreateContactSensor",
-    #         path="/sensor",
-    #         parent="/cube",
-    #         min_threshold=0,
-    #         max_threshold=10000000,
-    #         color=(1, 1, 1, 1),
-    #         radius=-1,
-    #         sensor_period=-1,
-    #     )
-    #     self.assertTrue(result)
-    #     self.assertIsNotNone(sensor)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-
-    #     for i in range(30):  # Simulate for one second
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     cube_prim3 = await add_cube(self._stage, "/cube3", 1, (2, 3, 0), physics=True, mass=10)
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-    #     # print("TIMELINE RESTARTED")
-    #     for i in range(30):  # Simulate for one second
-
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     pass
-
-    # async def test_ant_touching_restart(self):
-    #     await self.test_add_sensor_prim()
-    #     # cube_prim = await add_cube(self._stage, "/cube", 1, (0, 0, 1), physics=True, mass=10)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-
-    #     for i in range(30):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         pre_reading = self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-
-    #     first = True
-    #     for i in range(30):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         if first:
-    #             self.assertEqual(self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]["inContact"], False)
-    #         post_reading = self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]
-    #         first = False
-
-    #     self.assertEqual(pre_reading["inContact"], 1)
-    #     self.assertEqual(post_reading["inContact"], 1)
-
-    #     pass
-
-    # async def test_cubes_touching_restart(self):
-    #     # TODO: not working on windows:
-    #     if sys.platform == "win32":
-    #         return
-    #     cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 0), physics=True, mass=10)
-    #     cube_prim2 = await add_cube(self._stage, "/cube2", 1, (2, 3, 0), physics=True, mass=10)
-    #     await omni.kit.app.get_app().next_update_async()
-    #     # create fully body sensor (radius -1)
-    #     result, sensor = omni.kit.commands.execute(
-    #         "IsaacSensorCreateContactSensor",
-    #         path="/sensor",
-    #         parent="/cube",
-    #         min_threshold=0,
-    #         max_threshold=10000000,
-    #         color=(1, 1, 1, 1),
-    #         radius=-1,
-    #         sensor_period=-1,
-    #     )
-    #     self.assertTrue(result)
-    #     self.assertIsNotNone(sensor)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-
-    #     for i in range(30):  # Simulate for one second
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     await omni.kit.app.get_app().next_update_async()
-    #     self.my_world.play()
-    #     # print("TIMELINE RESTARTED")
-    #     for i in range(30):  # Simulate for one second
-
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     pass
-
-    # async def test_ant_touching_then_not_touching_restart(self):
-    #     await self.test_add_sensor_prim()
-    #     # cube_prim = await add_cube(self._stage, "/cube", 1, (0, 0, 1), physics=True, mass=10)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-
-    #     for i in range(30):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         pre_reading = self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     # delete_prim("/cube")
-
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-
-    #     first = True
-    #     for i in range(10):
-    #         await omni.kit.app.get_app().next_update_async()
-    #         if first:
-    #             self.assertEqual(self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]["inContact"], False)
-    #             first = False
-
-    #         post_reading = self._cs.get_sensor_readings(self.leg_paths[0] + "/sensor")[-1]
-
-    #     self.assertEqual(pre_reading["inContact"], 1)
-    #     self.assertEqual(post_reading["inContact"], 0)
-
-    #     pass
-
     async def test_sensor_latest_data(self):
+        """Ensure latest-data reads return monotonically increasing times."""
+        await self._setup_ant()
         # create four sensors that run at 30hz
         for i in range(4):
             result, sensor = omni.kit.commands.execute(
@@ -838,10 +397,9 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             self.assertIsNotNone(sensor)
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
         # give it some time to reach the ground first
         await omni.kit.app.get_app().next_update_async()
-        readings = []
         old_time = -1
 
         for i in range(10):  # Simulate for 10 steps
@@ -850,26 +408,26 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
 
             self.assertTrue(latest_sensor_reading.time > old_time)
             old_time = latest_sensor_reading.time
-        pass
 
     async def test_wrong_sensor_path(self):
-        await self.test_add_sensor_prim()
+        """Ensure invalid sensor paths return invalid readings."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
         # give it some time to reach the ground first
         await omni.kit.app.get_app().next_update_async()
-        readings = []
-
         for i in range(10):  # Simulate for 10 steps
             await omni.kit.app.get_app().next_update_async()
             latest_sensor_reading = self._cs.get_sensor_reading(self.leg_paths[0] + "/wrong_sensor", True)
 
             self.assertFalse(latest_sensor_reading.is_valid)
             self.assertEqual(latest_sensor_reading.time, 0)
-        pass
 
     async def test_sensor_threshold(self):
-        await self.test_add_sensor_prim()
+        """Verify min/max thresholds gate contact readings as expected."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
         await omni.kit.app.get_app().next_update_async()
 
         # note, expected reading is around 0.57
@@ -893,9 +451,9 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             self.assertIsNotNone(sensor)
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
         # give it some time to reach the ground first
-        await simulate_async(1.0)
+        await step_simulation(1.0)
 
         sensor_0 = self._cs.get_sensor_reading(self.leg_paths[0] + "/custom_sensor")  # expect contact
         sensor_1 = self._cs.get_sensor_reading(self.leg_paths[1] + "/custom_sensor")  # expect no contact
@@ -911,16 +469,18 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
         self.assertGreater(float(sensor_2.value), 0.1)
         self.assertAlmostEqual(float(sensor_3.value), 0.1, delta=1e-5)
 
-        pass
-
     async def test_sensor_with_skip_parents(self):
-        await self.test_add_sensor_prim()
+        """Verify sensors work when inserted under intermediate Xform prims."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
         await omni.kit.app.get_app().next_update_async()
 
         # create four sensors with in an Xform. The offset needed to reach the tip of the leg is (40,0,0)
         # Break this down to (20,0,0) to the xform, (20,0,0) to the sensor.
         for i in range(4):
-            xform = SingleXFormPrim(self.leg_paths[i] + "/xform", translation=Gf.Vec3d(20, 0, 0))
+            xform_path = self.leg_paths[i] + "/xform"
+            stage_utils.define_prim(xform_path, "Xform")
+            xform = XformPrim(xform_path, translations=[20, 0, 0], reset_xform_op_properties=True)
 
             result, sensor = omni.kit.commands.execute(
                 "IsaacSensorCreateContactSensor",
@@ -937,99 +497,43 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             self.assertIsNotNone(sensor)
 
         await omni.kit.app.get_app().next_update_async()
-        self.my_world.play()
+        self._timeline.play()
         # give it some time to reach the ground first
-        await simulate_async(1.0)
+        await step_simulation(1.0)
 
         # all four sensors should have proper reading
         for i in range(4):
             sensor_reading = self._cs.get_sensor_reading(self.leg_paths[i] + "/xform/custom_sensor")  # expect contact
             self.assertTrue(sensor_reading.inContact)
             self.assertGreater(float(sensor_reading.value), 0.1)
-        pass
-
-    # async def test_cubes_touching_then_not_touching_restart(self):
-    #     # TODO: not working on windows:
-    #     if sys.platform == "win32":
-    #         return
-    #     cube_prim = await add_cube(self._stage, "/cube", 1, (2, 2, 0), physics=True, mass=10)
-    #     cube_prim2 = await add_cube(self._stage, "/cube2", 1, (2, 3, 0), physics=True, mass=10)
-
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     # create fully body sensor (radius -1)
-    #     result, sensor = omni.kit.commands.execute(
-    #         "IsaacSensorCreateContactSensor",
-    #         path="/sensor",
-    #         parent="/cube",
-    #         min_threshold=0,
-    #         max_threshold=10000000,
-    #         color=(1, 1, 1, 1),
-    #         radius=-1,
-    #         sensor_period=-1,
-    #     )
-
-    #     self.assertTrue(result)
-    #     self.assertIsNotNone(sensor)
-
-    #     # need this sync to add the cube into the physics engine
-    #     await omni.kit.app.get_app().next_update_async()
-    #     # print("next update fail")
-
-    #     self.my_world.play()
-    #     # print("timeline play fail")
-
-    #     for i in range(30):  # Simulate for one second
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-
-    #         # print("sensor reading: " + str(sensor_reading))
-    #         # sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #         # # print("sensor sim: " + str(sensor_sim))
-
-    #     self.my_world.stop()
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     delete_prim("/cube2")
-
-    #     await omni.kit.app.get_app().next_update_async()
-
-    #     self.my_world.play()
-    #     # print("TIMELINE RESTARTED")
-    #     for i in range(30):  # Simulate for one second
-
-    #         await omni.kit.app.get_app().next_update_async()
-    #         sensor_reading = self._cs.get_sensor_readings("/cube/sensor")
-    #         # print("sensor reading: " + str(sensor_reading))
-    #     #           sensor_sim = self._cs.get_sensor_sim_reading("/cube/sensor")
-    #     #            # print("sensor sim: " + str(sensor_sim))
-
-    #     pass
 
     async def test_stacked_cubes_contact_forces(self):
         """Test contact sensor force calculations with stacked cubes in equilibrium."""
-
-        self.my_world = World(stage_units_in_meters=1.0, backend="torch")
-        physics_context = PhysicsContext()
-        GroundPlane(prim_path="/World/groundPlane", size=10, color=np.array([0.5, 0.5, 0.5]))
-        self.my_world._physics_context.set_gravity(-10)
+        await stage_utils.create_new_stage_async()
+        stage_utils.set_stage_units(meters_per_unit=1.0)
+        SimulationManager.setup_simulation(dt=1.0 / 60.0)
+        physics_scene = SimulationManager.get_physics_scenes()[0]
+        GroundPlane("/World/groundPlane", sizes=10.0, colors=[0.5, 0.5, 0.5])
+        physics_scene.set_gravity(Gf.Vec3f(0.0, 0.0, -10.0))
 
         # Create stacked cubes
-        cube = DynamicCuboid(
-            prim_path="/World/Cube",
-            mass=1.0,
-            position=np.array([-20, -0.2, 0.25]),
-            scale=np.array([0.5, 0.5, 0.5]),
-            color=np.array([0.2, 0.3, 0.0]),
+        Cube(
+            "/World/Cube",
+            sizes=1.0,
+            positions=[-20.0, -0.2, 0.25],
+            scales=[0.5, 0.5, 0.5],
         )
+        GeomPrim("/World/Cube", apply_collision_apis=True)
+        RigidPrim("/World/Cube", masses=[1.0])
 
-        cube2 = DynamicCuboid(
-            prim_path="/World/Cube2",
-            mass=1.0,
-            position=np.array([-20, -0.2, 0.75]),
-            scale=np.array([0.5, 0.5, 0.5]),
-            color=np.array([0.0, 0.2, 0.3]),
+        Cube(
+            "/World/Cube2",
+            sizes=1.0,
+            positions=[-20.0, -0.2, 0.75],
+            scales=[0.5, 0.5, 0.5],
         )
+        GeomPrim("/World/Cube2", apply_collision_apis=True)
+        RigidPrim("/World/Cube2", masses=[1.0])
 
         # Create contact sensors
         bottom_sensor = ContactSensor(
@@ -1052,25 +556,20 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             radius=-1,
         )
 
-        # Initialize world
-        self.my_world.reset(soft=False)
+        # Initialize timeline
+        await reset_timeline(self._timeline)
 
         # Allow settling time for cubes to come into contact
-        for _ in range(10):
-            self.my_world.step(render=False)
+        await step_simulation(10 * SimulationManager.get_physics_dt())
 
         # Get latest contact data
         bottom_data = bottom_sensor.get_current_frame()
         top_data = top_sensor.get_current_frame()
 
-        # Print contact forces from sensors
         bottom_force = bottom_data.get("force", 0)
         top_force = top_data.get("force", 0)
         bottom_contacts = bottom_data.get("number_of_contacts", 0)
         top_contacts = top_data.get("number_of_contacts", 0)
-
-        print(f"Bottom cube contact force: {bottom_force:.3f} N")
-        print(f"Top cube contact force: {top_force:.3f} N")
 
         # Validate that contacts are detected
         self.assertTrue(bottom_data.get("in_contact", False), "Bottom cube should be in contact")
@@ -1099,3 +598,73 @@ class TestContactSensor(omni.kit.test.AsyncTestCase):
             delta=expected_force * tolerance,
             msg=f"Top cube force {top_force:.3f} should be approximately {expected_force:.3f} N (m*g)",
         )
+
+    async def test_is_contact_sensor(self):
+        """Test is_contact_sensor returns correct values for valid sensor, invalid prim, and non-existent prim."""
+        await stage_utils.create_new_stage_async()
+        SimulationManager.setup_simulation(dt=1.0 / 60.0)
+
+        # Create a cube with rigid body
+        Cube("/World/Cube", sizes=1.0, positions=[0.0, 0.0, 1.0])
+        GeomPrim("/World/Cube", apply_collision_apis=True)
+        RigidPrim("/World/Cube", masses=[1.0])
+        await omni.kit.app.get_app().next_update_async()
+
+        # Create a contact sensor on the cube
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateContactSensor",
+            path="/contact_sensor",
+            parent="/World/Cube",
+            min_threshold=0,
+            max_threshold=10000000,
+            radius=0.12,
+            sensor_period=-1,
+            translation=Gf.Vec3d(0, 0, 0),
+        )
+        self.assertTrue(result)
+        self.assertIsNotNone(sensor)
+        await omni.kit.app.get_app().next_update_async()
+
+        # Before simulation starts, sensor should not be registered with the manager
+        self.assertFalse(self._cs.is_contact_sensor("/World/Cube/contact_sensor"))
+
+        # Start the timeline to register sensors with the manager
+        self._timeline.play()
+        await omni.kit.app.get_app().next_update_async()
+
+        # After simulation starts, valid contact sensor path should return True
+        self.assertTrue(self._cs.is_contact_sensor("/World/Cube/contact_sensor"))
+
+        # Test invalid prim (cube itself, not a sensor) - should return False
+        self.assertFalse(self._cs.is_contact_sensor("/World/Cube"))
+
+        # Test non-existent prim path - should return False
+        self.assertFalse(self._cs.is_contact_sensor("/World/NonExistent/sensor"))
+
+    async def test_raw_data_all_fields(self):
+        """Validate CsRawData fields include dt and position."""
+        await self._setup_ant()
+        await self._add_sensor_prims()
+        await omni.kit.app.get_app().next_update_async()
+        self._timeline.play()
+        await step_simulation(1.0)
+
+        contacts_raw = self._cs.get_contact_sensor_raw_data(self.leg_paths[0] + "/sensor")
+        self.assertGreater(len(contacts_raw), 0)
+        c = contacts_raw[0]
+
+        self.assertGreater(float(c["dt"]), 0.0)
+        self.assertLessEqual(float(c["dt"]), SimulationManager.get_physics_dt() * 1.1)
+
+        position = c["position"]
+        for axis in ("x", "y", "z"):
+            self.assertTrue(np.isfinite(position[axis]))
+
+    async def test_cs_sensor_reading_defaults(self):
+        """Verify CsSensorReading default construction values."""
+        reading = _sensor.CsSensorReading()
+        self.assertEqual(reading.time, 0.0)
+        self.assertEqual(reading.value, 0.0)
+        self.assertFalse(reading.inContact)
+        self.assertFalse(reading.in_contact)
+        self.assertFalse(reading.is_valid)

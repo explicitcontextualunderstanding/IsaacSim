@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.9.0] - 2026-03-04
+### Changed
+- Added python_api.md
+
+## [1.8.0] - 2026-02-26
+### Added
+- Added "pynvvideocodec==2.1.0"
+
+## [1.7.0] - 2026-01-26
+### Changed
+- Update imageio==2.37.2, scipy==1.17.0, pyyaml==6.0.3, opencv-python-headless==4.13.0.90, trimesh==4.11.1, rtree==1.4.1
+
+## [1.6.5] - 2025-12-17
+### Changed
+- Revert to opencv-python-headless==4.11.0.86
+
+## [1.6.4] - 2025-12-14
+### Changed
+- Update opencv-python-headless==4.12.0.88
+
 ## [1.6.3] - 2025-08-26
 ### Changed
 - Fix yamlimport used in test
@@ -38,7 +58,7 @@
 
 ## [1.4.5] - 2025-01-14
 ### Changed
-- switch to opencv-python-headless==4.9.0.80
+- Switch to opencv-python-headless==4.9.0.80
 
 ## [1.4.4] - 2025-01-13
 ### Changed
@@ -58,7 +78,7 @@
 
 ## [1.4.0] - 2024-07-05
 ### Changed
-- switch to opencv-python==4.9.0.80
+- Switch to opencv-python==4.9.0.80
 
 ## [1.3.1] - 2024-05-16
 ### Fixed
@@ -82,8 +102,8 @@
 ## [1.1.0] - 2023-05-15
 ### Changed
 - Added s3transfer
-- update boto3 to 1.26.63
-- update s3transfer to 0.6.1
+- Update boto3 to 1.26.63
+- Update s3transfer to 0.6.1
 
 ## [1.0.1] - 2023-05-10
 ### Changed

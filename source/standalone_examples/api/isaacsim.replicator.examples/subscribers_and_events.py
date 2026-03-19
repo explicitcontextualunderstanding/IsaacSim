@@ -22,7 +22,7 @@ import time
 import carb.eventdispatcher
 import carb.settings
 import omni.kit.app
-import omni.physx
+import omni.physics.core
 import omni.timeline
 import omni.usd
 from pxr import PhysxSchema, UsdPhysics
@@ -54,19 +54,18 @@ NUM_APP_UPDATES = 100
 VERBOSE = False
 
 
-def on_timeline_event(event: omni.timeline.TimelineEventType):
+def on_timeline_event(event: carb.eventdispatcher.Event):
     global timeline_events
-    if event.type == omni.timeline.TimelineEventType.CURRENT_TIME_TICKED.value:
-        timeline_events.append(event.payload)
-        if VERBOSE:
-            print(f"  [timeline][{len(timeline_events)}] {event.payload}")
-
-
-def on_physics_step(dt: float):
-    global physx_events
-    physx_events.append(dt)
+    timeline_events.append(event)
     if VERBOSE:
-        print(f"  [physics][{len(physx_events)}] dt={dt}")
+        print(f"  [timeline][{len(timeline_events)}] {event}")
+
+
+def on_physics_step(dt, context):
+    global physics_events
+    physics_events.append(dt)
+    if VERBOSE:
+        print(f"  [physics][{len(physics_events)}] dt={dt}")
 
 
 def on_stage_render_event(event: carb.eventdispatcher.Event):
@@ -188,9 +187,15 @@ wall_start_time = time.time()
 # Subscribe to events
 print(f"Subscribing to events...")
 timeline_events = []
-timeline_sub = timeline.get_timeline_event_stream().create_subscription_to_pop(on_timeline_event)
-physx_events = []
-physx_sub = omni.physx.get_physx_interface().subscribe_physics_step_events(on_physics_step)
+timeline_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
+    event_name=omni.timeline.GLOBAL_EVENT_CURRENT_TIME_TICKED,
+    on_event=on_timeline_event,
+    observer_name="subscribers_and_events.on_timeline_event",
+)
+physics_events = []
+physics_sub = omni.physics.core.get_physics_simulation_interface().subscribe_physics_on_step_events(
+    pre_step=False, order=0, on_update=on_physics_step
+)
 stage_render_events = []
 stage_render_sub = carb.eventdispatcher.get_eventdispatcher().observe_event(
     event_name=omni.usd.get_context().stage_rendering_event_name(omni.usd.StageRenderingEventType.NEW_FRAME, True),
@@ -215,18 +220,12 @@ print(f"Finished running the application for {NUM_APP_UPDATES} updates...")
 
 # Stop timeline and unsubscribe from all events
 timeline.stop()
-if app_sub:
-    app_sub.reset()
-    app_sub = None
-if stage_render_sub:
-    stage_render_sub.reset()
-    stage_render_sub = None
-if physx_sub:
-    physx_sub.unsubscribe()
-    physx_sub = None
-if timeline_sub:
-    timeline_sub.unsubscribe()
-    timeline_sub = None
+app_sub = None
+stage_render_sub = None
+if physics_sub:
+    physics_sub.unsubscribe()
+    physics_sub = None
+timeline_sub = None
 
 
 # Print summary statistics
@@ -234,13 +233,13 @@ print("\nStats:")
 print(f"- App updates: {NUM_APP_UPDATES}")
 print(f"- Wall time: {elapsed_wall_time:.4f} seconds")
 print(f"- Timeline events: {len(timeline_events)}")
-print(f"- Physics events: {len(physx_events)}")
+print(f"- Physics events: {len(physics_events)}")
 print(f"- Stage render events: {len(stage_render_events)}")
 print(f"- App update events: {len(app_update_events)}")
 
 # Calculate and display real-time performance factor
-if len(physx_events) > 0:
-    sim_time = sum(physx_events)
+if len(physics_events) > 0:
+    sim_time = sum(physics_events)
     realtime_factor = sim_time / elapsed_wall_time if elapsed_wall_time > 0 else 0
     print(f"- Simulation time: {sim_time:.4f}s")
     print(f"- Real-time factor: {realtime_factor:.2f}x")

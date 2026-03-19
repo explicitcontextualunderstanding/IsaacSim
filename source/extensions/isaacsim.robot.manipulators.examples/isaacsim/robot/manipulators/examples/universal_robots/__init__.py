@@ -14,5 +14,6 @@
 # limitations under the License.
 from isaacsim.robot.manipulators.examples.universal_robots.follow_target_experimental import UR10FollowTarget
 from isaacsim.robot.manipulators.examples.universal_robots.kinematics_solver import KinematicsSolver
+from isaacsim.robot.manipulators.examples.universal_robots.stacking import Stacking
 from isaacsim.robot.manipulators.examples.universal_robots.ur10 import UR10
 from isaacsim.robot.manipulators.examples.universal_robots.ur10_experimental import UR10Experimental

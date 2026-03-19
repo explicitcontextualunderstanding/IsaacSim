@@ -29,6 +29,8 @@ argv = [
     "omni.usd",
     "--enable",
     "omni.kit.uiapp",
+    "--enable",
+    "omni.hydra.usdrt_delegate",
 ]
 # startup
 app = AppFramework("test_app", argv)

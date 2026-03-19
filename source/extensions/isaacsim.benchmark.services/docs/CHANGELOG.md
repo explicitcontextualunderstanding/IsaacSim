@@ -1,4 +1,87 @@
 # Changelog
+## [4.1.3] - 2026-03-05
+### Changed
+- Fix api and docs syntax issues
+
+## [4.1.2] - 2026-03-02
+### Changed
+- Add Overview.md, add python_api.md, add SETTINGS.md and update docstrings
+
+## [4.1.1] - 2026-02-13
+### Fixed
+- Fixed validation tooling to correctly build the render product map
+
+## [4.1.0] - 2026-02-02
+### Added
+- Public API properties for frametime recorders: `sample_count` and `samples` for direct recorder access
+
+## [4.0.0] - 2026-01-28
+### Added
+- Decorator-based plug-in system for recorders using `@MeasurementDataRecorderRegistry.register()`
+- `DEFAULT_RECORDERS` constant exported for customization in benchmark scripts
+- Process-specific CPU tracking
+- Main thread CPU tracking via single-core usage metrics (Mean/Min/Max)
+- Support for selecting recorders via `recorders` list passed into `BaseIsaacBenchmark` instance
+
+### Changed
+- Merged `BaseIsaacBenchmark` and `BaseIsaacBenchmarkAsync` into unified core with shared logic
+- Refactored data architecture: eliminated collector layer, one recorder per metric
+- Report formatting: metrics ordered by category (Performance, Custom, Memory, CPU table, Frametime table)
+- Recorder lifecycle: stop/collect from recorders that were started in a given phase
+
+### Removed
+- Legacy collector classes (`IsaacUpdateFrametimeCollector`)
+- Wrapper layer between collectors and recorders
+- Unused profiling, settings, and execution modules
+- Removed support for passing in `gpu_frametime=True` into `BaseIsaacBenchmark` instance
+
+## [3.5.2] - 2026-01-08
+### Changed
+- Migrate more events to Events 2.0.
+
+## [3.5.1] - 2026-01-07
+### Added
+- Added "Num App Updates" metric to report the number of app update events per phase
+
+## [3.5.0] - 2025-12-17
+### Changed
+- Migrate extension implementation to core experimental API
+
+## [3.4.0] - 2025-12-09
+### Changed
+- Converted log statements to use logger for independent visibility control
+
+## [3.3.5] - 2025-12-09
+### Added
+- Add error handling if set_phase() is called without a matching store_measurements()
+
+### Removed
+- Removed stop_recording_runtime arg to benchmark.store_measurements()
+
+## [3.3.4] - 2025-12-07
+### Changed
+- Update description
+
+## [3.3.3] - 2025-12-05
+### Changed
+- Migrate to Events 2.0.
+
+## [3.3.2] - 2025-12-03
+### Changed
+- Remove TODOs.
+
+## [3.3.1] - 2025-11-21
+### Fixed
+- Write privacy.toml file to temporary directory
+
+## [3.3.0] - 2025-10-27
+### Changed
+- Get the CUDA device names using Warp API
+- Make omni.isaac.ml_archive an explicit test dependency
+
+## [3.2.0] - 2025-10-17
+### Changed
+- Migrate PhysX subscription and simulation control interfaces to Omni Physics
 
 ## [3.1.1] - 2025-09-26
 ### Changed
@@ -143,11 +226,11 @@
 
 ## [1.10.1] - 2024-09-05
 ### Fixed
-- convert sim_elapsed_time to ms for calculating real-time factor
+- Convert sim_elapsed_time to ms for calculating real-time factor
 
 ## [1.10.0] - 2024-08-05
 ### Changed
-- use omni.physdx.get_physx_benchmarks_interface() to get physics simulation profiling data
+- Use omni.physdx.get_physx_benchmarks_interface() to get physics simulation profiling data
 
 ## [1.9.0] - 2024-07-17
 ### Changed
@@ -155,7 +238,7 @@
 - omni.kit.test is a required dependency, not just for running tests
 
 ### Removed
-- removed unused omni.kit.profiler.window dependency
+- Removed unused omni.kit.profiler.window dependency
 
 ## [1.8.3] - 2024-07-15
 ### Added
@@ -179,13 +262,13 @@
 
 ## [1.6.0] - 2024-05-01
 ### Added
-- ability to enable/disable frametime and runtime separately when starting a phase
+- Ability to enable/disable frametime and runtime separately when starting a phase
 
 ## [1.5.0] - 2024-04-29
 ### Changed
-- cleaned up imports
-- updated docstrings
-- removed unused functions
+- Cleaned up imports
+- Updated docstrings
+- Removed unused functions
 
 ## [1.4.2] - 2024-04-15
 ### Fixed

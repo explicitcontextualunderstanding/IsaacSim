@@ -21,19 +21,38 @@ import omni.kit.commands
 import omni.kit.test
 
 # import omni.kit.usd
-from isaacsim.storage.native import find_filtered_files_async, get_assets_root_path, get_assets_root_path_async
+from isaacsim.storage.native import (
+    find_filtered_files_async,
+    get_assets_root_path,
+    get_assets_root_path_async,
+    resolve_asset_path,
+)
 
 
 class TestStorageNative(omni.kit.test.AsyncTestCase):
+    """Test suite for Isaac Sim storage native extension functionality.
+
+    Tests cover asset path resolution, file discovery, filtering, and Nucleus server
+    connectivity functions.
+    """
+
     async def setUp(self):
+        """Set up test fixtures before each test method."""
         await omni.kit.app.get_app().next_update_async()
         pass
 
     async def tearDown(self):
+        """Clean up after each test method."""
         await omni.kit.app.get_app().next_update_async()
         pass
 
     async def test_get_assets_root_path(self):
+        """Test asset root path retrieval with various settings configurations.
+
+        Verifies that get_assets_root_path and get_assets_root_path_async correctly
+        return the configured asset root path, handle unset settings, and support
+        the skip_check parameter for bypassing validation.
+        """
         default_assets_url = carb.settings.get_settings().get("/persistent/isaac/asset_root/default")
 
         # including checking step
@@ -334,3 +353,43 @@ class TestStorageNative(omni.kit.test.AsyncTestCase):
             self.assertTrue(
                 has_warehouse and has_shelves, f"File '{file_path}' should match ALL patterns ['warehouse', 'shelves']"
             )
+
+    async def test_resolve_asset_path_resolves_with_assets_root(self):
+        """Test resolve_asset_path resolves using assets root when original is bare path.
+
+        Verifies that when given a relative path like '/Isaac/...', the function
+        correctly prefixes it with the assets root path.
+        """
+        assets_root = get_assets_root_path()
+        original_relative = "/Isaac/Environments/Grid/default_environment.usd"
+
+        # Expect resolve_asset_path function to prefix with assets root and resolve
+        resolved = resolve_asset_path(original_relative)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved, assets_root + original_relative)
+
+    async def test_resolve_asset_path_returns_original_if_exists(self):
+        """Test resolve_asset_path returns original when full path already exists.
+
+        Verifies that when given a complete, valid path, the function returns
+        that path unchanged without attempting to modify it.
+        """
+        assets_root = get_assets_root_path()
+        full_path = assets_root + "/Isaac/Environments/Grid/default_environment.usd"
+
+        # Expect the function to return the given full path if it exists
+        resolved = resolve_asset_path(full_path)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved, full_path)
+
+    async def test_resolve_asset_path_returns_none_if_missing(self):
+        """Test resolve_asset_path returns None when neither path exists.
+
+        Verifies that when given a path that does not exist in either its
+        original form or when prefixed with the assets root, the function
+        returns None.
+        """
+        # Expect the function to return None for a non-existent path
+        original = "/nonexistent/path/definitely_missing.usd"
+        resolved = resolve_asset_path(original)
+        self.assertIsNone(resolved)

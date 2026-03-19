@@ -203,7 +203,6 @@ private:
     template <bool drawPoints, bool drawLines>
     void scan(const ::physx::PxVec3& sensorOrigin,
               const ::physx::PxQuat& worldRotation,
-              omni::physx::IPhysx* physxPtr,
               ::physx::PxScene* physxScenePtr,
               std::vector<uint16_t>& depth,
               std::vector<carb::Float3>& hitPosition,

@@ -18,17 +18,16 @@ from __future__ import annotations
 import carb
 import isaacsim.core.experimental.utils.backend as backend_utils
 import isaacsim.core.experimental.utils.ops as ops_utils
+import isaacsim.core.experimental.utils.prim as prim_utils
 import isaacsim.core.experimental.utils.stage as stage_utils
-import isaacsim.core.utils.numpy as numpy_utils
 import numpy as np
 import usdrt
 import usdrt.Gf
 import warp as wp
 from isaacsim.core.simulation_manager import SimulationManager
-from isaacsim.core.utils.prims import is_prim_non_root_articulation_link
 from pxr import Gf, Usd, UsdGeom, UsdShade
 
-from . import _fabric
+from . import _fabric, _transform
 from .prim import _MSG_PRIM_NOT_VALID, Prim
 
 
@@ -97,7 +96,7 @@ class XformPrim(Prim):
         # initialize base class
         super().__init__(paths, resolve_paths=resolve_paths)
         # initialize instance from arguments
-        self._non_root_articulation_link = is_prim_non_root_articulation_link(prim_path=self.paths[0])
+        self._non_root_articulation_link = prim_utils.is_prim_non_root_articulation_link(self.paths[0])
         # - reset xformOp properties
         if not self._non_root_articulation_link:
             if reset_xform_op_properties:
@@ -106,7 +105,7 @@ class XformPrim(Prim):
         if positions is not None or translations is not None or orientations is not None or scales is not None:
             assert (
                 positions is None or translations is None
-            ), "Both 'positions' and 'translations' are specified. Specifie only one of them"
+            ), "Both 'positions' and 'translations' are specified. Specify only one of them"
             if self._non_root_articulation_link:
                 raise carb.log_warn(
                     (
@@ -121,9 +120,6 @@ class XformPrim(Prim):
                     self.set_local_poses(translations, orientations)
                 if scales is not None:
                     self.set_local_scales(scales)
-        # setup physics-related configuration if simulation is running
-        if SimulationManager._physics_sim_view__warp is not None:
-            self._on_physics_ready(None)
 
     """
     Properties.
@@ -206,13 +202,13 @@ class XformPrim(Prim):
 
             >>> # get the visibility states of all prims
             >>> visibilities = prims.get_visibilities()
-            >>> visibilities.list()
-            [True, True, True]
+            >>> print(visibilities)
+            [[ True] [ True] [ True]]
             >>>
             >>> # get the visibility states of the first and last prims
             >>> visibilities = prims.get_visibilities(indices=[0, 2])
-            >>> visibilities.list()
-            [True, True]
+            >>> print(visibilities)
+            [[ True] [ True]]
         """
         assert self.valid, _MSG_PRIM_NOT_VALID
         # USD API
@@ -574,7 +570,7 @@ class XformPrim(Prim):
                     dtype=np.float32,
                 )
             # get and apply local transformation
-            local_translations, local_orientations = numpy_utils.transformations.get_local_from_world(
+            local_translations, local_orientations = _transform.local_from_world(
                 parent_transforms, positions, orientations
             )
             self.set_local_poses(translations=local_translations, orientations=local_orientations, indices=indices)
@@ -1145,6 +1141,13 @@ class XformPrim(Prim):
             for i, prim in enumerate(fabric_prims):
                 prim.CreateAttribute(self._fabric_view_index_attr, usdrt.Sdf.ValueTypeNames.UInt, True)
                 prim.GetAttribute(self._fabric_view_index_attr).Set(i)
+                # create local/world matrix attributes if they don't exist
+                xformable = usdrt.Rt.Xformable(prim)
+                if not xformable.GetFabricHierarchyLocalMatrixAttr():
+                    xformable.CreateFabricHierarchyLocalMatrixAttr()
+                if not xformable.GetFabricHierarchyWorldMatrixAttr():
+                    xformable.CreateFabricHierarchyWorldMatrixAttr()
+
         if key not in self._fabric_data:
             # create fabric data
             if key == "world-matrix":

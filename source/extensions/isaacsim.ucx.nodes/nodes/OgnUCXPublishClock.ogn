@@ -1,0 +1,42 @@
+{
+    "UCXPublishClock": {
+        "version": 1,
+        "icon": "icons/isaac-sim.svg",
+        "description": [
+            "This node publishes the given time as a UCX Clock message using tagged send"
+        ],
+        "metadata": {
+            "uiName": "UCX Publish Clock"
+        },
+        "categoryDefinitions": "config/CategoryDefinition.json",
+        "categories": "isaacUcx",
+        "inputs": {
+            "execIn": {
+                "type": "execution",
+                "description": "The input execution port."
+            },
+            "port": {
+                "type": "uint",
+                "description": "Port number for UCX listener",
+                "default": 13337
+            },
+            "tag": {
+                "type": "uint64",
+                "description": "UCX tag for message identification",
+                "default": 5
+            },
+            "timeStamp": {
+                "type": "double",
+                "description": "Time in seconds to publish",
+                "default": 0
+            },
+            "timeoutMs": {
+                "type": "uint",
+                "description": "Timeout in milliseconds for UCX send requests. If 0, waits indefinitely.",
+                "uiName": "Timeout (ms)",
+                "default": 1
+            }
+        }
+    }
+}
+

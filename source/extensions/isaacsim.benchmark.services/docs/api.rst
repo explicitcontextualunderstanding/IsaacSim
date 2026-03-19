@@ -11,20 +11,20 @@ Python API
 .. autosummary::
     :nosignatures:
 
-    ~base_isaac_benchmark_async.BaseIsaacBenchmarkAsync
-    ~base_isaac_benchmark.BaseIsaacBenchmark
+    ~base_benchmark.BaseIsaacBenchmarkAsync
+    ~base_benchmark.BaseIsaacBenchmark
 
 |
 
 .. API
 
-.. autoclass:: isaacsim.benchmark.services.base_isaac_benchmark_async.BaseIsaacBenchmarkAsync
+.. autoclass:: isaacsim.benchmark.services.base_benchmark.BaseIsaacBenchmarkAsync
     :members:
     :undoc-members:
     :inherited-members:
     :show-inheritance:
 
-.. autoclass:: isaacsim.benchmark.services.base_isaac_benchmark.BaseIsaacBenchmark
+.. autoclass:: isaacsim.benchmark.services.base_benchmark.BaseIsaacBenchmark
     :members:
     :undoc-members:
     :inherited-members:

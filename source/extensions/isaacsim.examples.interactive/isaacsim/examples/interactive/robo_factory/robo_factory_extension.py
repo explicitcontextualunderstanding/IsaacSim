@@ -13,19 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Extension module for the RoboFactory interactive example that provides UI components and extension lifecycle management."""
+
+
 import asyncio
 import os
 
 import omni.ext
 import omni.ui as ui
+from isaacsim.examples.base.base_sample_extension_experimental import BaseSampleUITemplate
 from isaacsim.examples.browser import get_instance as get_browser_instance
-from isaacsim.examples.interactive.base_sample import BaseSampleUITemplate
 from isaacsim.examples.interactive.robo_factory import RoboFactory
 from isaacsim.gui.components.ui_utils import btn_builder
 
 
 class RoboFactoryExtension(omni.ext.IExt):
+    """Extension for RoboFactory interactive example."""
+
     def on_startup(self, ext_id: str):
+        """Called when the extension is starting up.
+
+        Initializes the RoboFactory extension by setting up the UI template and registering
+        the example with the browser.
+
+        Args:
+            ext_id: The extension identifier.
+        """
         self.example_name = "RoboFactory"
         self.category = "Multi-Robot"
 
@@ -42,25 +55,33 @@ class RoboFactoryExtension(omni.ext.IExt):
 
         get_browser_instance().register_example(
             name=self.example_name,
-            execute_entrypoint=ui_handle.build_window,
             ui_hook=ui_handle.build_ui,
             category=self.category,
         )
 
-        return
-
     def on_shutdown(self):
+        """Called when the extension is shutting down.
+
+        Cleans up by deregistering the RoboFactory example from the browser.
+        """
         get_browser_instance().deregister_example(name=self.example_name, category=self.category)
-        return
 
 
 class RoboFactoryUI(BaseSampleUITemplate):
+    """UI for the RoboFactory interactive example.
+
+    Args:
+        *args: Variable length argument list passed to the parent class.
+        **kwargs: Additional keyword arguments passed to the parent class.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.task_ui_elements = {}
 
     def build_extra_frames(self):
+        """Build additional UI frames for task control."""
         extra_stacks = self.get_extra_frames_handle()
-        self.task_ui_elements = {}
 
         with extra_stacks:
             with ui.CollapsableFrame(
@@ -69,33 +90,32 @@ class RoboFactoryUI(BaseSampleUITemplate):
                 height=0,
                 visible=True,
                 collapsed=False,
-                # style=get_style(),
                 horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_AS_NEEDED,
                 vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
             ):
                 self.build_task_controls_ui()
 
     def _on_start_stacking_button_event(self):
+        """Handle start stacking button click."""
         asyncio.ensure_future(self.sample._on_start_stacking_event_async())
         self.task_ui_elements["Start Stacking"].enabled = False
-        return
 
     def post_reset_button_event(self):
+        """Called after the reset button is pressed."""
         self.task_ui_elements["Start Stacking"].enabled = True
-        return
 
     def post_load_button_event(self):
+        """Called after the load button is pressed."""
         self.task_ui_elements["Start Stacking"].enabled = True
-        return
 
     def post_clear_button_event(self):
+        """Called after the clear button is pressed."""
         self.task_ui_elements["Start Stacking"].enabled = False
-        return
 
     def build_task_controls_ui(self):
+        """Build the task control UI elements."""
         with ui.VStack(spacing=5):
-
-            dict = {
+            start_stacking_dict = {
                 "label": "Start Stacking",
                 "type": "button",
                 "text": "Start Stacking",
@@ -103,5 +123,5 @@ class RoboFactoryUI(BaseSampleUITemplate):
                 "on_clicked_fn": self._on_start_stacking_button_event,
             }
 
-            self.task_ui_elements["Start Stacking"] = btn_builder(**dict)
+            self.task_ui_elements["Start Stacking"] = btn_builder(**start_stacking_dict)
             self.task_ui_elements["Start Stacking"].enabled = False

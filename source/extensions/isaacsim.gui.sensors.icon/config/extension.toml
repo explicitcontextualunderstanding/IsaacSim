@@ -1,17 +1,16 @@
 [package]
-version = "2.0.3"
+version = "2.1.0"
 category = "other"
 title = "Sensor Icon"
-description = "sensor icon in viewport"
+description = "Renders sensor icons in the viewport and stage hierarchy for visual identification of camera, lidar, IMU, and other sensor prims."
 keywords = ["sensor","icon","gui"]
 changelog = "docs/CHANGELOG.md"
-readme = "docs/README.md"
+readme = "docs/Overview.md"
 preview_image = "data/preview.png"
 icon = "data/icon.png"
 writeTarget.kit = true
 
 [dependencies]
-"isaacsim.core.utils" = {}
 "omni.appwindow" = { public = true }
 "omni.kit.viewport.menubar.core" = {}
 "omni.kit.viewport.menubar.display" = {}
@@ -31,19 +30,26 @@ name = "isaacsim.gui.sensors.icon"
 name = "isaacsim.gui.sensors.icon.tests"
 
 [settings]
-# timeout for resolving sensor icon 
+# Timeout for resolving sensor icon settings.
 exts."isaacsim.gui.sensors.icon".timeout = 5
 
-# show prim name with the sensor icon, default to false
+# Show the prim name with the sensor icon. Defaults to `false`.
 exts."omni.kit.prim.sensor".showTitle = false
 
-# show sensor icon in viewport, default to false
+# Show the sensor icon in the viewport. Defaults to `false`.
 persistent.exts."isaacsim.gui.sensors.icon".visible_on_startup=false
+
+[[test]]
+name = "startup"
+enabled = false
+args = [
+    "--/app/settings/fabricDefaultStageFrameHistoryCount=3",
+]
 
 [[test]]
 enabled = true
 dependencies = [
-    "omni.hydra.rtx",                       # "omni.hydra.pxr", Can we run and pass with Storm ?,
+    "omni.hydra.rtx",
     "omni.hydra.usdrt_delegate",
     "omni.kit.ui_test", 
 ]
@@ -55,7 +61,7 @@ args = [
     "--/app/asyncRendering=0",
     "--/app/asyncRenderingLowLatency=0",
     "--/app/fastShutdown=1",
-    "--/app/file/ignoreUnsavedOnExit=1",
+    "--/app/file/ignoreUnsavedStage=1",
     "--/app/hydraEngine/waitIdle=0",
     "--/app/player/useFixedTimeStepping=false",
     "--/app/renderer/skipWhileMinimized=0",
@@ -71,6 +77,7 @@ args = [
     "--/exts/omni.usd/locking/onClose=0",
     "--/omni/kit/plugin/syncUsdLoads=1",
     "--/omni/replicator/asyncRendering=0",
+    "--/omnihydra/parallelHydraSprimSync=1",
     '--/persistent/app/stage/upAxis="Z"',
     "--/persistent/app/viewport/defaults/tickRate=120",
     "--/persistent/app/viewport/displayOptions=31951",
@@ -100,9 +107,5 @@ stdoutFailPatterns.exclude = [
 ]
 
 # disable startup test
-[[test]]
-name = "startup"
-enabled = false
-args = [
-    "--/app/settings/fabricDefaultStageFrameHistoryCount = 3",
-]
+[documentation]
+pages = ["docs/Overview.md","docs/SETTINGS.md", "docs/CHANGELOG.md"]

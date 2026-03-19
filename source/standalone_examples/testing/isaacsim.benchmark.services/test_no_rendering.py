@@ -78,5 +78,8 @@ for measurement in benchmark._test_phases[0].measurements:
 
 benchmark.stop()
 timeline.stop()
+
+omni.kit.app.get_app().update()
+
 assert min_physics_time > 0
 simulation_app.close()

@@ -65,14 +65,16 @@ enable_extension("isaacsim.ros2.bridge")
 omni.kit.app.get_app().update()
 
 enable_extension("isaacsim.benchmark.services")
-from isaacsim.benchmark.services import BaseIsaacBenchmark
+from isaacsim.benchmark.services import DEFAULT_RECORDERS, BaseIsaacBenchmark
 
 # Create the benchmark
+# Define recorders to use, use default set, other combinations, or custom data recorders
+recorders = DEFAULT_RECORDERS + ["gpu_frametime"] if gpu_frametime else DEFAULT_RECORDERS
 benchmark = BaseIsaacBenchmark(
     benchmark_name="benchmark_scene_loading",
     workflow_metadata={"metadata": [{"name": "env_url", "data": env_url}, {"name": "duration", "data": duration}]},
     backend_type=args.backend_type,
-    gpu_frametime=gpu_frametime,
+    recorders=recorders,
 )
 
 # Track scene loading time

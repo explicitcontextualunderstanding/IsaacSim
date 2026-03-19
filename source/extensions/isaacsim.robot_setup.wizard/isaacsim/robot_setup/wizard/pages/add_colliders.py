@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Provides UI components and models for managing collision physics setup in the Isaac Sim robot setup wizard."""
+
+
 import os
 from typing import List
 
@@ -39,6 +43,18 @@ APPROXIMATION_LIST = list(MESH_APPROXIMATIONS.keys()) + MESH_TYPES
 
 
 class ColliderItem(SearchableItem):
+    """Represents a collider configuration item for robot setup.
+
+    This class encapsulates the properties of a collider that can be applied to robot parts, including
+    the target name, collision mesh approximation type, and editability settings. It extends SearchableItem
+    to provide text-based filtering capabilities in UI components.
+
+    Args:
+        name: The name or path of the robot part to apply the collider to.
+        approx: The collision mesh approximation type (e.g., 'convexHull', 'trimesh', 'boundingCube').
+        editable: Whether the collider item can be modified in the UI.
+    """
+
     def __init__(self, name, approx="None", editable=True):
         super().__init__()
         self.name = ui.SimpleStringModel(name)
@@ -48,41 +64,82 @@ class ColliderItem(SearchableItem):
 
         self.text = " ".join((name, approx))
 
-    def set_name(self, name):
+    def set_name(self, name: str):
+        """Sets the name of the collider item.
+
+        Args:
+            name: The new name for the collider item.
+        """
         self.name.set_value(name)
         self.refresh_text()
 
-    def set_approx(self, approx):
+    def set_approx(self, approx: str):
+        """Sets the collision mesh approximation type for the collider item.
+
+        Args:
+            approx: The approximation type from the available mesh approximations and types.
+        """
         self.approx.set_value(approx)
         self.refresh_text()
 
     def refresh_text(self):
+        """Refreshes the searchable text by combining the current name and approximation values."""
         # TODO: should refresh text when item edited, so should add some on_item_changed callback in build function?
         self.text = " ".join((self.name.get_value_as_string(), self.approx.get_value_as_string()))
 
 
 class ColliderModel(TreeViewWithPlacerHolderModel):
+    """Model for managing collider items in a tree view structure.
+
+    This model extends TreeViewWithPlacerHolderModel to provide specialized functionality for handling
+    collider configuration items. It manages collider items that define collision mesh approximations
+    for robot parts, supporting operations like adding, editing, and organizing collider configurations
+    in a hierarchical tree structure.
+
+    The model integrates with the collider creation workflow, allowing users to define collision
+    properties for different robot components through a structured interface. It handles the display
+    and manipulation of collider items, each containing information about the target geometry and
+    the type of collision mesh approximation to apply.
+
+    Args:
+        items: Initial list of collider items to populate the model.
+    """
+
     def __init__(self, items):
         super().__init__(items)
         self._edit_window = None
 
     def destroy(self):
+        """Cleans up the ColliderModel by destroying the edit window and calling parent cleanup."""
         if self._edit_window:
             self._edit_window.destroy()
         self._edit_window = None
 
         super().destroy()
 
-    def get_item_value_model_count(self, item):
-        """The number of columns"""
+    def get_item_value_model_count(self, item) -> int:
+        """The number of columns
+
+        Args:
+            item: The collider item to get column count for.
+
+        Returns:
+            Number of columns in the tree view.
+        """
         return 4
 
-    def get_item_value_model(self, item, column_id):
-        """
-        Return value model.
-        It's the object that tracks the specific value.
-        In our case we use ui.SimpleStringModel for the first column
-        and SimpleFloatModel for the second column.
+    def get_item_value_model(self, item, column_id) -> ui.AbstractValueModel:
+        """Return value model.
+            It's the object that tracks the specific value.
+            In our case we use ui.SimpleStringModel for the first column
+            and SimpleFloatModel for the second column.
+
+        Args:
+            item: The collider item to get the value model from.
+            column_id: The column identifier (1 for name, 2 for approximation).
+
+        Returns:
+            The value model for the specified column, or None if not found.
         """
         if isinstance(item, ColliderItem):
             if column_id == 1:
@@ -91,6 +148,11 @@ class ColliderModel(TreeViewWithPlacerHolderModel):
                 return item.approx
 
     def edit_item(self, item):
+        """Opens the edit window for the specified collider item.
+
+        Args:
+            item: The collider item to edit.
+        """
         if not self._edit_window:
             self._edit_window = AddColliderWindow("Edit Colliders", self, item)
         else:
@@ -99,6 +161,20 @@ class ColliderModel(TreeViewWithPlacerHolderModel):
 
 
 class AddColliderWindow:
+    """A modal window for adding or editing collision properties on robot parts.
+
+    This window provides an interface for configuring collision mesh approximations on selected robot components.
+    Users can specify the target mesh or parent object, choose from various collision approximation types
+    (convex hull, triangle mesh, etc.), and create or modify collider configurations. The window supports both
+    creation of new colliders and editing of existing ones, with validation to ensure proper configuration
+    before applying changes.
+
+    Args:
+        window_title: Title displayed in the window header.
+        model: The ColliderModel instance that manages collider data and operations.
+        item: The ColliderItem to edit when opening in edit mode.
+    """
+
     def __init__(self, window_title, model, item=None):
         self._is_edit = window_title == "Edit Colliders"
         self._window_height = 335
@@ -116,6 +192,10 @@ class AddColliderWindow:
         self._window.frame.set_build_fn(self._rebuild_frame)
 
     def destroy(self):
+        """Clean up resources and destroy the AddColliderWindow.
+
+        Destroys the subscription, collider target selection window, and main window.
+        """
         self.__subscription = None
         if self._select_collider_target_window:
             self._select_collider_target_window.destroy()
@@ -125,11 +205,26 @@ class AddColliderWindow:
         self._window = None
 
     def _model_changed(self, model, item):
+        """Handle changes to the collider model.
+
+        Updates the UI when the collider model changes and the window is visible.
+
+        Args:
+            model: The collider model that changed.
+            item: The specific item that was modified.
+        """
         # when model item changes, we need to update the ui if the window is visible
         if item and self._window.visible:
             self._update_ui(item)
 
     def _update_ui(self, item):
+        """Update the UI elements based on the current collider item.
+
+        Sets the collider name field, checkbox state, and approximation dropdown based on the provided item.
+
+        Args:
+            item: The ColliderItem to display in the UI, or None to clear the UI.
+        """
         self._current_collider = item
         self._collider_name_model.set_value(
             item.name.get_value_as_string() if item else "Pick the part to add collider to"
@@ -142,6 +237,10 @@ class AddColliderWindow:
         self._window.frame.invalidate_raster()
 
     def _update_item(self):
+        """Update the current collider item with values from the UI.
+
+        Syncs the collider name and approximation type from the UI controls to the current collider item.
+        """
         # update item from ui
         self._current_collider.set_name(self._collider_name_model.get_value_as_string())
         self._current_collider.set_approx(
@@ -149,13 +248,27 @@ class AddColliderWindow:
         )
         self._collider_model._item_changed(self._current_collider)
 
-    def on_collapsed_changed(self, collapsed):
+    def on_collapsed_changed(self, collapsed: bool):
+        """Handle window height changes when the collapsible frame is toggled.
+
+        Adjusts the window height between collapsed and expanded states.
+
+        Args:
+            collapsed: Whether the frame is in collapsed state.
+        """
         if collapsed:
             self._window.height = self._collapsed_height
         else:
             self._window.height = self._window_height
 
     def _update_collider_name(self, model):
+        """Handle changes to the collider name field.
+
+        Updates UI state and creates a new ColliderItem when a valid name is entered. Only active in non-edit mode.
+
+        Args:
+            model: The string model containing the collider name.
+        """
         if self._is_edit:
             return
 
@@ -173,6 +286,14 @@ class AddColliderWindow:
             self._current_collider = None
 
     def _update_collider_approx(self, model, root_item):
+        """Handle changes to the collider approximation dropdown.
+
+        Updates the current collider's approximation type when the dropdown selection changes. Only active in non-edit mode.
+
+        Args:
+            model: The combo box model.
+            root_item: The root item of the model.
+        """
         if self._is_edit:
             return
         root_model = model.get_item_value_model(root_item)
@@ -182,9 +303,20 @@ class AddColliderWindow:
             self._current_collider.set_approx(approx)
 
     def _on_cancel_clicked(self):
+        """Handle the Cancel button click.
+
+        Hides the AddColliderWindow without saving changes.
+        """
         self._window.visible = False
 
-    def _on_create_clicked(self, closed=False):
+    def _on_create_clicked(self, closed: bool = False):
+        """Handle the Create or Create & Close button click.
+
+        Adds the current collider to the model and optionally closes the window.
+
+        Args:
+            closed: Whether to close the window after creating the collider.
+        """
         if closed:
             self._window.visible = False
 
@@ -193,6 +325,10 @@ class AddColliderWindow:
         self._update_ui(None)
 
     def _on_save_clicked(self):
+        """Handle the Save button click in edit mode.
+
+        Updates the current collider item with UI values and closes the window.
+        """
         if not self._current_collider:
             return
         # write to model
@@ -200,6 +336,11 @@ class AddColliderWindow:
         self._window.visible = False
 
     def _rebuild_frame(self):
+        """Rebuilds the UI frame with collider configuration controls.
+
+        Creates the complete user interface including radio buttons for collision target selection,
+        name field for the collider part, approximation type dropdown, and action buttons.
+        """
         with ui.ScrollingFrame():
             with ui.HStack(height=0):
                 ui.Spacer(width=10)
@@ -297,6 +438,13 @@ class AddColliderWindow:
                                 ui.Spacer(width=5)
 
     def select(self, selected_paths):
+        """Handles selection of collider target paths from the asset picker.
+
+        Updates the collider name field with the first selected path and marks the field as checked.
+
+        Args:
+            selected_paths: List of selected prim paths for collider targets.
+        """
         self._select_collider_target_window.visible = False
         self._selected_paths = selected_paths
         if self._selected_paths:
@@ -304,6 +452,11 @@ class AddColliderWindow:
             self._collider_name_widget.checked = True
 
     def select_collider_target(self):
+        """Opens the robot asset picker window for selecting collider targets.
+
+        Creates a new RobotAssetPicker window if it doesn't exist, or shows the existing one.
+        Filters for UsdGeom.Xform type prims and uses the select method as callback.
+        """
         if not self._select_collider_target_window:
             stage = omni.usd.get_context().get_stage()
             self._select_collider_target_window = RobotAssetPicker(
@@ -318,6 +471,23 @@ class AddColliderWindow:
 
 
 class AddColliders:
+    """A UI component for managing robot collider configuration in the Isaac Sim robot setup wizard.
+
+    This class provides an interactive interface for adding and configuring physics colliders on robot parts.
+    It displays a tree view of available robot components, allows users to select collision mesh approximation
+    types, and manages the collider creation workflow. The component includes search and filtering
+    capabilities, validation of collider configurations, and integration with the robot setup pipeline.
+
+    The interface supports various collision mesh approximations including convex hull, convex decomposition,
+    box, sphere, capsule, cylinder, and mesh types. Users can specify which robot parts require collision
+    detection and choose appropriate approximation methods for optimal physics simulation performance.
+
+    Args:
+        visible: Whether the UI component is initially visible.
+        *args: Additional positional arguments.
+        **kwargs: Additional keyword arguments.
+    """
+
     def __init__(self, visible, *args, **kwargs):
         self.visible = visible
         self._add_collider_window = None
@@ -331,6 +501,11 @@ class AddColliders:
         self._collider_model = None
 
     def destroy(self):
+        """Destroys the AddColliders widget and cleans up resources.
+
+        Cleans up internal components including the add collider window, tree view,
+        collider model, and any active subscriptions.
+        """
         self.__subscription = None
         if self._add_collider_window:
             self._add_collider_window.destroy()
@@ -342,6 +517,11 @@ class AddColliders:
             self._collider_model.destroy()
 
     def _build_frame(self):
+        """Builds the main UI frame for the add colliders widget.
+
+        Creates the collapsible frame containing the colliders section with search functionality,
+        tree view for displaying colliders, and the next step button for proceeding to joints and drivers.
+        """
         with ui.CollapsableFrame("Colliders", build_header_fn=custom_header):
             with ui.ScrollingFrame():
                 with ui.VStack(spacing=2, name="margin_vstack"):
@@ -391,16 +571,33 @@ class AddColliders:
                     )
 
     def _filter_by_text(self, filters):
+        """Filters the collider model items by text search.
+
+        Args:
+            filters: Text filters to apply to the collider model.
+        """
         if self._collider_model:
             self._collider_model.filter_by_text(filters)
 
-    def set_visible(self, visible):
+    def set_visible(self, visible: bool):
+        """Sets the visibility of the add colliders widget.
+
+        When making the widget visible, preprocesses the page to populate collider data.
+
+        Args:
+            visible: Whether the widget should be visible.
+        """
         if self.frame:
             if visible:
                 self._preprocess_page()
             self.frame.visible = visible
 
     def _preprocess_page(self):
+        """Preprocesses the page by loading colliders from the robot on stage.
+
+        Recursively searches through the /colliders scope prim to find mesh primitives
+        and adds them as collider items to the model.
+        """
         # get the colliders from the robot on stage
         self._robot = RobotRegistry().get()
         stage = omni.usd.get_context().get_stage()
@@ -429,9 +626,7 @@ class AddColliders:
         self._collider_model = updated_collider_model
 
     def _add_colliders(self):
-        """
-        the actual applying collider part. get the links from the table and add colliders accordingly
-        """
+        """The actual applying collider part. Get the links from the table and add colliders accordingly."""
         if self._collider_model:
             for item in self._collider_model.get_item_children(None):
                 if isinstance(item, ColliderItem):  ## as oppose to PlaceHolderItem
@@ -440,11 +635,24 @@ class AddColliders:
                     apply_collider(link_name, approximation_type)
 
     def add_colliders(self):
+        """Opens the add collider window for creating new colliders.
+
+        Creates the AddColliderWindow if it doesn't exist, otherwise makes the existing window visible.
+        """
         if not self._add_collider_window:
             self._add_collider_window = AddColliderWindow("Add Colliders", self._collider_model)
         self._add_collider_window._window.visible = True
 
     def _model_changed(self, model, item):
+        """Handles changes to the collider model.
+
+        Updates the UI state based on the number of items in the model, including enabling/disabling
+        the next step button and showing/hiding the empty page placeholder.
+
+        Args:
+            model: The collider model that changed.
+            item: The specific item that was modified.
+        """
         if not item or not model:
             return
 
@@ -471,6 +679,11 @@ class AddColliders:
             self.id_column.remove_item()
 
     def treeview_empty_page(self):
+        """Creates the empty state page displayed when no colliders exist.
+
+        Shows instructional text guiding users to click the 'Add Colliders' button
+        to begin the collider creation process.
+        """
         self._treeview_empty_page = ui.VStack(visible=True, height=self._treeview_initial_height)
         with self._treeview_empty_page:
             ui.Spacer(height=ui.Fraction(3))
@@ -485,6 +698,11 @@ class AddColliders:
         self._treeview_empty_page.visible = bool(self._collider_model._searchable_num == 0)
 
     def _build_tree_view(self):
+        """Builds the tree view component for displaying colliders.
+
+        Creates the tree view with headers, delegate, and empty page placeholder.
+        Includes a draggable splitter for resizing the tree view height.
+        """
         with ui.ZStack():
             scrolling_frame = ui.ScrollingFrame(name="treeview", height=self._treeview_initial_height)
             with scrolling_frame:

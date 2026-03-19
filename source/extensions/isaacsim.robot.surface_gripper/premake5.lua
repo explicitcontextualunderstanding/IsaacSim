@@ -66,14 +66,14 @@ links {
     "physxSchema",
 }
 
-extra_usd_libs = { "usdGeom", "usdPhysics", "usdUtils" }
+extra_usd_libs = { "usdGeom", "usdPhysics", "usdUtils", "ts" }
 add_usd(extra_usd_libs)
 
 -- Platform specific configurations
 filter { "system:linux" }
 includedirs {
     target_deps .. "/usd/%{cfg.buildcfg}/include/boost",
-    target_deps .. "/python/include/python3.11",
+    target_deps .. "/python/include/python3.12",
 }
 filter { "system:windows" }
 libdirs {

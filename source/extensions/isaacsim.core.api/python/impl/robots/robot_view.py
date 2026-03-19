@@ -15,8 +15,10 @@
 from typing import Optional, Union
 
 import numpy as np
-import torch
+from isaacsim.core.deprecation_manager import import_module
 from isaacsim.core.prims import Articulation
+
+torch = import_module("torch")
 
 
 class RobotView(Articulation):

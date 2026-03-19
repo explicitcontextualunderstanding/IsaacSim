@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Robot setup wizard extension that provides a guided interface for configuring robots in Isaac Sim."""
+
+
 import weakref
 
 import carb
@@ -24,12 +28,26 @@ from .window import RobotWizardWindow
 _robot_window_instance = None
 
 
-def get_window():
-    """Get IsaacSim robot window."""
+def get_window() -> RobotWizardWindow | None:
+    """Get the current Isaac Sim robot window instance.
+
+    Returns:
+        The robot window instance if it exists and is still valid, otherwise None.
+    """
     return _robot_window_instance if not _robot_window_instance else _robot_window_instance()
 
 
 class WizardExtension(omni.ext.IExt, MenuHelperExtension):
+    """Extension class that provides a robot setup wizard interface for Isaac Sim.
+
+    This extension creates a guided wizard interface to help users configure and set up robots
+    within Isaac Sim. It integrates with the Omniverse Kit menu system and workspace to provide
+    easy access to robot configuration tools through a dedicated window interface.
+
+    The extension manages the Robot Wizard window lifecycle, handles menu integration, and provides
+    settings for automatic launch behavior. It extends both omni.ext.IExt for extension functionality
+    and MenuHelperExtension for menu integration capabilities.
+    """
 
     WINDOW_NAME = "Robot Wizard [Beta]"
     """Isaac Sim robot window name"""
@@ -43,6 +61,13 @@ class WizardExtension(omni.ext.IExt, MenuHelperExtension):
         self._window = None
 
     def on_startup(self, ext_id):
+        """Initializes the robot wizard extension on startup.
+
+        Sets up the window functionality, menu integration, and handles launch-on-startup settings.
+
+        Args:
+            ext_id: The extension ID provided by the Omniverse Kit SDK.
+        """
         self.ext_id = ext_id
 
         ui.Workspace.set_show_window_fn(WizardExtension.WINDOW_NAME, self.show_window)
@@ -56,7 +81,10 @@ class WizardExtension(omni.ext.IExt, MenuHelperExtension):
         self.show_window(self._launch_on_startup)
 
     def on_shutdown(self):
-        """Shutdown function"""
+        """Shutdown function.
+
+        Cleans up menu items and destroys the robot wizard window.
+        """
         self.menu_shutdown()
 
         if self._window:
@@ -64,10 +92,10 @@ class WizardExtension(omni.ext.IExt, MenuHelperExtension):
             self._window = None
 
     def show_window(self, value: bool):
-        """Show/hide Isaac Sim robot window function
+        """Show/hide Isaac Sim robot window function.
 
         Args:
-            value (bool): True if window will be shown or False if window will be hidden.
+            value: True if window will be shown or False if window will be hidden.
         """
         global _robot_window_instance
 
@@ -82,4 +110,11 @@ class WizardExtension(omni.ext.IExt, MenuHelperExtension):
             self._window.set_visible(value)
 
     def _visiblity_changed_fn(self, visible):
+        """Handles robot wizard window visibility changes.
+
+        Refreshes the menu state when the window visibility changes.
+
+        Args:
+            visible: Whether the window is currently visible.
+        """
         self.menu_refresh()

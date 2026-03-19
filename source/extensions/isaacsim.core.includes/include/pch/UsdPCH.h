@@ -28,10 +28,11 @@
 #    pragma warning(disable : 4305) // argument truncation from double to float
 #    pragma warning(disable : 4800) // int to bool
 #    pragma warning(disable : 4996) // call to std::copy with parameters that may be unsafe
-#    pragma warning(disable : 4005) // NOMINMAX macro redefinition
-#    define NOMINMAX // Make sure nobody #defines min or max
+#    ifndef NOMINMAX
+#        define NOMINMAX
+#    endif
+#    define WIN32_LEAN_AND_MEAN
 #    include <Windows.h> // Include this here so we can curate
-#    undef small // defined in rpcndr.h
 #elif defined(__GNUC__)
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -45,19 +46,9 @@
 #    endif
 #endif
 
-// Hide deprecated TBB warnings since they are emited from OpenUsd headers
-#if !defined(TBB_SUPPRESS_DEPRECATED_MESSAGES)
-#    define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
-#endif
-
 // Include cstdio here so that vsnprintf is properly declared. This is necessary because pyerrors.h has
 // #define vsnprintf _vsnprintf which later causes <cstdio> to declare std::_vsnprintf instead of the correct and proper
 // std::vsnprintf. By doing it here before everything else, we avoid this nonsense.
-#include <cstdio>
-
-// Python must be included first because it monkeys with macros that cause
-// TBB to fail to compile in debug mode if TBB is included before Python
-#include <boost/python/object.hpp>
 #include <pxr/base/arch/stackTrace.h>
 #include <pxr/base/arch/threads.h>
 #include <pxr/base/gf/api.h>
@@ -104,6 +95,7 @@
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/pxOsd/tokens.h>
+#include <pxr/pxr.h>
 #include <pxr/usd/ar/resolver.h>
 #include <pxr/usd/ar/resolverContext.h>
 #include <pxr/usd/ar/resolverContextBinder.h>
@@ -129,8 +121,6 @@
 #include <pxr/usd/usd/relationship.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/stageCache.h>
-#include <pxr/usd/usd/usdFileFormat.h>
-#include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/capsule.h>
 #include <pxr/usd/usdGeom/cone.h>
@@ -148,6 +138,8 @@
 #include <pxr/usd/usdLux/diskLight.h>
 #include <pxr/usd/usdLux/distantLight.h>
 #include <pxr/usd/usdLux/domeLight.h>
+
+#include <cstdio>
 // https://github.com/PixarAnimationStudios/USD/commit/7540fdf3b2aa6b6faa0fce8e7b4c72b756286f51
 #if PXR_VERSION >= 2111
 #    include <pxr/usd/usdLux/lightAPI.h>
@@ -161,6 +153,7 @@
 #include <pxr/usd/usdSkel/skeleton.h>
 #include <pxr/usd/usdSkel/tokens.h>
 #include <pxr/usd/usdUtils/stageCache.h>
+#include <pxr/usd/usdVol/tokens.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
 
 
@@ -191,7 +184,7 @@
 #elif defined(__GNUC__)
 #    pragma GCC diagnostic pop
 #    ifdef OMNI_USD_SUPPRESS_DEPRECATION_WARNINGS
-#        define DEPRECATED
+#        define __DEPRECATED
 #        undef OMNI_USD_SUPPRESS_DEPRECATION_WARNINGS
 #    endif
 #endif
