@@ -318,8 +318,8 @@ echo "   Checking if gh CLI is available..."
 if command -v gh &> /dev/null; then
     echo -e "${GREEN}✅ gh CLI is installed${NC}"
     
-    # Check if gh is authenticated
-    GH_USER=$(gh auth status 2>&1 | grep -oP "Logged in to github.com as \K[^[:space:]]+" || echo "")
+    # Check if gh is authenticated (macOS compatible, no -P flag)
+    GH_USER=$(gh auth status 2>&1 | grep "Logged in to github.com as" | sed 's/.*as //' | awk '{print $1}' || echo "")
     
     if [ -n "$GH_USER" ]; then
         echo "   gh CLI is authenticated as: $GH_USER"
