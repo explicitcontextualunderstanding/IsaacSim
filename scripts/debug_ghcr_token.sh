@@ -312,6 +312,75 @@ else
 fi
 
 echo ""
+echo "--- Check 6.5: gh CLI Token Fallback ---"
+echo "   Checking if gh CLI is available..."
+
+if command -v gh &> /dev/null; then
+    echo -e "${GREEN}✅ gh CLI is installed${NC}"
+    
+    # Check if gh is authenticated
+    GH_USER=$(gh auth status 2>&1 | grep -oP "Logged in to github.com as \K[^[:space:]]+" || echo "")
+    
+    if [ -n "$GH_USER" ]; then
+        echo "   gh CLI is authenticated as: $GH_USER"
+        
+        # Get gh's token
+        GH_TOKEN=$(gh auth token 2>/dev/null || echo "")
+        
+        if [ -n "$GH_TOKEN" ]; then
+            echo "   Token prefix: ${GH_TOKEN:0:4}..."
+            
+            # Check if it's a PAT or OAuth
+            if [[ "$GH_TOKEN" =~ ^ghp_ ]]; then
+                echo -e "${GREEN}✅ gh token is a Classic PAT (ghp_)${NC}"
+                echo "   This token may work for GHCR!"
+                
+                # Offer to test it
+                echo ""
+                echo -e "${BLUE}   To test gh's token, run:${NC}"
+                echo "      export TOKEN=\"\$(gh auth token)\""
+                echo "      ./scripts/debug_ghcr_token.sh"
+                
+            elif [[ "$GH_TOKEN" =~ ^gho_ ]]; then
+                echo -e "${YELLOW}⚠️  gh token is OAuth (gho_)${NC}"
+                echo "   OAuth tokens do NOT work for GHCR package access"
+                echo "   You need a Classic PAT with read:packages scope"
+                
+            elif [[ "$GH_TOKEN" =~ ^ghs_ ]]; then
+                echo -e "${YELLOW}⚠️  gh token is GitHub App token (ghs_)${NC}"
+                echo "   App tokens may work but are permission snapshots"
+                echo "   Ensure App has 'read:packages' permission"
+            fi
+            
+            # Quick test of gh token
+            echo ""
+            echo "   Testing gh token against GHCR..."
+            GH_TEST=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                "https://ghcr.io/v2/explicitcontextualunderstanding/isaac-sim-6/manifests/latest")
+            
+            if [ "$GH_TEST" = "200" ]; then
+                echo -e "${GREEN}✅ gh token WORKS for GHCR!${NC}"
+                echo ""
+                echo "   To use gh's token:"
+                echo "      export TOKEN=\"\$(gh auth token)\""
+            else
+                echo -e "${YELLOW}⚠️  gh token failed (HTTP $GH_TEST)${NC}"
+                echo "   gh token likely lacks 'read:packages' scope"
+            fi
+        else
+            echo -e "${YELLOW}⚠️  Could not retrieve gh token${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  gh CLI is not authenticated${NC}"
+        echo "   Run: gh auth login"
+    fi
+else
+    echo -e "${YELLOW}⚠️  gh CLI is not installed${NC}"
+    echo "   Install from: https://cli.github.com/"
+fi
+
+echo ""
 echo "=== Summary ==="
 
 if [ "$GHCR_STATUS" = "200" ]; then
