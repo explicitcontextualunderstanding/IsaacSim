@@ -162,21 +162,28 @@ if [ -n "$PACKAGE_DETAILS" ]; then
     fi
     
     # Check if user has direct collaborator access
-    COLLABORATORS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
-        "https://api.github.com/user/packages/container/isaac-sim-6/collaborators" 2>/dev/null | \
-        jq -r '.[].login // empty')
+    # Note: The collaborators API may not work for user-owned packages or may require different permissions
+    COLLAB_API_URL="https://api.github.com/user/packages/container/isaac-sim-6/collaborators"
+    COLLAB_RESPONSE=$(curl -s -H "Authorization: Bearer ${TOKEN}" "$COLLAB_API_URL" 2>/dev/null || echo "")
     
-    if [ -n "$COLLABORATORS" ]; then
-        echo "   Package collaborators:"
-        echo "$COLLABORATORS" | head -5 | sed 's/^/     - /'
+    # Check if response is valid JSON array before parsing
+    if [ -n "$COLLAB_RESPONSE" ] && echo "$COLLAB_RESPONSE" | jq -e 'type == "array"' > /dev/null 2>&1; then
+        COLLABORATORS=$(echo "$COLLAB_RESPONSE" | jq -r '.[].login // empty')
         
-        if echo "$COLLABORATORS" | grep -q "$GH_USER"; then
-            echo -e "${GREEN}✅ User is listed as collaborator${NC}"
+        if [ -n "$COLLABORATORS" ]; then
+            echo "   Package collaborators:"
+            echo "$COLLABORATORS" | head -5 | sed 's/^/     - /'
+            
+            if echo "$COLLABORATORS" | grep -q "$GH_USER"; then
+                echo -e "${GREEN}✅ User is listed as collaborator${NC}"
+            else
+                echo -e "${YELLOW}⚠️  WARNING: User not in collaborator list${NC}"
+            fi
         else
-            echo -e "${YELLOW}⚠️  WARNING: User not in collaborator list${NC}"
+            echo "   No collaborators found (empty list)"
         fi
     else
-        echo "   No collaborators found or no access to view"
+        echo "   ℹ️  Collaborator list not available (normal for user-owned packages)"
     fi
 else
     echo -e "${YELLOW}⚠️  Could not fetch package details${NC}"
