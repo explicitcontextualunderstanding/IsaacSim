@@ -9,6 +9,7 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo "=== GHCR Token Debug Script ==="
@@ -49,8 +50,9 @@ fi
 
 echo ""
 echo "--- Check 2: Token Scopes ---"
-SCOPES=$(curl -sI -H "Authorization: Bearer ${TOKEN}" \
-    "https://api.github.com/user" | grep -i "x-oauth-scopes" | tr -d '\r')
+SCOPE_RESPONSE=$(curl -sI -H "Authorization: Bearer ${TOKEN}" \
+    "https://api.github.com/user")
+SCOPES=$(echo "$SCOPE_RESPONSE" | grep -i "x-oauth-scopes" | tr -d '\r')
 
 if [ -n "$SCOPES" ]; then
     echo -e "${GREEN}✅ Token has scopes${NC}"
@@ -70,8 +72,45 @@ if [ -n "$SCOPES" ]; then
         echo -e "${YELLOW}⚠️  WARNING: Missing 'repo' scope${NC}"
         echo "   May be needed for private package metadata"
     fi
+    
+    # NEW: Check if write:packages exists (for org-owned packages)
+    if echo "$SCOPES" | grep -q "write:packages"; then
+        echo -e "${GREEN}✅ Has 'write:packages' scope${NC}"
+        echo "   This may help with org-owned packages"
+    else
+        echo -e "${BLUE}ℹ️  INFO: Missing 'write:packages' scope${NC}"
+        echo "   May be needed for certain org configurations"
+    fi
 else
     echo -e "${YELLOW}⚠️  Could not determine token scopes${NC}"
+fi
+
+# NEW: Check 2.5 - SAML Authorization Status
+echo ""
+echo "--- Check 2.5: SAML/SSO Authorization ---"
+echo "   Checking if token requires SSO authorization..."
+
+# Get organizations for the user
+ORGS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
+    "https://api.github.com/user/orgs" | jq -r '.[].login // empty')
+
+if [ -n "$ORGS" ]; then
+    echo "   User belongs to organizations:"
+    echo "$ORGS" | head -5 | sed 's/^/     - /'
+    
+    # Check each org for SAML enforcement
+    for ORG in $(echo "$ORGS" | head -3); do
+        SAML_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "https://api.github.com/orgs/${ORG}/repos" 2>/dev/null || echo "000")
+        
+        if [ "$SAML_CHECK" = "403" ]; then
+            echo -e "${YELLOW}⚠️  Organization '$ORG' may require SSO authorization${NC}"
+            echo "   Token needs SSO enablement for this org"
+        fi
+    done
+else
+    echo "   User does not belong to any organizations"
 fi
 
 echo ""
@@ -94,11 +133,65 @@ else
     echo -e "${YELLOW}⚠️  No packages found or access denied${NC}"
 fi
 
+# NEW: Check 3.5 - Package Ownership and Collaborators
+echo ""
+echo "--- Check 3.5: Package Ownership & Collaborators ---"
+
+echo "   Fetching package details..."
+PACKAGE_DETAILS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
+    "https://api.github.com/user/packages/container/isaac-sim-6" 2>/dev/null || echo "")
+
+if [ -n "$PACKAGE_DETAILS" ]; then
+    OWNER_TYPE=$(echo "$PACKAGE_DETAILS" | jq -r '.owner.type // "unknown"')
+    OWNER_LOGIN=$(echo "$PACKAGE_DETAILS" | jq -r '.owner.login // "unknown"')
+    VISIBILITY=$(echo "$PACKAGE_DETAILS" | jq -r '.visibility // "unknown"')
+    
+    echo "   Package owner type: $OWNER_TYPE"
+    echo "   Package owner: $OWNER_LOGIN"
+    echo "   Package visibility: $VISIBILITY"
+    
+    if [ "$OWNER_TYPE" = "Organization" ]; then
+        echo -e "${YELLOW}⚠️  WARNING: Package is organization-owned${NC}"
+        echo "   Classic PATs may have limited access to org packages"
+        echo "   Consider:"
+        echo "     1. Ensure token has SSO authorization for org"
+        echo "     2. Check org PAT policy settings"
+        echo "     3. Try Fine-Grained PAT with explicit repo access"
+    elif [ "$OWNER_TYPE" = "User" ]; then
+        echo -e "${GREEN}✅ Package is user-owned${NC}"
+    fi
+    
+    # Check if user has direct collaborator access
+    COLLABORATORS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
+        "https://api.github.com/user/packages/container/isaac-sim-6/collaborators" 2>/dev/null | \
+        jq -r '.[].login // empty')
+    
+    if [ -n "$COLLABORATORS" ]; then
+        echo "   Package collaborators:"
+        echo "$COLLABORATORS" | head -5 | sed 's/^/     - /'
+        
+        if echo "$COLLABORATORS" | grep -q "$GH_USER"; then
+            echo -e "${GREEN}✅ User is listed as collaborator${NC}"
+        else
+            echo -e "${YELLOW}⚠️  WARNING: User not in collaborator list${NC}"
+        fi
+    else
+        echo "   No collaborators found or no access to view"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Could not fetch package details${NC}"
+fi
+
 echo ""
 echo "--- Check 4: GHCR Manifest Access ---"
-GHCR_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+echo "   Testing manifest access (this is the critical test)..."
+
+# Use verbose mode to capture headers
+GHCR_RESPONSE=$(curl -s -w "\n%{http_code}\n" \
     -H "Authorization: Bearer ${TOKEN}" \
-    "https://ghcr.io/v2/explicitcontextualunderstanding/isaac-sim-6/manifests/latest")
+    "https://ghcr.io/v2/explicitcontextualunderstanding/isaac-sim-6/manifests/latest" 2>&1)
+
+GHCR_STATUS=$(echo "$GHCR_RESPONSE" | tail -1)
 
 case "$GHCR_STATUS" in
     200)
@@ -113,10 +206,21 @@ case "$GHCR_STATUS" in
     403)
         echo -e "${RED}❌ FAIL: GHCR forbidden (HTTP 403)${NC}"
         echo "   Token has packages scope but access is denied"
-        echo "   Possible causes:"
-        echo "     - Token is expired"
-        echo "     - Token owner doesn't have access to the package"
-        echo "     - Package visibility issue"
+        echo ""
+        echo -e "${YELLOW}   Possible causes:${NC}"
+        echo "   1. Package is org-owned and token lacks SSO authorization"
+        echo "   2. Package collaborator access not granted"
+        echo "   3. Organization PAT policy blocks Classic tokens"
+        echo "   4. Fine-Grained PAT required for this repository"
+        echo "   5. Package visibility settings prevent access"
+        echo ""
+        echo -e "${BLUE}   Diagnostic steps:${NC}"
+        echo "   1. Check: https://github.com/settings/tokens"
+        echo "      Look for 'Enable SSO' button next to your token"
+        echo "   2. Check package settings:"
+        echo "      https://github.com/users/explicitcontextualunderstanding/packages/container/package/isaac-sim-6"
+        echo "   3. Try Fine-Grained PAT:"
+        echo "      https://github.com/settings/personal-access-tokens/new"
         ;;
     404)
         echo -e "${YELLOW}⚠️  GHCR not found (HTTP 404)${NC}"
@@ -126,6 +230,29 @@ case "$GHCR_STATUS" in
         echo -e "${YELLOW}⚠️  GHCR returned HTTP $GHCR_STATUS${NC}"
         ;;
 esac
+
+# NEW: Check 4.5 - Verbose Headers for Debugging
+echo ""
+echo "--- Check 4.5: Verbose Headers (for support) ---"
+echo "   Fetching detailed response headers..."
+
+VERBOSE_RESPONSE=$(curl -s -I \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "https://ghcr.io/v2/explicitcontextualunderstanding/isaac-sim-6/manifests/latest" 2>&1)
+
+# Extract key headers
+REQUEST_ID=$(echo "$VERBOSE_RESPONSE" | grep -i "x-github-request-id" | head -1 | tr -d '\r')
+WWW_AUTH=$(echo "$VERBOSE_RESPONSE" | grep -i "www-authenticate" | head -1 | tr -d '\r')
+CONTENT_TYPE=$(echo "$VERBOSE_RESPONSE" | grep -i "content-type" | head -1 | tr -d '\r')
+
+if [ -n "$REQUEST_ID" ]; then
+    echo "   $REQUEST_ID"
+fi
+
+if [ -n "$WWW_AUTH" ]; then
+    echo "   WWW-Authenticate: $WWW_AUTH"
+    echo -e "${YELLOW}   (This header indicates authentication challenge type)${NC}"
+fi
 
 echo ""
 echo "--- Check 5: Package Visibility ---"
@@ -140,6 +267,41 @@ elif [ "$ANON_STATUS" = "200" ]; then
     echo "   This shouldn't happen for a private EULA-protected image"
 else
     echo "   Unauthenticated access: HTTP $ANON_STATUS"
+fi
+
+# NEW: Check 6 - Token Type Detection & Fine-Grained PAT Info
+echo ""
+echo "--- Check 6: Token Type Analysis ---"
+
+if [[ "$TOKEN" =~ ^ghp_[a-zA-Z0-9]{36}$ ]]; then
+    echo -e "${BLUE}ℹ️  Token Type: Classic Personal Access Token (PAT)${NC}"
+    echo "   Prefix: ghp_"
+    echo ""
+    echo -e "${YELLOW}   Note: Classic PATs may have limitations:${NC}"
+    echo "   - May require SSO authorization for org access"
+    echo "   - May be blocked by org Fine-Grained PAT policy"
+    echo "   - Org-owned packages may need explicit collaborator access"
+    echo ""
+    echo "   Try creating a Fine-Grained PAT if this token fails:"
+    echo "   https://github.com/settings/personal-access-tokens/new"
+elif [[ "$TOKEN" =~ ^ghs_[a-zA-Z0-9]{35,}$ ]]; then
+    echo -e "${BLUE}ℹ️  Token Type: GitHub App Installation Token${NC}"
+    echo "   Prefix: ghs_"
+    echo ""
+    echo -e "${YELLOW}   Note: App tokens are permission snapshots:${NC}"
+    echo "   - Generated when App permissions were granted"
+    echo "   - Do NOT inherit permission changes retroactively"
+    echo "   - Must regenerate after App permission updates"
+elif [[ "$TOKEN" =~ ^gho_[a-zA-Z0-9]{35,}$ ]]; then
+    echo -e "${YELLOW}⚠️  Token Type: OAuth Token${NC}"
+    echo "   Prefix: gho_"
+    echo ""
+    echo -e "${RED}   WARNING: OAuth tokens do NOT support package access!${NC}"
+    echo "   These tokens are for user authentication only"
+    echo "   Use a Classic PAT (ghp_) or App token (ghs_) instead"
+else
+    echo -e "${YELLOW}⚠️  Unknown token format${NC}"
+    echo "   Unrecognized prefix: ${TOKEN:0:4}"
 fi
 
 echo ""
@@ -162,16 +324,33 @@ if [ "$GHCR_STATUS" = "200" ]; then
 else
     echo -e "${RED}❌ Token is NOT ready for GHCR${NC}"
     echo ""
-    echo "Common fixes:"
-    echo "1. Regenerate token with 'read:packages' scope:"
-    echo "   https://github.com/settings/tokens/new"
+    echo "Most Likely Causes (in order):"
     echo ""
-    echo "2. Verify token isn't expired:"
-    echo "   https://github.com/settings/tokens"
+    echo "1. ${YELLOW}Organization SAML/SSO${NC} - Token not authorized for org"
+    echo "   Fix: https://github.com/settings/tokens → Enable SSO"
     echo ""
-    echo "3. Alternative: Use S3 download instead:"
+    echo "2. ${YELLOW}Package Collaborator Access${NC} - Not listed as reader"
+    echo "   Fix: https://github.com/users/explicitcontextualunderstanding/packages/container/package/isaac-sim-6"
+    echo "   → Package Settings → Manage Access"
+    echo ""
+    echo "3. ${YELLOW}Org PAT Policy${NC} - Classic PATs blocked"
+    echo "   Fix: Create Fine-Grained PAT:"
+    echo "   https://github.com/settings/personal-access-tokens/new"
+    echo "   → Select repo: isaac-sim-6 → Grant packages:read"
+    echo ""
+    echo "4. ${YELLOW}Missing write:packages${NC} - Org requires write scope"
+    echo "   Fix: Regenerate token with BOTH read:packages AND write:packages"
+    echo ""
+    echo "Fallback: Use S3 download instead:"
     echo "   aws s3 cp s3://isaac-sim-6-0-dev/isaac-sim-6.tar ."
 fi
 
 echo ""
 echo "=== End of Report ==="
+echo ""
+echo -e "${BLUE}For support, include the following in your ticket:${NC}"
+echo "   - HTTP Status: $GHCR_STATUS"
+[ -n "$REQUEST_ID" ] && echo "   - $REQUEST_ID"
+echo "   - Token prefix: ${TOKEN:0:4}..."
+echo "   - User: $GH_USER"
+[ -n "$OWNER_TYPE" ] && echo "   - Package owner type: $OWNER_TYPE"
