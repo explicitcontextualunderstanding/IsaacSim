@@ -90,9 +90,17 @@ echo ""
 echo "--- Check 2.5: SAML/SSO Authorization ---"
 echo "   Checking if token requires SSO authorization..."
 
-# Get organizations for the user
-ORGS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
-    "https://api.github.com/user/orgs" | jq -r '.[].login // empty')
+    # Get organizations for the user
+    # Validate response is JSON array before parsing
+    ORGS_RESPONSE=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
+        "https://api.github.com/user/orgs" 2>/dev/null || echo "")
+    
+    if [ -n "$ORGS_RESPONSE" ] && echo "$ORGS_RESPONSE" | jq -e 'type == "array"' > /dev/null 2>&1; then
+        ORGS=$(echo "$ORGS_RESPONSE" | jq -r '.[].login // empty')
+    else
+        echo "   Could not fetch organizations (token may lack 'repo' scope)"
+        ORGS=""
+    fi
 
 if [ -n "$ORGS" ]; then
     echo "   User belongs to organizations:"
@@ -352,6 +360,21 @@ if command -v gh &> /dev/null; then
                 echo "   Ensure App has 'read:packages' permission"
             fi
             
+            # Get gh token scopes from auth status
+            echo ""
+            echo "   Checking gh token scopes..."
+            GH_SCOPES=$(gh auth status 2>&1 | grep "Token scopes:" | sed 's/.*Token scopes: //' | tr -d "'")
+            
+            if [ -n "$GH_SCOPES" ]; then
+                echo "   gh token scopes: $GH_SCOPES"
+                
+                if echo "$GH_SCOPES" | grep -q "read:packages"; then
+                    echo -e "${GREEN}✅ gh token has 'read:packages' scope${NC}"
+                else
+                    echo -e "${YELLOW}⚠️  gh token missing 'read:packages' scope${NC}"
+                fi
+            fi
+            
             # Quick test of gh token
             echo ""
             echo "   Testing gh token against GHCR..."
@@ -362,11 +385,32 @@ if command -v gh &> /dev/null; then
             if [ "$GH_TEST" = "200" ]; then
                 echo -e "${GREEN}✅ gh token WORKS for GHCR!${NC}"
                 echo ""
-                echo "   To use gh's token:"
+                echo -e "${BLUE}   RECOMMENDATION: Use gh's token!${NC}"
+                echo "   It has the correct scopes and is authenticated."
+                echo ""
+                echo "   To use gh's token immediately:"
                 echo "      export TOKEN=\"\$(gh auth token)\""
+                echo "      ./scripts/debug_ghcr_token.sh"
+                echo ""
+                echo "   Or for RunPod deployment:"
+                echo "      export TOKEN=\"\$(gh auth token)\""
+                echo "      runpod pod create \\"
+                echo "        --image ghcr.io/explicitcontextualunderstanding/isaac-sim-6:latest \\"
+                echo "        --gpu-type 'NVIDIA L40S'"
             else
                 echo -e "${YELLOW}⚠️  gh token failed (HTTP $GH_TEST)${NC}"
-                echo "   gh token likely lacks 'read:packages' scope"
+                
+                if [ "$GH_TEST" = "403" ]; then
+                    echo ""
+                    echo -e "${YELLOW}   OAuth tokens (gho_) typically fail with 403${NC}"
+                    echo "   even with correct scopes. This is a known GHCR limitation."
+                    echo ""
+                    echo "   SOLUTION: Create a Classic PAT instead:"
+                    echo "   https://github.com/settings/tokens/new"
+                    echo "   Select: repo, read:packages, write:packages"
+                else
+                    echo "   gh token may lack required scopes or have other issues"
+                fi
             fi
         else
             echo -e "${YELLOW}⚠️  Could not retrieve gh token${NC}"
