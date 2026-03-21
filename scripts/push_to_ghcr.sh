@@ -19,6 +19,19 @@ if [ -z "$GITHUB_TOKEN" ]; then
     exit 1
 fi
 
+# Install AWS CLI if needed
+if ! command -v aws &> /dev/null; then
+    echo "📥 Installing AWS CLI..."
+    apt-get update -qq
+    apt-get install -y -qq curl unzip
+    cd /tmp
+    curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip -q awscliv2.zip
+    ./aws/install --update
+    rm -rf aws awscliv2.zip
+    cd - > /dev/null
+fi
+
 if [ ! -f "$TAR_FILE" ]; then
     echo "❌ Error: Tar file not found at ${TAR_FILE}"
     echo "Downloading from S3..."
@@ -27,6 +40,10 @@ fi
 
 # Check tar size
 TAR_SIZE=$(stat -c%s "$TAR_FILE" 2>/dev/null || stat -f%z "$TAR_FILE")
+# Install coreutils for numfmt if on minimal system
+if ! command -v numfmt &> /dev/null; then
+    apt-get install -y -qq coreutils 2>/dev/null || true
+fi
 echo "📦 Tar size: $(numfmt --to=iec-i $TAR_SIZE 2>/dev/null || echo $TAR_SIZE bytes)"
 
 # Install skopeo if needed
