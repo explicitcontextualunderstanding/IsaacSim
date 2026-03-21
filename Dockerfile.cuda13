@@ -1,0 +1,105 @@
+# Isaac Sim 6.0 Container with CUDA 13.1+
+# Base: nvidia/cuda:13.1.1-devel-ubuntu24.04
+# For Blackwell (sm_100) and newer GPU support
+
+FROM nvidia/cuda:13.1.1-devel-ubuntu24.04
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Install system dependencies
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    git \
+    git-lfs \
+    build-essential \
+    gcc-11 \
+    g++-11 \
+    software-properties-common \
+    gpgv \
+    libatomic1 \
+    libegl1 \
+    libgl1 \
+    libglu1-mesa \
+    libglx0 \
+    libgomp1 \
+    libsm6 \
+    libxi6 \
+    libxrandr2 \
+    libxt6 \
+    unzip \
+    ca-certificates \
+    libglib2.0-0 \
+    libnghttp2-14 \
+    libvulkan-dev \
+    vulkan-tools \
+    libgl1-mesa-dev \
+    libx11-dev \
+    libxext-dev \
+    libxcursor-dev \
+    libxrandr-dev \
+    libxi-dev \
+    libxinerama-dev \
+    libxfixes-dev \
+    libxrender1 \
+    libxtst6 \
+    libxmu6 \
+    libgtest-dev \
+    libbenchmark-dev \
+    rapidjson-dev \
+    libopenexr-dev \
+    libjson-c-dev \
+    libtbb-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libzstd-dev \
+    libssl-dev \
+    pkg-config \
+    p7zip-full \
+    python3 \
+    python3-pip \
+    && apt-get -y autoremove \
+    && apt-get clean autoclean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure GCC 11 as default (required for Isaac Sim 6.0)
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 110
+
+# Verify CUDA installation
+RUN nvcc --version && gcc --version
+
+# Install runtime configuration files for Vulkan/NVIDIA
+RUN mkdir -p /usr/share/glvnd/egl_vendor.d /etc/vulkan/icd.d /etc/vulkan/implicit_layer.d
+RUN printf '{\n  "file_format_version" : "1.0.0",\n  "ICD" : {\n    "library_path" : "libEGL_nvidia.so.0"\n  }\n}\n' > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+RUN printf '{\n  "file_format_version" : "1.0.0",\n  "ICD" : {\n    "library_path" : "libEGL_mesa.so.0"\n  }\n}\n' > /usr/share/glvnd/egl_vendor.d/50_mesa.json
+RUN printf '{\n  "file_format_version" : "1.0.0",\n  "ICD" : {\n    "library_path" : "libGLX_nvidia.so.0",\n    "api_version" : "1.3.194"\n  }\n}\n' > /etc/vulkan/icd.d/nvidia_icd.json
+
+ENV VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json
+
+# Create non-root user
+RUN useradd -ms /bin/bash -l --uid 1234 isaac-sim -d /isaac-sim \
+    && mkdir -p /isaac-sim \
+    && chown -R isaac-sim:isaac-sim /isaac-sim
+
+# Set up workspace
+WORKDIR /isaac-sim
+USER isaac-sim
+
+# Create config directory
+RUN mkdir -p /isaac-sim/.nvidia-omniverse/config
+
+ENV MIN_DRIVER_VERSION=570.169
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD bash -c 'logdir="/isaac-sim/.nvidia-omniverse/logs/Kit"; [ -d "$logdir" ] && latest=$(ls -t "$logdir"/*/*/kit_*.log 2>/dev/null | head -1) && [ -n "$latest" ] && grep -q "AppReady" "$latest" && exit 0; exit 1'
+
+# Default entrypoint
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c", "echo 'Isaac Sim 6.0 CUDA 13.1+ base image ready. Mount Isaac Sim binaries to /isaac-sim to use.' && sleep infinity"]
