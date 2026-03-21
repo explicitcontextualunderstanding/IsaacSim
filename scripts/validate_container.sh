@@ -124,14 +124,14 @@ else
     echo "✅ LD_LIBRARY_PATH includes Isaac ROS paths."
 fi
 
-# Bridge Import Test
-echo "   Running ROS 2 bridge import test..."
-ROS2_LOAD_TEST=$(./python.sh -c "import omni.isaac.ros2_bridge; print('ROS2 Bridge Loaded')" 2>&1 || true)
-if echo "$ROS2_LOAD_TEST" | grep -q "ROS2 Bridge Loaded"; then
-    echo "✅ ROS2 Bridge loaded successfully without undefined symbol errors."
+# Bridge Import Test (Isaac Sim 6.0-dev2 Modular ROS2)
+echo " Running ROS 2 bridge import test (modular isaacsim.ros2.core)..."
+ROS2_LOAD_TEST=$(./python.sh -c "import isaacsim.ros2.core; print('ROS2 Core Loaded')" 2>&1 || true)
+if echo "$ROS2_LOAD_TEST" | grep -q "ROS2 Core Loaded"; then
+    echo "✅ Modular ROS2 Core (isaacsim.ros2.core) loaded successfully."
 else
-    echo "❌ Error: ROS2 Bridge failed to load. Typical cause: fastdds/rmw linkage failure."
-    echo "   Output: $ROS2_LOAD_TEST"
+    echo "❌ Error: Modular ROS2 Core failed to load. Typical cause: fastdds/rmw linkage failure."
+    echo "    Output: $ROS2_LOAD_TEST"
     exit 1
 fi
 
