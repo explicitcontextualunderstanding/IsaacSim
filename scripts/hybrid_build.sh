@@ -179,91 +179,33 @@ BUILD_EOF
 # PHASE 2: CPU Reassembly on external CPU
 # ============================================
 run_cpu_assemble() {
-    log "=========================================="
-    log "PHASE 2: CPU Reassembly on external CPU"
-    log "=========================================="
+log "=========================================="
+log "PHASE 2: CPU Reassembly on external CPU"
+log "=========================================="
 
-    if [ -z "${GITHUB_TOKEN:-}" ]; then
-        error "GITHUB_TOKEN not set (needed for GHCR push)"
-        exit 1
-    fi
+# Check for assemble_image.sh
+ASSEMBLE_SCRIPT="${SCRIPT_DIR}/assemble_image.sh"
+if [ ! -f "$ASSEMBLE_SCRIPT" ]; then
+    error "assemble_image.sh not found at ${ASSEMBLE_SCRIPT}"
+    log "Clone the full repo to get all scripts"
+    exit 1
+fi
 
-    log "Creating reassembly Dockerfile..."
+log "Executing assemble_image.sh..."
+log "  Build Tag: ${BUILD_TAG}"
+log "  S3 Bucket: ${S3_BUCKET}"
+log "  GHCR Image: ${GHCR_IMAGE}"
 
-    # Create Dockerfile for reassembly
-    cat > /tmp/Dockerfile.reassemble << DOCKER_EOF
-FROM ubuntu:24.04
+# Run the assembly script
+bash "$ASSEMBLE_SCRIPT" \
+    --build-tag "${BUILD_TAG}" \
+    --s3-bucket "${S3_BUCKET}" \
+    --s3-prefix "${S3_PREFIX}" \
+    --ghcr-image "${GHCR_IMAGE}" \
+    --github-user "${GITHUB_USER}"
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    python3 \
-    python3-pip \
-    libvulkan1 \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install AWS CLI
-RUN pip3 install --break-system-packages awscli
-
-# Download and extract Isaac Sim from S3
-ARG S3_BUCKET=${S3_BUCKET}
-ARG S3_PREFIX=${S3_PREFIX}
-ARG BUILD_TAG=${BUILD_TAG}
-ARG AWS_ACCESS_KEY_ID
-ARG AWS_SECRET_ACCESS_KEY
-
-ENV AWS_ACCESS_KEY_ID=\${AWS_ACCESS_KEY_ID}
-ENV AWS_SECRET_ACCESS_KEY=\${AWS_SECRET_ACCESS_KEY}
-ENV AWS_DEFAULT_REGION=us-east-1
-
-RUN echo "Downloading from S3..." && \
-    aws s3 cp s3://\${S3_BUCKET}/\${S3_PREFIX}/isaac-sim-build-\${BUILD_TAG}.tar.gz /tmp/ && \
-    echo "Extracting..." && \
-    mkdir -p /opt/isaac-sim && \
-    tar xzf /tmp/isaac-sim-build-\${BUILD_TAG}.tar.gz -C /opt/isaac-sim && \
-    rm /tmp/isaac-sim-build-\${BUILD_TAG}.tar.gz && \
-    echo "Extraction complete"
-
-# Set environment
-ENV ISAAC_SIM_PATH=/opt/isaac-sim/_build/linux-x86_64/release
-ENV PATH=\${ISAAC_SIM_PATH}/python.sh:\${PATH}
-WORKDIR /opt/isaac-sim
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD ls -d \${ISAAC_SIM_PATH} || exit 1
-
-ENTRYPOINT ["/bin/bash"]
-CMD ["-c", "echo 'Isaac Sim ready. Run ./python.sh to start.' && sleep infinity"]
-DOCKER_EOF
-
-    log "Dockerfile created: /tmp/Dockerfile.reassemble"
-    log ""
-    log "To build on external CPU:"
-    log "  1. SSH to external CPU CPU instance"
-    log "  2. Copy Dockerfile: scp /tmp/Dockerfile.reassemble vultr:/tmp/"
-    log "  3. Set AWS creds: export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=..."
-    log "  4. Build:"
-    log ""
-    log "     docker build \\"
-    log "       --build-arg AWS_ACCESS_KEY_ID=\$AWS_ACCESS_KEY_ID \\"
-    log "       --build-arg AWS_SECRET_ACCESS_KEY=\$AWS_SECRET_ACCESS_KEY \\"
-    log "       --build-arg BUILD_TAG=${BUILD_TAG} \\"
-    log "       -f /tmp/Dockerfile.reassemble \\"
-    log "       -t ${GHCR_IMAGE} \\"
-    log "       ."
-    log ""
-    log "  5. Push:"
-    log "     echo \$GITHUB_TOKEN | docker login ghcr.io -u ${GITHUB_USER} --password-stdin"
-    log "     docker push ${GHCR_IMAGE}"
-
-    success "CPU reassembly phase prepared"
-    return 0
+success "CPU reassembly complete"
+return 0
 }
 
 # ============================================
