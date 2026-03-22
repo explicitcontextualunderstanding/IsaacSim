@@ -1,0 +1,184 @@
+name: Assemble Isaac Sim Image from S3
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_tag:
+        description: 'Build tag to assemble (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+      s3_bucket:
+        description: 'S3 bucket containing build artifacts'
+        required: false
+        default: 'isaac-sim-6-0-dev'
+        type: string
+      s3_prefix:
+        description: 'S3 prefix path'
+        required: false
+        default: 'builds'
+        type: string
+      push_to_ghcr:
+        description: 'Push to GHCR after build'
+        required: false
+        default: true
+        type: boolean
+
+  # Optional: Trigger on new S3 builds (requires AWS EventBridge setup)
+  # repository_dispatch:
+  #   types: [s3-build-complete]
+
+env:
+  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/isaac-sim-6
+  BUILD_TAG: ${{ github.event.inputs.build_tag || 'latest' }}
+  S3_BUCKET: ${{ github.event.inputs.s3_bucket || 'isaac-sim-6-0-dev' }}
+  S3_PREFIX: ${{ github.event.inputs.s3_prefix || 'builds' }}
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write  # For AWS OIDC
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Verify S3 access
+        run: |
+          echo "Checking S3 bucket: ${S3_BUCKET}"
+          aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" | head -20
+
+      - name: Download build from S3
+        run: |
+          S3_URL="s3://${S3_BUCKET}/${S3_PREFIX}/isaac-sim-build-${BUILD_TAG}.tar.gz"
+          echo "Downloading from: ${S3_URL}"
+          
+          # Download build artifact
+          aws s3 cp "${S3_URL}" "./isaac-sim-build.tar.gz"
+          
+          # Verify download
+          BUILD_SIZE=$(stat -c%s "./isaac-sim-build.tar.gz" 2>/dev/null || stat -f%z "./isaac-sim-build.tar.gz" 2>/dev/null)
+          BUILD_SIZE_MB=$((BUILD_SIZE / 1024 / 1024))
+          echo "Downloaded: ${BUILD_SIZE_MB}MB"
+          
+          # Also download manifest if exists
+          MANIFEST_URL="s3://${S3_BUCKET}/${S3_PREFIX}/manifest-${BUILD_TAG}.json"
+          if aws s3 ls "${MANIFEST_URL}" &>/dev/null; then
+            aws s3 cp "${MANIFEST_URL}" "./manifest.json"
+            echo "Build info:"
+            cat manifest.json | jq . || cat manifest.json
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: ${{ github.event.inputs.push_to_ghcr != 'false' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event.inputs.push_to_ghcr != 'false' }}
+          tags: |
+            ${{ env.GHCR_IMAGE }}:${{ env.BUILD_TAG }}
+            ${{ env.GHCR_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_TAG=${{ env.BUILD_TAG }}
+
+      - name: Build image locally (no push)
+        if: ${{ github.event.inputs.push_to_ghcr == 'false' }}
+        run: |
+          # Create Dockerfile inline
+          cat > Dockerfile.assemble << 'DOCKER_EOF'
+          FROM ubuntu:24.04
+          
+          ENV NVIDIA_VISIBLE_DEVICES=all
+          ENV NVIDIA_DRIVER_CAPABILITIES=all
+          ENV OMNI_KIT_ALLOW_ROOT=1
+          ENV ACCEPT_EULA=Y
+          ENV PRIVACY_CONSENT=Y
+          
+          # Install runtime dependencies
+          RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              python3 python3-pip libvulkan1 libgl1-mesa-glx libglib2.0-0 \
+              libsm6 libxext6 libxrender1 libxcursor1 libxi6 libxrandr2 \
+              libxt6 libglu1-mesa libegl1 libgomp1 libatomic1 \
+              libopenexr-dev libtbb-dev rapidjson-dev libbenchmark-dev \
+              libgtest-dev libjson-c-dev \
+              && rm -rf /var/lib/apt/lists/*
+          
+          # Create non-root user
+          RUN useradd -ms /bin/bash -l --uid 1234 isaac-sim -d /isaac-sim
+          
+          # Copy and extract build
+          COPY isaac-sim-build.tar.gz /tmp/
+          RUN mkdir -p /isaac-sim && \
+              tar xzf /tmp/isaac-sim-build.tar.gz -C /isaac-sim && \
+              rm /tmp/isaac-sim-build.tar.gz && \
+              chown -R isaac-sim:isaac-sim /isaac-sim
+          
+          ENV ISAAC_SIM_PATH=/isaac-sim/_build/linux-x86_64/release
+          ENV PATH=${ISAAC_SIM_PATH}:${PATH}
+          ENV PYTHONPATH=${ISAAC_SIM_PATH}:${PYTHONPATH}
+          ENV MIN_DRIVER_VERSION=570.169
+          
+          WORKDIR /isaac-sim
+          USER isaac-sim
+          
+          RUN mkdir -p /isaac-sim/.nvidia-omniverse/config
+          
+          ENTRYPOINT ["/bin/bash"]
+          CMD ["-c", "echo 'Isaac Sim 6.0 ready' && sleep infinity"]
+          DOCKER_EOF
+          
+          # Build locally
+          docker build -f Dockerfile.assemble -t "isaac-sim-6:local" .
+          docker images | grep isaac-sim
+
+      - name: Verify GHCR push
+        if: ${{ github.event.inputs.push_to_ghcr != 'false' }}
+        run: |
+          echo "Image pushed to: ${GHCR_IMAGE}:${BUILD_TAG}"
+          echo "Also tagged as: ${GHCR_IMAGE}:latest"
+          
+          # Pull to verify
+          docker pull "${GHCR_IMAGE}:${BUILD_TAG}"
+          docker images | grep isaac-sim
+
+      - name: Cleanup
+        run: |
+          rm -f isaac-sim-build.tar.gz manifest.json Dockerfile.assemble
+          docker system prune -f
+
+      - name: Summary
+        run: |
+          echo "=========================================="
+          echo "  IMAGE ASSEMBLY COMPLETE ✓"
+          echo "=========================================="
+          echo "Build Tag: ${BUILD_TAG}"
+          echo "Source: s3://${S3_BUCKET}/${S3_PREFIX}/isaac-sim-build-${BUILD_TAG}.tar.gz"
+          echo "Image: ${GHCR_IMAGE}:${BUILD_TAG}"
+          if [ "${{ github.event.inputs.push_to_ghcr }}" != "false" ]; then
+            echo "Status: Pushed to GHCR"
+          else
+            echo "Status: Built locally"
+          fi
+          echo "=========================================="
