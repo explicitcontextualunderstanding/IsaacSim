@@ -47,6 +47,21 @@ echo "Vultr GPU Instance → GHCR Runnable Image"
 echo "=========================================="
 echo ""
 
+# ============================================
+# RUN PREFLIGHT CHECKS (Fail Fast)
+# ============================================
+log "Running preflight checks..."
+if [ -f "${ISAAC_DIR}/scripts/preflight_checks.sh" ]; then
+    cd "${ISAAC_DIR}"
+    if ! bash scripts/preflight_checks.sh; then
+        error "Preflight checks failed - fix issues before proceeding"
+        exit 1
+    fi
+    success "Preflight checks passed"
+else
+    warn "Preflight script not found - proceeding with basic checks only"
+fi
+
 # Check prerequisites
 start_phase "Environment Validation"
 
@@ -100,6 +115,12 @@ fi
 
 success "Repository ready at $ISAAC_DIR"
 
+# Run mid-flight check after clone
+if [ -f "scripts/mid_flight_check.sh" ]; then
+    log "Running mid-flight check (post-clone)..."
+    ISAAC_DIR="$ISAAC_DIR" bash scripts/mid_flight_check.sh post-clone || warn "Mid-flight check had issues"
+fi
+
 # Phase 3: Build Isaac Sim from Source
 start_phase "Build Isaac Sim Binaries (This takes 2-4 hours)"
 
@@ -132,6 +153,12 @@ if [ -f repo.sh ]; then
     log "Packaging Isaac Sim..."
     mkdir -p "${BUILD_DIR}/packages"
     ./repo.sh package -c release -m isaac-sim-standalone --temp-dir "${BUILD_DIR}/temp" 2>&1 | tee -a "${BUILD_DIR}/build.log" || warn "Packaging may have failed"
+fi
+
+# Run mid-flight check after build
+if [ -f "scripts/mid_flight_check.sh" ]; then
+    log "Running mid-flight check (post-build)..."
+    ISAAC_DIR="$ISAAC_DIR" bash scripts/mid_flight_check.sh post-build || warn "Build artifacts check had issues"
 fi
 
 # Phase 4: Create Full Docker Image
@@ -228,6 +255,12 @@ docker build -f "${WORKSPACE}/Dockerfile.full" -t "${GHCR_IMAGE}" -t "isaac-sim-
 
 success "Docker image built: ${GHCR_IMAGE}"
 docker images | grep isaac-sim | head -5 | tee -a "$LOG_FILE"
+
+# Run mid-flight check after Docker build
+if [ -f "scripts/mid_flight_check.sh" ]; then
+    log "Running mid-flight check (post-docker)..."
+    IMAGE_NAME="isaac-sim-6:local" bash scripts/mid_flight_check.sh post-docker || warn "Docker image check had issues"
+fi
 
 # Phase 5: Validate the Container
 start_phase "Validate Container"

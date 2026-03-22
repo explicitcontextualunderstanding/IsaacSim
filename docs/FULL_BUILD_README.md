@@ -55,10 +55,40 @@ Requirements:
 - 100GB+ disk space
 - Ubuntu 24.04 LTS
 
-### 2. Run Single Command
+### 2. Run Preflight Checks (Fail Fast)
+
+**Before starting the full build, validate your environment:**
+
+```bash
+# Download and run preflight checks
+wget https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/preflight_checks.sh
+chmod +x preflight_checks.sh
+export GITHUB_TOKEN=ghp_xxxxxxxx
+./preflight_checks.sh
+```
+
+**What preflight checks do:**
+- ✅ Verify GitHub token (`write:packages` scope)
+- ✅ Check Docker daemon is running
+- ✅ Validate NVIDIA GPU & drivers (570+)
+- ✅ Confirm CUDA 13.1+ available
+- ✅ Test Docker NVIDIA runtime
+- ✅ Check disk space (100GB+ required)
+- ✅ Verify memory (64GB+ recommended)
+- ✅ Test network connectivity
+- ✅ Validate GHCR authentication
+
+**Why fail fast?** Catches issues in ~2 minutes instead of failing after 4 hours.
+
+### 3. Run Full Build
+
+**Prerequisites:**
+- GitHub Personal Access Token with **`write:packages`** scope (for pushing to GHCR.io)
+- All preflight checks passed
 
 ```bash
 # On Vultr instance
+export GITHUB_TOKEN=ghp_xxxxxxxx  # Your token here
 curl -fsSL https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/vultr_full_build.sh | bash
 ```
 
@@ -69,10 +99,17 @@ Or step-by-step:
 wget https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/vultr_full_build.sh
 chmod +x vultr_full_build.sh
 
-# Run with GitHub token
+# Set token (required for GHCR push)
 export GITHUB_TOKEN=ghp_xxxxxxxx
+
+# Run build
 time ./vultr_full_build.sh
 ```
+
+**Why the token?**
+- **REQUIRED**: Push final image to `ghcr.io` (GHCR registry)
+- **Optional**: Clone private repos (this repo is public)
+- **Token scope needed**: `write:packages` ([create token](https://github.com/settings/tokens))
 
 ### 3. What Happens
 
@@ -92,16 +129,53 @@ timeline
         Push GHCR : 5-15 min
 ```
 
+## Validation Hierarchy (Fail Fast)
+
+```mermaid
+flowchart TD
+    subgraph Preflight["🚀 Preflight (2 min)"]
+        P1[GitHub Token] --> P2[Docker]
+        P2 --> P3[GPU Check]
+        P3 --> P4[CUDA 13.1+]
+        P4 --> P5[Disk Space]
+        P5 --> P6[GHCR Auth]
+    end
+
+    subgraph Build["🔨 Build (4-6 hours)"]
+        M1[Post-Clone Check] --> M2[Post-Build Check]
+        M2 --> M3[Post-Package Check]
+        M3 --> M4[Post-Docker Check]
+        M4 --> M5[Pre-Push Check]
+    end
+
+    subgraph Runtime["🎯 Runtime"]
+        R1[RunPod Validation]
+        R2[Health Checks]
+    end
+
+    Preflight -->|All Pass| Build
+    Build -->|All Pass| Runtime
+
+    Preflight -.->|Any Fail| Fail1[Exit Immediately]
+    Build -.->|Any Fail| Fail2[Stop & Debug]
+```
+
+| Level | Script | When | Duration | Purpose |
+|-------|--------|------|----------|---------|
+| **Preflight** | `preflight_checks.sh` | Before any work | ~2 min | Fail fast on missing prerequisites |
+| **Mid-Flight** | `mid_flight_check.sh` | After each phase | ~30 sec | Validate intermediate artifacts |
+| **Runtime** | `runpod_validation.sh` | On RunPod | ~1 min | Confirm deployment ready |
+
 ## Build Phases
 
-| Phase | Duration | Description | Output |
-|-------|----------|-------------|--------|
-| **1** | 10 min | Environment validation, clone repo | Source code ready |
-| **2** | 2-4 hrs | Compile Isaac Sim with CUDA 13.1+ | Compiled binaries |
-| **3** | 30 min | Package release artifacts | `_build/packages/` |
-| **4** | 20 min | Docker build with binaries | Local image |
-| **5** | 10 min | Container validation | Test results |
-| **6** | 15 min | Push to GHCR | `ghcr.io/...` |
+| Phase | Duration | Description | Output | Mid-Flight Check |
+|-------|----------|-------------|--------|------------------|
+| **1** | 10 min | Environment validation, clone repo | Source code ready | `post-clone` |
+| **2** | 2-4 hrs | Compile Isaac Sim with CUDA 13.1+ | Compiled binaries | `post-build` |
+| **3** | 30 min | Package release artifacts | `_build/packages/` | `post-package` |
+| **4** | 20 min | Docker build with binaries | Local image | `post-docker` |
+| **5** | 10 min | Container validation | Test results | `pre-push` |
+| **6** | 15 min | Push to GHCR | `ghcr.io/...` | Final validation |
 
 ## Cost Comparison
 

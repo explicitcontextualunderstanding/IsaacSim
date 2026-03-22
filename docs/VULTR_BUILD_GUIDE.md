@@ -44,6 +44,8 @@ ssh root@<your-vultr-ip>
 
 ### 2. Download and run the build script
 
+**Prerequisites:** GitHub token with `write:packages` scope ([create token](https://github.com/settings/tokens))
+
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -54,6 +56,7 @@ sequenceDiagram
     U->>V: SSH connect
     V->>V: Install Docker (if needed)
     U->>V: Download build script
+    U->>V: Set GITHUB_TOKEN env var
     V->>V: Run manual_vultr_build.sh
     V->>D: docker build -f Dockerfile.cuda13
     D->>V: Build complete (~10-15 min)
@@ -64,6 +67,10 @@ sequenceDiagram
 ```
 
 ```bash
+# Set your GitHub token (for GHCR push)
+export GITHUB_TOKEN=ghp_xxxxxxxx
+
+# Run build
 curl -fsSL https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/manual_vultr_build.sh | bash
 ```
 
@@ -73,7 +80,6 @@ Or manually:
 # Copy scripts/manual_vultr_build.sh
 chmod +x manual_vultr_build.sh
 export GITHUB_TOKEN=ghp_xxxxxxxx
-docker login ghcr.io -u explicitcontextualunderstanding --password-stdin <<< "$GITHUB_TOKEN"
 ./manual_vultr_build.sh
 ```
 
