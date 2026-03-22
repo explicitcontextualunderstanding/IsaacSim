@@ -41,11 +41,11 @@ flowchart LR
         S1[S3 Bucket] --> S2[Versioned Artifacts]
     end
 
-    subgraph Assemble["🚀 Phase 3: Reassembly (Vultr)"]
-        A1[Pull Ubuntu Base] --> A2[Download from S3]
-        A2 --> A3[Extract Overlay]
-        A3 --> A4[Commit as Image]
-        A4 --> A5[Push to GHCR]
+subgraph Assemble["🚀 Phase 3: Reassembly (External CPU)"]
+    A1[Pull Ubuntu Base] --> A2[Download from S3]
+    A2 --> A3[Extract Overlay]
+    A3 --> A4[Commit as Image]
+    A4 --> A5[Push to GHCR]
     end
 
     Build --> Store
@@ -120,11 +120,11 @@ s3://isaac-sim-6-0-dev/
 - **Cross-region**: S3 accessible from any cloud provider
 - **No GHCR tokens**: IAM-based authentication
 
-## Phase 3: CPU Reassembly (Vultr)
+## Phase 3: CPU Reassembly (External)
 
 ### Provision CPU Instance
 ```bash
-# Vultr CPU-only instance (cheaper, no GPU needed)
+# External CPU-only instance (cheaper, no GPU needed)
 # 4 vCPU, 8GB RAM, 100GB disk
 ```
 
@@ -169,7 +169,7 @@ ENTRYPOINT ["python3", "-m", "isaacsim.run"]```
 
 ### Build on CPU
 ```bash
-# On Vultr CPU instance
+# On external CPU instance
 export GITHUB_TOKEN=ghp_xxxxxxxx
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
@@ -237,7 +237,7 @@ case $PHASE in
 
   cpu-assemble)
     echo "Phase 2: Reassembling on Vultr CPU..."
-    # SSH to Vultr and run Docker build
+    # SSH to external and run Docker build
     ;;
 
   all)
@@ -266,7 +266,7 @@ md5sum -c checksum.md5
 aws sts get-caller-identity
 aws s3 ls s3://isaac-sim-6-0-dev/
 
-# Ensure bucket policy allows from Vultr IP
+# Ensure bucket policy allows from external IP
 ```
 
 ### Missing Dependencies on CPU

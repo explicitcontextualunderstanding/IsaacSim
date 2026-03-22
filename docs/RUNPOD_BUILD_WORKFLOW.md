@@ -59,10 +59,9 @@ curl -fsSL https://raw.githubusercontent.com/explicitcontextualunderstanding/Isa
 RunPod blocks Docker-in-Docker. Image assembly requires full Docker access:
 
 **Options:**
-- Vultr CPU instance (~$0.15 for 5 min)
-- AWS EC2 t3.large (spot)
-- GCP e2-medium
+- External CPU service (Vultr, AWS EC2, GCP, etc.)
 - Local machine with Docker
+- CI/CD runner (GitHub Actions, etc.)
 
 ### Assembly Script
 ```bash
