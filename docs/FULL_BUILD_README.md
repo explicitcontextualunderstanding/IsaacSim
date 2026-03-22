@@ -2,12 +2,42 @@
 
 ## Overview
 
-Traditional workflow had **3 separate steps**:
-1. Build Isaac Sim on self-hosted runner (4+ hours)
-2. Package and push to S3 (manual)
-3. Build container image on Vultr (separate process)
+**RunPod-centric workflow** - Compile on GPU, assemble externally, deploy back on RunPod:
 
-**New unified workflow** - Single script on Vultr:
+```
+RunPod GPU (Compile) → S3 → External CPU (Assemble) → GHCR → RunPod (Deploy)
+     └────────────────────── Unified Process ──────────────────────┘
+```
+
+## Why RunPod-Centric?
+
+| Traditional | RunPod-Centric |
+|-------------|----------------|
+| Multiple platforms | RunPod + one external CPU step |
+| Manual handoffs | Orchestrated workflow |
+| S3 complexity | S3 as simple transport |
+| Error-prone | Validated at each phase |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Build["Phase 1: RunPod GPU"]
+        R1[4x L40S] --> R2[Compile Source]
+        R2 --> R3[Upload S3]
+    end
+
+    subgraph Assemble["Phase 2: External CPU"]
+        E1[Download] --> E2[Docker Build]
+        E2 --> E3[Push GHCR]
+    end
+
+    subgraph Deploy["Phase 3: RunPod"]
+        D1[Pull Image] --> D2[Validate]
+        D2 --> D3[Runtime]
+    end
+
+    Build --> Assemble --> Deploy
 ```
 Source Code → Compile → Package → Containerize → Validate → Push to GHCR
      └────────────────── One Process ─────────────────────────┘

@@ -1,6 +1,20 @@
-# Vultr Build Guide: Isaac Sim 6.0 CUDA 13.1+ Image
+# Vultr Build Guide (LEGACY) - Use Hybrid Workflow Instead
 
-## Architecture Overview
+> ⚠️ **DEPRECATED**: This guide is for **legacy full builds on Vultr only** (~$10-15, 4-6 hours).
+>
+> **RECOMMENDED**: Use [Hybrid GPU→S3→CPU Workflow](HYBRID_BUILD_WORKFLOW.md) instead (~$2.65, 30 min).
+>
+> This document is kept for reference. For new builds, use hybrid approach.
+
+## Quick Decision
+
+| Scenario | Use This | Cost | Time |
+|----------|----------|------|------|
+| **New Build** | [Hybrid Workflow](HYBRID_BUILD_WORKFLOW.md) | ~$2.65 | 30 min |
+| **Emergency/Debug** | This guide (full Vultr) | ~$10-15 | 4-6 hours |
+| **CPU Reassembly Only** | Hybrid Phase 3 | ~$0.20 | 5 min |
+
+## Legacy Architecture (Full Vultr Build)
 
 ```mermaid
 flowchart TB

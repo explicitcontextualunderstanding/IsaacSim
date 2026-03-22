@@ -276,21 +276,21 @@ main() {
         gpu-build)
             run_gpu_build
             ;;
-        cpu-assemble)
-            run_cpu_assemble
-            ;;
-        all)
-            run_gpu_build && run_cpu_assemble
-            log ""
-            log "=========================================="
-            log "FULL WORKFLOW CONFIGURED"
-            log "=========================================="
-            log ""
-            log "Execute in order:"
-            log "  1. Run 'gpu-build' commands on RunPod"
-            log "  2. Verify S3 upload complete"
-            log "  3. Run 'cpu-assemble' commands on Vultr"
-            log "  4. Push to GHCR"
+  cpu-assemble)
+    run_cpu_assemble
+    ;;
+  all)
+    run_gpu_build && run_cpu_assemble
+    log ""
+    log "=========================================="
+    log "FULL WORKFLOW CONFIGURED"
+    log "=========================================="
+    log ""
+    log "Execute in order:"
+    log "  1. Run 'gpu-build' on RunPod GPU"
+    log "  2. Verify S3 upload complete"
+    log "  3. Run 'cpu-assemble' on external CPU (Vultr/AWS/GCP/Local)"
+    log "  4. Push to GHCR"
             ;;
         help|--help|-h)
             usage

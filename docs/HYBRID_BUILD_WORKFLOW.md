@@ -2,18 +2,18 @@
 
 ## Overview
 
-Traditional container builds fail on RunPod due to Docker-in-Docker restrictions. This workflow uses **Filesystem Overlay** strategy instead:
+RunPod blocks Docker-in-Docker, so we split the build: compile on RunPod GPU, assemble image on external CPU.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  GPU Build (RunPod)  →  S3 Storage  →  CPU Reassembly (Vultr)        │
+│  RunPod GPU (Compile)  →  S3  →  External CPU (Assemble)  →  GHCR   │
 │                                                                     │
 │  ┌──────────────┐    ┌────────────┐    ┌──────────────────────┐  │
-│  │ Compile      │    │ Private    │    │ Base Ubuntu +        │  │
-│  │ Isaac Sim    │───▶│ Binary     │───▶│ Extract S3 tarball   │  │
-│  │ 25 min       │    │ Repository │    │ 5 min                │  │
+│  │ Compile      │    │ Binary     │    │ Docker Build + Push  │  │
+│  │ Isaac Sim    │───▶│ Storage    │───▶│ (Vultr/AWS/GCP/Local)│  │
+│  │ 25 min       │    │            │    │ 5 min                │  │
 │  └──────────────┘    └────────────┘    └──────────────────────┘  │
-│        L40S 4x            S3                 CPU-only            │
+│        L40S 4x            S3                CPU-only               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
