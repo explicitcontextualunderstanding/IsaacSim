@@ -19,6 +19,61 @@ RunPod GPU (Compile) → S3 → GitHub Actions (Assemble) → GHCR → RunPod (D
 | **Automation** | ✅ Native | Manual | Manual |
 | **Integration** | ✅ Git-based triggers | API calls | None |
 
+## ⚠️ Resource Limits (Free Tier)
+
+GitHub Actions free tier has constraints that **may impact** Isaac Sim assembly:
+
+| Limit | Value | Impact |
+|-------|-------|--------|
+| **Storage** | 500MB (actions/cache) | ✅ Sufficient (extracted build ~400MB) |
+| **Artifact retention** | 90 days | ✅ Image in GHCR, not artifacts |
+| **Job timeout** | 6 hours | ✅ Assembly ~10 min, well under limit |
+| **Concurrent jobs** | 20 (Linux) | ✅ Single job |
+| **Disk space** | ~14GB SSD | ⚠️ **Tight** - 4GB build + base image |
+| **Network** | Unmetered | ✅ No egress charges |
+
+### Disk Space Warning
+
+**Free tier runners have ~14GB disk:**
+- Ubuntu base image: ~2GB
+- Isaac Sim build: ~4GB extracted
+- Docker layers: ~4GB
+- Working space: ~4GB
+- **Total**: ~14GB (at limit!)
+
+**Mitigations:**
+1. Use `ubuntu:22.04` base (smaller than 24.04)
+2. Use `--squash` during build (reduces layers)
+3. Clean up with `docker system prune -f`
+4. Skip local layer caching if disk low
+
+### If Free Tier Fails
+
+| Symptom | Cause | Solution |
+|-----------|-------|----------|
+| "No space left" | Disk full | Use larger runner or external CPU |
+| "timeout" | Job too slow | Splits steps, use caching |
+| "rate limit" | Too many runs | Wait or use GitHub Team ($4/mo) |
+
+**Paid Options (With Funds):**
+
+| Option | Cost | Specs | Best For |
+|--------|------|-------|----------|
+| **GitHub Larger Runners** | $0.008/min (2-core) to $0.64/min (64-core) | Up to 64 cores, 128GB RAM, 2040GB SSD | Frequent builds, automation |
+| **Vultr CPU** | $0.03/hr (1 vCPU) to $0.48/hr (8 vCPU) | 1-8 vCPU, 4-32GB RAM, 10-40GB disk | One-off builds, full control |
+| **AWS EC2 t3.large spot** | ~$0.03/hr | 2 vCPU, 8GB RAM | Reliable, well-known |
+| **Self-hosted runner** | Hardware cost only | Your own specs | Unlimited, private |
+
+### Recommendation
+
+**For occasional builds**: Vultr CPU (~$0.15 for 5 min) - simplest, full Docker access  
+**For automated CI**: GitHub Larger Runners - integrated, metered billing  
+
+**Your choice depends on:**
+- Build frequency (once vs daily)
+- Need for automation (manual vs triggered)
+- Preference for integration (GitHub native vs external)
+
 ## Setup
 
 ### 1. Add Secrets

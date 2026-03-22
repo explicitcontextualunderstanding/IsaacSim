@@ -36,6 +36,9 @@ env:
 
 jobs:
   assemble:
+    # Free tier: ubuntu-24.04 (~14GB disk)
+    # Paid option: ubuntu-latest-8-cores (larger runners, more disk)
+    # See: Settings → Actions → Runners → New runner
     runs-on: ubuntu-24.04
     permissions:
       contents: read
