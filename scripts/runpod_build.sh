@@ -54,8 +54,8 @@ log "[1/5] Setting up environment..."
 
 # Install dependencies
 apt-get update -qq && apt-get install -y -qq \
-    git git-lfs gcc-11 g++-11 awscli \
-    && rm -rf /var/lib/apt/lists/*
+    git git-lfs gcc-11 g++-11 awscli &&
+    rm -rf /var/lib/apt/lists/*
 
 # Set GCC 11
 update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110
@@ -98,7 +98,12 @@ git submodule update --init --recursive 2>/dev/null || warn "No submodules"
 
 # Git LFS
 git lfs install
-git lfs pull || warn "Git LFS pull may have failed"
+if ! git lfs pull; then
+    LFS_EXIT=$?
+    error "Git LFS pull failed with exit code $LFS_EXIT"
+    warn "Build may proceed but assets will be missing"
+    warn "Manual fix: cd $ISAAC_DIR && git lfs pull"
+fi
 
 success "Repository ready at $ISAAC_DIR"
 
@@ -143,8 +148,12 @@ tar czf "${WORKSPACE}/artifacts/isaac-sim-build-${BUILD_TAG}.tar.gz" \
     --exclude='*.pyc' \
     --exclude='_build/packages/temp' \
     -C "$ISAAC_DIR" \
-    _build/linux-x86_64/release/ \
-    2>&1 | tee -a "${WORKSPACE}/build.log"
+    _build/linux-x86_64/release/ 2>&1 | tee -a "${WORKSPACE}/build.log"
+TAR_EXIT=${PIPESTATUS[0]}
+if [ "$TAR_EXIT" -ne 0 ]; then
+    error "tar failed with exit code $TAR_EXIT"
+    exit 1
+fi
 
 BUILD_SIZE=$(stat -c%s "${WORKSPACE}/artifacts/isaac-sim-build-${BUILD_TAG}.tar.gz" 2>/dev/null || echo "0")
 BUILD_SIZE_MB=$((BUILD_SIZE / 1024 / 1024))
@@ -152,7 +161,7 @@ BUILD_SIZE_MB=$((BUILD_SIZE / 1024 / 1024))
 success "Package created: ${BUILD_SIZE_MB}MB"
 
 # Create manifest
-cat > "${WORKSPACE}/artifacts/manifest-${BUILD_TAG}.json" << MANIFEST
+cat >"${WORKSPACE}/artifacts/manifest-${BUILD_TAG}.json" <<MANIFEST
 {
     "build_tag": "${BUILD_TAG}",
     "timestamp": "$(date -Iseconds)",

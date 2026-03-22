@@ -28,7 +28,7 @@ warn() { echo -e "${YELLOW}⚠${NC} $*"; }
 error() { echo -e "${RED}✗${NC} $*"; }
 
 usage() {
-    cat << 'EOF'
+    cat <<'EOF'
 Hybrid Build Orchestrator
 =========================
 
@@ -90,7 +90,8 @@ run_gpu_build() {
     log "  Estimated cost: ~$2.50"
 
     # Create build script for RunPod
-    BUILD_SCRIPT=$(cat << 'BUILD_EOF'
+    BUILD_SCRIPT=$(
+        cat <<'BUILD_EOF'
 #!/bin/bash
 set -euo pipefail
 
@@ -136,11 +137,11 @@ tar czf /workspace/build-artifacts/isaac-sim-build.tar.gz \
 # Upload to S3
 log "Uploading to S3..."
 aws s3 cp /workspace/build-artifacts/isaac-sim-build.tar.gz \
-    s3://${S3_BUCKET}/${S3_PREFIX}/isaac-sim-build-${BUILD_TAG}.tar.gz
+s3://S3_BUCKET_PLACEHOLDER/S3_PREFIX_PLACEHOLDER/isaac-sim-build-BUILD_TAG_PLACEHOLDER.tar.gz
 
 # Upload latest symlink
 aws s3 cp /workspace/build-artifacts/isaac-sim-build.tar.gz \
-    s3://${S3_BUCKET}/${S3_PREFIX}/isaac-sim-build-latest.tar.gz
+s3://S3_BUCKET_PLACEHOLDER/S3_PREFIX_PLACEHOLDER/isaac-sim-build-latest.tar.gz
 
 # Upload manifest
 cat > /workspace/build-artifacts/manifest.json << MANIFEST
@@ -154,17 +155,22 @@ cat > /workspace/build-artifacts/manifest.json << MANIFEST
 MANIFEST
 
 aws s3 cp /workspace/build-artifacts/manifest.json \
-    s3://${S3_BUCKET}/${S3_PREFIX}/manifest-${BUILD_TAG}.json
+s3://S3_BUCKET_PLACEHOLDER/S3_PREFIX_PLACEHOLDER/manifest-BUILD_TAG_PLACEHOLDER.json
 
 echo "GPU Build Complete!"
 BUILD_EOF
-)
+    )
+
+    # Replace placeholders with actual values
+    BUILD_SCRIPT="${BUILD_SCRIPT//S3_BUCKET_PLACEHOLDER/${S3_BUCKET}}"
+    BUILD_SCRIPT="${BUILD_SCRIPT//S3_PREFIX_PLACEHOLDER/${S3_PREFIX}}"
+    BUILD_SCRIPT="${BUILD_SCRIPT//BUILD_TAG_PLACEHOLDER/${BUILD_TAG}}"
 
     # Deploy to RunPod
     log "Creating RunPod build instance..."
 
     # Save build script
-    echo "$BUILD_SCRIPT" > /tmp/runpod-build-script.sh
+    echo "$BUILD_SCRIPT" >/tmp/runpod-build-script.sh
 
     log "Build script prepared. To execute:"
     log "  1. Provision RunPod: 4x L40S, 200GB disk"
@@ -179,33 +185,33 @@ BUILD_EOF
 # PHASE 2: CPU Reassembly on external CPU
 # ============================================
 run_cpu_assemble() {
-log "=========================================="
-log "PHASE 2: CPU Reassembly on external CPU"
-log "=========================================="
+    log "=========================================="
+    log "PHASE 2: CPU Reassembly on external CPU"
+    log "=========================================="
 
-# Check for assemble_image.sh
-ASSEMBLE_SCRIPT="${SCRIPT_DIR}/assemble_image.sh"
-if [ ! -f "$ASSEMBLE_SCRIPT" ]; then
-    error "assemble_image.sh not found at ${ASSEMBLE_SCRIPT}"
-    log "Clone the full repo to get all scripts"
-    exit 1
-fi
+    # Check for assemble_image.sh
+    ASSEMBLE_SCRIPT="${SCRIPT_DIR}/assemble_image.sh"
+    if [ ! -f "$ASSEMBLE_SCRIPT" ]; then
+        error "assemble_image.sh not found at ${ASSEMBLE_SCRIPT}"
+        log "Clone the full repo to get all scripts"
+        exit 1
+    fi
 
-log "Executing assemble_image.sh..."
-log "  Build Tag: ${BUILD_TAG}"
-log "  S3 Bucket: ${S3_BUCKET}"
-log "  GHCR Image: ${GHCR_IMAGE}"
+    log "Executing assemble_image.sh..."
+    log "  Build Tag: ${BUILD_TAG}"
+    log "  S3 Bucket: ${S3_BUCKET}"
+    log "  GHCR Image: ${GHCR_IMAGE}"
 
-# Run the assembly script
-bash "$ASSEMBLE_SCRIPT" \
-    --build-tag "${BUILD_TAG}" \
-    --s3-bucket "${S3_BUCKET}" \
-    --s3-prefix "${S3_PREFIX}" \
-    --ghcr-image "${GHCR_IMAGE}" \
-    --github-user "${GITHUB_USER}"
+    # Run the assembly script
+    bash "$ASSEMBLE_SCRIPT" \
+        --build-tag "${BUILD_TAG}" \
+        --s3-bucket "${S3_BUCKET}" \
+        --s3-prefix "${S3_PREFIX}" \
+        --ghcr-image "${GHCR_IMAGE}" \
+        --github-user "${GITHUB_USER}"
 
-success "CPU reassembly complete"
-return 0
+    success "CPU reassembly complete"
+    return 0
 }
 
 # ============================================
@@ -215,34 +221,34 @@ main() {
     COMMAND="${1:-all}"
 
     case $COMMAND in
-        gpu-build)
-            run_gpu_build
-            ;;
-  cpu-assemble)
-    run_cpu_assemble
-    ;;
-  all)
-    run_gpu_build && run_cpu_assemble
-    log ""
-    log "=========================================="
-    log "FULL WORKFLOW CONFIGURED"
-    log "=========================================="
-    log ""
-    log "Execute in order:"
-    log "  1. Run 'gpu-build' on RunPod GPU"
-    log "  2. Verify S3 upload complete"
-    log "  3. Run 'cpu-assemble' on external CPU (external CPU/AWS/GCP/Local)"
-    log "  4. Push to GHCR"
-            ;;
-        help|--help|-h)
-            usage
-            exit 0
-            ;;
-        *)
-            error "Unknown command: $COMMAND"
-            usage
-            exit 1
-            ;;
+    gpu-build)
+        run_gpu_build
+        ;;
+    cpu-assemble)
+        run_cpu_assemble
+        ;;
+    all)
+        run_gpu_build && run_cpu_assemble
+        log ""
+        log "=========================================="
+        log "FULL WORKFLOW CONFIGURED"
+        log "=========================================="
+        log ""
+        log "Execute in order:"
+        log "  1. Run 'gpu-build' on RunPod GPU"
+        log "  2. Verify S3 upload complete"
+        log "  3. Run 'cpu-assemble' on external CPU (external CPU/AWS/GCP/Local)"
+        log "  4. Push to GHCR"
+        ;;
+    help | --help | -h)
+        usage
+        exit 0
+        ;;
+    *)
+        error "Unknown command: $COMMAND"
+        usage
+        exit 1
+        ;;
     esac
 }
 

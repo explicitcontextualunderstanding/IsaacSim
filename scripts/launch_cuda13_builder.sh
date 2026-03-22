@@ -4,20 +4,21 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
 
 # Load RunPod API key from 1Password if not set
 if [ -z "${RUNPOD_API_KEY:-}" ]; then
     export RUNPOD_API_KEY=$(python3 -c "
 import subprocess
 import os
-os.chdir('/Users/kieranlal/workspace/nano2')
 result = subprocess.run(
     ['bash', '-c', 'source scripts/op_api_key_wrapper.sh --print-export RUNPOD_API_KEY'],
     capture_output=True, text=True, timeout=60
 )
 if result.returncode == 0 and result.stdout.startswith('export RUNPOD_API_KEY='):
-    print(result.stdout.split('=', 1)[1].strip().strip(\"'\\\"\"))
+    print(result.stdout.split('=', 1)[1].strip().strip('\"\\''))
 ")
 fi
 

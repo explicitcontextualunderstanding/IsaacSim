@@ -267,8 +267,9 @@ df -h
 # Check memory
 free -h
 
-# Resume build (if incremental supported)
-./runpod_build.sh --resume
+# Incremental build - re-run will continue from last checkpoint
+# (No --resume flag needed; build.sh supports incremental compilation)
+./scripts/runpod_build.sh
 ```
 
 ### Docker Push Fails
@@ -286,7 +287,7 @@ docker images | grep isaac-sim
 docker run --rm --gpus all -it isaac-sim-6:local bash
 
 # Manual validation
-cd /isaac-sim && ./scripts/validate_container.sh
+cd /workspace/IsaacSim && ./scripts/validate_container.sh
 ```
 
 ## Migration from Traditional

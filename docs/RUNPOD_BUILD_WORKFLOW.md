@@ -94,7 +94,7 @@ runpodctl create pod \
 ### Validate Deployment
 ```bash
 # Inside RunPod runtime instance
-./scripts/runpod_validate.sh
+./scripts/validate_container.sh
 ```
 
 ## Complete Workflow Script
@@ -179,7 +179,7 @@ flowchart LR
 
 ## Next Steps
 
-1. **Set up S3 bucket**: `isaac-sim-builds-6`
+1. **Set up S3 bucket**: `isaac-sim-6-0-dev`
 2. **Configure AWS credentials**: `aws configure`
-3. **Run build**: `./scripts/runpod_workflow.sh build`
-4. **Deploy**: `./scripts/runpod_workflow.sh deploy`
+3. **Run build**: `./scripts/runpod_build.sh`
+4. **Deploy**: Follow validation steps in PREFLIGHT_VALIDATION.md

@@ -19,9 +19,19 @@ WARNINGS=0
 declare -A CHECK_STATUS
 
 log() { echo -e "${BLUE}[PREFLIGHT]${NC} $*"; }
-pass() { echo -e "${GREEN}✓${NC} $*"; CHECKS_PASSED=$((CHECKS_PASSED + 1)); }
-fail() { echo -e "${RED}✗${NC} $*"; CHECKS_FAILED=$((CHECKS_FAILED + 1)); CHECK_STATUS["$1"]=failed; }
-warn() { echo -e "${YELLOW}⚠${NC} $*"; WARNINGS=$((WARNINGS + 1)); }
+pass() {
+    echo -e "${GREEN}✓${NC} $*"
+    CHECKS_PASSED=$((CHECKS_PASSED + 1))
+}
+fail() {
+    echo -e "${RED}✗${NC} $*"
+    CHECKS_FAILED=$((CHECKS_FAILED + 1))
+    CHECK_STATUS["$1"]=failed
+}
+warn() {
+    echo -e "${YELLOW}⚠${NC} $*"
+    WARNINGS=$((WARNINGS + 1))
+}
 
 fatal() {
     echo ""
@@ -67,11 +77,11 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     echo "Set these variables:"
     for var in "${MISSING_VARS[@]}"; do
         case $var in
-            GITHUB_TOKEN)
-                echo "  export GITHUB_TOKEN=ghp_xxxxxxxx"
-                echo "    Create at: https://github.com/settings/tokens"
-                echo "    Required scope: write:packages"
-                ;;
+        GITHUB_TOKEN)
+            echo "  export GITHUB_TOKEN=ghp_xxxxxxxx"
+            echo "    Create at: https://github.com/settings/tokens"
+            echo "    Required scope: write:packages"
+            ;;
         esac
     done
 else
@@ -88,8 +98,10 @@ if [ -z "${GITHUB_TOKEN:-}" ]; then
     fail "GITHUB_AUTH" "Cannot validate token - GITHUB_TOKEN not set"
 else
     # Check token format
-    if [[ ! "$GITHUB_TOKEN" =~ ^ghp_[a-zA-Z0-9]{36}$ ]] && [[ ! "$GITHUB_TOKEN" =~ ^ghs_[a-zA-Z0-9]{36}$ ]]; then
-        warn "Token format looks unusual (should start with ghp_ or ghs_)"
+    if [[ ! "$GITHUB_TOKEN" =~ ^ghp_[a-zA-Z0-9]{36}$ ]] &&
+        [[ ! "$GITHUB_TOKEN" =~ ^ghs_[a-zA-Z0-9]{36}$ ]] &&
+        [[ ! "$GITHUB_TOKEN" =~ ^github_pat_[a-zA-Z0-9_]{22,}$ ]]; then
+        warn "Token format looks unusual (should start with ghp_, ghs_, or github_pat_)"
     fi
 
     # Test API access
@@ -177,10 +189,15 @@ else
 
         # Check driver version for CUDA 13.1+
         DRIVER_MAJOR=$(echo "$DRIVER_VERSION" | cut -d'.' -f1)
-        if [ "$DRIVER_MAJOR" -ge 570 ] 2>/dev/null; then
-            pass "Driver supports CUDA 13.1+ (570+)"
+        if ! [[ "$DRIVER_MAJOR" =~ ^[0-9]+$ ]]; then
+            fail "NVIDIA" "Cannot parse driver version: $DRIVER_VERSION (major: '$DRIVER_MAJOR')"
+            echo "  Expected format: XXX.YYY"
         else
-            warn "Driver $DRIVER_VERSION may not support CUDA 13.1+ (needs 570+)"
+            if [ "$DRIVER_MAJOR" -ge 570 ]; then
+                pass "Driver supports CUDA 13.1+ (570+)"
+            else
+                warn "Driver $DRIVER_VERSION may not support CUDA 13.1+ (needs 570+)"
+            fi
         fi
 
         CHECK_STATUS["NVIDIA"]=passed
@@ -227,7 +244,10 @@ else
     else
         fail "NVIDIA_DOCKER" "Docker cannot access GPU"
         echo "Install nvidia-docker2:"
-        echo "  distribution=$(. /etc/os-release;echo $ID$VERSION_ID)"
+        echo "  distribution=$(
+            . /etc/os-release
+            echo $ID$VERSION_ID
+        )"
         echo "  curl -s -L https://nvidia.github.io/nvidia-docker/\$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list"
         echo "  sudo apt-get update && sudo apt-get install -y nvidia-docker2"
         echo "  sudo systemctl restart docker"

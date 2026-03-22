@@ -12,16 +12,15 @@ echo "=== Pulling Isaac Sim 6.0-dev from GHCR ==="
 echo "Image: ${GHCR_IMAGE}"
 echo ""
 
-# Check if logged in to GHCR
-if ! docker login ghcr.io &>/dev/null; then
-    echo "Not logged in to GHCR. Logging in..."
-    if [ -n "$GH_TOKEN" ]; then
-        echo "${GH_TOKEN}" | docker login ghcr.io -u explicitcontextualunderstanding --password-stdin
-    else
-        echo "❌ Error: GH_TOKEN not found in environment."
-        exit 1
-    fi
+# Check for GH_TOKEN first
+if [ -z "${GH_TOKEN:-}" ]; then
+    echo "❌ Error: GH_TOKEN not found in environment."
+    exit 1
 fi
+
+# Login to GHCR
+echo "Logging in to GHCR..."
+echo "${GH_TOKEN}" | docker login ghcr.io -u explicitcontextualunderstanding --password-stdin
 
 # Pull the image
 echo "Pulling image..."

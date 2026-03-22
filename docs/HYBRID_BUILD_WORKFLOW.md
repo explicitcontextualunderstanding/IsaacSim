@@ -291,7 +291,7 @@ vs Traditional External CPU build: **~$10-15** (4-6 hours)
 
 ## Next Steps
 
-1. **Run `hybrid_build.sh`** to execute full workflow
+1. **Run `./scripts/hybrid_build.sh all`** to execute full workflow
 2. **Monitor S3** for artifact uploads
 3. **Verify** GHCR image with `validate_container.sh`
 4. **Deploy** to RunPod production with `runpod_validation.sh`
