@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 Isaac Sim 6.0 Container Build Orchestrator
-
 Builds Isaac Sim 6.0 container on RunPod and optionally pushes to GHCR.
+SECURITY NOTE: Uses AutoAddPolicy for ephemeral RunPod instances. Do not use in production.
 """
 
 import os
 import sys
 import time
 import subprocess
+import shlex
 from pathlib import Path
 
 try:
@@ -347,6 +348,10 @@ def wait_for_ssh(pod, timeout=120):
     for attempt in range(timeout // 10):
         try:
             ssh = paramiko.SSHClient()
+            # SECURITY: AutoAddPolicy is used because RunPod instances are ephemeral
+            # with randomly generated hostnames/IPs. There's no persistent known_hosts.
+            # This is safe for isolated build environments but should NOT be used
+            # for persistent production systems.
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(address, port=port, username='root', timeout=10)
             print(f"✅ SSH available at {address}")
@@ -434,15 +439,15 @@ def run_build(ssh, github_user):
 def push_to_ghcr(ssh, github_user):
     """Push container to GHCR."""
     # Authenticate
-    execute_command(ssh, f"echo $GITHUB_TOKEN | docker login ghcr.io -u {github_user} --password-stdin")
+    execute_command(ssh, f"echo $GITHUB_TOKEN | docker login ghcr.io -u {shlex.quote(github_user)} --password-stdin")
 
     # Get image tag
     execute_command(ssh, "docker images --format '{{.Repository}}:{{.Tag}}' | head -1")
 
     # Tag and push
     # Note: Adjust based on actual image name from package_container
-    execute_command(ssh, f"docker tag isaac-sim-6-dev ghcr.io/{github_user}/isaac-sim-6-dev:latest")
-    execute_command(ssh, f"docker push ghcr.io/{github_user}/isaac-sim-6-dev:latest")
+    execute_command(ssh, f"docker tag isaac-sim-6-dev ghcr.io/{shlex.quote(github_user)}/isaac-sim-6-dev:latest")
+    execute_command(ssh, f"docker push ghcr.io/{shlex.quote(github_user)}/isaac-sim-6-dev:latest")
 
 
 def dry_run():
@@ -531,10 +536,10 @@ def preflight(config, github_user):
     )
 
     print(f"📦 Preflight pod created: {pod['id']}")
-    print(f"   Internal IP: {pod.get('ip', 'N/A')}")
-    print(f"   Public IP: {pod.get('publicIp', 'N/A')}")
+    print(f" Internal IP: {pod.get('ip', 'N/A')}")
+    print(f" Public IP: {pod.get('publicIp', 'N/A')}")
     if pod.get('publicIp'):
-        print(f"   SSH: ssh root@{pod.get('publicIp')}")
+        print(f" SSH: ssh root@{pod.get('publicIp')}")
 
     try:
         ssh = wait_for_ssh(pod)
@@ -554,14 +559,14 @@ CMD ["echo", "preflight-success"]
 
         # Login to GHCR
         if config.get("GITHUB_TOKEN"):
-            execute_command(ssh, f"echo $GITHUB_TOKEN | docker login ghcr.io -u {github_user} --password-stdin")
+            execute_command(ssh, f"echo $GITHUB_TOKEN | docker login ghcr.io -u {shlex.quote(github_user)} --password-stdin")
         else:
             print("⚠️ No GITHUB_TOKEN, skipping GHCR push")
             return
 
         # Tag and push
-        execute_command(ssh, f"docker tag preflight-test:latest ghcr.io/{github_user}/preflight-test:latest")
-        execute_command(ssh, f"docker push ghcr.io/{github_user}/preflight-test:latest")
+        execute_command(ssh, f"docker tag preflight-test:latest ghcr.io/{shlex.quote(github_user)}/preflight-test:latest")
+        execute_command(ssh, f"docker push ghcr.io/{shlex.quote(github_user)}/preflight-test:latest")
 
         print("✅ Preflight complete!")
 

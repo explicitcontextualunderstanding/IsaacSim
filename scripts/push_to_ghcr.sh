@@ -20,7 +20,7 @@ if [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 # Install AWS CLI if needed
-if ! command -v aws &> /dev/null; then
+if ! command -v aws &>/dev/null; then
     echo "📥 Installing AWS CLI..."
     apt-get update -qq
     apt-get install -y -qq curl unzip
@@ -29,7 +29,7 @@ if ! command -v aws &> /dev/null; then
     unzip -q awscliv2.zip
     ./aws/install --update
     rm -rf aws awscliv2.zip
-    cd - > /dev/null
+    cd - >/dev/null
 fi
 
 if [ ! -f "$TAR_FILE" ]; then
@@ -41,27 +41,34 @@ fi
 # Check tar size
 TAR_SIZE=$(stat -c%s "$TAR_FILE" 2>/dev/null || stat -f%z "$TAR_FILE")
 # Install coreutils for numfmt if on minimal system
-if ! command -v numfmt &> /dev/null; then
+if ! command -v numfmt &>/dev/null; then
     apt-get install -y -qq coreutils 2>/dev/null || true
 fi
 echo "📦 Tar size: $(numfmt --to=iec-i $TAR_SIZE 2>/dev/null || echo $TAR_SIZE bytes)"
 
 # Install skopeo if needed
-if ! command -v skopeo &> /dev/null; then
+if ! command -v skopeo &>/dev/null; then
     echo "📥 Installing skopeo..."
     apt-get update -qq && apt-get install -y -qq skopeo
 fi
 
 # Login to GHCR via skopeo
 echo "🔐 Authenticating to GHCR..."
-skopeo login ghcr.io -u explicitcontextualunderstanding --password-stdin <<< "$GITHUB_TOKEN"
+skopeo login ghcr.io -u explicitcontextualunderstanding --password-stdin <<<"$GITHUB_TOKEN"
 
 # Push tar as runnable OCI image
 echo "🚀 Pushing to GHCR (this may take 10-15 min for 16GB)..."
+
+# Create credentials file to avoid leaking token in process list
+CREDS_FILE=$(mktemp)
+trap 'rm -f "$CREDS_FILE"' EXIT
+printf 'explicitcontextualunderstanding:%s\n' "$GITHUB_TOKEN" >"$CREDS_FILE"
+chmod 600 "$CREDS_FILE"
+
 skopeo copy \
     docker-archive:"$TAR_FILE" \
     docker://"$GHCR_IMAGE" \
-    --dest-creds="explicitcontextualunderstanding:${GITHUB_TOKEN}"
+    --dest-creds-file="$CREDS_FILE"
 
 echo "✅ Push complete!"
 echo ""

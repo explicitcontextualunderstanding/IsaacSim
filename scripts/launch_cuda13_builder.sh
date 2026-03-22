@@ -31,7 +31,7 @@ echo "Looking for GPUs with CUDA 13.1+ support..."
 echo ""
 
 # Run Python script to launch pod
-python3 << 'PYTHON_SCRIPT'
+python3 <<'PYTHON_SCRIPT'
 import os
 import sys
 import runpod
@@ -185,7 +185,7 @@ try:
     print(f"\n⏳ Pod is starting... This may take 2-3 minutes.")
     print(f"Monitor at: https://www.runpod.io/console/pods")
     print(f"\nTo check pod status:")
-    print(f"  python3 -c \"import runpod; runpod.api_key='{os.environ['RUNPOD_API_KEY']}'; print(runpod.get_pod('{pod['id']}'))\"")
+print(f" python3 -c \"import runpod; runpod.api_key=os.environ['RUNPOD_API_KEY']; print(runpod.get_pod('{pod['id']}'))\"")
     
 except Exception as e:
     print(f"\n❌ Failed to create pod: {e}")

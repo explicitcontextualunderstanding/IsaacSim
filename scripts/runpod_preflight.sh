@@ -14,7 +14,7 @@ echo "=== Isaac Sim 6.0 Pre-Flight ==="
 
 # Check CUDA version
 echo "[1/5] Checking CUDA..."
-if command -v nvidia-smi &> /dev/null; then
+if command -v nvidia-smi &>/dev/null; then
     nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
     CUDA_VERSION=$(nvcc --version 2>/dev/null | grep release | awk '{print $5}' | tr -d ',')
     echo "   CUDA Version: ${CUDA_VERSION:-not found}"
@@ -69,8 +69,8 @@ apt-get install -y --no-install-recommends \
     ca-certificates \
     unzip \
     p7zip-full \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential &&
+    rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI for S3 uploads
 echo "   Installing AWS CLI..."
@@ -101,9 +101,12 @@ echo "   Dependencies installed"
 echo "[4/5] Setting up GitHub access..."
 GH_TOKEN="${GH_TOKEN:-${RUNPOD_SECRET_GH_TOKEN}}"
 if [ -n "$GH_TOKEN" ]; then
-    echo "   GH_TOKEN found in environment"
+    echo " GH_TOKEN found in environment"
     git config --global credential.helper store
-    echo "https://${GH_TOKEN}@github.com" > ~/.git-credentials
+    # SECURITY NOTE: Token written to ~/.git-credentials in plaintext.
+    # This is acceptable ONLY because RunPod pods are ephemeral and isolated.
+    # For persistent systems, use: git config --global credential.helper cache --timeout=3600
+    echo "https://${GH_TOKEN}@github.com" >~/.git-credentials
     git config --global user.email "ci@runpod.io"
     git config --global user.name "RunPod CI"
 else
