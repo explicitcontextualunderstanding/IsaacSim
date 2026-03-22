@@ -38,7 +38,7 @@ Usage: ./scripts/hybrid_build.sh [COMMAND] [OPTIONS]
 
 Commands:
   gpu-build       Phase 1: Compile on RunPod GPU, upload to S3
-  cpu-assemble    Phase 2: Reassemble on Vultr CPU, push to GHCR
+  cpu-assemble    Phase 2: Reassemble on external CPU CPU, push to GHCR
   all             Run full workflow (default)
 
 Options:
@@ -176,11 +176,11 @@ BUILD_EOF
 }
 
 # ============================================
-# PHASE 2: CPU Reassembly on Vultr
+# PHASE 2: CPU Reassembly on external CPU
 # ============================================
 run_cpu_assemble() {
     log "=========================================="
-    log "PHASE 2: CPU Reassembly on Vultr"
+    log "PHASE 2: CPU Reassembly on external CPU"
     log "=========================================="
 
     if [ -z "${GITHUB_TOKEN:-}" ]; then
@@ -244,8 +244,8 @@ DOCKER_EOF
 
     log "Dockerfile created: /tmp/Dockerfile.reassemble"
     log ""
-    log "To build on Vultr:"
-    log "  1. SSH to Vultr CPU instance"
+    log "To build on external CPU:"
+    log "  1. SSH to external CPU CPU instance"
     log "  2. Copy Dockerfile: scp /tmp/Dockerfile.reassemble vultr:/tmp/"
     log "  3. Set AWS creds: export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=..."
     log "  4. Build:"
@@ -289,7 +289,7 @@ main() {
     log "Execute in order:"
     log "  1. Run 'gpu-build' on RunPod GPU"
     log "  2. Verify S3 upload complete"
-    log "  3. Run 'cpu-assemble' on external CPU (Vultr/AWS/GCP/Local)"
+    log "  3. Run 'cpu-assemble' on external CPU (external CPU/AWS/GCP/Local)"
     log "  4. Push to GHCR"
             ;;
         help|--help|-h)

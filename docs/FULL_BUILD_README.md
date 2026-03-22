@@ -64,7 +64,7 @@ flowchart LR
     end
 
     subgraph Unified["✅ Full Stack (Unified)"]
-        U1[Vultr GPU] --> U2[Clone]
+        U1[External CPU] --> U2[Clone]
         U2 --> U3[Build]
         U3 --> U4[Package]
         U4 --> U5[Docker Build]
@@ -78,7 +78,7 @@ flowchart LR
 
 ## Usage
 
-### 1. Provision Vultr GPU Instance
+### 1. Provision RunPod GPU Instance
 
 Requirements:
 - CUDA 13.1+ capable GPU (A100, H100, RTX Pro 6000)
@@ -117,23 +117,23 @@ export GITHUB_TOKEN=ghp_xxxxxxxx
 - All preflight checks passed
 
 ```bash
-# On Vultr instance
+# On external CPU instance
 export GITHUB_TOKEN=ghp_xxxxxxxx  # Your token here
-curl -fsSL https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/vultr_full_build.sh | bash
+curl -fsSL https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/runpod_build.sh | bash
 ```
 
 Or step-by-step:
 
 ```bash
 # Download script
-wget https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/vultr_full_build.sh
-chmod +x vultr_full_build.sh
+wget https://raw.githubusercontent.com/explicitcontextualunderstanding/IsaacSim/main/scripts/runpod_build.sh
+chmod +x runpod_build.sh
 
 # Set token (required for GHCR push)
 export GITHUB_TOKEN=ghp_xxxxxxxx
 
 # Run build
-time ./vultr_full_build.sh
+time ./runpod_build.sh
 ```
 
 **Why the token?**
@@ -268,7 +268,7 @@ df -h
 free -h
 
 # Resume build (if incremental supported)
-./vultr_full_build.sh --resume
+./runpod_build.sh --resume
 ```
 
 ### Docker Push Fails
@@ -306,12 +306,12 @@ Vultr (build + containerize + validate) → GHCR (runnable image)
 1. **Use tmux/screen** - Build takes 4-6 hours, don't lose progress
    ```bash
    tmux new -s isaac-build
-   ./vultr_full_build.sh
+   ./runpod_build.sh
    # Ctrl+b d to detach
    tmux attach -t isaac-build
    ```
 
-2. **Monitor costs** - Vultr charges by the hour
+2. **Monitor costs** - external CPU charges by the hour
    - A100: ~$2.50/hour
    - Build time: 4-6 hours
    - **Total: ~$10-15 per build**
@@ -329,7 +329,7 @@ Vultr (build + containerize + validate) → GHCR (runnable image)
 ## Next Steps
 
 After successful build:
-1. ✅ Terminate Vultr instance (save money!)
+1. ✅ Terminate external CPU instance (save money!)
 2. ✅ Update RunPod template with new image
 3. ✅ Test deployment
 4. ✅ Document build hash for reproducibility
@@ -338,7 +338,7 @@ After successful build:
 
 | Script | Purpose |
 |--------|---------|
-| `vultr_full_build.sh` | **Main build script** |
+| `runpod_build.sh` | **Main build script** |
 | `Dockerfile.cuda13` | Base image only |
-| `manual_vultr_build.sh` | Base image build (deprecated) |
+| `runpod_build.sh` | Base image build (deprecated) |
 | `build_cuda13_image.sh` | Local build helper |

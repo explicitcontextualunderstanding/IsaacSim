@@ -10,7 +10,7 @@ RunPod blocks Docker-in-Docker, so we split the build: compile on RunPod GPU, as
 │                                                                     │
 │  ┌──────────────┐    ┌────────────┐    ┌──────────────────────┐  │
 │  │ Compile      │    │ Binary     │    │ Docker Build + Push  │  │
-│  │ Isaac Sim    │───▶│ Storage    │───▶│ (Vultr/AWS/GCP/Local)│  │
+│  │ Isaac Sim    │───▶│ Storage    │───▶│ (external CPU/AWS/GCP/Local)│  │
 │  │ 25 min       │    │            │    │ 5 min                │  │
 │  └──────────────┘    └────────────┘    └──────────────────────┘  │
 │        L40S 4x            S3                CPU-only               │
@@ -236,7 +236,7 @@ case $PHASE in
     ;;
 
   cpu-assemble)
-    echo "Phase 2: Reassembling on Vultr CPU..."
+    echo "Phase 2: Reassembling on external CPU CPU..."
     # SSH to external and run Docker build
     ;;
 
@@ -287,7 +287,7 @@ ldd /opt/isaac-sim/_build/linux-x86_64/release/kit | grep "not found"
 | GHCR Push | - | - | - | Free (public) |
 | **Total** | | | **~30 min** | **~$2.65** |
 
-vs Traditional Vultr GPU build: **~$10-15** (4-6 hours)
+vs Traditional External CPU build: **~$10-15** (4-6 hours)
 
 ## Next Steps
 

@@ -9,7 +9,7 @@ Single-platform workflow using RunPod for both GPU compilation and deployment. C
 │  RunPod GPU (Compile)  →  S3  →  External CPU  →  GHCR  →  RunPod    │
 │                                                                     │
 │  ┌──────────────┐    ┌────────┐    ┌──────────┐    ┌────────────┐ │
-│  │ L40S/4090    │    │ Binary │    │ Vultr/   │    │ Deploy     │ │
+│  │ L40S/4090    │    │ Binary │    │ external CPU/   │    │ Deploy     │ │
 │  │ Build Source │───▶│ Repo   │───▶│ AWS/GCP  │───▶│ L40S       │ │
 │  │ 25 min       │    │        │    │ CPU      │    │ Inference  │ │
 │  └──────────────┘    └────────┘    └──────────┘    └────────────┘ │

@@ -2,7 +2,7 @@
 # Preflight Checks for RunPod Spot Instance
 # Validates GPU, CUDA, token, network BEFORE provisioning expensive Vultr
 # Usage: ./scripts/preflight_runpod.sh
-# Cost: ~$0.50 for 10 minutes on RunPod spot vs $2.50/hr on Vultr
+# Cost: ~$0.50 for 10 minutes on RunPod spot vs $2.50/hr on external CPU
 
 set -euo pipefail
 
@@ -32,7 +32,7 @@ print_summary() {
         echo ""
         echo "Passed: $CHECKS_PASSED | Warnings: $WARNINGS | Failed: $CHECKS_FAILED"
         echo ""
-        echo "✅ Ready to provision Vultr for Docker build"
+        echo "✅ Ready to provision external CPU for Docker build"
         echo ""
         return 0
     else
@@ -49,7 +49,7 @@ print_summary() {
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  RunPod Spot Preflight - Validate Before Vultr             ║"
-echo "║  Cost: ~$0.50 (10 min) vs $2.50+/hr on Vultr                ║"
+echo "║  Cost: ~$0.50 (10 min) vs $2.50+/hr on external CPU                ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -338,18 +338,18 @@ log "[10/10] Cost estimate..."
 echo ""
 echo "Estimated costs for full build:"
 echo "  • RunPod spot (validation):    ~\$0.50 (10 min)"
-echo "  • Vultr GPU (build):           ~\$10-15 (4-6 hrs)"
+echo "  • External CPU (build):           ~\$10-15 (4-6 hrs)"
 echo "  • GHCR storage:                Free (public)"
 echo "  • Total:                       ~\$10.50-15.50"
 echo ""
 
 if [ $CHECKS_FAILED -eq 0 ]; then
-    echo "✅ Ready to provision Vultr"
+    echo "✅ Ready to provision external CPU"
     echo ""
     echo "Next steps:"
-    echo "  1. Provision Vultr GPU instance (CUDA 13.1+ capable)"
-    echo "  2. SSH into Vultr"
-    echo "  3. Run: ./vultr_full_build.sh --skip-preflight"
+    echo "  1. Provision External CPU instance (CUDA 13.1+ capable)"
+    echo "  2. SSH into external CPU"
+    echo "  3. Run: ./runpod_build.sh --skip-preflight"
 else
     echo "❌ Fix failed checks before provisioning Vultr"
     echo ""
