@@ -98,7 +98,7 @@ esac
 # ============================================
 # CHECK 1: Environment Variables
 # ============================================
-log "[1/10] Checking environment variables..."
+log "[1/12] Checking environment variables..."
 
 MISSING_VARS=()
 
@@ -138,7 +138,7 @@ fi
 # ============================================
 # CHECK 2: GitHub Token Validation
 # ============================================
-log "[2/10] Validating GitHub token..."
+log "[2/12] Validating GitHub token..."
 
 if [ -z "${GITHUB_TOKEN:-}" ]; then
     fail "GITHUB_AUTH" "Cannot validate token - GITHUB_TOKEN not set"
@@ -193,7 +193,7 @@ fi
 # ============================================
 # CHECK 3: Docker Daemon
 # ============================================
-log "[3/10] Checking Docker..."
+log "[3/12] Checking Docker..."
 
 if ! command -v docker &>/dev/null; then
     fail "DOCKER" "Docker not installed"
@@ -215,7 +215,7 @@ fi
 # ============================================
 # CHECK 4: NVIDIA GPU & Drivers
 # ============================================
-log "[4/10] Checking NVIDIA GPU..."
+log "[4/12] Checking NVIDIA GPU..."
 
 if ! command -v nvidia-smi &>/dev/null; then
     fail "NVIDIA" "nvidia-smi not found - NVIDIA drivers not installed"
@@ -252,7 +252,7 @@ fi
 # ============================================
 # CHECK 5: CUDA Toolkit
 # ============================================
-log "[5/10] Checking CUDA toolkit..."
+log "[5/12] Checking CUDA toolkit..."
 
 if ! command -v nvcc &>/dev/null; then
     fail "CUDA" "nvcc not found - CUDA toolkit not installed"
@@ -276,7 +276,7 @@ fi
 # ============================================
 # CHECK 6: Docker NVIDIA Runtime
 # ============================================
-log "[6/10] Checking Docker NVIDIA runtime..."
+log "[6/12] Checking Docker NVIDIA runtime..."
 
 if [ "${CHECK_STATUS[DOCKER]:-}" != "passed" ] || [ "${CHECK_STATUS[NVIDIA]:-}" != "passed" ]; then
     warn "Skipping NVIDIA runtime check (prerequisites not met)"
@@ -302,7 +302,7 @@ fi
 # ============================================
 # CHECK 7: Disk Space
 # ============================================
-log "[7/10] Checking disk space..."
+log "[7/12] Checking disk space..."
 
 log "Checking storage locations for environment: $ENVIRONMENT"
 for storage_type in "${!STORAGE_PATHS[@]}"; do
@@ -333,7 +333,7 @@ fi
 # ============================================
 # CHECK 8: Memory
 # ============================================
-log "[8/10] Checking memory..."
+log "[8/12] Checking memory..."
 
 if command -v free &>/dev/null; then
     MEM_TOTAL=$(free -g | awk '/^Mem:/{print $2}')
@@ -357,7 +357,7 @@ fi
 # ============================================
 # CHECK 9: Network Connectivity
 # ============================================
-log "[9/10] Checking network connectivity..."
+log "[9/12] Checking network connectivity..."
 
 NETWORK_OK=true
 
@@ -391,7 +391,7 @@ fi
 # ============================================
 # CHECK 10: GHCR Authentication
 # ============================================
-log "[10/10] Checking GHCR authentication..."
+log "[10/12] Checking GHCR authentication..."
 
 if [ "${CHECK_STATUS[GITHUB_AUTH]:-}" != "passed" ] || [ "${CHECK_STATUS[DOCKER]:-}" != "passed" ]; then
     warn "Skipping GHCR auth check (prerequisites not met)"
@@ -419,6 +419,74 @@ else
         echo "  3. Package permissions granted at:"
         echo "     https://github.com/users/$GITHUB_USER/packages/container/isaac-sim-6/settings"
     fi
+fi
+
+# ============================================
+# CHECK 11: S3 Build Artifact (for GH workflow)
+# ============================================
+log "[11/12] Checking S3 build artifacts..."
+
+S3_BUCKET="${S3_BUCKET:-isaac-sim-6-0-dev}"
+S3_PREFIX="${S3_PREFIX:-builds}"
+
+# Check if AWS credentials are available
+if [ -z "${AWS_ACCESS_KEY_ID:-}" ] && [ -z "${AWS_PROFILE:-}" ]; then
+    warn "AWS credentials not set - cannot verify S3 artifacts"
+else
+    # List available builds
+    S3_BUILDS=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" 2>/dev/null || echo "")
+
+    if [ -z "$S3_BUILDS" ]; then
+        warn "No builds found in s3://${S3_BUCKET}/${S3_PREFIX}/"
+    else
+        pass "S3 bucket accessible"
+
+        # Check for specific build
+        if echo "$S3_BUILDS" | grep -q "isaac-sim-build-.*\.tar\.gz"; then
+            pass "Build artifacts found in S3"
+            echo "$S3_BUILDS" | grep "isaac-sim-build" | head -5 | sed 's/^/    /'
+        else
+            warn "No isaac-sim-build-*.tar.gz found"
+        fi
+    fi
+fi
+
+# ============================================
+# CHECK 12: GHCR Image Manifest (for RunPod)
+# ============================================
+log "[12/12] Checking GHCR image accessibility..."
+
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+    warn "GITHUB_TOKEN not set - cannot verify GHCR image"
+else
+    # Test if we can access the specific image manifest
+    GHCR_IMAGE="ghcr.io/explicitcontextualunderstanding/isaac-sim-6"
+
+    MANIFEST_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+        "https://ghcr.io/v2/${GHCR_IMAGE}/manifests/latest" 2>/dev/null || echo "000")
+
+    case $MANIFEST_RESPONSE in
+    200)
+        pass "GHCR image accessible: ${GHCR_IMAGE}:latest"
+        CHECK_STATUS["GHCR_IMAGE"]=passed
+        ;;
+    401)
+        warn "GHCR auth required - token may need 'read:packages' scope"
+        echo "  Run: curl -sI -H 'Authorization: Bearer \$GITHUB_TOKEN' \\"
+        echo "    'https://ghcr.io/v2/${GHCR_IMAGE}/manifests/latest'"
+        CHECK_STATUS["GHCR_IMAGE"]=warning
+        ;;
+    404)
+        warn "GHCR image not found: ${GHCR_IMAGE}:latest"
+        CHECK_STATUS["GHCR_IMAGE"]=warning
+        ;;
+    *)
+        warn "GHCR image check returned HTTP $MANIFEST_RESPONSE"
+        CHECK_STATUS["GHCR_IMAGE"]=warning
+        ;;
+    esac
 fi
 
 # ============================================
