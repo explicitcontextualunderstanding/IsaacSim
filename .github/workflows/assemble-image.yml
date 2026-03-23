@@ -61,7 +61,32 @@ jobs:
           echo "Checking S3 bucket: ${S3_BUCKET}"
           aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" | head -20
 
-      - name: Download build from S3
+      - name: Validate build artifact exists
+        run: |
+          S3_BUILD="s3://${S3_BUCKET}/${S3_PREFIX}/isaac-sim-build-${BUILD_TAG}.tar.gz"
+          S3_MANIFEST="s3://${S3_BUCKET}/${S3_PREFIX}/manifest-${BUILD_TAG}.json"
+          
+          # Check build exists
+          if ! aws s3 ls "$S3_BUILD" &>/dev/null; then
+            echo "ERROR: Build artifact not found: $S3_BUILD"
+            echo "Available builds:"
+            aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/"
+            exit 1
+          fi
+          echo "✓ Build artifact exists"
+          
+          # Check manifest exists
+          if ! aws s3 ls "$S3_MANIFEST" &>/dev/null; then
+            echo "ERROR: Manifest not found: $S3_MANIFEST"
+            exit 1
+          fi
+          echo "✓ Manifest exists"
+          
+          # Get file sizes
+          BUILD_SIZE=$(aws s3 ls "$S3_BUILD" | awk '{print $3}')
+          echo "Build size: $BUILD_SIZE bytes"
+
+      - name: Download and validate build artifact
         run: |
           S3_URL="s3://${S3_BUCKET}/${S3_PREFIX}/isaac-sim-build-${BUILD_TAG}.tar.gz"
           echo "Downloading from: ${S3_URL}"
@@ -69,10 +94,22 @@ jobs:
           # Download build artifact
           aws s3 cp "${S3_URL}" "./isaac-sim-build.tar.gz"
           
-          # Verify download
+          # Validate size (minimum 1GB for a valid Isaac Sim build)
           BUILD_SIZE=$(stat -c%s "./isaac-sim-build.tar.gz" 2>/dev/null || stat -f%z "./isaac-sim-build.tar.gz" 2>/dev/null)
           BUILD_SIZE_MB=$((BUILD_SIZE / 1024 / 1024))
-          echo "Downloaded: ${BUILD_SIZE_MB}MB"
+          
+          if [ $BUILD_SIZE -lt 1073741824 ]; then
+            echo "ERROR: Build artifact too small (${BUILD_SIZE_MB}MB). Expected >1GB"
+            exit 1
+          fi
+          echo "✓ Build artifact valid: ${BUILD_SIZE_MB}MB"
+          
+          # Verify tar is not corrupt
+          if ! tar tzf ./isaac-sim-build.tar.gz &>/dev/null; then
+            echo "ERROR: Build artifact is corrupt (cannot read tar)"
+            exit 1
+          fi
+          echo "✓ Build artifact is valid tar.gz"
           
           # Also download manifest if exists
           MANIFEST_URL="s3://${S3_BUCKET}/${S3_PREFIX}/manifest-${BUILD_TAG}.json"
@@ -80,6 +117,8 @@ jobs:
             aws s3 cp "${MANIFEST_URL}" "./manifest.json"
             echo "Build info:"
             cat manifest.json | jq . || cat manifest.json
+          else
+            echo "WARNING: Manifest not found, continuing without build metadata"
           fi
 
       - name: Set up Docker Buildx
@@ -147,6 +186,9 @@ jobs:
           USER isaac-sim
           
           RUN mkdir -p /isaac-sim/.nvidia-omniverse/config
+          
+          # Verify build contains expected binaries
+          RUN ls -la /isaac-sim/_build/linux-x86_64/release/ | head -20
           
           ENTRYPOINT ["/bin/bash"]
           CMD ["-c", "echo 'Isaac Sim 6.0 ready' && sleep infinity"]
